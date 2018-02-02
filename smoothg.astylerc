@@ -1,0 +1,40 @@
+# BHEADER ####################################################################
+#
+# Copyright (c) 2018, Lawrence Livermore National Security, LLC.
+# Produced at the Lawrence Livermore National Laboratory.
+# LLNL-CODE-745247. All Rights reserved. See file COPYRIGHT for details.
+#
+# This file is part of smoothG.For more information and source code
+# availability, see https://www.github.com/llnl/smoothG.
+#
+# smoothG is free software; you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License (as published by the Free
+# Software Foundation) version 2.1 dated February 1999.
+#
+#################################################################### EHEADER #
+
+# Modification of MFEM formatting options for Artistic Style
+--style=allman
+--indent=spaces=4
+--keep-one-line-statements
+--keep-one-line-blocks
+--pad-header
+--max-code-length=100
+--max-instatement-indent=80
+--min-conditional-indent=0
+--indent-col1-comments
+--indent-labels
+#--break-after-logical
+--indent-switches
+--convert-tabs
+--lineend=linux
+--suffix=none
+--preserve-date
+--formatted
+#--break-blocks
+--pad-oper
+--pad-comma
+--align-pointer=type
+--align-reference=type
+#--indent-preproc-cond
+#--indent-classes

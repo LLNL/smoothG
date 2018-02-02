@@ -1,0 +1,17 @@
+build/
+
+*.sh~
+*.cpp~
+*.hpp~
+*.txt~
+.gitignore~
+*.py~
+*.in~
+*.md~
+*.swp
+
+GPATH
+GRTAGS
+GTAGS
+mfem-link
+parelag-link
