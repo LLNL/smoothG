@@ -21,17 +21,22 @@
 #ifndef __MIXEDLAPLACIANSOLVER_HPP__
 #define __MIXEDLAPLACIANSOLVER_HPP__
 
+#include "mfem.hpp"
+#include "utilities.hpp"
+
 namespace smoothg
 {
 
 /**
    @brief Abstract base class for solvers of graph Laplacian problems
 */
-class MixedLaplacianSolver
+class MixedLaplacianSolver : public mfem::Operator
 {
 public:
-    MixedLaplacianSolver() {}
-    virtual ~MixedLaplacianSolver() {}
+    MixedLaplacianSolver(const mfem::Array<int>& block_offsets);
+    MixedLaplacianSolver() = delete;
+
+    virtual ~MixedLaplacianSolver() = default;
 
     /**
        Solve the graph Laplacian problem
@@ -39,26 +44,30 @@ public:
        The BlockVectors here are in "dof" numbering, rather than "truedof" numbering.
        That is, dofs on processor boundaries are *repeated* in the vectors that
        come into and go out of this method.
-
-       @todo should be const
     */
-    virtual void solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) = 0;
+    virtual void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
+    virtual void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
     ///@name Set solver parameters
     ///@{
-    void SetPrintLevel(int print_level) { print_level_ = print_level; }
-    void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
-    void SetRelTol(double rtol) { rtol_ = rtol; }
-    void SetAbsTol(double atol) { atol_ = atol; }
+    virtual void SetPrintLevel(int print_level) { print_level_ = print_level; }
+    virtual void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
+    virtual void SetRelTol(double rtol) { rtol_ = rtol; }
+    virtual void SetAbsTol(double atol) { atol_ = atol; }
     ///@}
 
     ///@name Get results of iterative solve
     ///@{
-    int GetNumIterations() const { return num_iterations_; }
-    int GetNNZ() const { return nnz_; }
-    double GetTiming() const { return timing_; }
+    virtual int GetNumIterations() const { return num_iterations_; }
+    virtual int GetNNZ() const { return nnz_; }
+    virtual double GetTiming() const { return timing_; }
     ///@}
+
 protected:
+    std::unique_ptr<mfem::BlockVector> rhs_;
+    std::unique_ptr<mfem::BlockVector> sol_;
+
     // default linear solver options
     int print_level_ = 0;
     int max_num_iter_ = 5000;

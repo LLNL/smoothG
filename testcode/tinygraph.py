@@ -85,7 +85,21 @@ def get_weights():
     return [1, 2, 3, 4, 5, 6, 7]
 
 
-def get_weighted_mixed(weights, unique=False):
+def get_w_block():
+    """
+    This is the w block such that A = W + L, where L is
+    the graph laplacian
+    """
+    w = np.array([[ 1.,  0.,  0., 0., 0., 0.],
+                  [ 0.,  2.,  0., 0., 0., 0.],
+                  [ 0.,  0.,  3., 0., 0., 0.],
+                  [ 0.,  0.,  0., 4., 0., 0.],
+                  [ 0.,  0.,  0., 0., 5., 0.],
+                  [ 0.,  0.,  0., 0., 0., 6.]])
+    return w
+
+
+def get_full_mixed(W, weights, unique=False):
     """
     Builds mixed system, unique specifies whether to
     put something in the usually zero block to mimic
@@ -97,15 +111,27 @@ def get_weighted_mixed(weights, unique=False):
     inv_weight = [1.0 / abs(w) for w in weights]
     M = np.diag(inv_weight)
     D = DT.T
-    W = np.zeros((nvertices, nvertices))
 
-    if unique:
-        W[0, 0] = 1.0
+    W_norm = np.linalg.norm(W)
+    tol = 1e-8
+    if unique and W_norm < tol:
+        W[0, 0] = -1.0
 
     a = np.bmat([[M, DT],
-                 [D, W]])
+                 [D, -W]])
 
     return a
+
+
+def get_weighted_mixed(weights, unique=False):
+    """
+    Builds mixed system, unique specifies whether to
+    put something in the usually zero block to mimic
+    the TTB matrix in the C++ code.
+    """
+    W = np.zeros((6, 6))
+
+    return get_full_mixed(W, weights, unique)
 
 
 def get_mixed(unique=False):
@@ -151,34 +177,69 @@ def solve_constrained():
 
 def solve_modified():
     a = get_modified_mat()
-    b = np.ones((6,))
-    x = normalize(np.linalg.solve(a, b))
-    print("x:", x)
+
+    solve_primal_system(a, normalize_sol=True)
 
 
 def solve_mixed():
     a = get_mixed(unique=True)
-    b = np.zeros(7 + 6)
-    b[7:] = 1.0
 
-    x = np.linalg.solve(a, b)
-    print("x:", x)
-
-    pressure_part = x[7:]
-    # print(normalize(pressure_part))
-    printvec(normalize(pressure_part))
+    solve_mixed_system(a, normalize_sol=True)
 
 
 def solve_weighted_modified():
     a = get_weighted_gl_mat()
     a[0, 0] -= 1.0
-    b = np.ones((6,))
-    x = normalize(np.linalg.solve(a, b))
-    print("x:", x)
+
+    solve_primal_system(a, normalize_sol=True)
 
 
 def solve_weighted_mixed():
     a = get_weighted_mixed(get_weights(), unique=True)
+    solve_mixed_system(a, normalize_sol=True)
+
+
+def solve_w_block_modified():
+    l = get_gl_mat()
+    w = get_w_block()
+    a = w + l
+
+    solve_primal_system(a, normalize_sol=False)
+
+
+def solve_w_block_mixed():
+    weights = np.ones(7)
+
+    a = get_full_mixed(get_w_block(), weights, unique=False)
+
+    solve_mixed_system(a, normalize_sol=False)
+
+
+def solve_full_modified():
+    l = get_weighted_gl_mat()
+    w = get_w_block()
+    a = w + l
+
+    solve_primal_system(a, normalize_sol=False)
+
+
+def solve_full_mixed():
+    a = get_full_mixed(get_w_block(), get_weights(), unique=False)
+
+    solve_mixed_system(a, normalize_sol=False)
+
+
+def solve_primal_system(a, normalize_sol):
+    b = np.ones((a.shape[0],))
+    x = np.linalg.solve(a, b)
+
+    if normalize_sol:
+        x = normalize(x)
+
+    print("x:", x)
+
+
+def solve_mixed_system(a, normalize_sol):
     b = np.zeros(7 + 6)
     b[7:] = 1.0
 
@@ -186,8 +247,13 @@ def solve_weighted_mixed():
     print("x:", x)
 
     pressure_part = x[7:]
-    # print(normalize(pressure_part))
-    printvec(normalize(pressure_part))
+
+    if normalize_sol:
+        pressure_part = normalize(pressure_part)
+
+    print("x:", pressure_part)
+    printvec(pressure_part)
+
 
 
 def check_mats():
@@ -205,11 +271,21 @@ def check_mats():
 
 
 if __name__ == "__main__":
+    print("Regular:")
     solve_modified()
     solve_mixed()
 
+    print("Weighted:")
     solve_weighted_modified()
     solve_weighted_mixed()
+
+    print("W Block:")
+    solve_w_block_modified()
+    solve_w_block_mixed()
+
+    print("Weighted W Block:")
+    solve_full_modified()
+    solve_full_mixed()
 
     # solve_constrained()
     # check_mats()

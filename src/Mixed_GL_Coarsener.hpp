@@ -70,17 +70,26 @@ public:
 
     const mfem::SparseMatrix& get_Psigma() const;
     const mfem::SparseMatrix& get_Pu() const;
-    const std::vector<std::unique_ptr<mfem::DenseMatrix>>& get_CM_el() const;
+    const std::vector<mfem::DenseMatrix>& get_CM_el() const;
+    //const std::vector<std::unique_ptr<mfem::DenseMatrix>>& get_CM_el() const;
 
     /// Coarsen the (block) right-hand side by multiplying by \f$ P_\sigma, P_u \f$
     std::unique_ptr<mfem::BlockVector> coarsen_rhs(
         const mfem::BlockVector& rhs) const;
 
+    // Mixed form
+    void coarsen(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
+    void interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
+
+    // Primal form
+    void coarsen(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
+    void interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
+
     const mfem::SparseMatrix& construct_Agg_cvertexdof_table() const;
     const mfem::SparseMatrix& construct_Agg_cedgedof_table() const;
     const mfem::SparseMatrix& construct_face_facedof_table() const;
 
-    std::shared_ptr<mfem::HypreParMatrix>& get_face_dof_truedof_table() const;
+    const mfem::HypreParMatrix& get_face_dof_truedof_table() const;
 
     /**
         @brief Get the Array of offsets representing the block structure of
@@ -126,16 +135,29 @@ public:
         return std::move(CoarseD_);
     }
 
+    /**
+       @brief Get the coarse D matrix
+    */
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseW()
+    {
+        return std::move(CoarseW_);
+    }
+
+    /**
+       @brief Creates the matrix from coarse M, D, W
+    */
+    MixedMatrix GetCoarse();
+
 private:
     virtual void do_construct_coarse_subspace() = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;
-    void check_subspace_construction_(std::string objname) const
+    void check_subspace_construction_(const std::string& objname) const
     {
         if (!is_coarse_subspace_constructed_)
         {
-            throw std::runtime_error("Must first construct coarse subspaces!");
+            throw std::runtime_error("Must first construct coarse subspaces before using " + objname + "!");
         }
     }
 
@@ -149,15 +171,19 @@ protected:
     mfem::SparseMatrix Pu_;
 
     /// Some kind of element matrices for hybridization
-    std::vector<std::unique_ptr<mfem::DenseMatrix>> CM_el_;
+    //std::vector<std::unique_ptr<mfem::DenseMatrix>> CM_el_;
+    std::vector<mfem::DenseMatrix> CM_el_;
     mutable std::unique_ptr<mfem::Array<int>> coarseBlockOffsets_;
-    mutable std::shared_ptr<mfem::HypreParMatrix> face_dof_truedof_table_;
+    mutable std::unique_ptr<mfem::HypreParMatrix> face_dof_truedof_table_;
 
     /// Coarse D operator
     std::unique_ptr<mfem::SparseMatrix> CoarseD_;
 
     /// Coarse M operator
     std::unique_ptr<mfem::SparseMatrix> CoarseM_;
+
+    /// Coarse W operator
+    std::unique_ptr<mfem::SparseMatrix> CoarseW_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

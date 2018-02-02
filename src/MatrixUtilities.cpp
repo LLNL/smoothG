@@ -29,6 +29,170 @@ using std::unique_ptr;
 namespace smoothg
 {
 
+void Print(const mfem::DenseMatrix& mat, const std::string& label, std::ostream& out)
+{
+    const int old_precision = out.precision();
+    out.precision(5);
+
+    out << label << "\n";
+
+    for (int i = 0; i < mat.Height(); ++i)
+    {
+        for (int j = 0; j < mat.Width(); ++j)
+        {
+            out << std::setw(5) << mat(i, j) << " ";
+        }
+
+        out << "\n";
+    }
+
+    out.precision(old_precision);
+}
+
+void Print(const mfem::SparseMatrix& mat, const std::string& label, std::ostream& out)
+{
+    mfem::DenseMatrix dense(mat.Height(), mat.Width());
+    dense = 0.0;
+
+    for (int i = 0; i < mat.Height(); ++i)
+    {
+        for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; ++j)
+        {
+            dense(i, mat.GetJ()[j]) = mat.GetData()[j];
+        }
+    }
+
+    Print(dense, label, out);
+}
+
+
+mfem::SparseMatrix Transpose(const mfem::SparseMatrix& A)
+{
+    std::unique_ptr<mfem::SparseMatrix> A_t_ptr(mfem::Transpose(A));
+    mfem::SparseMatrix A_t;
+    A_t.Swap(*A_t_ptr);
+
+    return A_t;
+}
+
+mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B)
+{
+    std::unique_ptr<mfem::SparseMatrix> C_ptr(mfem::Mult(A, B));
+    mfem::SparseMatrix C;
+    C.Swap(*C_ptr);
+
+    return C;
+}
+
+mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
+{
+    // TODO(gelever1): Perform this more better
+
+    mfem::SparseMatrix out(mat.Height(), mat.Width());
+
+    for (int i = 0; i < mat.Height(); ++i)
+    {
+        for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; ++j)
+        {
+            const double val = mat.GetData()[j];
+            // if (std::fabs(val) > tol)
+            // Keep diagonal always??
+            if (std::fabs(val) > tol || i == mat.GetJ()[j])
+            {
+                out.Add(i, mat.GetJ()[j], val);
+            }
+        }
+    }
+
+    out.Finalize();
+
+    return out;
+}
+
+mfem::SparseMatrix TableToSparse(const mfem::Table& table)
+{
+    const int height = table.Size();
+    const int width = table.Width();
+    const int nnz = table.Size_of_connections();
+
+    int* i = new int[height + 1];
+    int* j = new int[nnz];
+    double* data = new double[nnz];
+
+    std::copy_n(table.GetI(), height + 1, i);
+    std::copy_n(table.GetJ(), nnz, j);
+    std::fill_n(data, nnz, 1.);
+
+    return mfem::SparseMatrix(i, j, data, height, width);
+}
+
+mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
+                          const mfem::HypreParMatrix& P)
+{
+    // TODO(gelever1): Remove const cast once mfem version update
+    unique_ptr<mfem::HypreParMatrix> RT(const_cast<mfem::HypreParMatrix&>(R).Transpose());
+    assert(RT);
+    unique_ptr<mfem::HypreParMatrix> AP(mfem::ParMult(const_cast<mfem::HypreParMatrix*>(&A),
+                                                      const_cast<mfem::HypreParMatrix*>(&P)));
+
+    mfem::HypreParMatrix* rap = mfem::ParMult(RT.get(), AP.get());
+    assert(rap);
+
+    rap->CopyRowStarts();
+    //rap->CopyColStarts();
+    hypre_ParCSRMatrixSetNumNonzeros(*rap);
+
+    return rap;
+}
+
+mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& P)
+{
+    return RAP(P, A, P);
+}
+
+void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
+{
+    int myid;
+    MPI_Comm_rank(comm, &myid);
+
+    int sizes[3];
+    if (myid == 0)
+    {
+        sizes[0] = mat.Height();
+        sizes[1] = mat.Width();
+        sizes[2] = mat.NumNonZeroElems();
+    }
+    MPI_Bcast(sizes, 3, MPI_INT, 0, comm);
+
+    int* I;
+    int* J;
+    double* Data;
+
+    if (myid == 0)
+    {
+        I = mat.GetI();
+        J = mat.GetJ();
+        Data = mat.GetData();
+    }
+    else
+    {
+        I = new int[sizes[0] + 1];
+        J = new int[sizes[2]];
+        Data = new double[sizes[2]];
+    }
+
+    MPI_Bcast(I, sizes[0] + 1, MPI_INT, 0, comm);
+    MPI_Bcast(J, sizes[2], MPI_INT, 0, comm);
+    MPI_Bcast(Data, sizes[2], MPI_DOUBLE, 0, comm);
+
+    if (myid != 0)
+    {
+        mfem::SparseMatrix tmp(I, J, Data, sizes[0], sizes[1]);
+        mat.Swap(tmp);
+    }
+}
+
+
 void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C)
 {
@@ -41,6 +205,35 @@ void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
         B.GetColumnReference(j, column_in);
         C.GetColumnReference(j, column_out);
         A.Mult(column_in, column_out);
+    }
+}
+
+void MultSparseDenseTranspose(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+                              mfem::DenseMatrix& C)
+{
+    MFEM_ASSERT(C.Width() == A.Height() && C.Height() == B.Width() &&
+                A.Width() == B.Height(), "incompatible dimensions");
+
+    const double* A_data = A.GetData();
+    const int* A_i = A.GetI();
+    const int* A_j = A.GetJ();
+
+    const int A_height = A.Height();
+    const int B_width = B.Width();
+
+    for (int k = 0; k < B_width; ++k)
+    {
+        for (int i = 0; i < A_height; ++i)
+        {
+            double val = 0.0;
+
+            for (int j = A_i[i]; j < A_i[i + 1]; ++j)
+            {
+                val += A_data[j] * B(A_j[j], k);
+            }
+
+            C(k, i) = val;
+        }
     }
 }
 
@@ -63,24 +256,21 @@ void Mult_a_VVt(const double a, const mfem::Vector& v, mfem::DenseMatrix& aVVt)
     }
 }
 
-void SetConstantValue(mfem::HypreParMatrix* pmat, double c)
+void SetConstantValue(mfem::HypreParMatrix& pmat, double c)
 {
-    hypre_CSRMatrix* Diag = ((hypre_ParCSRMatrix*) *pmat)->diag;
-    hypre_CSRMatrix* Offd = ((hypre_ParCSRMatrix*) *pmat)->offd;
-    double* Diag_data = hypre_CSRMatrixData(Diag);
-    double* Offd_data = hypre_CSRMatrixData(Offd);
-    std::fill_n(Diag_data, Diag->num_nonzeros, c);
-    std::fill_n(Offd_data, Offd->num_nonzeros, c);
+    pmat = c;
 }
 
-unique_ptr<mfem::SparseMatrix> PartitionToMatrix(
+mfem::SparseMatrix PartitionToMatrix(
     const mfem::Array<int>& partition, int nparts)
 {
     int nvertices = partition.Size();
     int* aggregate_vertex_i = new int[nparts + 1]();
     int* aggregate_vertex_j = new int[nvertices];
     double* aggregate_vertex_data = new double[nvertices];
+
     std::fill_n(aggregate_vertex_data, nvertices, 1.);
+
     for (int i = 0; i < nvertices; ++i)
         aggregate_vertex_i[partition[i] + 1]++;
     for (int i = 1; i < nparts; ++i)
@@ -92,12 +282,11 @@ unique_ptr<mfem::SparseMatrix> PartitionToMatrix(
         aggregate_vertex_i[i] = aggregate_vertex_i[i - 1];
     aggregate_vertex_i[0] = 0;
 
-    return make_unique<mfem::SparseMatrix>(
-               aggregate_vertex_i, aggregate_vertex_j, aggregate_vertex_data,
-               nparts, nvertices);
+    return mfem::SparseMatrix(aggregate_vertex_i, aggregate_vertex_j, aggregate_vertex_data,
+                              nparts, nvertices);
 }
 
-unique_ptr<mfem::SparseMatrix> SparseIdentity(int size)
+mfem::SparseMatrix SparseIdentity(int size)
 {
     int* I = new int[size + 1];
     std::iota(I, I + size + 1, 0);
@@ -106,18 +295,225 @@ unique_ptr<mfem::SparseMatrix> SparseIdentity(int size)
     double* Data = new double[size];
     std::fill_n(Data, size, 1.0);
 
-    return make_unique<mfem::SparseMatrix>(I, J, Data, size, size);
+    return mfem::SparseMatrix(I, J, Data, size, size);
 }
 
-unique_ptr<mfem::SparseMatrix> ExtractRowAndColumns(
+mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset, int col_offset)
+{
+    assert(rows >= 0);
+    assert(cols >= 0);
+    assert(row_offset <= rows);
+    assert(row_offset >= 0);
+    assert(col_offset <= cols);
+    assert(col_offset >= 0);
+
+    const int diag_size = std::min(rows - row_offset, cols - col_offset);
+
+    int* I = new int[rows + 1];
+    std::fill(I, I + row_offset, 0);
+    std::iota(I + row_offset, I + row_offset + diag_size, 0);
+    std::fill(I + row_offset + diag_size, I + rows + 1, diag_size);
+
+    int* J = new int[diag_size];
+    std::iota(J, J + diag_size, col_offset);
+    double* Data = new double[diag_size];
+    std::fill_n(Data, diag_size, 1.0);
+
+    return mfem::SparseMatrix(I, J, Data, rows, cols);
+}
+
+mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect)
+{
+    if (vect.Size() == 0)
+    {
+        return mfem::SparseMatrix();
+    }
+
+    const int size = vect.Size();
+
+    int* I = new int[size + 1];
+    int* J = new int[size];
+    double* Data = new double[size];
+
+    for (int i = 0; i < size; ++i)
+    {
+        Data[i] = vect[i];
+    }
+
+    std::iota(I, I + size + 1, 0);
+    std::iota(J, J + size, 0);
+
+    return mfem::SparseMatrix(I, J, Data, size, size);
+}
+
+// Modified from MFEM
+mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::HypreParMatrix& B_ref)
+{
+    hypre_ParCSRMatrix* A(const_cast<mfem::HypreParMatrix&>(A_ref));
+    hypre_ParCSRMatrix* B(const_cast<mfem::HypreParMatrix&>(B_ref));
+
+    MPI_Comm            comm   = hypre_ParCSRMatrixComm(A);
+    hypre_CSRMatrix*    A_diag = hypre_ParCSRMatrixDiag(A);
+    hypre_CSRMatrix*    A_offd = hypre_ParCSRMatrixOffd(A);
+    HYPRE_Int*          A_cmap = hypre_ParCSRMatrixColMapOffd(A);
+    HYPRE_Int           A_cmap_size = hypre_CSRMatrixNumCols(A_offd);
+    hypre_CSRMatrix*    B_diag = hypre_ParCSRMatrixDiag(B);
+    hypre_CSRMatrix*    B_offd = hypre_ParCSRMatrixOffd(B);
+    HYPRE_Int*          B_cmap = hypre_ParCSRMatrixColMapOffd(B);
+    HYPRE_Int           B_cmap_size = hypre_CSRMatrixNumCols(B_offd);
+    hypre_ParCSRMatrix* C;
+    hypre_CSRMatrix*    C_diag;
+    hypre_CSRMatrix*    C_offd;
+    HYPRE_Int*          C_cmap;
+    HYPRE_Int           im;
+    HYPRE_Int           cmap_differ;
+
+    /* Check if A_cmap and B_cmap are the same. */
+    cmap_differ = 0;
+    if (A_cmap_size != B_cmap_size)
+    {
+        cmap_differ = 1; /* A and B have different cmap_size */
+    }
+    else
+    {
+        for (im = 0; im < A_cmap_size; im++)
+        {
+            if (A_cmap[im] != B_cmap[im])
+            {
+                cmap_differ = 1; /* A and B have different cmap arrays */
+                break;
+            }
+        }
+    }
+
+    if ( cmap_differ == 0 )
+    {
+        /* A and B have the same column mapping for their off-diagonal blocks so
+           we can sum the diagonal and off-diagonal blocks separately and reduce
+           temporary memory usage. */
+
+        /* Add diagonals, off-diagonals, copy cmap. */
+        C_diag = hypre_CSRMatrixAdd(A_diag, B_diag);
+        if (!C_diag)
+        {
+            return NULL; /* error: A_diag and B_diag have different dimensions */
+        }
+        C_offd = hypre_CSRMatrixAdd(A_offd, B_offd);
+        if (!C_offd)
+        {
+            hypre_CSRMatrixDestroy(C_diag);
+            return NULL; /* error: A_offd and B_offd have different dimensions */
+        }
+        /* copy A_cmap -> C_cmap */
+        C_cmap = hypre_TAlloc(HYPRE_Int, A_cmap_size);
+        for (im = 0; im < A_cmap_size; im++)
+        {
+            C_cmap[im] = A_cmap[im];
+        }
+
+        C = hypre_ParCSRMatrixCreate(comm,
+                                     hypre_ParCSRMatrixGlobalNumRows(A),
+                                     hypre_ParCSRMatrixGlobalNumCols(A),
+                                     hypre_ParCSRMatrixRowStarts(A),
+                                     hypre_ParCSRMatrixColStarts(A),
+                                     hypre_CSRMatrixNumCols(C_offd),
+                                     hypre_CSRMatrixNumNonzeros(C_diag),
+                                     hypre_CSRMatrixNumNonzeros(C_offd));
+
+        /* In C, destroy diag/offd (allocated by Create) and replace them with
+        C_diag/C_offd. */
+        hypre_CSRMatrixDestroy(hypre_ParCSRMatrixDiag(C));
+        hypre_CSRMatrixDestroy(hypre_ParCSRMatrixOffd(C));
+        hypre_ParCSRMatrixDiag(C) = C_diag;
+        hypre_ParCSRMatrixOffd(C) = C_offd;
+
+        hypre_ParCSRMatrixColMapOffd(C) = C_cmap;
+    }
+    else
+    {
+        /* A and B have different column mappings for their off-diagonal blocks so
+        we need to use the column maps to create full-width CSR matricies. */
+
+        int  ierr = 0;
+        hypre_CSRMatrix* csr_A;
+        hypre_CSRMatrix* csr_B;
+        hypre_CSRMatrix* csr_C_temp;
+
+        /* merge diag and off-diag portions of A */
+        csr_A = hypre_MergeDiagAndOffd(A);
+
+        /* merge diag and off-diag portions of B */
+        csr_B = hypre_MergeDiagAndOffd(B);
+
+        /* add A and B */
+        csr_C_temp = hypre_CSRMatrixAdd(csr_A, csr_B);
+
+        /* delete CSR versions of A and B */
+        ierr += hypre_CSRMatrixDestroy(csr_A);
+        ierr += hypre_CSRMatrixDestroy(csr_B);
+
+        /* create a new empty ParCSR matrix to contain the sum */
+        C = hypre_ParCSRMatrixCreate(hypre_ParCSRMatrixComm(A),
+                                     hypre_ParCSRMatrixGlobalNumRows(A),
+                                     hypre_ParCSRMatrixGlobalNumCols(A),
+                                     hypre_ParCSRMatrixRowStarts(A),
+                                     hypre_ParCSRMatrixColStarts(A),
+                                     0, 0, 0);
+
+        /* split C into diag and off-diag portions */
+        /* FIXME: GenerateDiagAndOffd() uses an int array of size equal to the
+           number of columns in csr_C_temp which is the global number of columns
+           in A and B. This does not scale well. */
+        ierr += GenerateDiagAndOffd(csr_C_temp, C,
+                                    hypre_ParCSRMatrixFirstColDiag(A),
+                                    hypre_ParCSRMatrixLastColDiag(A));
+
+        /* delete CSR version of C */
+        ierr += hypre_CSRMatrixDestroy(csr_C_temp);
+
+        assert(ierr == 0);
+    }
+
+    /* hypre_ParCSRMatrixSetNumNonzeros(A); */
+
+    /* Make sure that the first entry in each row is the diagonal one. */
+    hypre_CSRMatrixReorder(hypre_ParCSRMatrixDiag(C));
+
+    /* C owns diag, offd, and cmap. */
+    hypre_ParCSRMatrixSetDataOwner(C, 1);
+    /* C does not own row and column starts. */
+    hypre_ParCSRMatrixSetRowStartsOwner(C, 0);
+    hypre_ParCSRMatrixSetColStartsOwner(C, 0);
+
+    return new mfem::HypreParMatrix(C);
+}
+
+double MaxNorm(const mfem::HypreParMatrix& A)
+{
+    mfem::SparseMatrix diag;
+    mfem::SparseMatrix offd;
+
+    HYPRE_Int* junk_map;
+    A.GetDiag(diag);
+    A.GetOffd(offd, junk_map);
+
+    double local_max = std::max(diag.MaxNorm(), offd.MaxNorm());
+
+    double global_max;
+    MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, A.GetComm());
+
+    return global_max;
+}
+
+mfem::SparseMatrix ExtractRowAndColumns(
     const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
     const mfem::Array<int>& cols, mfem::Array<int>& colMapper,
     bool colMapper_not_filled)
 {
     if (rows.Size() == 0 || cols.Size() == 0)
     {
-        auto out = make_unique<mfem::SparseMatrix>(rows.Size(), cols.Size());
-        out->Finalize();
+        mfem::SparseMatrix out(rows.Size(), cols.Size());
+        out.Finalize();
         return out;
     }
 
@@ -130,8 +526,10 @@ unique_ptr<mfem::SparseMatrix> ExtractRowAndColumns(
     assert(colMapper.Size() >= A.Width());
 
     if (colMapper_not_filled)
+    {
         for (int jcol(0); jcol < cols.Size(); ++jcol)
             colMapper[cols[jcol]] = jcol;
+    }
 
     const int nrow_sub = rows.Size();
     const int ncol_sub = cols.Size();
@@ -140,14 +538,16 @@ unique_ptr<mfem::SparseMatrix> ExtractRowAndColumns(
     i_sub[0] = 0;
 
     // Find the number of nnz.
-    int currentRow(-1);
-    int nnz(0);
-    for (int i(0); i < nrow_sub; ++i)
+    int nnz = 0;
+    for (int i = 0; i < nrow_sub; ++i)
     {
-        currentRow = rows[i];
-        for (const int* it = j_A + i_A[currentRow]; it != j_A + i_A[currentRow + 1]; ++it)
-            if ( colMapper[*it] >= 0)
+        const int current_row = rows[i];
+
+        for (int j = i_A[current_row]; j < i_A[current_row + 1]; ++j)
+        {
+            if (colMapper[j_A[j]] >= 0)
                 ++nnz;
+        }
 
         i_sub[i + 1] = nnz;
     }
@@ -157,28 +557,33 @@ unique_ptr<mfem::SparseMatrix> ExtractRowAndColumns(
     double* a_sub = new double[nnz];
 
     // Fill in the matrix
-    const double* it_a;
-    int* it_j_sub = j_sub;
-    double* it_a_sub = a_sub;
+    int count = 0;
     for (int i(0); i < nrow_sub; ++i)
     {
-        currentRow = rows[i];
-        it_a = a_A + i_A[currentRow];
-        for (const int* it = j_A + i_A[currentRow]; it != j_A + i_A[currentRow + 1]; ++it, ++it_a)
-            if ( colMapper[*it] >= 0)
+        const int current_row = rows[i];
+
+        for (int j = i_A[current_row]; j < i_A[current_row + 1]; ++j)
+        {
+            if (colMapper[j_A[j]] >= 0)
             {
-                *(it_j_sub++) = colMapper[*it];
-                *(it_a_sub++) = *it_a;
+                j_sub[count] = colMapper[j_A[j]];
+                a_sub[count] = a_A[j];
+                count++;
             }
+        }
     }
+
+    assert(count == nnz);
 
     // Restore colMapper so it can be reused other times!
     if (colMapper_not_filled)
+    {
         for (int jcol(0); jcol < cols.Size(); ++jcol)
             colMapper[cols[jcol]] = -1;
+    }
 
-    return make_unique<mfem::SparseMatrix>(i_sub, j_sub, a_sub,
-                                           nrow_sub, ncol_sub);
+    return mfem::SparseMatrix(i_sub, j_sub, a_sub,
+                              nrow_sub, ncol_sub);
 }
 
 void ExtractSubMatrix(
@@ -196,17 +601,16 @@ void ExtractSubMatrix(
     A_sub.SetSize(nrow, ncol);
     A_sub = 0.;
 
-    int irow, j;
-    for (int i = 0; i < nrow; i++)
+    for (int i = 0; i < nrow; ++i)
     {
-        irow = rows[i];
-        const double* a_it = A_data + A_i[irow];
-        for (const int* j_it = A_j + A_i[irow]; j_it != A_j + A_i[irow + 1];
-             ++j_it, ++a_it)
+        const int row = rows[i];
+
+        for (int j = A_i[row]; j < A_i[row + 1]; ++j)
         {
-            j = colMapper[*j_it];
-            if (j >= 0)
-                A_sub(i, j) = *a_it;
+            const int col = colMapper[A_j[j]];
+
+            if (col >= 0)
+                A_sub(i, col) = A_data[j];
         }
     }
 }
@@ -384,6 +788,7 @@ void GenerateOffsets(MPI_Comm comm, int N, HYPRE_Int loc_sizes[],
     int num_procs, myid;
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
+
     if (HYPRE_AssumedPartitionCheck())
     {
         mfem::Array<HYPRE_Int> temp(N);
@@ -424,6 +829,14 @@ void GenerateOffsets(MPI_Comm comm, int N, HYPRE_Int loc_sizes[],
     }
 }
 
+void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offsets)
+{
+    mfem::Array<HYPRE_Int>* start[1] = {&offsets};
+    const int N = 1;
+
+    GenerateOffsets(comm, N, &local_size, start);
+}
+
 // This constructor assumes M to be diagonal
 LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                                            const mfem::SparseMatrix& D)
@@ -442,23 +855,27 @@ LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::Vector& M,
 
 void LocalGraphEdgeSolver::Init(double* M_data, const mfem::SparseMatrix& D)
 {
-    MinvDT_.reset( Transpose(D) );
+    mfem::SparseMatrix DT(smoothg::Transpose(D));
+    MinvDT_.Swap(DT);
 
     // Compute M^{-1}D^T (assuming M is diagonal)
-    int* DT_i = MinvDT_->GetI();
-    double* DT_data = MinvDT_->GetData();
-    double scale;
-    for (int i = 0; i < MinvDT_->Height(); i++)
+    int* DT_i = MinvDT_.GetI();
+    double* DT_data = MinvDT_.GetData();
+
+    for (int i = 0; i < MinvDT_.Height(); i++)
     {
-        scale = M_data[i];
+        const double scale = M_data[i];
         for (int j = DT_i[i]; j < DT_i[i + 1]; j++)
             DT_data[j] /= scale;
     }
-    A_.reset( mfem::Mult(D, *MinvDT_) );
+
+    // TODO(gelever1): change all the swaps once mfem version > PR #352
+    unique_ptr<mfem::SparseMatrix> tmp(mfem::Mult(D, MinvDT_));
+    A_.Swap(*tmp);
 
     // Eliminate the first unknown so that A_ is invertible
-    A_->EliminateRowCol(0);
-    solver_ = make_unique<mfem::UMFPackSolver>(*A_);
+    A_.EliminateRowCol(0);
+    solver_ = make_unique<mfem::UMFPackSolver>(A_);
 }
 
 void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::
@@ -470,7 +887,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::
     double rhs_0 = rhs_copy(0);
     rhs_copy(0) = 0.;
 
-    mfem::Vector sol_u_tmp(A_->Size());
+    mfem::Vector sol_u_tmp(A_.Size());
     sol_u_tmp = 0.;
     solver_->Mult(rhs_copy, sol_u_tmp);
 
@@ -478,7 +895,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::
     rhs_copy(0) = rhs_0;
 
     // SparseMatrix::Mult asserts that sol.Size() should equal MinvDT_->Height()
-    MinvDT_->Mult(sol_u_tmp, sol_sigma);
+    MinvDT_.Mult(sol_u_tmp, sol_sigma);
 }
 
 void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
@@ -498,7 +915,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
     rhs_copy(0) = rhs_0;
 
     // SparseMatrix::Mult asserts that sol.Size() should equal MinvDT_->Height()
-    MinvDT_->Mult(sol_u, sol_sigma);
+    MinvDT_.Mult(sol_u, sol_sigma);
 }
 
 double InnerProduct(const mfem::Vector& weight, const mfem::Vector& u,

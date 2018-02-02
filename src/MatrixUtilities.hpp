@@ -23,9 +23,51 @@
 
 #include "mfem.hpp"
 #include <memory>
+#include <iomanip>
 
 namespace smoothg
 {
+
+/**
+    @brief Prints dense matrices
+*/
+void Print(const mfem::DenseMatrix& mat, const std::string& label = "",
+           std::ostream& out = std::cout);
+void Print(const mfem::SparseMatrix& mat, const std::string& label = "",
+           std::ostream& out = std::cout);
+
+/**
+    @brief Remove small entries from a matrix
+*/
+mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol = 1e-8);
+
+
+/**
+    @brief Creates a sparse matrix from a table
+*/
+mfem::SparseMatrix TableToSparse(const mfem::Table& table);
+
+// Rap by hand that seems to be faster than the mfem rap but uses more memory
+// Use mfem::RAP if memory is more important than cycles
+mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
+                          const mfem::HypreParMatrix& P);
+mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& P);
+
+
+/**
+    @brief Broadcast a SparseMatrix on processor 0 to all other processors
+*/
+void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat);
+
+/**
+    @brief Compute transpose of a matrix
+*/
+mfem::SparseMatrix Transpose(const mfem::SparseMatrix& A);
+
+/**
+    @brief Multiply two sparse matrices C = A * B
+*/
+mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B);
 
 /**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
@@ -33,6 +75,13 @@ namespace smoothg
 */
 void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C);
+
+/**
+    @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
+           \f$ B \f$ is dense, but C is kept transposed.
+*/
+void MultSparseDenseTranspose(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+                              mfem::DenseMatrix& C);
 
 /**
     @brief Compute the (scaled) outer product \f$ a v v^T \f$.
@@ -46,18 +95,46 @@ void Mult_a_VVt(const double a, const mfem::Vector& v, mfem::DenseMatrix& aVVt);
 /**
     @brief Set values of the non zero entries of a HypreParMatrix to 'c'.
 */
-void SetConstantValue(mfem::HypreParMatrix* pmat, double c);
+void SetConstantValue(mfem::HypreParMatrix& pmat, double c);
 
 /**
     @brief Construct the relation table aggregate to vertex from partition
 */
-std::unique_ptr<mfem::SparseMatrix> PartitionToMatrix(
-    const mfem::Array<int>& partition, int nparts);
+mfem::SparseMatrix PartitionToMatrix(const mfem::Array<int>& partition, int nparts);
 
 /**
    @brief Construct an identity matrix (as a SparseMatrix) of size 'size'
 */
-std::unique_ptr<mfem::SparseMatrix> SparseIdentity(int size);
+mfem::SparseMatrix SparseIdentity(int size);
+
+/**
+   @brief Construct an rectangular identity matrix (as a SparseMatrix)
+   @param rows number of row
+   @param cols number of columns
+   @params row_offset offset row where diagonal identity starts
+   @params col_offset offset column where diagonal identity starts
+*/
+mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset = 0, int col_offset = 0);
+
+/**
+   @brief Construct a diagonal matrix with the entries specified by a vector
+   @param vect diagonal entries
+*/
+mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect);
+
+/**
+   @brief Add two parallel matrices C = A + B
+   @param A left hand side matrix
+   @param B right hand side matrix
+   @note can be removed with MFEM version > 3.3.2
+*/
+mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& B);
+
+/**
+   @brief Compute max norm of parallel matrix
+   @param A Parallel Matrix
+*/
+double MaxNorm(const mfem::HypreParMatrix& A);
 
 /**
    @brief Extract a submatrix from a matrix
@@ -69,7 +146,7 @@ std::unique_ptr<mfem::SparseMatrix> SparseIdentity(int size);
 
    @returns the extracted submatrix
 */
-std::unique_ptr<mfem::SparseMatrix> ExtractRowAndColumns(
+mfem::SparseMatrix ExtractRowAndColumns(
     const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
     const mfem::Array<int>& cols, mfem::Array<int>& colMapper,
     bool colMapper_not_filled = true);
@@ -176,6 +253,14 @@ mfem::DenseMatrix get_sq_differences_matrix(const std::vector<mfem::Vector>& vec
 void GenerateOffsets(MPI_Comm comm, int N, HYPRE_Int loc_sizes[],
                      mfem::Array<HYPRE_Int>* offsets[]);
 
+
+/**
+   @brief Generate the "start" array for HypreParMatrix based on the number of
+   local true dofs
+   Single case
+*/
+void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offsets);
+
 /**
    @brief Solver for local saddle point problems, see the formula below.
 
@@ -238,8 +323,8 @@ private:
     void Init(double* M_data, const mfem::SparseMatrix& D);
 
     std::unique_ptr<mfem::UMFPackSolver> solver_;
-    std::unique_ptr<mfem::SparseMatrix> A_;
-    std::unique_ptr<mfem::SparseMatrix> MinvDT_;
+    mfem::SparseMatrix A_;
+    mfem::SparseMatrix MinvDT_;
 };
 
 /**
