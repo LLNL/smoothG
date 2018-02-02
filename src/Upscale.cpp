@@ -447,11 +447,7 @@ std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol
 void Upscale::ShowErrors(const mfem::BlockVector& upscaled_sol,
                          const mfem::BlockVector& fine_sol) const
 {
-    const mfem::SparseMatrix& M = GetFineMatrix().getWeight();
-    const mfem::SparseMatrix& D = GetFineMatrix().getD();
-
-    auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
-    info.push_back(OperatorComplexity());
+    auto info = ComputeErrors(upscaled_sol, fine_sol);
 
     if (myid_ == 0)
     {
