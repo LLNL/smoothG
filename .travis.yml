@@ -72,10 +72,10 @@ install:
 
    # suitesparse
    - if [ ! -e SuiteSparse-install/lib/libumfpack.a ]; then
-        wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz
+        wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
         tar xvzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
-        make install INSTALL=../SuiteSparse-install
+        make install INSTALL=../SuiteSparse-install;
      else
         echo "Reusing cahed SuiteSparse-4.5.4";
      fi;
