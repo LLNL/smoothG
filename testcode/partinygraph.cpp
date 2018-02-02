@@ -387,6 +387,7 @@ int main(int argc, char* argv[])
 
     delete D;
     delete M;
+    delete W;
 
     if (norm < equality_tolerance)
         return 0;
