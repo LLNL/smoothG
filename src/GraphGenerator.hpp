@@ -26,6 +26,8 @@
 #include <assert.h>
 
 #include "mfem.hpp"
+#include "MatrixUtilities.hpp"
+#include "utilities.hpp"
 
 namespace smoothg
 {
@@ -43,7 +45,7 @@ public:
        @param mean_degree average vertex degree of the generated graph
        @param beta probability of rewiring
     */
-    GraphGenerator(MPI_Comm comm, int nvertices, int mean_degree, double beta);
+    GraphGenerator(int nvertices, int mean_degree, double beta);
 
     /**
        @brief Constructor of a random graph generator.
@@ -53,26 +55,19 @@ public:
        @param beta probability of rewiring
        @param seed seed for the random number engine
     */
-    GraphGenerator(MPI_Comm comm, int nvertices, int mean_degree, double beta,
-                   unsigned int seed);
+    GraphGenerator(int nvertices, int mean_degree, double beta, unsigned int seed);
+
 
     /**
-       @brief process 0 generates a graph and distribues to other processes
-    */
-    void Generate();
+       @brief Generate a random graph based on the Watts-Strogatz model
 
-    /**
-       @brief Get the const reference of vertex_edge_
+       This implements the algorithm described in
+       https://en.wikipedia.org/wiki/Watts%E2%80%93Strogatz_model#Algorithm
     */
-    const mfem::SparseMatrix& GetVertexEdge()
-    {
-        assert(vertex_edge_);
-        return *vertex_edge_;
-    }
+    mfem::SparseMatrix Generate();
 
 private:
-    int GenerateNewFriend(
-        int current_vertex, const std::vector<int>& old_friend_list);
+    int GenerateNewFriend(int current_vertex, const std::vector<int>& old_friend_list);
 
     /**
        @brief Rewiring step of the Watts-Strogatz generator
@@ -85,34 +80,22 @@ private:
     /**
        @brief Based on vertex neighbor lists, construct vertex to edge table
     */
-    void FriendLists_to_v_e(const std::vector<std::vector<int> >& friend_lists);
+    mfem::SparseMatrix FriendLists_to_v_e(const std::vector<std::vector<int> >& friend_lists);
 
-    /**
-       @brief Generate a random graph based on the Watts-Strogatz model
-
-       This implements the algorithm described in
-       https://en.wikipedia.org/wiki/Watts%E2%80%93Strogatz_model#Algorithm
-    */
-    void WattsStrogatz();
-
-    /**
-       @brief process 0 broadcasts vertex_edge_ to other processes
-    */
-    void Broadcast_v_e();
-
-    MPI_Comm comm_;
-    int myid_;
-
-    int nvertices_;
-    int mean_degree_;
-    double beta_;
-    int nedges_;
-    std::unique_ptr<mfem::SparseMatrix> vertex_edge_;
+    const int nvertices_;
+    const int mean_degree_;
+    const double beta_;
+    const int nedges_;
 
     std::random_device rd_; // Used to get a seed for the random number engine
     std::mt19937 gen_; // Standard mersenne_twister_engine seeded with rd_()
     std::uniform_real_distribution<> rand_double_0_1_; // Random number in [0,1]
 }; // class GraphGenerator
+
+
+/// Generate a vertex edge relationship for a WattsStrogatz random graph
+mfem::SparseMatrix GenerateGraph(MPI_Comm comm, int nvertices, int mean_degree, double beta,
+                                 double seed);
 
 } // namespace smoothg
 

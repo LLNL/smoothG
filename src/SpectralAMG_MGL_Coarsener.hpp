@@ -53,12 +53,7 @@ public:
                               std::unique_ptr<GraphTopology> gt,
                               double spectral_tol,
                               unsigned int max_evecs_per_agg,
-                              bool is_hybridization_used)
-        : Mixed_GL_Coarsener(mgL, std::move(gt)),
-          is_hybridization_used_(is_hybridization_used),
-          spectral_tol_(spectral_tol),
-          max_evecs_per_agg_(max_evecs_per_agg)
-    {}
+                              bool is_hybridization_used);
 
 private:
     /**

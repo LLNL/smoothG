@@ -20,22 +20,16 @@
 */
 
 #include "GraphGenerator.hpp"
-#include "utilities.hpp"
-
-using std::unique_ptr;
 
 namespace smoothg
 {
 
-GraphGenerator::GraphGenerator(MPI_Comm comm, int nvertices,
-                               int mean_degree, double beta)
+GraphGenerator::GraphGenerator(int nvertices, int mean_degree, double beta)
     :
-    comm_(comm),
     nvertices_(nvertices),
     mean_degree_(mean_degree),
     beta_(beta),
     nedges_(nvertices_ * mean_degree_ / 2),
-    vertex_edge_(nullptr),
     gen_(rd_()),
     rand_double_0_1_(0, 1)
 {
@@ -49,15 +43,12 @@ GraphGenerator::GraphGenerator(MPI_Comm comm, int nvertices,
     assert(mean_degree_ < nvertices_);
 }
 
-GraphGenerator::GraphGenerator(MPI_Comm comm, int nvertices,
-                               int mean_degree, double beta, unsigned int seed)
+GraphGenerator::GraphGenerator(int nvertices, int mean_degree, double beta, unsigned int seed)
     :
-    comm_(comm),
     nvertices_(nvertices),
     mean_degree_(mean_degree),
     beta_(beta),
     nedges_(nvertices_ * mean_degree_ / 2),
-    vertex_edge_(nullptr),
     gen_(seed),
     rand_double_0_1_(0, 1)
 {
@@ -69,6 +60,8 @@ GraphGenerator::GraphGenerator(MPI_Comm comm, int nvertices,
 
     // vertex degree cannot be greater than number of vertices -1
     assert(mean_degree_ < nvertices_);
+
+    assert(mean_degree_ > std::log(nvertices_));
 }
 
 int GraphGenerator::GenerateNewFriend(
@@ -130,7 +123,7 @@ void GraphGenerator::Rewiring(std::vector<std::vector<int> >& friend_lists)
     }
 }
 
-void GraphGenerator::FriendLists_to_v_e(
+mfem::SparseMatrix GraphGenerator::FriendLists_to_v_e(
     const std::vector<std::vector<int> >& friend_lists)
 {
     int* e_v_i = new int[nedges_ + 1];
@@ -158,10 +151,11 @@ void GraphGenerator::FriendLists_to_v_e(
     assert(edge_count == nedges_);
 
     mfem::SparseMatrix e_v(e_v_i, e_v_j, e_v_data, nedges_, nvertices_);
-    vertex_edge_.reset(mfem::Transpose(e_v));
+
+    return smoothg::Transpose(e_v);
 }
 
-void GraphGenerator::WattsStrogatz()
+mfem::SparseMatrix GraphGenerator::Generate()
 {
     // Generate a ring of nvertices_ vertices, each vertex is connected
     // to the neighboring mean_degree_ vertices (mean_degree/2 on each side)
@@ -183,55 +177,29 @@ void GraphGenerator::WattsStrogatz()
     // rewire with probability beta_
     Rewiring(friend_lists);
 
-    // Store the generated graph as a vertex to edge table
-    FriendLists_to_v_e(friend_lists);
+    // Generate graph as a vertex to edge table
+    return FriendLists_to_v_e(friend_lists);
 }
 
-void GraphGenerator::Broadcast_v_e()
+mfem::SparseMatrix GenerateGraph(MPI_Comm comm, int nvertices, int mean_degree, double beta,
+                                 double seed)
 {
-    // Distribute number of rows and nnz of vertex_edge_
-    int sizes[3];
-    if (myid_ == 0)
-    {
-        sizes[0] = vertex_edge_->Height();
-        sizes[1] = vertex_edge_->Width();
-        sizes[2] = vertex_edge_->NumNonZeroElems();
-    }
-    MPI_Bcast(sizes, 3, MPI_INT, 0, comm_);
+    int myid;
+    MPI_Comm_rank(comm, &myid);
 
-    int* I;
-    int* J;
-    double* Data;
-    if (myid_ == 0)
-    {
-        I = vertex_edge_->GetI();
-        J = vertex_edge_->GetJ();
-        Data = vertex_edge_->GetData();
-    }
-    else
-    {
-        I = new int[sizes[0] + 1];
-        J = new int[sizes[2]];
-        Data = new double[sizes[2]];
-    }
-    MPI_Bcast(I, sizes[0] + 1, MPI_INT, 0, comm_);
-    MPI_Bcast(J, sizes[2], MPI_INT, 0, comm_);
-    MPI_Bcast(Data, sizes[2], MPI_DOUBLE, 0, comm_);
+    GraphGenerator graph_gen(nvertices, mean_degree, beta, seed);
 
-    if (myid_ != 0)
+    mfem::SparseMatrix vertex_edge;
+
+    if (myid == 0)
     {
-        vertex_edge_ = make_unique<mfem::SparseMatrix>(
-                           I, J, Data, sizes[0], sizes[1]);
+        auto tmp = graph_gen.Generate();
+        vertex_edge.Swap(tmp);
     }
-}
 
-void GraphGenerator::Generate()
-{
-    MPI_Comm_rank(comm_, &myid_);
-    if (myid_ == 0)
-        WattsStrogatz();
+    BroadCast(comm, vertex_edge);
 
-    Broadcast_v_e();
+    return vertex_edge;
 }
 
 } // namespace smoothg

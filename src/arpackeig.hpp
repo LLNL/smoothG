@@ -13,11 +13,9 @@
  *
  ***********************************************************************EHEADER*/
 
-/**
-   @file arpackeig.hpp
-
-   @brief Interface with ARPACK via arpackpp, to find eigenvalues of a
-   symmetric hypre_CSRMatrix object.
+/** @file arpackeig.hpp
+    @brief Interface with ARPACK via arpackpp, to find eigenvalues of a
+    symmetric hypre_CSRMatrix object.
 */
 
 #ifndef __ARPACKEIG_HPP

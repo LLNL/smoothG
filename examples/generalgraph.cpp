@@ -15,6 +15,8 @@
 
 /**
    @example
+   @file generalgraph.cpp
+   @brief Compares a graph upscaled solution to the fine solution.
 */
 
 #include <fstream>
@@ -32,31 +34,14 @@ using std::make_shared;
 
 using namespace smoothg;
 
-enum
-{
-    TOPOLOGY = 0, SEQUENCE, SOLVER, NSTAGES
-};
-
-int read_graph_from_file(const char* graphFileName,
-                         mfem::SparseMatrix& vertex_edge_global);
-
-void read_fiedler_vector_from_file(const char* FiedlerFileName,
-                                   const ParGraph& pgraph, int nvertices_global,
-                                   mfem::Vector& rhs_u_fine);
-
-void read_weight_from_file(const char* filename,
-                           const ParGraph& pgraph, int nedges_global,
-                           mfem::Vector& local_weight);
-
-void compute_fiedler_vector_from_graph(const ParGraph& pgraph,
-                                       mfem::Vector& rhs_u_fine);
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
+               int isolate);
+mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
 {
-    int num_procs, myid;
-    picojson::object serialize;
-
     // 1. Initialize MPI
+    int num_procs, myid;
     MPI_Init(&argc, &argv);
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size(comm, &num_procs);
@@ -79,6 +64,9 @@ int main(int argc, char* argv[])
     const char* weight_filename = "";
     args.AddOption(&weight_filename, "-w", "--weight",
                    "File to load for graph edge weights.");
+    const char* w_block_filename = "";
+    args.AddOption(&w_block_filename, "-wb", "--w_block",
+                   "File to load for w block.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -95,8 +83,14 @@ int main(int argc, char* argv[])
     bool generate_graph = false;
     args.AddOption(&generate_graph, "-gg", "--generate-graph", "-no-gg",
                    "--no-generate-graph", "Generate a graph at runtime.");
-    int nvertices_global = 1000;
-    args.AddOption(&nvertices_global, "-nv", "--num-vert",
+    bool generate_fiedler = false;
+    args.AddOption(&generate_fiedler, "-gf", "--generate-fiedler", "-no-gf",
+                   "--no-generate-fiedler", "Generate a fiedler vector at runtime.");
+    bool save_fiedler = false;
+    args.AddOption(&save_fiedler, "-sf", "--save-fiedler", "-no-sf",
+                   "--no-save-fiedler", "Save a generate a fiedler vector at runtime.");
+    int gen_vertices = 1000;
+    args.AddOption(&gen_vertices, "-nv", "--num-vert",
                    "Number of vertices of the graph to be generated.");
     int mean_degree = 40;
     args.AddOption(&mean_degree, "-md", "--mean-degree",
@@ -125,290 +119,160 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    const int nLevels = 2;
-    UpscalingStatistics stats(nLevels);
+    assert(num_partitions >= num_procs);
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix vertex_edge_global;
-    GraphGenerator graph_gen(comm, nvertices_global, mean_degree, beta, seed);
     if (generate_graph)
     {
-        graph_gen.Generate();
-        vertex_edge_global.MakeRef(graph_gen.GetVertexEdge());
+        mfem::SparseMatrix tmp = GenerateGraph(comm, gen_vertices, mean_degree, beta, seed);
+        vertex_edge_global.Swap(tmp);
     }
     else
     {
-        nvertices_global = read_graph_from_file(graphFileName,
-                                                vertex_edge_global);
+        mfem::SparseMatrix tmp = ReadVertexEdge(graphFileName);
+        vertex_edge_global.Swap(tmp);
     }
+
+    const int nedges_global = vertex_edge_global.Width();
+    const int nvertices_global = vertex_edge_global.Height();
+
     /// [Load graph from file or generate one]
 
-    // Partition the global fine graph
-    mfem::StopWatch chrono;
-    chrono.Clear();
-    chrono.Start();
     /// [Partitioning]
     mfem::Array<int> global_partitioning;
     if (metis_agglomeration || generate_graph)
     {
-        smoothg::MetisGraphPartitioner partitioner;
-        partitioner.setUnbalanceTol(2);
-        mfem::SparseMatrix* edge_vertex = Transpose(vertex_edge_global);
-        mfem::SparseMatrix* vertex_vertex = Mult(vertex_edge_global,
-                                                 *edge_vertex);
-        delete edge_vertex;
-        mfem::Array<int> isolate_vertices;
-        if (isolate >= 0)
-            isolate_vertices.Append(isolate);
-        partitioner.SetIsolateVertices(isolate_vertices);
-        partitioner.doPartition(*vertex_vertex, num_partitions,
-                                global_partitioning);
-        delete vertex_vertex;
+        MetisPart(vertex_edge_global, global_partitioning, num_partitions, isolate);
     }
     else
     {
-        global_partitioning.SetSize(nvertices_global);
         std::ifstream partFile(partition_filename);
-        if (!partFile.is_open())
-            mfem::mfem_error("Error in opening the partition file");
-        for (int i = 0; i < nvertices_global; i++)
-            partFile >> global_partitioning[i];
+        global_partitioning.SetSize(nvertices_global);
+        global_partitioning.Load(partFile, nvertices_global);
     }
     /// [Partitioning]
-    chrono.Stop();
-    if (myid == 0)
-        std::cout << "Partition of vertices done in "
-                  << chrono.RealTime() << " seconds \n";
 
-    // Distribute the global graph to processors
-    stats.BeginTiming();
-    /// [Build ParGraph]
-    smoothg::ParGraph pgraph(comm, vertex_edge_global, global_partitioning);
-    /// [Build ParGraph]
-
-    const mfem::Array<int>& partitioning = pgraph.GetLocalPartition();
-    auto vertex_edge = make_shared<mfem::SparseMatrix>();
-    vertex_edge->MakeRef(pgraph.GetLocalVertexToEdge());
-    auto edge_e_te = make_shared<mfem::HypreParMatrix>();
-    edge_e_te->MakeRef(pgraph.GetEdgeToTrueEdge());
-    int nedges = vertex_edge->Width();
-    mfem::Vector rhs_sigma_fine;
-    rhs_sigma_fine.SetSize(nedges);
-    rhs_sigma_fine = 0.;
-
-    // Load the Fiedler vector corresponding to the graph from file, or compute
-    // the Fiedler vector for the generated graph, put it in rhs_u_fine
-    mfem::Vector rhs_u_fine;
-
-    if (generate_graph)
-    {
-        compute_fiedler_vector_from_graph(pgraph, rhs_u_fine);
-    }
-    else
-    {
-        read_fiedler_vector_from_file(FiedlerFileName, pgraph,
-                                      nvertices_global, rhs_u_fine);
-    }
-
-    // Load the edge weights
-    mfem::Vector weight(nedges);
+    /// [Load the edge weights]
+    mfem::Vector weight(nedges_global);
     if (std::strlen(weight_filename))
     {
-        const int nedges_global = vertex_edge_global.Width();
-        read_weight_from_file(weight_filename, pgraph,
-                              nedges_global, weight);
+        std::ifstream weight_file(weight_filename);
+        weight.Load(weight_file, nedges_global);
     }
     else
     {
         weight = 1.0;
     }
+    /// [Load the edge weights]
 
-    stats.EndTiming(0, SEQUENCE);
-
-    // Set up MixedMatrix and Coarsener objects
-    chrono.Clear();
-    chrono.Start();
-    std::vector<smoothg::MixedMatrix> mixed_laplacians;
-    std::unique_ptr<smoothg::Mixed_GL_Coarsener> coarsener;
-
-    // Build fine topology, data structures, and try to coarsen
+    // Set up GraphUpscale
     {
-        /// [Coarsen graph]
-        mixed_laplacians.emplace_back(*vertex_edge, weight, edge_e_te);
+        /// [Upscale]
+        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
+                             spect_tol, max_evects, hybridization, weight);
 
-        /// [Coarsen graph]
-        std::unique_ptr<GraphTopology> graph_topology
-            = make_unique<GraphTopology>(vertex_edge, edge_e_te, partitioning);
+        upscale.PrintInfo();
+        upscale.ShowSetupTime();
+        /// [Upscale]
 
-        coarsener = make_unique<SpectralAMG_MGL_Coarsener>(
-                        mixed_laplacians[0], std::move(graph_topology),
-                        spect_tol, max_evects, hybridization);
-        coarsener->construct_coarse_subspace();
+        mfem::Vector rhs_u_fine;
 
-        mixed_laplacians.emplace_back(coarsener->GetCoarseM(),
-                                      coarsener->GetCoarseD(),
-                                      coarsener->get_face_dof_truedof_table());
-        /// [Coarsen graph]
-
-        mixed_laplacians[0].set_Drow_start(
-            coarsener->get_GraphTopology_ref().GetVertexStart());
-
-        mixed_laplacians[1].set_Drow_start(
-            coarsener->get_GraphCoarsen_ref().GetVertexCoarseDofStart());
-
-    }
-    if (myid == 0)
-        std::cout << "Timing all levels: Coarsening done in "
-                  << chrono.RealTime() << " seconds \n";
-
-    /// [Coarsen rhs]
-    std::vector<std::unique_ptr<mfem::BlockVector>> rhs(nLevels);
-    rhs[0] = mixed_laplacians[0].subvecs_to_blockvector(rhs_sigma_fine, rhs_u_fine);
-    rhs[1] = coarsener->coarsen_rhs(*rhs[0]);
-    /// [Coarsen rhs]
-
-    std::vector<std::unique_ptr<mfem::BlockVector>> sol(nLevels);
-    for (int k(0); k < nLevels; ++k)
-    {
-        sol[k] = make_unique<mfem::BlockVector>(
-                     mixed_laplacians[k].get_blockoffsets());
-    }
-
-    for (int k(0); k < nLevels; ++k)
-    {
-        if (myid == 0)
-            std::cout << "Begin solve loop level " << k << std::endl;
-        stats.BeginTiming();
-
-        // ndofs[k] = mixed_laplacians[k].get_edge_d_td().GetGlobalNumCols()
-        //  + mixed_laplacians[k].get_Drow_start().Last();
-
-        /// [Solve system]
-        std::unique_ptr<MixedLaplacianSolver> solver;
-        if (hybridization) // Hybridization solver
+        /// [Right Hand Side]
+        if (generate_graph || generate_fiedler)
         {
-            if (k == 0)
-                solver = make_unique<HybridSolver>(comm, mixed_laplacians[k]);
-            else
-                solver = make_unique<HybridSolver>(comm, mixed_laplacians[k],
-                                                   *coarsener);
+            rhs_u_fine = ComputeFiedlerVector(upscale.GetFineMatrix());
         }
-        else // L2-H1 block diagonal preconditioner
+        else
         {
-            if (myid == 0)
-            {
-                mixed_laplacians[k].getD().EliminateRow(0);
-                rhs[k]->GetBlock(1)(0) = 0.;
-            }
-            solver = make_unique<MinresBlockSolverFalse>(mixed_laplacians[k], comm);
+            rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
         }
-        solver->solve(*rhs[k], *sol[k]);
-        /// [Solve system]
-        stats.RegisterSolve(*solver, k);
-        stats.EndTiming(k, SOLVER);
-        if (k == 0)
-            par_orthogonalize_from_constant(sol[k]->GetBlock(1),
-                                            mixed_laplacians[k].get_Drow_start().Last());
+
+        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+        fine_rhs.GetBlock(0) = 0.0;
+        fine_rhs.GetBlock(1) = rhs_u_fine;
+        /// [Right Hand Side]
+
+        /// [Solve]
+        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
+        upscale.ShowCoarseSolveInfo();
+
+        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
+        upscale.ShowFineSolveInfo();
+        /// [Solve]
+
+        /// [Check Error]
+        auto error_info = upscale.ComputeErrors(upscaled_sol, fine_sol);
+
         if (myid == 0)
-            std::cout << "  Level " << k
-                      << " solved in " << stats.GetTiming(k, SOLVER) << "s. \n";
+        {
+            ShowErrors(error_info);
+        }
+        /// [Check Error]
 
-        // error norms
-        stats.ComputeErrorSquare(k, mixed_laplacians, *coarsener, sol);
+        if (save_fiedler)
+        {
+            upscale.WriteVertexVector(rhs_u_fine, FiedlerFileName);
+        }
     }
-    stats.PrintStatistics(comm, serialize);
-
-    if (myid == 0)
-        std::cout << picojson::value(serialize).serialize() << std::endl;
 
     MPI_Finalize();
     return 0;
 }
 
-int read_graph_from_file(const char* graphFileName,
-                         mfem::SparseMatrix& vertex_edge_global)
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
+               int isolate)
 {
-    int myid;
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    mfem::StopWatch chrono;
+    smoothg::MetisGraphPartitioner partitioner;
+    partitioner.setUnbalanceTol(2);
+    mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
+    mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
 
-    chrono.Start();
-    std::ifstream graphFile(graphFileName);
-    ReadVertexEdge(graphFile, vertex_edge_global);
-    chrono.Stop();
-    if (myid == 0)
-        std::cout << "Graph data read in " << chrono.RealTime()
-                  << " seconds \n";
-    return vertex_edge_global.Height();
+    mfem::Array<int> post_isolate_vertices;
+    if (isolate >= 0)
+        post_isolate_vertices.Append(isolate);
+
+    partitioner.SetPostIsolateVertices(post_isolate_vertices);
+
+    partitioner.doPartition(vertex_vertex, num_parts, part);
 }
 
-void read_fiedler_vector_from_file(const char* FiedlerFileName,
-                                   const ParGraph& pgraph, int nvertices_global,
-                                   mfem::Vector& rhs_u_fine)
+mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 {
-    int myid;
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    mfem::StopWatch chrono;
+    auto& pM = mixed_laplacian.get_pM();
+    auto& pD = mixed_laplacian.get_pD();
+    auto* pW = mixed_laplacian.get_pW();
 
-    chrono.Clear();
-    chrono.Start();
-    std::ifstream FiedlerFile(FiedlerFileName);
-    double* FiedlerData = new double[nvertices_global];
-    for (int i = 0; i < nvertices_global; i++)
-        FiedlerFile >> FiedlerData[i];
-    mfem::Vector Fiedler_global(FiedlerData, nvertices_global);
-    Fiedler_global.MakeDataOwner();
-    // set the appropriate right hand side for graph problem
-    const mfem::Array<int>& vert_local2global =
-        pgraph.GetVertexLocalToGlobalMap();
-    Fiedler_global.GetSubVector(vert_local2global, rhs_u_fine);
-    chrono.Stop();
-    if (myid == 0)
-        std::cout << "Fiedler vector read in " << chrono.RealTime()
-                  << " seconds \n";
-}
+    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
 
-void read_weight_from_file(const char* filename,
-                           const ParGraph& pgraph, int nedges_global,
-                           mfem::Vector& local_weight)
-{
-    std::ifstream file(filename);
-    assert(file.is_open());
+    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
+    pM.GetDiag(M_inv);
+    MinvDT->InvScaleRows(M_inv);
 
-    mfem::Vector global_weight(nedges_global);
-    global_weight.Load(file, nedges_global);
+    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
 
-    const mfem::Array<int>& edge_local = pgraph.GetEdgeLocalToGlobalMap();
+    const bool use_w = mixed_laplacian.CheckW();
 
-    global_weight.GetSubVector(edge_local, local_weight);
-}
+    if (use_w)
+    {
+        (*pW) *= -1.0;
+        // TODO(gelever1): define ParSub lol
+        A.reset(ParAdd(*A, *pW));
+        (*pW) *= -1.0;
+    }
+    else
+    {
+        // Adding identity to A so that it is non-singular
+        mfem::SparseMatrix diag;
+        A->GetDiag(diag);
+        for (int i = 0; i < diag.Width(); i++)
+            diag(i, i) += 1.0;
+    }
 
-void compute_fiedler_vector_from_graph(const ParGraph& pgraph,
-                                       mfem::Vector& rhs_u_fine)
-{
-    auto edge_e_te = make_shared<mfem::HypreParMatrix>();
-    edge_e_te->MakeRef(pgraph.GetEdgeToTrueEdge());
-
-    MixedMatrix mixed_laplacians(pgraph.GetLocalVertexToEdge(), edge_e_te);
-    mfem::Array<HYPRE_Int> vertex_start;
-    mfem::Array<HYPRE_Int>* start[3] = {&vertex_start};
-    HYPRE_Int nvertices = pgraph.GetLocalVertexToEdge().Height();
-    GenerateOffsets(edge_e_te->GetComm(), 1, &nvertices, start);
-    mixed_laplacians.set_Drow_start(vertex_start);
-
-    auto& pD = mixed_laplacians.get_pD();
-    unique_ptr<mfem::HypreParMatrix> pDT(pD.Transpose());
-    unique_ptr<mfem::HypreParMatrix> A( mfem::ParMult(&pD, pDT.get()) );
-
-    // Adding identity to A so that it is non-singular
-    mfem::SparseMatrix diag;
-    A->GetDiag(diag);
-    for (int i = 0; i < diag.Width(); i++)
-        diag(i, i) += 1.0;
     mfem::HypreBoomerAMG prec(*A);
     prec.SetPrintLevel(0);
 
-    mfem::HypreLOBPCG lobpcg(edge_e_te->GetComm());
+    mfem::HypreLOBPCG lobpcg(A->GetComm());
     lobpcg.SetMaxIter(5000);
     lobpcg.SetTol(1e-8);
     lobpcg.SetPrintLevel(0);
@@ -420,10 +284,26 @@ void compute_fiedler_vector_from_graph(const ParGraph& pgraph,
     mfem::Array<double> evals;
     lobpcg.GetEigenvalues(evals);
 
+    bool converged = true;
+
     // First eigenvalue of A+I should be 1 (graph Laplacian has a 1D null space)
-    assert(std::abs(evals[0] - 1.0) < 1e-8);
+    if (!use_w)
+    {
+        converged &= std::abs(evals[0] - 1.0) < 1e-8;
+    }
 
     // Second eigenvalue of A+I should be greater than 1 for connected graphs
-    assert(std::abs(evals[1] - 1.0) > 1e-8);
-    rhs_u_fine = lobpcg.GetEigenvector(1);
+    converged &= std::abs(evals[1] - 1.0) > 1e-8;
+
+    int myid;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+
+    if (!converged && myid == 0)
+    {
+        std::cout << "LOBPCG Failed to converge: \n";
+        std::cout << evals[0] << "\n";
+        std::cout << evals[1] << "\n";
+    }
+
+    return lobpcg.GetEigenvector(1);
 }

@@ -22,8 +22,10 @@
 #define __METISGRAPHPARTITIONER_HPP__
 
 #include <functional>
+#include <numeric>
 #include <metis.h>
 #include "mfem.hpp"
+#include "MatrixUtilities.hpp"
 
 namespace smoothg
 {
@@ -87,7 +89,10 @@ public:
 
        (this does a deep copy of the indices)
     */
-    void SetIsolateVertices(const mfem::Array<int>& indices);
+    void SetPreIsolateVertices(int index);
+    void SetPreIsolateVertices(const mfem::Array<int>& indices);
+    void SetPostIsolateVertices(int index);
+    void SetPostIsolateVertices(const mfem::Array<int>& indices);
 
 private:
     int options_[METIS_NOPTIONS];
@@ -95,7 +100,8 @@ private:
 
     PartType part_type_;
     real_t unbalance_tol_;
-    mfem::Array<int> isolated_vertices_;
+    mfem::Array<int> pre_isolated_vertices_;
+    mfem::Array<int> post_isolated_vertices_;
 
     void removeEmptyParts(mfem::Array<int>& partitioning,
                           int& num_partitions) const;
@@ -105,6 +111,10 @@ private:
     int connectedComponents(mfem::Array<int>& partitioning,
                             const mfem::SparseMatrix& conn);
 
+    void IsolatePreProcess(const mfem::SparseMatrix& wtable,
+                           mfem::SparseMatrix& sub_table,
+                           mfem::Array<int>& sub_to_global);
+
     void IsolatePostProcess(const mfem::SparseMatrix& wtable,
                             int& num_partitions,
                             mfem::Array<int>& partitioning);
@@ -112,6 +122,8 @@ private:
     std::function<int(int*, int*, int*, int*, int*, int*,
                       int*, int*, float*, float*, int*, int*, int*)> CallMetis;
 };
+
+void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning, int num_parts);
 
 } // namespace smoothg
 

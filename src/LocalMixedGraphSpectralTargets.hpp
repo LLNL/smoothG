@@ -66,6 +66,14 @@ public:
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const GraphTopology& graph_topology);
+
+    LocalMixedGraphSpectralTargets(
+        double rel_tol, int max_evects,
+        const mfem::SparseMatrix& M_local,
+        const mfem::SparseMatrix& D_local,
+        const mfem::SparseMatrix* W_local,
+        const GraphTopology& graph_topology);
+
     ~LocalMixedGraphSpectralTargets() {}
 
     /**
@@ -75,9 +83,8 @@ public:
        @param local_vertex_targets vectors corresponding to smallest eigenvalues
                                    on the vertex space.
     */
-    void Compute(
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& local_edge_trace_targets,
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& local_vertex_targets);
+    void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
 private:
     /**
        @brief Solve an eigenvalue problem on each agglomerate, put the result in
@@ -89,10 +96,8 @@ private:
            When it comes out, each entry is a DenseMatrix with one column for each
            eigenvector selected.
     */
-    void ComputeVertexTargets(
-        int nAggs,
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& AggExt_sigma,
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& local_vertex_targets);
+    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigma,
+                              std::vector<mfem::DenseMatrix>& local_vertex_targets);
 
     /**
        @brief Given normal traces of eigenvectors in AggExt_sigma, put those as well as
@@ -101,12 +106,11 @@ private:
        @param AggExt_sigma (IN)
        @param local_edge_trace_targets (OUT)
     */
-    void ComputeEdgeTargets(
-        const std::vector<std::unique_ptr<mfem::DenseMatrix> >& AggExt_sigma,
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& local_edge_trace_targets);
+    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigma,
+                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
-    mfem::DenseMatrix* Orthogonalize(mfem::DenseMatrix& vectors,
-                                     mfem::Vector& single_vec, int offset);
+    void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
+                       int offset, mfem::DenseMatrix& out);
 
     MPI_Comm comm_;
 
@@ -115,14 +119,17 @@ private:
 
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
+    const mfem::SparseMatrix* W_local_;
+
     std::unique_ptr<mfem::HypreParMatrix> M_global_;
     std::unique_ptr<mfem::HypreParMatrix> D_global_;
+    std::unique_ptr<mfem::HypreParMatrix> W_global_;
 
     const GraphTopology& graph_topology_;
     double zero_eigenvalue_threshold_;
 
     /// face to permuted edge relation table
-    std::unique_ptr<mfem::HypreParMatrix> face_permedge;
+    std::unique_ptr<mfem::HypreParMatrix> face_permedge_;
 
     mfem::Array<HYPRE_Int> M_local_rowstart;
     mfem::Array<HYPRE_Int> D_local_rowstart;

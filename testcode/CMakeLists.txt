@@ -43,12 +43,19 @@ add_test(lineargraph64 lineargraph --size 64)
 add_valgrind_test(vlineargraph lineargraph)
 
 add_test(tinygraphsolver tinygraphsolver)
-add_valgrind_test(vtinygraph tinygraphsolver)
+add_test(tinygraphsolver_w tinygraphsolver -w)
+add_test(tinygraphsolver_m tinygraphsolver -m)
+add_test(tinygraphsolver_wm tinygraphsolver -w -m)
 
-add_test(wtinygraphsolver tinygraphsolver -w)
-add_valgrind_test(vwtinygraph tinygraphsolver -w)
+add_valgrind_test(vtinygraph tinygraphsolver)
+add_valgrind_test(vtinygraph_w tinygraphsolver -w)
+add_valgrind_test(vtinygraph_m tinygraphsolver -m)
+add_valgrind_test(vtinygraph_wm tinygraphsolver -w -m)
 
 add_test(partinygraph mpirun -np 2 ./partinygraph)
+add_test(partinygraph_w mpirun -np 2 ./partinygraph -w)
+add_test(partinygraph_m mpirun -np 2 ./partinygraph -m)
+add_test(partinygraph_wm mpirun -np 2 ./partinygraph -w -m)
 
 add_test(eigen eigen)
 add_valgrind_test(veigen eigen)

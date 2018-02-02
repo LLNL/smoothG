@@ -84,7 +84,7 @@ public:
     static void BuildFineLevelLocalMassMatrix(
         const mfem::SparseMatrix& vertex_edge,
         const mfem::SparseMatrix& M,
-        std::vector<std::unique_ptr<mfem::Vector> >& M_el);
+        std::vector<mfem::Vector>& M_el);
 
 public:
     /**
@@ -99,12 +99,12 @@ public:
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
-                 std::shared_ptr<const mfem::SparseMatrix> face_bdrattr = nullptr,
-                 std::shared_ptr<const mfem::Array<int> > ess_edge_dofs = nullptr,
+                 const mfem::SparseMatrix* face_bdrattr = nullptr,
+                 const mfem::Array<int>* ess_edge_dofs = nullptr,
                  bool spectralAMGe = false);
 
     /**
-       @brief Constructor for fine-level hybridiziation solver.
+       @brief Constructor for coarse-level hybridiziation solver.
 
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the coarse level
@@ -117,26 +117,25 @@ public:
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const Mixed_GL_Coarsener& mgLc,
-                 std::shared_ptr<const mfem::SparseMatrix> face_bdrattr = nullptr,
-                 std::shared_ptr<const mfem::Array<int> > ess_edge_dofs = nullptr,
+                 const mfem::SparseMatrix* face_bdrattr = nullptr,
+                 const mfem::Array<int>* ess_edge_dofs = nullptr,
                  bool spectralAMGe = false);
 
     virtual ~HybridSolver() {}
 
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs,
-              mfem::BlockVector& Sol);
+              mfem::BlockVector& Sol) const;
 
     /// Same as Mult()
-    /// @todo should be const
-    void solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
+    void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
     {
         Mult(rhs, sol);
     }
 
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const mfem::BlockVector& OriginalRHS,
-                      mfem::Vector& HybridRHS);
+                      mfem::Vector& HybridRHS) const;
 
     /**
        @brief Recover the solution of the original system from multiplier \f$ \mu \f$.
@@ -155,41 +154,46 @@ public:
        This function assumes the offsets of RecoveredSol have been defined
     */
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
-                                 mfem::BlockVector& RecoveredSol);
+                                 mfem::BlockVector& RecoveredSol) const;
+
+    ///@name Set solver parameters
+    ///@{
+    virtual void SetPrintLevel(int print_level) override;
+    virtual void SetMaxIter(int max_num_iter) override;
+    virtual void SetRelTol(double rtol) override;
+    virtual void SetAbsTol(double atol) override;
+    ///@}
 
 protected:
     template<typename T>
     void Init(const mfem::SparseMatrix& face_edgedof,
-              const std::vector<std::unique_ptr<T> >& M_el,
+              const std::vector<T>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
-              std::shared_ptr<const mfem::SparseMatrix> face_bdrattr,
-              std::shared_ptr<const mfem::Array<int> > ess_edge_dofs,
-              bool spectralAMGe);
+              const mfem::SparseMatrix* face_bdrattr,
+              const mfem::Array<int>* ess_edge_dofs);
 
     /**
        @todo this method and its cousin share a lot of duplicated code
     */
     void AssembleHybridSystem(
-        const std::vector<std::unique_ptr<mfem::DenseMatrix> >& M_el,
-        mfem::Array<int>& edgedof_global_to_local_map,
-        mfem::Array<bool>& edge_marker,
-        int* j_multiplier_edgedof,
-        bool spectralAMGe);
+        const std::vector<mfem::DenseMatrix>& M_el,
+        const mfem::Array<int>& j_multiplier_edgedof);
 
     void AssembleHybridSystem(
-        const std::vector<std::unique_ptr<mfem::Vector> >& M_el,
-        mfem::Array<int>& edgedof_global_to_local_map,
-        mfem::Array<bool>& edge_marker,
-        int* j_multiplier_edgedof,
-        bool spectralAMGe);
+        const std::vector<mfem::Vector>& M_el,
+        const mfem::Array<int>& j_multiplier_edgedof);
+
 private:
     MPI_Comm comm_;
     int myid_;
+
+    mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
     mfem::SparseMatrix edgedof_IsOwned_;
 
     const mfem::SparseMatrix& D_;
+    const mfem::SparseMatrix* W_;
 
     std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
     std::unique_ptr<mfem::SparseMatrix> HybridSystemElim_;
@@ -197,14 +201,15 @@ private:
     std::unique_ptr<mfem::HypreBoomerAMG> prec_;
     std::unique_ptr<mfem::CGSolver> cg_;
 
-    std::unique_ptr<mfem::SparseMatrix> Agg_multiplier_;
 
-    std::vector<std::unique_ptr<mfem::DenseMatrix>> Hybrid_el_;
-    std::vector<std::unique_ptr<mfem::DenseMatrix>> MinvDT_;
-    std::vector<std::unique_ptr<mfem::DenseMatrix>> MinvCT_;
-    std::vector<std::unique_ptr<mfem::DenseMatrix>> AinvDMinvCT_;
-    std::vector<std::unique_ptr<mfem::Vector>> Ainv_f_;
-    std::vector<std::unique_ptr<mfem::Operator>> Ainv_;
+    std::vector<mfem::DenseMatrix> Hybrid_el_;
+
+    std::vector<mfem::DenseMatrix> MinvDT_;
+    std::vector<mfem::DenseMatrix> MinvCT_;
+    std::vector<mfem::DenseMatrix> AinvDMinvCT_;
+    std::vector<mfem::DenseMatrix> Ainv_;
+
+    mutable std::vector<mfem::Vector> Ainv_f_;
 
     bool ess_multiplier_bc_;
     mfem::Array<int> ess_multiplier_dofs_;
@@ -213,9 +218,17 @@ private:
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
 
+    mutable mfem::Vector trueHrhs_;
+    mutable mfem::Vector trueMu_;
+    mutable mfem::Vector Hrhs_;
+    mutable mfem::Vector Mu_;
+
     int nAggs_;
     int num_edge_dofs_;
     int num_multiplier_dofs_;
+
+    bool spectralAMGe_;
+    bool use_w_;
 };
 
 } // namespace smoothg

@@ -26,6 +26,9 @@
 #include <assert.h>
 #include <numeric>
 
+#include <iostream>
+#include <fstream>
+
 #include <mpi.h>
 #include "mfem.hpp"
 
@@ -157,8 +160,7 @@ void PostProcess(mfem::SparseMatrix& M_global,
    This only works for the fine level, because of the mfem::Mesh. To get
    this table on a coarser mesh, premultiply by AEntity_entity.
 */
-std::unique_ptr<mfem::SparseMatrix> GenerateBoundaryAttributeTable(
-    const mfem::Mesh* mesh);
+mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh);
 
 /**
    Given a face_boundaryatrribute matrix, bndrAttributesMarker, and face_dof,
@@ -200,9 +202,14 @@ public:
 
     ///@name Getters for tables that describe parallel graph
     ///@{
+    mfem::SparseMatrix& GetLocalVertexToEdge()
+    {
+        return vertex_edge_local_;
+    }
+
     const mfem::SparseMatrix& GetLocalVertexToEdge() const
     {
-        return *vertex_edge_local_;
+        return vertex_edge_local_;
     }
 
     const mfem::Array<int>& GetLocalPartition() const
@@ -226,7 +233,7 @@ public:
     }
     ///@}
 private:
-    std::unique_ptr<mfem::SparseMatrix> vertex_edge_local_;
+    mfem::SparseMatrix vertex_edge_local_;
     mfem::Array<int> partition_local_;
     std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
     mfem::Array<int> vert_local2global_;
@@ -373,7 +380,11 @@ private:
    @param graphFile the (open) stream to read
    @param out a reference to the returned matrix
 */
+
 void ReadVertexEdge(std::ifstream& graphFile, mfem::SparseMatrix& out);
+void ReadCoordinate(std::ifstream& graphFile, mfem::SparseMatrix& out);
+
+mfem::SparseMatrix ReadVertexEdge(const std::string& filename);
 
 /**
    @brief A utility class for working with the SPE10 data set.
@@ -390,8 +401,8 @@ public:
     static void SetMeshSizes(double hx, double hy, double hz);
     static void Set2DSlice(SliceOrientation o, int npos );
 
-    static void ReadPermeabilityFile(const std::string fileName);
-    static void ReadPermeabilityFile(const std::string fileName, MPI_Comm comm);
+    static void ReadPermeabilityFile(const std::string& fileName);
+    static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
 
     static void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
 
@@ -411,6 +422,30 @@ private:
     static SliceOrientation orientation;
     static int npos;
 };
+
+
+// Compute D(sigma_h - sigma_H) / D(sigma_h)
+double DivError(MPI_Comm comm, const mfem::SparseMatrix& D, const mfem::Vector& numer,
+                const mfem::Vector& denom);
+
+// Compute l2 error norm (v_h - v_H) / v_h
+double CompareError(MPI_Comm comm, const mfem::Vector& numer, const mfem::Vector& denom);
+
+
+/// Compare errors between upscaled and fine solution.
+/// Returns {vertex_error, edge_error, div_error} array.
+std::vector<double> ComputeErrors(MPI_Comm comm, const mfem::SparseMatrix& M,
+                                  const mfem::SparseMatrix& D,
+                                  const mfem::BlockVector& upscaled_sol,
+                                  const mfem::BlockVector& fine_sol);
+
+// Show error information.  Error_info is an array of size 4 that has vertex, edge, div errors, and optionally operator complexity.
+void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::cout,
+                bool pretty = true);
+
+/// Use power iterations to find the maximum eigenpair
+double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
+                    int max_iter = 1000, double tol = 1e-8, bool verbose = false);
 
 } // namespace smoothg
 

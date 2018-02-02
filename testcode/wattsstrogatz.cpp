@@ -66,9 +66,8 @@ int main(int argc, char* argv[])
     chrono.Clear();
     chrono.Start();
 
-    GraphGenerator graph_gen(comm, nvertices, mean_degree, beta);
-    graph_gen.Generate();
-    const mfem::SparseMatrix& vertex_edge = graph_gen.GetVertexEdge();
+    GraphGenerator graph_gen(nvertices, mean_degree, beta);
+    mfem::SparseMatrix vertex_edge = graph_gen.Generate();
 
     std::map<int, double> graph_stats;
     for (int i = 0; i < vertex_edge.Height(); i++)

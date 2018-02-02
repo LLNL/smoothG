@@ -20,7 +20,8 @@ Here we take you through the `generalgraph.cpp` example to give you an idea of h
 
 ### The problem
 
-One important problem in computational graph algorithms is to find the [Fiedler vector](https://en.wikipedia.org/wiki/Algebraic_connectivity), which can be used to partition a network into communities.
+One important problem in computational graph algorithms is to find the [Fiedler vector](https://en.wikipedia.org/wiki/Algebraic_connectivity),
+which can be used to partition a network into communities.
 For a connected graph, the Fiedler vector is the eigenvector corresponding to the second smallest eigenvalue of the graph Laplacian.
 
 To keep things simple, in this example we do not solve an eigenvalue problem but instead a single linear system.
@@ -32,7 +33,8 @@ We know
 \f[
   Ax = \lambda x ,
 \f]
-and the main purpose of this library is to produce a smaller, easier to solve, *upscaled* version of the graph, which we can think of as having a graph Laplacian matrix \f$ A_c \f$.
+and the main purpose of this library is to produce a smaller, easier to solve, *upscaled* version of the graph,
+which we can think of as having a graph Laplacian matrix \f$ A_c \f$.
 This code then computes a coarse Fiedler vector \f$ x_c \f$ from
 \f[
   A_c x_c = \lambda P^T x
@@ -43,39 +45,35 @@ and compares it to \f$ x \f$ to see how accurate our upscaling is.
 
 After some initialization and reading command line arguments, the first substantive code is to read a (mixed) graph from a file:
 
-\snippet generalgraph.cpp Load graph from file
+\snippet generalgraph.cpp Load graph from file or generate one
 
-We consider graphs in a *vertex-edge* format, which means we interpret them as matrices with as many rows as there are vertices in the graph, and as many columns as there are edges.
+We consider graphs in a *vertex-edge* format, which means we interpret them as matrices with as many rows as there are vertices in the graph,
+and as many columns as there are edges.
 This matrix has a 1 wherever a vertex and an edge are connected, and 0 elsewhere.
 As a result, each column has exactly two nonzeros, since each edge is connected to exactly two vertices in a graph.
 
 After loading the graph, we partition the vertices into *agglomerated vertices*, which are key to our upscaling approach.
 If you have a partitioning you like, you can provide it in a file.
-Otherwise we use Metis to partition the vertices into agglomerates, putting the results into a partitioning vector `global_partitioning` which, for each vertex, indicates which agglomerate it is in.
+Otherwise we use Metis to partition the vertices into agglomerates, putting the results into a partitioning vector `global_partitioning` which,
+for each vertex, indicates which agglomerate it is in.
 
 \snippet generalgraph.cpp Partitioning
 
-The next step is to create a [ParGraph](@ref smoothg::ParGraph) object.
-This object encapsulates several tables describing the relationship between vertices, edges, and aggregates, and is used for later coarsening.
+If the user has provided edge weights to use, we load them from file.  Otherwise, all weights are set to 1.
 
-\snippet generalgraph.cpp Build ParGraph
+\snippet generalgraph.cpp Load the edge weights
 
-The heart of the method is in these next few lines, which first put the fine mixed graph into `mixed_laplacians`, then build the all-important [GraphTopology](@ref smoothg::GraphTopology) object, and then coarsen the object.
-In this code `vertex_edge` describes the graph itself, while `edge_e_te` describes some details of how edges are distributed on a parallel machine.
-The `GraphTopology` constructor takes this information, as well as the partitioning onto agglomerates generated above, and constructs tables that describe how the agglomerated vertices and edges relate to each other.
-The coarsening is done by a [SpectralAMG_MGL_Coarsener](@ref smoothg::SpectralAMG_MGL_Coarsener) object, whose key method is [construct_coarse_subspace](@ref smoothg::SpectralAMG_MGL_Coarsener::construct_coarse_subspace).
-Finally the coarse graph is placed at the end of the `mixed_laplacians` list, so this list now has both fine and coarse spaces in it.
+The next step is to create an [GraphUpscale](@ref smoothg::GraphUpscale) object.
+Given some user parameters, the [GraphUpscale](@ref smoothg::GraphUpscale) object handles the construction of the coarse space.
+\snippet generalgraph.cpp Upscale
 
-\snippet generalgraph.cpp Coarsen graph
-
-We also need to "coarsen" the right-hand-side, using [coarsen_rhs](@ref smoothg::SpectralAMG_MGL_Coarsener::coarsen_rhs), which essentially means multiplying it by \f$ P^T \f$.
-
-\snippet generalgraph.cpp Coarsen rhs
+The right hand side can be read from file or computed as the Fielder vector of the fine level graph.
+It is then set into the appropriate mixed form.
+\snippet generalgraph.cpp Right Hand Side
 
 The next major step is to actually solve the system.
-Our code loops over the levels (in this example there are only two) and solves for a Fiedler vector on each level.
-The solve itself can be done by two methods, either using [HybridSolver](@ref smoothg::HybridSolver) or [MinresBlockSolverFalse](@ref smoothg::MinresBlockSolverFalse).
-
-\snippet generalgraph.cpp Solve system
+Both the upscaled solution and the fine level solution can be computed by the [Upscale](@ref smoothg::Upscale) object.
+\snippet generalgraph.cpp Solve
 
 The last few lines of the code compare the solutions on each level, to see how close the upscaled model is to the original fine-scale graph.
+\snippet generalgraph.cpp Check Error

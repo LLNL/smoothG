@@ -119,7 +119,75 @@ mfem::HypreParMatrix* build_tiny_graph()
     return out;
 }
 
-mfem::HypreParMatrix* build_tiny_graph_weights()
+mfem::HypreParMatrix* build_tiny_w_block()
+{
+    int num_procs, myid;
+    MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Comm_size(comm, &num_procs);
+    MPI_Comm_rank(comm, &myid);
+
+    MFEM_ASSERT(num_procs == 2, "This example for 2 processors!");
+    MFEM_ASSERT(HYPRE_AssumedPartitionCheck(),
+                "Only implemented for assumed partition!");
+
+    int nrows = 3;
+    HYPRE_Int glob_nrows = 6;
+    HYPRE_Int glob_ncols = 6;
+    int local_nnz = 3;
+
+    HYPRE_Int* I = new HYPRE_Int[nrows + 1];
+    HYPRE_Int* J = new HYPRE_Int[local_nnz];
+    double* data = new double[local_nnz];
+    HYPRE_Int* rows = new HYPRE_Int[2];
+    if (myid == 0)
+    {
+        I[0] = 0;
+        I[1] = 1;
+        I[2] = 2;
+        I[3] = 3;
+
+        J[0] = 0;
+        data[0] = -1.0;
+        J[1] = 1;
+        data[1] = -2.0;
+        J[2] = 2;
+        data[2] = -3.0;
+
+        rows[0] = 0;
+        rows[1] = 3;
+    }
+    else
+    {
+        MFEM_ASSERT(myid == 1, "Something is wrong with MPI ids!");
+
+        I[0] = 0;
+        I[1] = 1;
+        I[2] = 2;
+        I[3] = 3;
+
+        J[0] = 3;
+        data[0] = -4.0;
+        J[1] = 4;
+        data[1] = -5.0;
+        J[2] = 5;
+        data[2] = -6.0;
+
+        rows[0] = 3;
+        rows[1] = 6;
+    }
+
+    mfem::HypreParMatrix* out =  new mfem::HypreParMatrix(
+        comm, nrows, glob_nrows, glob_ncols, I, J, data, rows, rows);
+
+    delete [] I;
+    delete [] J;
+    delete [] data;
+    delete [] rows;
+
+    return out;
+}
+
+mfem::HypreParMatrix* build_tiny_graph_weights(bool weighted = false)
 {
     int num_procs, myid;
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -158,7 +226,14 @@ mfem::HypreParMatrix* build_tiny_graph_weights()
     {
         I[i + 1] = i + 1;
         J[i] = (myid * 4) + i;
-        data[i] = 1.0;
+        if (weighted)
+        {
+            data[i] = 1.0 / (1 + i + myid * (glob_nrows - nrows));
+        }
+        else
+        {
+            data[i] = 1.0;
+        }
     }
 
     mfem::HypreParMatrix* out =  new mfem::HypreParMatrix(
@@ -185,11 +260,38 @@ int main(int argc, char* argv[])
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
+    // parse command line options
+    mfem::OptionsParser args(argc, argv);
+    bool weighted = false;
+    args.AddOption(&weighted, "-w", "--weighted", "-no-w",
+                   "--no-weighted", "Use weighted graph.");
+    bool w_block = false;
+    args.AddOption(&w_block, "-m", "--w_block", "-no-m",
+                   "--no-w_block", "Use W block.");
+
+    args.Parse();
+    if (!args.Good())
+    {
+        if (myid == 0)
+        {
+            args.PrintUsage(std::cout);
+        }
+        MPI_Finalize();
+        return 1;
+    }
+    if (myid == 0)
+    {
+        args.PrintOptions(std::cout);
+    }
+
+    const int nvertices = 6;
+
     // generate the graph
     if (myid == 0)
         std::cout << "Building parallel graph..." << std::endl;
     mfem::HypreParMatrix* D = build_tiny_graph();
-    mfem::HypreParMatrix* M = build_tiny_graph_weights();
+    mfem::HypreParMatrix* M = build_tiny_graph_weights(weighted);
+    mfem::HypreParMatrix* W = build_tiny_w_block();
 
     // set the appropriate right hand side
     mfem::HypreParVector rhs_u_fine(comm, M->GetGlobalNumRows(),
@@ -219,7 +321,7 @@ int main(int argc, char* argv[])
     // solve
     if (myid == 0)
         std::cout << "Solving graph problem..." << std::endl;
-    MinresBlockSolver mgp(comm, M, D, block_true_offsets);
+    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, w_block);
     mgp.Mult(rhs, sol);
     int iter = mgp.GetNumIterations();
     // int nnz = mgp.GetNNZ();
@@ -227,23 +329,57 @@ int main(int argc, char* argv[])
     if (myid == 0)
         std::cout << "Minres converged in " << iter << " iterations."
                   << std::endl;
-    par_orthogonalize_from_constant(sol.GetBlock(1), rhs_p_fine.GlobalSize());
+
+    if (!w_block)
+    {
+        par_orthogonalize_from_constant(sol.GetBlock(1), rhs_p_fine.GlobalSize());
+    }
 
     // truesol was found "independently" with python: testcode/tinygraph.py
-    // [ 4.16666667  2.16666667  1.16666667 -1.83333333 -2.83333333 -2.83333333]
-    mfem::HypreParVector truesol(rhs_p_fine);
-    if (myid == 0)
+    mfem::Vector global_truesol(nvertices);
+    if (weighted && w_block)
     {
-        truesol(0) = 4.16666666666667e+00;
-        truesol(1) = 2.16666666666667e+00;
-        truesol(2) = 1.16666666666667e+00;
+        global_truesol[0] = -5.46521374685666e-01;
+        global_truesol[1] = -4.43419949706622e-01;
+        global_truesol[2] = -3.71332774518022e-01;
+        global_truesol[3] = -2.58172673931266e-01;
+        global_truesol[4] = -2.23976847914538e-01;
+        global_truesol[5] = -2.16677577841545e-01;
+    }
+    else if (weighted)
+    {
+        global_truesol[0] = 1.84483857264231e+00;
+        global_truesol[1] = 2.99384027187765e-01;
+        global_truesol[2] = 1.17565845369583e-01;
+        global_truesol[3] = -6.32434154630417e-01;
+        global_truesol[4] = -8.19350042480884e-01;
+        global_truesol[5] = -8.10004248088361e-01;
+    }
+    else if (w_block)
+    {
+        global_truesol[0] = -6.36443964459280e-01;
+        global_truesol[1] = -5.09155171567424e-01;
+        global_truesol[2] = -4.00176721810417e-01;
+        global_truesol[3] = -2.55461194835796e-01;
+        global_truesol[4] = -2.05439104609494e-01;
+        global_truesol[5] = -1.82612537430661e-01;
     }
     else
     {
-        truesol(0) = -1.83333333333333e+00;
-        truesol(1) = -2.83333333333333e+00;
-        truesol(2) = -2.83333333333333e+00;
+        global_truesol[0] = 4.16666666666667e+00;
+        global_truesol[1] = 2.16666666666667e+00;
+        global_truesol[2] = 1.16666666666667e+00;
+        global_truesol[3] = -1.83333333333333e+00;
+        global_truesol[4] = -2.83333333333333e+00;
+        global_truesol[5] = -2.83333333333333e+00;
     }
+
+    mfem::Vector truesol(3);
+    for (int i = 0; i < 3; ++i)
+    {
+        truesol[i] = global_truesol[i + (myid * 3)];
+    }
+
     truesol -= sol.GetBlock(1);
     double norm = truesol.Norml2();
     if (myid == 0)
