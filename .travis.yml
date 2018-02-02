@@ -1,0 +1,89 @@
+sudo: false
+
+language: cpp
+
+matrix:
+  include:
+    #
+    # Linux
+    #
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          # sources:
+            # - ubuntu-toolchain-r-test
+          packages:
+            # GCC 4.9
+            # - g++-4.9
+            # MPICH
+            - mpich
+            - libmpich-dev
+            # OpenMPI
+            # - openmpi-bin
+            # - libopenmpi-dev
+      env: DEBUG=YES
+      cache:
+        directories:
+          - $TRAVIS_BUILD_DIR/../hypre-2.10.0b/src/hypre/lib
+          - $TRAVIS_BUILD_DIR/../hypre-2.10.0b/src/hypre/include
+
+install:
+   # Set MPI compilers, print compiler version
+   - if [ $MPI == "YES" ]; then
+        if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+           export MPICH_CC="$CC";
+           export MPICH_CXX="$CXX";
+        else
+           export OMPI_CC="$CC";
+           export OMPI_CXX="$CXX";
+           mpic++ --showme:version;
+        fi;
+        mpic++ -v;
+     else
+        $CXX -v;
+     fi
+
+   # Back out of the smoothG directory to install the libraries
+   - cd ..
+
+   # hypre
+   - if [ $MPI == "YES" ]; then
+        if [ ! -e hypre-2.10.0b/src/hypre/lib/libHYPRE.a ]; then
+           wget https://computation.llnl.gov/project/linear_solvers/download/hypre-2.10.0b.tar.gz --no-check-certificate;
+           rm -rf hypre-2.10.0b;
+           tar xvzf hypre-2.10.0b.tar.gz;
+           cd hypre-2.10.0b/src;
+           ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++;
+           make -j3;
+           cd ../..;
+        else
+            echo "Reusing cached hypre-2.10.0b/";
+        fi;
+     else
+        echo "Serial build, not using hypre";
+     fi
+
+script:
+   # Compiler
+   - export MYCXX=mpic++;
+
+   # Print the compiler version
+   - $MYCXX -v
+
+   # Set some variables
+   - cd $TRAVIS_BUILD_DIR;
+     CPPFLAGS="";
+     SKIP_TEST_DIRS="";
+
+   # Configure the library
+   - mkdir build;
+     cd build;
+     cmake -DMFEM_DIR=../mfem -DHYPRE_DIR=../hypre-2.10.0b ..;
+
+   # Build the library
+   - make -j3
+
+   # Run tests
+   - make test
+
