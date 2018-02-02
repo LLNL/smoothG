@@ -170,6 +170,11 @@ public:
     std::vector<double> ComputeErrors(const mfem::BlockVector& upscaled_sol,
                                       const mfem::BlockVector& fine_sol) const;
 
+    /// Compare errors between upscaled and fine solution.
+    /// Displays error to stdout on processor 0
+    void ShowErrors(const mfem::BlockVector& upscaled_sol,
+                    const mfem::BlockVector& fine_sol) const;
+
 protected:
     Upscale(MPI_Comm comm, int size, bool hybridization = false)
         : Operator(size), comm_(comm), setup_time_(0.0), hybridization_(hybridization)

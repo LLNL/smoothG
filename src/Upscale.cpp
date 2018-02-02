@@ -444,6 +444,21 @@ std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol
     return info;
 }
 
+void Upscale::ShowErrors(const mfem::BlockVector& upscaled_sol,
+                         const mfem::BlockVector& fine_sol) const
+{
+    const mfem::SparseMatrix& M = GetFineMatrix().getWeight();
+    const mfem::SparseMatrix& D = GetFineMatrix().getD();
+
+    auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
+    info.push_back(OperatorComplexity());
+
+    if (myid_ == 0)
+    {
+        smoothg::ShowErrors(info);
+    }
+}
+
 void Upscale::ShowCoarseSolveInfo(std::ostream& out) const
 {
     assert(coarse_solver_);

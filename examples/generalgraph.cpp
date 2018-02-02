@@ -202,12 +202,7 @@ int main(int argc, char* argv[])
         /// [Solve]
 
         /// [Check Error]
-        auto error_info = upscale.ComputeErrors(upscaled_sol, fine_sol);
-
-        if (myid == 0)
-        {
-            ShowErrors(error_info);
-        }
+        upscale.ShowErrors(upscaled_sol, fine_sol);
         /// [Check Error]
 
         if (save_fiedler)
