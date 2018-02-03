@@ -35,6 +35,8 @@ matrix:
           - $TRAVIS_BUILD_DIR/../metis-install
 
 install:
+   - sudo apt-get -qq update
+   - sudo apt-get install -y libblas-dev -liblapack-dev libmetis-dev libsuitesparse-dev
    # Set MPI compilers, print compiler version
    - if [ $MPI == "YES" ]; then
         if [ "$TRAVIS_OS_NAME" == "linux" ]; then
@@ -56,7 +58,7 @@ install:
    # metis
    - if [ ! -e metis-install/lib/libmetis.a ]; then
         wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz;
-        tar -xvzf metis-5.1.0.tar.gz;
+        tar -xzf metis-5.1.0.tar.gz;
         cd metis-5.1.0;
         make config prefix=../metis-install;
         make install;
@@ -67,7 +69,7 @@ install:
    # suitesparse
    - if [ ! -e SuiteSparse-install/lib/libumfpack.a ]; then
         wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
-        tar xvzf SuiteSparse-4.5.4.tar.gz;
+        tar xzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
         export LD_LIBRARY_PATH=../SuiteSparse-install:$LD_LIBRARY_PATH;
         make install MY_METIS_LIB=../metis-install/lib/metis.a MY_METIS_INC=../metis-install/include/metis.h INSTALL=../SuiteSparse-install;
@@ -80,7 +82,7 @@ install:
         if [ ! -e hypre-2.10.0b/src/hypre/lib/libHYPRE.a ]; then
            wget https://computation.llnl.gov/project/linear_solvers/download/hypre-2.10.0b.tar.gz --no-check-certificate;
            rm -rf hypre-2.10.0b;
-           tar xvzf hypre-2.10.0b.tar.gz;
+           tar xzf hypre-2.10.0b.tar.gz;
            cd hypre-2.10.0b/src;
            ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++;
            make -j3;
