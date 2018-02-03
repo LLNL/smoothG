@@ -78,8 +78,9 @@ install:
         if [ ! -e mfem-install/libmfem.a ]; then
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
-            CC=mpicc CXX=mpic++ make MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES;
-            make install PREFIX=../mfem-install
+            CC=mpicc CXX=mpic++ make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES;
+            make;
+            make install PREFIX=../mfem-install;
             cd ../..;
         else
             echo "Reusing cached mfem";
