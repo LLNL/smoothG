@@ -41,6 +41,7 @@ int main(int argc, char* argv[])
     constexpr auto coarse_factor = 80;
     constexpr auto max_evects = 4;
     constexpr auto spect_tol = 1.0;
+    constexpr auto trace_method = 1.0;
     constexpr auto hybridization = false;
 
     // Solve Parameters
@@ -57,8 +58,8 @@ int main(int argc, char* argv[])
     // Power Iteration With Upscale Operators
     {
         // Upscaler
-        const GraphUpscale upscale(comm, vertex_edge, coarse_factor,
-                                   spect_tol, max_evects, hybridization);
+        const GraphUpscale upscale(comm, vertex_edge, coarse_factor, spect_tol,
+                                   max_evects, trace_method, hybridization);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);

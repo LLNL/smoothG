@@ -46,6 +46,7 @@ public:
 
        @param rel_tol tolerance for including small eigenvectors
        @param max_evects max eigenvectors to include per aggregate
+       @param trace_method methods (1-4) for getting edge trace samples
        @param M_local is mass matrix on edge-based (velocity) space
        @param D_local is a divergence-like operator
        @param graph_topology the partitioning relations for coarsening
@@ -62,13 +63,13 @@ public:
        \f]
     */
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects,
+        double rel_tol, int max_evects, int trace_method,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const GraphTopology& graph_topology);
 
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects,
+        double rel_tol, int max_evects, int trace_method,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const mfem::SparseMatrix* W_local,
@@ -109,13 +110,22 @@ private:
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigma,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
+    std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
+            const mfem::SparseMatrix& Lloc,
+            const mfem::SparseMatrix& Dloc,
+            const mfem::Vector& Mloc_diag_inv);
+
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
+    void CheckMinimalEigenvalue(
+            double eval_min, int aggregate_id, std::string entity);
+
     MPI_Comm comm_;
 
-    double rel_tol_;
-    int max_evects_;
+    const double rel_tol_;
+    const int max_evects_;
+    const int trace_method_;
 
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
@@ -126,7 +136,7 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> W_global_;
 
     const GraphTopology& graph_topology_;
-    double zero_eigenvalue_threshold_;
+    const double zero_eigenvalue_threshold_;
 
     /// face to permuted edge relation table
     std::unique_ptr<mfem::HypreParMatrix> face_permedge_;

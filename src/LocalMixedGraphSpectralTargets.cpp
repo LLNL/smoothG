@@ -22,7 +22,7 @@
 #include "GraphCoarsen.hpp"
 #include "utilities.hpp"
 #include "sharedentitycommunication.hpp"
-#include "arpackeig.hpp"
+#include "LocalEigenSolver.hpp"
 #include "MatrixUtilities.hpp"
 
 using std::unique_ptr;
@@ -62,22 +62,23 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
 }
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-    double rel_tol, int max_evects,
+    double rel_tol, int max_evects, int trace_method,
     const mfem::SparseMatrix& M_local, const mfem::SparseMatrix& D_local,
     const GraphTopology& graph_topology)
     :
-    LocalMixedGraphSpectralTargets(rel_tol, max_evects, M_local, D_local, nullptr, graph_topology)
+    LocalMixedGraphSpectralTargets(rel_tol, max_evects, trace_method, M_local, D_local, nullptr, graph_topology)
 {
 }
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-    double rel_tol, int max_evects,
+    double rel_tol, int max_evects, int trace_method,
     const mfem::SparseMatrix& M_local, const mfem::SparseMatrix& D_local,
     const mfem::SparseMatrix* W_local, const GraphTopology& graph_topology)
     :
     comm_(graph_topology.edge_d_td_.GetComm()),
     rel_tol_(rel_tol),
     max_evects_(max_evects),
+    trace_method_(trace_method),
     M_local_(M_local),
     D_local_(D_local),
     W_local_(W_local),
@@ -108,6 +109,71 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
         W_global_ = make_unique<mfem::HypreParMatrix>(
                         comm_, D_local_rowstart.Last(),
                         D_local_rowstart, W_local_ptr);
+    }
+}
+
+std::vector<mfem::SparseMatrix>
+LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
+        const mfem::SparseMatrix& L,
+        const mfem::SparseMatrix& D,
+        const mfem::Vector& M_diag_inv)
+{
+    // Extract the diagonal of local Laplacian
+    mfem::Vector L_diag;
+    L.GetDiag(L_diag);
+
+    // Construct B (like D but no direction) from D
+    mfem::SparseMatrix B(D, false);
+    B = 1.0;
+
+    // BM^{-1}
+    B.ScaleColumns(M_diag_inv);
+
+    // X = DM^{-1}D^T + BM^{-1}B^T = 2*diag(L)
+    mfem::Vector X_inv(L_diag.Size());
+    for (int i = 0; i < L_diag.Size(); i++)
+        X_inv(i) = 0.5 / L_diag(i);
+
+    // Construct Laplacian for edge space M^{-1} - M^{-1}B^TX^{-1}BM^{-1}
+    mfem::SparseMatrix L_edge = smoothg::Mult_AtDA(B, X_inv);
+    smoothg::Add(-1.0, L_edge, 1.0, M_diag_inv);
+
+    // Scale L_edge by M if trace_method_ = 4
+    if (trace_method_ == 4)
+    {
+        mfem::Vector M_diag(M_diag_inv.Size());
+        for (int i = 0; i < D.Width() ; i++)
+        {
+            M_diag(i) = 1. / M_diag_inv(i);
+        }
+        L_edge.ScaleColumns(M_diag);
+        L_edge.ScaleRows(M_diag);
+    }
+
+    std::vector<mfem::SparseMatrix> EigSys;
+    EigSys.push_back(L_edge);
+
+    if (trace_method_ == 3 || trace_method_ == 4)
+    {
+        // Compute M + D^T D
+        mfem::SparseMatrix DT( smoothg::Transpose(D) );
+        mfem::SparseMatrix edge_product( smoothg::Mult(DT, D) );
+        smoothg::Add(edge_product, M_diag_inv, true);
+        EigSys.push_back(edge_product);
+    }
+
+    return EigSys;
+}
+
+void LocalMixedGraphSpectralTargets::CheckMinimalEigenvalue(
+        double eval_min, int aggregate_id, std::string entity)
+{
+    if (fabs(eval_min) > zero_eigenvalue_threshold_)
+    {
+        std::cerr << "Aggregate id: " << aggregate_id << "\n";
+        std::cout << "Smallest eigenvalue: "<< eval_min << "\n";
+        auto msg = "Smallest eigenvalue of "+ entity +" Laplacian is nonzero!";
+        mfem::mfem_error(msg.c_str());
     }
 }
 
@@ -202,14 +268,14 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     // The following is used to extract the correct indices when restricting
     // from an extended aggregate to the original aggregate (which is in diag)
-    int nvertex_local_dof_diag, nvertex_local_dofs;
+    int nvertex_local_dof_diag;
     mfem::Array<int> vertex_dof_marker(nvertices_diag);
     vertex_dof_marker = -1;
 
     mfem::Array<int> vertex_local_dof;
     mfem::Array<int> diag_loc_dof, offd_loc_dof;
-    mfem::Vector first_evect, evals;
-    mfem::DenseMatrix GLloc, evects, evects_tmp, evects_restricted;
+    mfem::Vector first_evect, Mloc_diag_inv;
+    mfem::DenseMatrix evects, evects_tmp, evects_restricted;
     mfem::DenseMatrix evects_T, evects_restricted_T;
     const double* M_diag_data = M_ext.GetData();
 
@@ -223,11 +289,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // ---
     // solve eigenvalue problem on each (extended) neighbor_agg, our (3.1)
     // ---
-    Eigensolver eigs;
-    bool use_dense_eigensolver = true;
-#if SMOOTHG_USE_ARPACK
-    SparseEigensolver speigs;
-#endif
+    LocalEigenSolver eigs(max_evects_, rel_tol_);
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
     {
         mfem::Array<int> edge_local_dof_ext, vertex_local_dof_ext;
@@ -262,6 +324,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             GetTableRow(AggExt_vertex_diag, iAgg, vertex_local_dof_ext);
             nvertex_local_dof_diag = vertex_local_dof_ext.Size();
         }
+        assert(nvertex_local_dof_diag > 0);
 
         // Single vertex aggregate
         if (edge_local_dof_ext.Size() == 0)
@@ -277,15 +340,12 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
         // build local (weighted) graph Laplacian
         mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc);
-        const int* DT_i = DlocT.GetI();
-        double* DT_data = DlocT.GetData();
+        Mloc_diag_inv.SetSize(edge_local_dof_ext.Size());
         for (int i = 0; i < DlocT.Height(); i++)
         {
-            // M is assumed to be diagonal
-            const double M_ii = M_diag_data[edge_local_dof_ext[i]];
-            for (int j = DT_i[i]; j < DT_i[i + 1]; j++)
-                DT_data[j] /= M_ii;
+            Mloc_diag_inv(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
         }
+        DlocT.ScaleRows(Mloc_diag_inv);
         mfem::SparseMatrix DMinvDt = smoothg::Mult(Dloc, DlocT);
 
         // Wloc assumed to be diagonal
@@ -299,118 +359,29 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             DMinvDt.Add(-1.0, Wloc);
         }
 
-#if SMOOTHG_USE_ARPACK
-        use_dense_eigensolver = (DlocT.Width() < 20);
-#endif
         // actually solve (3.1)
-        if (use_dense_eigensolver)
+        double eval_min = eigs.Compute(DMinvDt, evects);
+        if (!use_w)
         {
-            Full(DMinvDt, GLloc);
-            eigs.Compute(GLloc, evals, evects, rel_tol_, max_evects_);
+            CheckMinimalEigenvalue(eval_min, iAgg, "vertex");
         }
-#if SMOOTHG_USE_ARPACK
-        else
-        {
-            // The SparseEigensolver will find the largest eigenvalues of the
-            // inverse of the local graph Laplacian, so we add an identity to
-            // the local graph Laplacian so that its inverse is well-defined
-            if (!use_w)
-            {
-                for (int i = 0; i < DlocT.Width() ; i++)
-                    DMinvDt.Elem(i, i) += 1.;
-            }
 
-            int not_converge = speigs.Compute(DMinvDt, evals, evects, max_evects_);
-
-            if (not_converge)
-            {
-                std::cout << "Warning:\n";
-                std::cout << not_converge << " eigenvector(s) in " << iAgg
-                          << "-th aggregate did not converge\n";
-            }
-
-        }
-#endif
-
-        // For SparseEigensolver, we pick largest eigenvalues of inverse matrix
         int nevects = evects.Width();
-        if (use_dense_eigensolver)
-        {
-            if (fabs(evals(0)) > zero_eigenvalue_threshold_ && !use_w)
-            {
-                std::cerr << "neighbor_agg " << iAgg << "\n";
-                std::cout << evals(0) << std::endl;
-                //mfem::mfem_error("Smallest eigenvalue is nonzero!");
-                printf("Smallest eigenvalue is nonzero!");
-            }
-        }
-        else
-        {
-            if (fabs(evals(nevects - 1) - 1) > zero_eigenvalue_threshold_ && !use_w)
-            {
-                std::cerr << "neighbor_agg " << iAgg << "\n";
-                std::cout << evals(nevects - 1) - 1 << std::endl;
-                mfem::mfem_error("Smallest eigenvalue is nonzero!");
-            }
-        }
 
         if (use_w)
         {
             // Explicitly add constant vector
-            if (use_dense_eigensolver)
-            {
-                mfem::DenseMatrix out(evects.Height(), evects.Width() + 1);
+            mfem::DenseMatrix out(evects.Height(), evects.Width() + 1);
 
-                mfem::Vector constant(evects.Height());
-                constant = 1.0 / std::sqrt(evects.Height());
+            mfem::Vector constant(evects.Height());
+            constant = 1.0 / std::sqrt(evects.Height());
 
-                Concatenate(constant, evects, out);
+            Concatenate(constant, evects, out);
 
-                evects = out;
-            }
-            else
-            {
-                mfem::DenseMatrix out(evects.Height(), evects.Width() + 1);
-                out.CopyMN(evects, 0, 0);
-
-                mfem::Vector constant(evects.Height());
-                constant = 1.0 / std::sqrt(evects.Height());
-
-                out.SetCol(evects.Width(), constant);
-
-                evects = out;
-            }
-
-            mfem::Vector eval_tmp(evals.Size() + 1);
-            eval_tmp[0] = 0.0;
-            eval_tmp.SetVector(evals, 1);
+            evects = out;
 
             nevects++;
-
-            //evals.Swap(eval_tmp);
-            evals = (eval_tmp);
         }
-
-        // Do not consider the first vertex eigenvector, which is constant
-        if (nevects > 1)
-        {
-            if (use_dense_eigensolver)
-                evects_tmp.UseExternalData(evects.Data() + evects.Height(),
-                                           evects.Height(), nevects - 1);
-            else
-                evects_tmp.UseExternalData(evects.Data(),
-                                           evects.Height(), nevects - 1);
-        }
-        else
-        {
-            evects_tmp.SetSize(evects.Height(), nevects - 1);
-        }
-
-        // compute trace samples from vertex eigenvectors
-        // (recall M^{-1} scaling of DlocT above)
-        // transposed for extraction later
-        AggExt_sigma[iAgg].SetSize(evects_tmp.Width(), DlocT.Height());
-        MultSparseDenseTranspose(DlocT, evects_tmp, AggExt_sigma[iAgg]);
 
         // restricting vertex dofs on extended region to the original aggregate
         // note that all vertex dofs are true dofs, so AggExt_vertex_diag and
@@ -418,33 +389,46 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         for (int j = 0; j < nvertex_local_dof_diag; ++j)
             vertex_dof_marker[vertex_local_dof_ext[j]] = j;
         GetTableRow(graph_topology_.Agg_vertex_, iAgg, vertex_local_dof);
-        nvertex_local_dofs = vertex_local_dof.Size();
 
         evects_T.Transpose(evects);
-
-        assert(evects_T.Width() == vertex_local_dof_ext.Size());
-
-        evects_restricted_T.SetSize(nevects, nvertex_local_dofs);
-
-        assert(nvertex_local_dof_diag > 0);
-
-        for (int j = 0; j < nvertex_local_dofs; ++j)
-        {
-            int id_in_AggExt = vertex_dof_marker[vertex_local_dof[j]];
-            assert(id_in_AggExt >= 0);
-            std::copy(evects_T.Data() + id_in_AggExt * nevects,
-                      evects_T.Data() + (id_in_AggExt + 1) * nevects,
-                      evects_restricted_T.Data() + j * nevects);
-        }
-
+        evects_restricted_T.SetSize(nevects, vertex_local_dof.Size());
+        ExtractColumns(evects_T, vertex_dof_marker, vertex_local_dof, 0,
+                       evects_restricted_T);
         evects_restricted.Transpose(evects_restricted_T);
 
-        if (use_dense_eigensolver)
-            evects_restricted.GetColumn(0, first_evect);
-        else
-            evects_restricted.GetColumn(nevects - 1, first_evect);
-
+        // Apply SVD to the restricted vectors (first vector is always kept)
+        evects_restricted.GetColumn(0, first_evect);
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[iAgg]);
+
+        // Compute edge trace samples (before restriction and SVD)
+        if (trace_method_ == 1 || use_w)
+        {
+            // Do not consider the first vertex eigenvector, which is constant
+            evects_tmp.UseExternalData(evects.Data() + evects.Height(),
+                                       evects.Height(), nevects - 1);
+
+            // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
+            // transposed for extraction later
+            AggExt_sigma[iAgg].SetSize(evects_tmp.Width(), DlocT.Height());
+            MultSparseDenseTranspose(DlocT, evects_tmp, AggExt_sigma[iAgg]);
+        }
+        else
+        {
+            // Collect trace samples from eigenvectors of dual graph Laplacian
+            auto EES = BuildEdgeEigenSystem(DMinvDt, Dloc, Mloc_diag_inv);
+            if (trace_method_ == 2)
+            {
+                eval_min = eigs.Compute(EES[0], AggExt_sigma[iAgg]);
+            }
+            else
+            {
+                eval_min = eigs.Compute(EES[0], EES[1], AggExt_sigma[iAgg]);
+            }
+            CheckMinimalEigenvalue(eval_min, iAgg, "edge");
+
+            // Transpose all for extraction later
+            AggExt_sigma[iAgg].Transpose();
+        }
     }
 }
 
@@ -523,17 +507,9 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 }
 
                 const mfem::DenseMatrix& sigma(AggExt_sigma[iAgg]);
-                const int vects = sigma.Height();
-                for (int j = 0; j < num_iface_edge_dof; ++j)
-                {
-                    int id_in_AggExt = edge_dof_marker[face_edge_dof[j]];
-                    assert(0 <= id_in_AggExt);
-                    assert(sigma.Width() > id_in_AggExt);
-                    std::copy(sigma.Data() + id_in_AggExt * vects,
-                              sigma.Data() + (id_in_AggExt + 1)*vects,
-                              face_sigma_tmp.Data() + j * total_vects + start);
-                }
-                start += vects;
+                ExtractColumns(sigma, edge_dof_marker, face_edge_dof, start,
+                               face_sigma_tmp);
+                start += sigma.Height();
             }
 
             face_sigma_tmp = mfem::DenseMatrix(face_sigma_tmp, 't');
@@ -834,6 +810,7 @@ void LocalMixedGraphSpectralTargets::Compute(std::vector<mfem::DenseMatrix>&
                                              local_edge_trace_targets,
                                              std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
+    assert(trace_method_ < 5 && trace_method_ > 0);
     const int nAggs = graph_topology_.Agg_vertex_.Height();
 
     std::vector<mfem::DenseMatrix> AggExt_sigma(nAggs);

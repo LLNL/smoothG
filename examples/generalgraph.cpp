@@ -104,6 +104,9 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
+    int trace_method = 1;
+    args.AddOption(&trace_method, "-tm", "--trace-method",
+                   "Different methods (1-4) to get edge trace samples.");
     args.Parse();
     if (!args.Good())
     {
@@ -169,8 +172,8 @@ int main(int argc, char* argv[])
     // Set up GraphUpscale
     {
         /// [Upscale]
-        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, hybridization, weight);
+        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning, spect_tol,
+                             max_evects, trace_method, hybridization, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

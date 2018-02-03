@@ -439,13 +439,10 @@ void HybridSolver::AssembleHybridSystem(
         Mloc_solver.Mult(DlocT, MinvDT_i);
         Mloc_solver.Mult(ClocT, MinvCT_i);
 
-        tmpHybrid_el.SetSize(nlocal_multiplier, nlocal_multiplier);
-
         // Compute CMinvCT = Cloc * MinvCT
         MultSparseDense(Cloc, MinvCT_i, tmpHybrid_el);
 
         // Compute Aloc = DMinvDT = Dloc * MinvDT
-        Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
         MultSparseDense(Dloc, MinvDT_i, Aloc);
 
         if (W_)
@@ -459,7 +456,6 @@ void HybridSolver::AssembleHybridSystem(
         }
 
         // Compute DMinvCT Dloc * MinvCT
-        DMinvCT.SetSize(nlocal_vertexdof, nlocal_multiplier);
         MultSparseDense(Dloc, MinvCT_i, DMinvCT);
 
         // Compute the LU factorization of Aloc and Ainv_ * DMinvCT

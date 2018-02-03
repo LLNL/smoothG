@@ -49,6 +49,7 @@ public:
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param trace_method methods (1-4) for getting edge trace samples
        @param hybridization use hybridization as solver
     */
     FiniteVolumeUpscale(MPI_Comm comm,
@@ -58,7 +59,8 @@ public:
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
-                        double spect_tol = 0.001, int max_evects = 4, bool hybridization = false);
+                        double spect_tol = 0.001, int max_evects = 4,
+                        int trace_method = 1, bool hybridization = false);
 
     /**
        @brief Constructor with W block specified
@@ -71,6 +73,7 @@ public:
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param trace_method methods (1-4) for getting edge trace samples
        @param hybridization use hybridization as solver
     */
     FiniteVolumeUpscale(MPI_Comm comm,
@@ -81,7 +84,8 @@ public:
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
-                        double spect_tol = 0.001, int max_evects = 4, bool hybridization = false);
+                        double spect_tol = 0.001, int max_evects = 4,
+                        int trace_method = 1, bool hybridization = false);
 
     void MakeFineSolver(const mfem::Array<int>& marker) const;
 

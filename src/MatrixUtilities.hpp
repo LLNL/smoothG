@@ -111,10 +111,31 @@ mfem::SparseMatrix SparseIdentity(int size);
    @brief Construct an rectangular identity matrix (as a SparseMatrix)
    @param rows number of row
    @param cols number of columns
-   @params row_offset offset row where diagonal identity starts
-   @params col_offset offset column where diagonal identity starts
+   @param row_offset offset row where diagonal identity starts
+   @param col_offset offset column where diagonal identity starts
 */
 mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset = 0, int col_offset = 0);
+
+/**
+   @brief mat = a * mat + b * diag(vec) or diag(vec^{-1}) if invert_vec = true
+
+   mat must have nonzeros on the diagonal
+*/
+void Add(const double a, mfem::SparseMatrix& mat, const double b,
+         const mfem::Vector& vec, const bool invert_vec = false);
+
+/**
+   @brief mat = mat + diag(vec) or diag(vec^{-1}) if invert_vec = true
+
+   mat must have nonzeros on the diagonal
+*/
+void Add(mfem::SparseMatrix& mat, const mfem::Vector& vec,
+         const bool invert_vec = false);
+
+/**
+   @brief Compute A^t * diag(D) * A
+*/
+mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D);
 
 /**
    @brief Construct a diagonal matrix with the entries specified by a vector
@@ -163,6 +184,20 @@ mfem::SparseMatrix ExtractRowAndColumns(
 void ExtractSubMatrix(
     const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
     const mfem::Array<int>& cols, const mfem::Array<int>& colMapper,
+    mfem::DenseMatrix& A_sub);
+
+/**
+   @brief Extract columns from a dense matrix (A) to another dense matrix (A_sub)
+
+   @param A the matrix to extract from
+   @param ref_to_col mapping from reference index to column index of A
+   @param subcol_to_ref mapping from column index of A_sub to reference index
+   @param row_offset which row of A_sub to start putting the extracted columns
+   @param A_sub the returned matrix where the extracted columns are collected)
+*/
+void ExtractColumns(
+    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
+    const mfem::Array<int>& subcol_to_ref, const int row_offset,
     mfem::DenseMatrix& A_sub);
 
 /**

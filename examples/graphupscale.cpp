@@ -49,6 +49,7 @@ int main(int argc, char* argv[])
     constexpr auto num_partitions = 10;
     constexpr auto max_evects = 4;
     constexpr auto spect_tol = 1.e-3;
+    constexpr auto trace_method = 1;
     constexpr auto hybridization = false;
 
     const auto vertex_edge = ReadVertexEdge(ve_filename);
@@ -62,7 +63,7 @@ int main(int argc, char* argv[])
         Partition(vertex_vertex, global_partitioning, num_partitions);
 
         const auto upscale = GraphUpscale(comm, vertex_edge, global_partitioning,
-                                          spect_tol, max_evects, hybridization);
+                                          spect_tol, max_evects, trace_method, hybridization);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(rhs_u_fine);
@@ -72,8 +73,8 @@ int main(int argc, char* argv[])
 
     // vertex_edge and coarse factor
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                          spect_tol, max_evects, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor, spect_tol,
+                                          max_evects, trace_method, hybridization);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(rhs_u_fine);
@@ -83,8 +84,8 @@ int main(int argc, char* argv[])
 
     // Using coarse space
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                          spect_tol, max_evects, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor, spect_tol,
+                                          max_evects, trace_method, hybridization);
 
         // Start at Fine Level
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
@@ -108,8 +109,8 @@ int main(int argc, char* argv[])
 
     // Comparing Error; essentially generalgraph.cpp
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                          spect_tol, max_evects, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor, spect_tol,
+                                          max_evects, trace_method, hybridization);
 
         mfem::BlockVector fine_rhs = upscale.ReadVertexBlockVector(rhs_filename);
 
@@ -133,11 +134,11 @@ int main(int argc, char* argv[])
     {
         const bool use_hybridization = true;
 
-        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                             spect_tol, max_evects, use_hybridization);
+        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor, spect_tol,
+                                             max_evects, trace_method, use_hybridization);
 
-        const auto minres_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                                 spect_tol, max_evects, !use_hybridization);
+        const auto minres_upscale = GraphUpscale(comm, vertex_edge, coarse_factor, spect_tol,
+                                                 max_evects, trace_method, !use_hybridization);
 
         const auto rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 

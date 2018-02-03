@@ -224,7 +224,7 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets(num_partitions);
 
     LocalMixedGraphSpectralTargets localtargets(
-        spect_tol, max_evects, graph.GetM(), graph.GetD(), graph_topology);
+        spect_tol, max_evects, 1, graph.GetM(), graph.GetD(), graph_topology);
 
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
