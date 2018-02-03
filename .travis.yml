@@ -19,12 +19,15 @@ matrix:
             # MPICH
             - mpich
             - libmpich-dev
+            - liblapack-dev
+            - libblas-dev
+            - metis
+            - libmetis-dev
+            - libsuitesparse-dev
             # OpenMPI
             # - openmpi-bin
             # - libopenmpi-dev
             # Metis
-            - metis
-            - libmetis-dev
       env: DEBUG=YES
            MPI=YES
       cache:
@@ -35,8 +38,6 @@ matrix:
           - $TRAVIS_BUILD_DIR/../metis-install
 
 install:
-   - sudo apt-get -qq update
-   - sudo apt-get install -y libblas-dev -liblapack-dev libmetis-dev libsuitesparse-dev
    # Set MPI compilers, print compiler version
    - if [ $MPI == "YES" ]; then
         if [ "$TRAVIS_OS_NAME" == "linux" ]; then
