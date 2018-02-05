@@ -54,6 +54,15 @@ install:
    # Back out of the smoothG directory to install the libraries
    - cd ..
 
+   # spe10 dataset
+   - if [ ! -e spe10-install/spe_perm.dat ]; then
+        wget http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
+        unzip -d spe10-install por_perm_case2a.zip;
+        rm por_per_case2a.zip;
+     else
+        echo "Reusing cached spe10";
+     fi;
+
    # metis
    - if [ ! -e metis-install/lib/libmetis.a ]; then
         wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz;
@@ -101,13 +110,13 @@ install:
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
             make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES HYPRE_DIR=/home/travis/build/LLNL/hypre-install SUITESPARSE_DIR=/home/travis/build/LLNL/SuiteSparse-install METIS_DIR=/home/travis/build/LLNL/metis-install PREFIX=/home/build/travis/build/LLNL/mfem-install;
-            CC=mpicc CXX=mpic++ make install PREFIX=/home/build/travis/build/LLNL/mfem-install;
+            CC=mpicc CXX=mpic++ make install PREFIX=/home/travis/build/LLNL/mfem-install;
             cd ..;
         else
             echo "Reusing cached mfem";
         fi;
      else
-        echo "mfem failed to build";
+        echo "Serial build, not using mfem";
      fi
 
 
@@ -126,7 +135,7 @@ script:
    # Configure the library
    - mkdir build;
      cd build;
-     cmake -DMFEM_DIR=../mfem -DHYPRE_DIR=../hypre-2.10.0b .. -DSuiteSparse_DIR=../SuiteSparse-install
+     cmake -DMFEM_DIR=../../mfem-install -DHYPRE_DIR=../../hypre-install .. -DSuiteSparse_DIR=../../SuiteSparse-install -DMETIS_DIR=../../metis-install -DUSE_ARPACK=NO -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_DIR=../../spe10;
 
    # Build the library
    - make -j3
