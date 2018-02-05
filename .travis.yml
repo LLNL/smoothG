@@ -19,11 +19,11 @@ matrix:
             # MPICH
             - mpich
             - libmpich-dev
+            # Other
             - liblapack-dev
             - libblas-dev
             - metis
             - libmetis-dev
-            - libsuitesparse-dev
             # OpenMPI
             # - openmpi-bin
             # - libopenmpi-dev
