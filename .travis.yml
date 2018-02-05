@@ -151,5 +151,8 @@ script:
    - make -j3
 
    # Run tests
+   # mpich doesn't set path automatically?
+   - export PATH=examples:$PATH;
+   - export PATH=testcode:$PATH;
    - env CTEST_OUTPUT_ON_FAILURE=1 make test
 
