@@ -146,5 +146,5 @@ script:
    - make -j3
 
    # Run tests
-   - make test
+   - env CTEST_OUTPUT_ON_FAILURE=1 make test
 
