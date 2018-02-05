@@ -30,10 +30,11 @@ matrix:
            MPI=YES
       cache:
         directories:
-          - $TRAVIS_BUILD_DIR/../hypre-2.10.0b/src/hypre/lib
-          - $TRAVIS_BUILD_DIR/../hypre-2.10.0b/src/hypre/include
+          - $TRAVIS_BUILD_DIR/../hypre-install
+          - $TRAVIS_BUILD_DIR/../mfem-install
           - $TRAVIS_BUILD_DIR/../SuiteSparse-install
           - $TRAVIS_BUILD_DIR/../metis-install
+          - $TRAVIS_BUILD_DIR/../spe10-install
 
 install:
    # Set MPI compilers, print compiler version
