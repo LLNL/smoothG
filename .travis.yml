@@ -138,10 +138,10 @@ script:
    - mkdir build;
    - echo "Dirs:";
    - ls -la $TRAVIS_BUILD_DIR;
-   - ls -la $TRAVIS_BUILD_DIR/metis-install;
-   - ls -la $TRAVIS_BUILD_DIR/mfem-install;
-   - ls -la $TRAVIS_BUILD_DIR/hypre-install;
-   - ls -la $TRAVIS_BUILD_DIR/SuiteSparse-install;
+   - ls -la $TRAVIS_BUILD_DIR/../metis-install;
+   - ls -la $TRAVIS_BUILD_DIR/../mfem-install;
+   - ls -la $TRAVIS_BUILD_DIR/../hypre-install;
+   - ls -la $TRAVIS_BUILD_DIR/../SuiteSparse-install;
    - echo "End Dirs:";
    - cd build;
    - cmake \
