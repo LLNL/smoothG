@@ -136,9 +136,13 @@ script:
 
    # Configure the library
    - mkdir build;
-   - ls /home/travis/build/LLNL/mfem-install;
-   - ls /home/travis/build/LLNL/hypre-install;
-   - ls /home/travis/build/LLNL/SuiteSparse-install;
+   - echo "Dirs:";
+   - ls -la $TRAVIS_BUILD_DIR;
+   - ls -la $TRAVIS_BUILD_DIR/metis-install;
+   - ls -la $TRAVIS_BUILD_DIR/mfem-install;
+   - ls -la $TRAVIS_BUILD_DIR/hypre-install;
+   - ls -la $TRAVIS_BUILD_DIR/SuiteSparse-install;
+   - echo "End Dirs:";
    - cd build;
    - cmake \
      -DMFEM_DIR=/home/travis/build/LLNL/mfem-install \
