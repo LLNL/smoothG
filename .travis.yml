@@ -79,12 +79,12 @@ install:
 
    # hypre
    - if [ $MPI == "YES" ]; then
-        if [ ! -e hypre-2.10.0b/src/hypre/lib/libHYPRE.a ]; then
+        if [ ! -e hypre-install/lib/libHYPRE.a ]; then
            wget https://computation.llnl.gov/project/linear_solvers/download/hypre-2.10.0b.tar.gz --no-check-certificate;
            rm -rf hypre-2.10.0b;
            tar xzf hypre-2.10.0b.tar.gz;
            cd hypre-2.10.0b/src;
-           ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++ prefix=../../hypre-install;
+           ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++ prefix=/home/travis/build/LLNL/hypre-install;
            make -j3;
            make install;
            cd ../..;
