@@ -68,9 +68,12 @@ include_directories(${METIS_INCLUDE_DIRS})
 list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
 
 # SuiteSparse
-find_package(SuiteSparse REQUIRED)
+find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)
 include_directories(${SuiteSparse_INCLUDE_DIRS})
 list(APPEND TPL_LIBRARIES ${SuiteSparse_LIBRARIES})
+
+MESSAGE("SUITEPRRE" ${SuiteSparse_LIBRARIES})
+MESSAGE("SUITEPRRE" ${SuiteSparse_INCLUDE_DIRS})
 
 # ARPACK
 # there are several sources for ARPACK, I recommend
