@@ -62,8 +62,8 @@ install:
         tar xzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
         make config;
-        make BLAS=-lblas MY_METIS_LIB=../metis-install/lib/metis.a MY_METIS_INC=../metis-install/include/metis.h;
-        make install;
+        make BLAS=-lblas MY_METIS_LIB=-lmetis MY_METIS_INC=metis.h;
+        make install INSTALL=/home/travis/build/LLNL/SuiteSparse-install;
         cd ..;
      else
         echo "Reusing cached SuiteSparse-4.5.4";
