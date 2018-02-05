@@ -23,7 +23,7 @@ matrix:
             - liblapack-dev
             - libblas-dev
             - doxygen
-            - libastyle3
+            - astyle
             - valgrind
             # OpenMPI
             - openmpi-bin
@@ -57,6 +57,16 @@ install:
 
    # Back out of the smoothG directory to install the libraries
    - cd ..
+
+   # Astyle3
+   - if [ ! -e astyle3-install/spe_perm.dat ]; then
+     wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" \\
+        http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
+        unzip -d spe10-install por_perm_case2a.zip;
+        rm por_perm_case2a.zip;
+     else
+        echo "Reusing cached spe10";
+     fi;
 
    # spe10 dataset
    - if [ ! -e spe10-install/spe_perm.dat ]; then
