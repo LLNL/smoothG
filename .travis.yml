@@ -56,6 +56,16 @@ install:
    # Back out of the smoothG directory to install the libraries
    - cd ..
 
+   # suitesparse
+   - if [ ! -e SuiteSparse-install/lib/libumfpack.a ]; then
+        wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
+        tar xzf SuiteSparse-4.5.4.tar.gz;
+        cd SuiteSparse;
+        make install BLAS=-lblas MY_METIS_LIB=../metis-install/lib/metis.a MY_METIS_INC=../metis-install/include/metis.h INSTALL=../SuiteSparse-install;
+     else
+        echo "Reusing cached SuiteSparse-4.5.4";
+     fi;
+
    # hypre
    - if [ $MPI == "YES" ]; then
         if [ ! -e hypre-2.10.0b/src/hypre/lib/libHYPRE.a ]; then
@@ -81,7 +91,7 @@ install:
             CC=mpicc CXX=mpic++ make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES;
             make;
             make install PREFIX=../mfem-install;
-            cd ../..;
+            cd ..;
         else
             echo "Reusing cached mfem";
         fi;
