@@ -160,6 +160,42 @@ def make_tests():
           "finest-u-error": 0.2031768008190909,
           "operator-complexity": 1.0398091940641514}]
 
+    tests["fv-trace-method-2"] = \
+        [["./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "2",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2049690562060094e-08,
+          "finest-p-error": 0.055207481027916193,
+          "finest-u-error": 0.06430185063505546,
+          "operator-complexity": 1.3017591339648173}]
+
+    tests["fv-trace-method-3"] = \
+        [["./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "3",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2032854597960414e-8,
+          "finest-p-error": 0.055279347333696799,
+          "finest-u-error": 0.068336534035533678,
+          "operator-complexity": 1.3017591339648173}]
+
+    tests["fv-trace-method-4"] = \
+        [["./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "4",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2079666982238907e-8,
+          "finest-p-error": 0.055052992284074398,
+          "finest-u-error": 0.035336370431801843,
+          "operator-complexity": 1.3017591339648173}]
+
     tests["samplegraph1"] = \
         [["./generalgraph",
           "--spect-tol", "1.0",
@@ -296,6 +332,42 @@ def make_tests():
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
           "operator-complexity": 1.0221724964280585}]
+
+    tests["parfv-trace-method-2"] = \
+        [["mpirun", "-n", "4", "./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "2",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2049690562060094e-08,
+          "finest-p-error": 0.055207481027916193,
+          "finest-u-error": 0.06430185063505546,
+          "operator-complexity": 1.3017591339648173}]
+
+    tests["parfv-trace-method-3"] = \
+        [["mpirun", "-n", "4", "./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "3",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2032854597960414e-8,
+          "finest-p-error": 0.055279347333696799,
+          "finest-u-error": 0.068336534035533678,
+          "operator-complexity": 1.3017591339648173}]
+
+    tests["parfv-trace-method-4"] = \
+        [["mpirun", "-n", "4", "./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "4",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2079666982238907e-8,
+          "finest-p-error": 0.055052992284074398,
+          "finest-u-error": 0.035336370431801843,
+          "operator-complexity": 1.3017591339648173}]
 
     tests["parsamplegraph1"] = \
         [["mpirun", "-n", "4", "./generalgraph",
