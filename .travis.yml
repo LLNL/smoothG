@@ -62,7 +62,8 @@ install:
         tar xzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
         make config;
-        make install BLAS=-lblas MY_METIS_LIB=../metis-install/lib/metis.a MY_METIS_INC=../metis-install/include/metis.h INSTALL=../SuiteSparse-install;
+        make BLAS=-lblas MY_METIS_LIB=../metis-install/lib/metis.a MY_METIS_INC=../metis-install/include/metis.h;
+        make install;
         cd ..;
      else
         echo "Reusing cached SuiteSparse-4.5.4";
@@ -75,8 +76,9 @@ install:
            rm -rf hypre-2.10.0b;
            tar xzf hypre-2.10.0b.tar.gz;
            cd hypre-2.10.0b/src;
-           ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++;
+           ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++ prefix=../../hypre-install;
            make -j3;
+           make install;
            cd ../..;
         else
             echo "Reusing cached hypre-2.10.0b/";
@@ -90,7 +92,7 @@ install:
         if [ ! -e mfem-install/libmfem.a ]; then
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
-            CC=mpicc CXX=mpic++ make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES;
+            CC=mpicc CXX=mpic++ make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES MFEM_HYPRE_DIR=../hypre-install MFEM_SUITESPARSE_DIR=../SuiteSparse-install MFEM_METIS_DIR=../metis-install;
             make;
             make install PREFIX=../mfem-install;
             cd ..;
