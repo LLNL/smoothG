@@ -58,9 +58,6 @@ install:
    # Back out of the smoothG directory to install the libraries
    - cd ..
 
-     rm -r hypre-install;
-     rm -r mfem-install;
-
    # spe10 dataset
    - if [ ! -e spe10-install/spe_perm.dat ]; then
      wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" \\
