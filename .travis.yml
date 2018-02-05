@@ -110,7 +110,6 @@ install:
      fi
 
    # mfem
-   - rm -r mfem-install;
    - if [ $MPI == "YES" ]; then
         if [ ! -e mfem-install/lib/libmfem.a ]; then
             git clone https://github.com/mfem/mfem.git mfem;
