@@ -14,14 +14,9 @@
 #################################################################### EHEADER #
 
 """
-Try to automate tests for smoothG code within a cmake
-framework.
+A way to interface some basic JSON-parsing tests in python
+with the cmake/ctest testing framework.
 
-Andrew T. Barker
-atb@llnl.gov
-22 June 2016
-
-Updated with reckless abandon by:
 Stephan Gelever
 gelever1@llnl.gov
 17 July 2017
@@ -37,7 +32,7 @@ import platform
 
 spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@smoothG_GRAPHDATA@"
-
+memorycheck_command = "@MEMORYCHECK_COMMAND@"
 
 def run_test(command, expected={}, verbose=False):
     """ Executes test
@@ -387,14 +382,14 @@ def make_tests():
 
     if "tux" in platform.node():
         tests["veigenvector"] = \
-            [["valgrind", "--leak-check=full",
+            [[memorycheck_command, "--leak-check=full",
               "mpirun", "-n", "4", "./finitevolume",
               "--max-evects", "1",
               "--spe10-scale", "1",
               "--perm", spe10_perm_file]]
 
         tests["vgraph-small-usegenerator"] = \
-            [["valgrind", "--leak-check=full",
+            [[memorycheck_command, "--leak-check=full",
               "./generalgraph",
               "--num-vert", "20",
               "--mean-degree", "4",
@@ -403,7 +398,7 @@ def make_tests():
               "--generate-graph"]]
 
         tests["vgraph-small-usegenerator-hb"] = \
-            [["valgrind", "--leak-check=full",
+            [[memorycheck_command, "--leak-check=full",
               "./generalgraph",
               "--hybridization",
               "--num-vert", "20",
