@@ -50,7 +50,7 @@ extern "C"
                  const double* tau, double* c, const int* ldc, double* work,
                  int* lwork, int* info);
 
-    void dpotrf_(char* uplo, const int* n, double* a, const int *lda, int* info);
+    void dpotrf_(char* uplo, const int* n, double* a, const int* lda, int* info);
 
     void dsygst_(const int* itype, char* uplo, const int* n, double* a,
                  const int* lda, const double* b, const int* ldb, int* info);
@@ -423,11 +423,10 @@ void LocalEigenSolver::Compute(
                      &adapter_B_inv_A, &B_inv_A_adapter::MultOP,
                      &adapter_B, &A_adapter::MultOP,
                      "LM", ncv, tolerance_, max_iterations_);
+        eigvalueprob.Eigenvalues(eig_max_ptr_);
 
-         eigvalueprob.Eigenvalues(eig_max_ptr_);
-
-         int num_evects = FindNumberOfEigenPairs(evals, max_num_evects, eig_max_);
-         EigenPairsSetSizeAndData(n, num_evects, evals, evects);
+        int num_evects = FindNumberOfEigenPairs(evals, max_num_evects, eig_max_);
+        EigenPairsSetSizeAndData(n, num_evects, evals, evects);
     }
 }
 #endif // SMOOTHG_USE_ARPACK

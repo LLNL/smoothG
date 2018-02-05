@@ -118,7 +118,7 @@ private:
 
        Returns eigenvalues < rel_tol_ * eig_max_, up to max_num_evects_ total.
     */
-   int Compute(int n, double* a, mfem::Vector& evals, mfem::DenseMatrix& evects);
+    int Compute(int n, double* a, mfem::Vector& evals, mfem::DenseMatrix& evects);
 
     int max_num_evects_;
     double rel_tol_;

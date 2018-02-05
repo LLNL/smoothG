@@ -66,7 +66,8 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     const mfem::SparseMatrix& M_local, const mfem::SparseMatrix& D_local,
     const GraphTopology& graph_topology)
     :
-    LocalMixedGraphSpectralTargets(rel_tol, max_evects, trace_method, M_local, D_local, nullptr, graph_topology)
+    LocalMixedGraphSpectralTargets(rel_tol, max_evects, trace_method, M_local,
+                                  D_local, nullptr, graph_topology)
 {
 }
 
@@ -114,9 +115,9 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 
 std::vector<mfem::SparseMatrix>
 LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
-        const mfem::SparseMatrix& L,
-        const mfem::SparseMatrix& D,
-        const mfem::Vector& M_diag_inv)
+    const mfem::SparseMatrix& L,
+    const mfem::SparseMatrix& D,
+    const mfem::Vector& M_diag_inv)
 {
     // Extract the diagonal of local Laplacian
     mfem::Vector L_diag;
@@ -166,13 +167,13 @@ LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
 }
 
 void LocalMixedGraphSpectralTargets::CheckMinimalEigenvalue(
-        double eval_min, int aggregate_id, std::string entity)
+    double eval_min, int aggregate_id, std::string entity)
 {
     if (fabs(eval_min) > zero_eigenvalue_threshold_)
     {
         std::cerr << "Aggregate id: " << aggregate_id << "\n";
-        std::cout << "Smallest eigenvalue: "<< eval_min << "\n";
-        auto msg = "Smallest eigenvalue of "+ entity +" Laplacian is nonzero!";
+        std::cout << "Smallest eigenvalue: " << eval_min << "\n";
+        auto msg = "Smallest eigenvalue of " + entity + " Laplacian is nonzero!";
         mfem::mfem_error(msg.c_str());
     }
 }

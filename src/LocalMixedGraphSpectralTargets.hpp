@@ -111,15 +111,15 @@ private:
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
-            const mfem::SparseMatrix& Lloc,
-            const mfem::SparseMatrix& Dloc,
-            const mfem::Vector& Mloc_diag_inv);
+        const mfem::SparseMatrix& Lloc,
+        const mfem::SparseMatrix& Dloc,
+        const mfem::Vector& Mloc_diag_inv);
 
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
     void CheckMinimalEigenvalue(
-            double eval_min, int aggregate_id, std::string entity);
+        double eval_min, int aggregate_id, std::string entity);
 
     MPI_Comm comm_;
 
