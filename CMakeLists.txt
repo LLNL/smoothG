@@ -42,15 +42,49 @@ set(TPL_LIBRARIES "")
 # This is a list of linker flags to be used with TPLs for all targets
 set(TPL_LINKER_FLAGS "")
 
+# MFEM
+find_path(MFEM_INCLUDE_PATH mfem.hpp
+          HINTS ${MFEM_DIR}/include)
+set(MFEM_LIB_NAME libmfem.a)
+find_path(MFEM_LIBRARY_PATH ${MFEM_LIB_NAME}
+  ${MFEM_DIR}/lib)
+include_directories(${MFEM_INCLUDE_PATH})
+add_library(MFEM_LIB STATIC IMPORTED)
+set_property(TARGET MFEM_LIB PROPERTY IMPORTED_LOCATION ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
+list(APPEND TPL_LIBRARIES ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
+
+# Hypre
+find_path(HYPRE_INCLUDE_PATH HYPRE.h
+          HINTS ${HYPRE_DIR}/include)
+include_directories(${HYPRE_INCLUDE_PATH})
+set(HYPRE_LIB_NAME libHYPRE.a)
+find_library(HYPRE_LIB HYPRE
+  ${HYPRE_DIR}/lib)
+list(APPEND TPL_LIBRARIES ${HYPRE_LIB})
+
+# MPI
+find_package(MPI REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
+list(APPEND TPL_LIBRARIES ${MPI_LIBRARIES})
+if(MPI_CXX_COMPILE_FLAGS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
+endif()
+
+# Metis
+find_path(METIS_INCLUDE_PATH metis.h
+  HINTS ${METIS_DIR}/include)
+set(METIS_LIB_NAME libmetis.a)
+find_path(METIS_LIBRARY_PATH ${METIS_LIB_NAME}
+  ${METIS_DIR}/lib)
+include_directories(${METIS_INCLUDE_PATH})
+add_library(METIS_LIB STATIC IMPORTED)
+set_property(TARGET METIS_LIB PROPERTY IMPORTED_LOCATION ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
+list(APPEND TPL_LIBRARIES ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
+
 # SuiteSparse
 find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)
 include_directories(${SuiteSparse_INCLUDE_DIRS})
 list(APPEND TPL_LIBRARIES ${SuiteSparse_LIBRARIES})
-
-# Metis
-find_package(METIS REQUIRED)
-include_directories(${METIS_INCLUDE_DIRS})
-list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
 
 # ARPACK
 # there are several sources for ARPACK, I recommend
