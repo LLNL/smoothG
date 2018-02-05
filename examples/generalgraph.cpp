@@ -26,8 +26,9 @@
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
 #include "partition.hpp"
+#include "../src/smoothG.hpp"
 
-//using namespace smoothg;
+using namespace smoothg;
 using namespace linalgcpp;
 using namespace parlinalgcpp;
 
@@ -49,7 +50,7 @@ int main(int argc, char* argv[])
     std::string partition_filename = "../../graphdata/partition_sample.txt";
     std::string weight_filename = "";
     std::string w_block_filename = "";
-    bool metis_agglomeration = false;
+    bool metis_agglomeration = true;
     int max_evects = 4;
     double spect_tol = 1.e-3;
     bool hybridization = false;
@@ -89,11 +90,11 @@ int main(int argc, char* argv[])
     /// [Load the edge weights]
 
     // Set up GraphUpscale
-    /*
     {
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
                              spect_tol, max_evects, weight);
+    /*
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
@@ -118,8 +119,8 @@ int main(int argc, char* argv[])
         /// [Check Error]
         upscale.ShowErrors(upscaled_sol, fine_sol);
         /// [Check Error]
-    }
     */
+    }
 
     MPI_Finalize();
     return 0;

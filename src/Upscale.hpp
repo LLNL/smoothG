@@ -174,6 +174,9 @@ public:
     size_t Rows() const override { return size_; }
     size_t Cols() const override { return size_; }
 
+private:
+    size_t size_;
+
 protected:
     Upscale(MPI_Comm comm, int size)
         : size_(size), comm_(comm), setup_time_(0.0)
@@ -199,14 +202,11 @@ protected:
 
     double setup_time_;
 
-    //std::unique_ptr<linalgcpp::BlockVector> rhs_coarse_;
-    //std::unique_ptr<linalgcpp::BlockVector> sol_coarse_;
+    linalgcpp::BlockVector<double> rhs_coarse_;
+    linalgcpp::BlockVector<double> sol_coarse_;
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
     //mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
-
-private:
-    size_t size_;
 };
 
 } // namespace smoothg
