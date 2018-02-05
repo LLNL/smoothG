@@ -138,8 +138,8 @@ LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
     mfem::SparseMatrix L_edge = smoothg::Mult_AtDA(B, X_inv);
     smoothg::Add(-1.0, L_edge, 1.0, M_diag_inv);
 
-    // Scale L_edge by M if trace_method_ = 4
-    if (trace_method_ == 4)
+    // Scale L_edge by M if trace_method_ = 3 or 5
+    if (trace_method_ == 3 || trace_method_ == 5)
     {
         mfem::Vector M_diag(M_diag_inv.Size());
         for (int i = 0; i < D.Width() ; i++)
@@ -153,7 +153,7 @@ LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
     std::vector<mfem::SparseMatrix> EigSys;
     EigSys.push_back(L_edge);
 
-    if (trace_method_ == 3 || trace_method_ == 4)
+    if (trace_method_ == 4 || trace_method_ == 5)
     {
         // Compute M + D^T D
         mfem::SparseMatrix DT( smoothg::Transpose(D) );
@@ -401,7 +401,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[iAgg]);
 
         // Compute edge trace samples (before restriction and SVD)
-        if (trace_method_ == 1 || use_w)
+        if (trace_method_ == 1 || use_w || max_evects_ == 1)
         {
             // Do not consider the first vertex eigenvector, which is constant
             evects_tmp.UseExternalData(evects.Data() + evects.Height(),
@@ -416,7 +416,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         {
             // Collect trace samples from eigenvectors of dual graph Laplacian
             auto EES = BuildEdgeEigenSystem(DMinvDt, Dloc, Mloc_diag_inv);
-            if (trace_method_ == 2)
+            if (trace_method_ == 2 || trace_method_ == 3)
             {
                 eval_min = eigs.Compute(EES[0], AggExt_sigma[iAgg]);
             }
@@ -810,7 +810,7 @@ void LocalMixedGraphSpectralTargets::Compute(std::vector<mfem::DenseMatrix>&
                                              local_edge_trace_targets,
                                              std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
-    assert(trace_method_ < 5 && trace_method_ > 0);
+    assert(trace_method_ < 6 && trace_method_ > 0);
     const int nAggs = graph_topology_.Agg_vertex_.Height();
 
     std::vector<mfem::DenseMatrix> AggExt_sigma(nAggs);

@@ -179,9 +179,9 @@ def make_tests():
           "--max-evects", "4",
           "--trace-method", "3",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2032854597960414e-8,
-          "finest-p-error": 0.055279347333696799,
-          "finest-u-error": 0.068336534035533678,
+         {"finest-div-error": 1.9821133537907875e-08,
+          "finest-p-error": 0.055054636384856817,
+          "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
 
     tests["fv-trace-method-4"] = \
@@ -190,6 +190,18 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "4",
           "--trace-method", "4",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2032854597960414e-8,
+          "finest-p-error": 0.055279347333696799,
+          "finest-u-error": 0.068336534035533678,
+          "operator-complexity": 1.3017591339648173}]
+
+    tests["fv-trace-method-5"] = \
+        [["./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "5",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2079666982238907e-8,
           "finest-p-error": 0.055052992284074398,
@@ -352,9 +364,9 @@ def make_tests():
           "--max-evects", "4",
           "--trace-method", "3",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2032854597960414e-8,
-          "finest-p-error": 0.055279347333696799,
-          "finest-u-error": 0.068336534035533678,
+         {"finest-div-error": 1.9821133537907875e-08,
+          "finest-p-error": 0.055054636384856817,
+          "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
 
     tests["parfv-trace-method-4"] = \
@@ -363,6 +375,18 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "4",
           "--trace-method", "4",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 3.2032854597960414e-8,
+          "finest-p-error": 0.055279347333696799,
+          "finest-u-error": 0.068336534035533678,
+          "operator-complexity": 1.3017591339648173}]
+
+    tests["parfv-trace-method-5"] = \
+        [["mpirun", "-n", "4", "./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--trace-method", "5",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2079666982238907e-8,
           "finest-p-error": 0.055052992284074398,
