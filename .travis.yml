@@ -141,7 +141,7 @@ script:
    # Configure the library
    - mkdir build;
    - cd build;
-   - cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" -DMFEM_LIBRARIES="/home/travis/build/LLNL/mfem-install/lib/libmfem.a" -DMFEM_INCLUDE_DIRS="/home/travis/build/LLNL/mfem-install/include" -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" -DHYPRE_LIBRARIES="/home/travis/build/LLNL/hypre-install/lib/libHYPRE.a" -DHYPRE_INCLUDE_DIRS="/home/travis/build/LLNL/hypre-install/include" -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" -DMETIS_DIR="/home/travis/build/LLNL/metis-install" -DMETIS_LIBRARIES="/home/travis/build/LLNL/metis-install/lib/libmetis.a" -DMETIS_INCLUDE_DIRS="/home/travis/build/LLNL/metis-install/include" -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" ..;
+   - cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" -DMETIS_DIR="/home/travis/build/LLNL/metis-install" -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" ..;
 
    # Build the library
    - make -j3
