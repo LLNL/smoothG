@@ -22,6 +22,8 @@ matrix:
             # Other
             - liblapack-dev
             - libblas-dev
+            - doxygen
+            - astyle
             # OpenMPI
             # - openmpi-bin
             # - libopenmpi-dev
