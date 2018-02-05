@@ -134,9 +134,13 @@ script:
      CPPFLAGS="";
      SKIP_TEST_DIRS="";
 
+
    # Configure the library
    - mkdir build;
    - cd build;
+   - ls ../../mfem-install/lib;
+   - ls ../../hypre-install/lib;
+   - ls ../../metis-install/include;
    - cmake \
      -DMFEM_DIR=../../mfem-install \
      -DHYPRE_DIR=../../hypre-install \
