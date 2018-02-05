@@ -97,11 +97,11 @@ install:
 
    # mfem
    - if [ $MPI == "YES" ]; then
-        if [ ! -e mfem-install/libmfem.a ]; then
+        if [ ! -e mfem-install/lib/libmfem.a ]; then
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
-            CC=mpicc CXX=mpic++ make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES HYPRE_DIR=../hypre-install SUITESPARSE_DIR=../SuiteSparse-install METIS_DIR=../metis-install PREFIX=../mfem-install;
-            make install PREFIX=../mfem-install;
+            make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES HYPRE_DIR=/home/travis/build/LLNL/hypre-install SUITESPARSE_DIR=/home/travis/build/LLNL/SuiteSparse-install METIS_DIR=/home/travis/build/LLNL/metis-install PREFIX=/home/build/travis/build/LLNL/mfem-install;
+            CC=mpicc CXX=mpic++ make install PREFIX=/home/build/travis/build/LLNL/mfem-install;
             cd ..;
         else
             echo "Reusing cached mfem";
