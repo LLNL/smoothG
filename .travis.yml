@@ -24,6 +24,7 @@ matrix:
             - libblas-dev
             - doxygen
             - astyle
+            - valgrind
             # OpenMPI
             # - openmpi-bin
             # - libopenmpi-dev

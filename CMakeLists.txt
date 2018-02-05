@@ -42,38 +42,15 @@ set(TPL_LIBRARIES "")
 # This is a list of linker flags to be used with TPLs for all targets
 set(TPL_LINKER_FLAGS "")
 
-MESSAGE("DIRS:" ${MFEM_DIR}  ${HYPRE_DIR} ${METIS_DIR})
-
-# MFEM
-find_package(MFEM REQUIRED)
-include_directories(${MFEM_INCLUDE_DIRS})
-list(APPEND TPL_LIBRARIES ${MFEM_LIBRARIES})
-
-# Hypre
-find_package(HYPRE REQUIRED)
-include_directories(${HYPRE_INCLUDE_DIRS})
-list(APPEND TPL_LIBRARIES ${HYPRE_LIBRARIES})
-
-# MPI
-find_package(MPI REQUIRED)
-include_directories(${MPI_INCLUDE_PATH})
-list(APPEND TPL_LIBRARIES ${MPI_LIBRARIES})
-if(MPI_CXX_COMPILE_FLAGS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
-endif()
-
-# Metis
-find_package(METIS REQUIRED)
-include_directories(${METIS_INCLUDE_DIRS})
-list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
-
 # SuiteSparse
 find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)
 include_directories(${SuiteSparse_INCLUDE_DIRS})
 list(APPEND TPL_LIBRARIES ${SuiteSparse_LIBRARIES})
 
-MESSAGE("SUITEPRRE" ${SuiteSparse_LIBRARIES})
-MESSAGE("SUITEPRRE" ${SuiteSparse_INCLUDE_DIRS})
+# Metis
+find_package(METIS REQUIRED)
+include_directories(${METIS_INCLUDE_DIRS})
+list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
 
 # ARPACK
 # there are several sources for ARPACK, I recommend
