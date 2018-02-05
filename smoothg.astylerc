@@ -33,7 +33,7 @@
 --formatted
 #--break-blocks
 --pad-oper
---pad-comma
+#--pad-comma
 --align-pointer=type
 --align-reference=type
 #--indent-preproc-cond
