@@ -57,8 +57,9 @@ install:
 
    # Back out of the smoothG directory to install the libraries
    - cd ..
-   - rm -r mfem-install;
-   - rm -r hypre-install;
+
+   #- rm -r mfem-install;
+   #- rm -r hypre-install;
 
    # spe10 dataset
    - if [ ! -e spe10-install/spe_perm.dat ]; then
