@@ -21,12 +21,8 @@
 #ifndef __UPSCALE_HPP__
 #define __UPSCALE_HPP__
 
-#include "MinresBlockSolver.hpp"
-#include "HybridSolver.hpp"
-#include "SpectralAMG_MGL_Coarsener.hpp"
-#include "MetisGraphPartitioner.hpp"
-#include "MixedMatrix.hpp"
-#include "mfem.hpp"
+#include "linalgcpp.hpp"
+#include "parlinalgcpp.hpp"
 
 namespace smoothg
 {
@@ -34,94 +30,94 @@ namespace smoothg
 /**
    @brief Use upscaling as operator.
 */
-class Upscale : public mfem::Operator
+class Upscale : public linalgcpp::Operator
 {
 public:
-    /// Wrapper for applying the upscaling, in mfem terminology
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const override;
+    /// Wrapper for applying the upscaling, in linalgcpp terminology
+    virtual void Mult(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const override;
 
     /// Wrapper for applying the upscaling
-    virtual void Solve(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Solve(const mfem::Vector& x) const;
+    virtual void Solve(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
+    virtual linalgcpp::Vector<double> Solve(const linalgcpp::VectorView<double>& x) const;
 
     /// Wrapper for applying the upscaling in mixed form
-    virtual void Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Solve(const mfem::BlockVector& x) const;
+    virtual void Solve(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
+    virtual linalgcpp::BlockVector<double> Solve(const linalgcpp::BlockVector<double>& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level
-    virtual void SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector SolveCoarse(const mfem::Vector& x) const;
+    virtual void SolveCoarse(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
+    virtual linalgcpp::Vector<double> SolveCoarse(const linalgcpp::VectorView<double>& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level,
     //  in mixed form
-    virtual void SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector SolveCoarse(const mfem::BlockVector& x) const;
+    virtual void SolveCoarse(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
+    virtual linalgcpp::BlockVector<double> SolveCoarse(const linalgcpp::BlockVector<double>& x) const;
 
     /// Solve Fine Level
-    virtual void SolveFine(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector SolveFine(const mfem::Vector& x) const;
+    virtual void SolveFine(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
+    virtual linalgcpp::Vector<double> SolveFine(const linalgcpp::VectorView<double>& x) const;
 
     /// Solve Fine Level, in mixed form
-    virtual void SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector SolveFine(const mfem::BlockVector& x) const;
+    virtual void SolveFine(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
+    virtual linalgcpp::BlockVector<double> SolveFine(const linalgcpp::BlockVector<double>& x) const;
 
     /// Interpolate a coarse vector to the fine level
-    virtual void Interpolate(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Interpolate(const mfem::Vector& x) const;
+    virtual void Interpolate(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
+    virtual linalgcpp::Vector<double> Interpolate(const linalgcpp::VectorView<double>& x) const;
 
     /// Interpolate a coarse vector to the fine level, in mixed form
-    virtual void Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Interpolate(const mfem::BlockVector& x) const;
+    virtual void Interpolate(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
+    virtual linalgcpp::BlockVector<double> Interpolate(const linalgcpp::BlockVector<double>& x) const;
 
     /// Coarsen a fine vector to the coarse level
-    virtual void Coarsen(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Coarsen(const mfem::Vector& x) const;
+    virtual void Coarsen(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
+    virtual linalgcpp::Vector<double> Coarsen(const linalgcpp::VectorView<double>& x) const;
 
     /// Coarsen a fine vector to the coarse level, in mixed form
-    virtual void Coarsen(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Coarsen(const mfem::BlockVector& x) const;
+    virtual void Coarsen(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
+    virtual linalgcpp::BlockVector<double> Coarsen(const linalgcpp::BlockVector<double>& x) const;
 
     /// Get block offsets
-    virtual void FineBlockOffsets(mfem::Array<int>& offsets) const;
-    virtual void CoarseBlockOffsets(mfem::Array<int>& offsets) const;
+    virtual std::vector<HYPRE_Int> FineBlockOffsets() const;
+    virtual std::vector<HYPRE_Int> CoarseBlockOffsets() const;
 
     /// Get true block offsets
-    virtual void FineTrueBlockOffsets(mfem::Array<int>& offsets) const;
-    virtual void CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const;
+    virtual std::vector<HYPRE_Int> FineTrueBlockOffsets() const;
+    virtual std::vector<HYPRE_Int> CoarseTrueBlockOffsets() const;
 
     /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(mfem::Vector& vect) const;
-    virtual void Orthogonalize(mfem::BlockVector& vect) const;
+    virtual void Orthogonalize(linalgcpp::VectorView<double>& vect) const;
+    virtual void Orthogonalize(linalgcpp::BlockVector<double>& vect) const;
 
     /// Create a coarse vertex space vector
-    virtual mfem::Vector GetCoarseVector() const;
+    virtual linalgcpp::Vector<double> GetCoarseVector() const;
 
     /// Create a fine vertex space vector
-    virtual mfem::Vector GetFineVector() const;
+    virtual linalgcpp::Vector<double> GetFineVector() const;
 
     /// Create a coarse mixed form vector
-    virtual mfem::BlockVector GetCoarseBlockVector() const;
+    virtual linalgcpp::BlockVector<double> GetCoarseBlockVector() const;
 
     /// Create a fine mixed form vector
-    virtual mfem::BlockVector GetFineBlockVector() const;
+    virtual linalgcpp::BlockVector<double> GetFineBlockVector() const;
 
     /// Create a coarse mixed form vector on true dofs
-    virtual mfem::BlockVector GetCoarseTrueBlockVector() const;
+    virtual linalgcpp::BlockVector<double> GetCoarseTrueBlockVector() const;
 
     /// Create a fine mixed form vector on true dofs
-    virtual mfem::BlockVector GetFineTrueBlockVector() const;
+    virtual linalgcpp::BlockVector<double> GetFineTrueBlockVector() const;
 
     // Get Mixed Matrix
-    virtual MixedMatrix& GetMatrix(int level);
-    virtual const MixedMatrix& GetMatrix(int level) const;
+    //virtual MixedMatrix& GetMatrix(int level);
+    //virtual const MixedMatrix& GetMatrix(int level) const;
 
     /// Get Fine level Mixed Matrix
-    virtual MixedMatrix& GetFineMatrix();
-    virtual const MixedMatrix& GetFineMatrix() const;
+    //virtual MixedMatrix& GetFineMatrix();
+    //virtual const MixedMatrix& GetFineMatrix() const;
 
     /// Get Coarse level Mixed Matrix
-    virtual MixedMatrix& GetCoarseMatrix();
-    virtual const MixedMatrix& GetCoarseMatrix() const;
+    //virtual MixedMatrix& GetCoarseMatrix();
+    //virtual const MixedMatrix& GetCoarseMatrix() const;
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
@@ -130,7 +126,7 @@ public:
     double OperatorComplexity() const;
 
     /// Get Row Starts
-    virtual mfem::Array<HYPRE_Int>& get_Drow_start() const { return mixed_laplacians_[0].get_Drow_start();};
+    //virtual std::vector<HYPRE_Int>& get_Drow_start() const { return mixed_laplacians_[0].get_Drow_start();};
 
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
@@ -167,49 +163,50 @@ public:
 
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
-    std::vector<double> ComputeErrors(const mfem::BlockVector& upscaled_sol,
-                                      const mfem::BlockVector& fine_sol) const;
+    std::vector<double> ComputeErrors(const linalgcpp::BlockVector<double>& upscaled_sol,
+                                      const linalgcpp::BlockVector<double>& fine_sol) const;
 
     /// Compare errors between upscaled and fine solution.
     /// Displays error to stdout on processor 0
-    void ShowErrors(const mfem::BlockVector& upscaled_sol,
-                    const mfem::BlockVector& fine_sol) const;
+    void ShowErrors(const linalgcpp::BlockVector<double>& upscaled_sol,
+                    const linalgcpp::BlockVector<double>& fine_sol) const;
+
+    size_t Rows() const override { return size_; }
+    size_t Cols() const override { return size_; }
 
 protected:
-    Upscale(MPI_Comm comm, int size, bool hybridization = false)
-        : Operator(size), comm_(comm), setup_time_(0.0), hybridization_(hybridization)
+    Upscale(MPI_Comm comm, int size)
+        : size_(size), comm_(comm), setup_time_(0.0)
     {
         MPI_Comm_rank(comm_, &myid_);
     }
 
     void MakeCoarseVectors()
     {
-        rhs_coarse_ = make_unique<mfem::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
-        sol_coarse_ = make_unique<mfem::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
+        //rhs_coarse_ = make_unique<linalgcpp::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
+        //sol_coarse_ = make_unique<linalgcpp::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
     }
 
-    std::vector<smoothg::MixedMatrix> mixed_laplacians_;
+    //std::vector<smoothg::MixedMatrix> mixed_laplacians_;
 
-    std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
-    std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
+    //std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
+    //std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
 
-    const mfem::HypreParMatrix* edge_e_te_;
+    //const linalgcpp::HypreParMatrix* edge_e_te_;
 
     MPI_Comm comm_;
     int myid_;
 
     double setup_time_;
 
-    const bool hybridization_;
-
-    std::unique_ptr<mfem::BlockVector> rhs_coarse_;
-    std::unique_ptr<mfem::BlockVector> sol_coarse_;
+    //std::unique_ptr<linalgcpp::BlockVector> rhs_coarse_;
+    //std::unique_ptr<linalgcpp::BlockVector> sol_coarse_;
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+    //mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
 
 private:
-    void SetOperator(const mfem::Operator& op) {};
+    size_t size_;
 };
 
 } // namespace smoothg

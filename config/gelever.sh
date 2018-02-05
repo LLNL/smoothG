@@ -15,6 +15,31 @@
 #################################################################### EHEADER #
 
 
-# add executables
-add_executable(generalgraph generalgraph.cpp)
-target_link_libraries(generalgraph smoothg ${TPL_LIBRARIES})
+# This is the path to the root of the git repo
+# the BASE_DIR should contain smoothG_config.h.in
+BASE_DIR=${PWD}
+
+# this is where we actually build binaries and so forth
+BUILD_DIR=${BASE_DIR}/build
+
+EXTRA_ARGS=$@
+
+mkdir -p $BUILD_DIR
+cd $BUILD_DIR
+
+# Force a reconfigure
+rm CMakeCache.txt
+rm -rf CMakeFiles
+
+cmake \
+    -DSPARSESOLVE_DIR=${HOME}/Code/umfpack \
+    -DPARTITION_DIR=${HOME}/Code/partition \
+    -DLINALGCPP_DIR=${HOME}/Code/linalgcpp \
+    -DPARLINALGCPP_DIR=${HOME}/Code/parlinalgcpp \
+    -DHYPRE_DIR=${HOME}/hypre \
+    -DSuiteSparse_DIR=${HOME}/SuiteSparse \
+    -DSPE10_DIR=${HOME}/spe10 \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DUSE_ARPACK=OFF \
+    ${EXTRA_ARGS} \
+    ${BASE_DIR}
