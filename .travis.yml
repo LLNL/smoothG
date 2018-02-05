@@ -136,22 +136,15 @@ script:
 
    # Configure the library
    - mkdir build;
-   - echo "Dirs:";
-   - ls -la $TRAVIS_BUILD_DIR;
-   - ls -la $TRAVIS_BUILD_DIR/../metis-install;
-   - ls -la $TRAVIS_BUILD_DIR/../mfem-install;
-   - ls -la $TRAVIS_BUILD_DIR/../hypre-install;
-   - ls -la $TRAVIS_BUILD_DIR/../SuiteSparse-install;
-   - echo "End Dirs:";
    - cd build;
    - cmake \
-     -DMFEM_DIR=/home/travis/build/LLNL/mfem-install \
-     -DHYPRE_DIR=/home/travis/build/LLNL/hypre-install \
-     -DSuiteSparse_DIR=/home/travis/build/LLNL/SuiteSparse-install \
-     -DMETIS_DIR=/home/travis/build/LLNL/metis-install \
-     -DUSE_ARPACK=NO \
+     -DMFEM_DIR=../../mfem-install \
+     -DHYPRE_DIR=../../hypre-install \
+     -DSuiteSparse_DIR=../../SuiteSparse-install \
+     -DMETIS_DIR=../../metis-install \
+     -DUSE_ARPACK=OFF \
      -DCMAKE_BUILD_TYPE=DEBUG \
-     -DSPE10_DIR=/home/travis/build/LLNL/spe10 ..;
+     -DSPE10_DIR=../../spe10 ..;
 
    # Build the library
    - make -j3
