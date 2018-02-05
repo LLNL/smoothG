@@ -17,17 +17,17 @@ matrix:
             # GCC 4.9
             # - g++-4.9
             # MPICH
-            - mpich
-            - libmpich-dev
+            #- mpich
+            #- libmpich-dev
             # Other
             - liblapack-dev
             - libblas-dev
             - doxygen
-            - astyle
+            - libastyle3
             - valgrind
             # OpenMPI
-            # - openmpi-bin
-            # - libopenmpi-dev
+            - openmpi-bin
+            - libopenmpi-dev
             # Metis
       env: DEBUG=YES
            MPI=YES
