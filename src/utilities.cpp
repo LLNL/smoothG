@@ -23,7 +23,6 @@
 
 #include "utilities.hpp"
 #include "MatrixUtilities.hpp"
-#include "general/sort_pairs.hpp"
 #include "SpectralAMG_MGL_Coarsener.hpp"
 #include "MixedLaplacianSolver.hpp"
 
