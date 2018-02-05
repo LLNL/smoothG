@@ -70,7 +70,7 @@ install:
         tar -xzf metis-5.1.0.tar.gz;
         cd metis-5.1.0;
         make config prefix=/home/travis/build/LLNL/metis-install;
-        make install;
+        make -j3 install;
         cd ..;
      else
         echo "Reusing cached metis";
@@ -81,7 +81,7 @@ install:
         wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
         tar xzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
-        make install INSTALL=/home/travis/build/LLNL/SuiteSparse-install BLAS=-lblas MY_METIS_LIB=/home/travis/build/LLNL/metis-install/lib/libmetis.a MY_METIS_INC=/home/travis/build/LLNL/metis-install/include/;
+        make -j3 install INSTALL=/home/travis/build/LLNL/SuiteSparse-install BLAS=-lblas MY_METIS_LIB=/home/travis/build/LLNL/metis-install/lib/libmetis.a MY_METIS_INC=/home/travis/build/LLNL/metis-install/include/;
         cd ..;
      else
         echo "Reusing cached SuiteSparse-4.5.4";
@@ -111,7 +111,7 @@ install:
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
             make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES HYPRE_DIR=/home/travis/build/LLNL/hypre-install SUITESPARSE_DIR=/home/travis/build/LLNL/SuiteSparse-install METIS_DIR=/home/travis/build/LLNL/metis-install PREFIX=/home/build/travis/build/LLNL/mfem-install;
-            CC=mpicc CXX=mpic++ make install PREFIX=/home/travis/build/LLNL/mfem-install;
+            CC=mpicc CXX=mpic++ make -j3 install PREFIX=/home/travis/build/LLNL/mfem-install;
             cd ..;
         else
             echo "Reusing cached mfem";
@@ -136,7 +136,13 @@ script:
    # Configure the library
    - mkdir build;
      cd build;
-     cmake -DMFEM_DIR=../../mfem-install -DHYPRE_DIR=../../hypre-install .. -DSuiteSparse_DIR=../../SuiteSparse-install -DMETIS_DIR=../../metis-install -DUSE_ARPACK=NO -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_DIR=../../spe10;
+     cmake -DMFEM_DIR=/home/travis/build/LLNL/mfem-install \
+     -DHYPRE_DIR=/home/travis/build/LLNL/hypre-install \
+     -DSuiteSparse_DIR=/home/travis/build/LLNL/SuiteSparse-install \
+     -DMETIS_DIR=/home/travis/build/LLNL/metis-install \
+     -DUSE_ARPACK=NO \
+     -DCMAKE_BUILD_TYPE=DEBUG \
+     -DSPE10_DIR=/home/travis/build/LLNL/spe10 ..;
 
    # Build the library
    - make -j3
