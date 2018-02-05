@@ -67,13 +67,15 @@ install:
      fi;
 
    # suitesparse
-   - if [ ! -e SuiteSparse-install/lib/libumfpack.a ]; then
+   - if [ ! -e SuiteSparse-install/lib/libumfpack.so ]; then
         pwd;
         wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
         tar xzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
         make install INSTALL=/home/travis/build/LLNL/SuiteSparse-install BLAS=-lblas MY_METIS_LIB=/home/travis/build/LLNL/metis-install/lib/libmetis.a MY_METIS_INC=/home/travis/build/LLNL/metis-install/include/;
         cd ..;
+        ls;
+        ls SuiteSparse-install/lib;
      else
         echo "Reusing cached SuiteSparse-4.5.4";
      fi;
@@ -101,7 +103,7 @@ install:
         if [ ! -e mfem-install/libmfem.a ]; then
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
-            make config;
+            CC=mpicc CXX=mpic++ make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES MFEM_HYPRE_DIR=../hypre-install MFEM_SUITESPARSE_DIR=../SuiteSparse-install MFEM_METIS_DIR=../metis-install PREFIX=../mfem-install;
             CC=mpicc CXX=mpic++ make install MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES MFEM_HYPRE_DIR=../hypre-install MFEM_SUITESPARSE_DIR=../SuiteSparse-install MFEM_METIS_DIR=../metis-install PREFIX=../mfem-install;
             cd ..;
         else
