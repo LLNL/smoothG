@@ -12,7 +12,7 @@ matrix:
       addons:
         apt:
           # sources:
-            # - ubuntu-toolchain-r-test
+            - ubuntu-toolchain-r-test
           packages:
             # GCC 4.9
             # - g++-4.9
@@ -28,7 +28,6 @@ matrix:
             # OpenMPI
             - openmpi-bin
             - libopenmpi-dev
-            # Metis
       env: DEBUG=YES
            MPI=YES
       cache:
@@ -141,7 +140,7 @@ script:
    # Configure the library
    - mkdir build;
    - cd build;
-   - cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" -DMETIS_DIR="/home/travis/build/LLNL/metis-install" -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" ..;
+   - CC=gcc CXX=g++ cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" -DMETIS_DIR="/home/travis/build/LLNL/metis-install" -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" ..;
 
    # Build the library
    - make -j3
