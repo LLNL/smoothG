@@ -40,9 +40,18 @@ namespace smoothg
 GraphCoarsen::GraphCoarsen(const mfem::SparseMatrix& M_proc,
                            const mfem::SparseMatrix& D_proc,
                            const GraphTopology& graph_topology)
+    : GraphCoarsen(M_proc, D_proc, nullptr, graph_topology)
+{
+}
+
+GraphCoarsen::GraphCoarsen(const mfem::SparseMatrix& M_proc,
+                           const mfem::SparseMatrix& D_proc,
+                           const mfem::SparseMatrix* W_proc,
+                           const GraphTopology& graph_topology)
     :
     M_proc_(M_proc),
     D_proc_(D_proc),
+    W_proc_(W_proc),
     graph_topology_(graph_topology),
     colMapper_(M_proc.Size())
 {
@@ -50,14 +59,14 @@ GraphCoarsen::GraphCoarsen(const mfem::SparseMatrix& M_proc,
 }
 
 void GraphCoarsen::BuildPVertices(
-    std::vector<unique_ptr<mfem::DenseMatrix> >& vertex_target,
+    std::vector<mfem::DenseMatrix>& vertex_target,
     mfem::SparseMatrix& Pvertices, bool build_coarse_relation)
 {
     // simply put vertex_target into Pvertices
 
     const unsigned int nAggs = vertex_target.size();
-    const unique_ptr<mfem::SparseMatrix>& Agg_vertex(graph_topology_.Agg_vertex_);
-    int nvertices = Agg_vertex->Width();
+    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
+    int nvertices = Agg_vertex.Width();
     int nlocal_fine_dofs, nlocal_coarse_dofs;
     mfem::Array<int> local_fine_dofs;
 
@@ -65,8 +74,8 @@ void GraphCoarsen::BuildPVertices(
     Pvertices_i[0] = 0;
     for (unsigned int i = 0; i < nAggs; ++i)
     {
-        GetTableRow(*Agg_vertex, i, local_fine_dofs);
-        nlocal_coarse_dofs = vertex_target[i]->Width();
+        GetTableRow(Agg_vertex, i, local_fine_dofs);
+        nlocal_coarse_dofs = vertex_target[i].Width();
         nlocal_fine_dofs = local_fine_dofs.Size();
         for (int j = 0; j < nlocal_fine_dofs; ++j)
             Pvertices_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
@@ -81,10 +90,10 @@ void GraphCoarsen::BuildPVertices(
     int ptr;
     for (unsigned int i = 0; i < nAggs; ++i)
     {
-        nlocal_coarse_dofs = vertex_target[i]->Width();
-        GetTableRow(*Agg_vertex, i, local_fine_dofs);
+        nlocal_coarse_dofs = vertex_target[i].Width();
+        GetTableRow(Agg_vertex, i, local_fine_dofs);
         nlocal_fine_dofs = local_fine_dofs.Size();
-        mfem::DenseMatrix& target_i = *vertex_target[i];
+        mfem::DenseMatrix& target_i = vertex_target[i];
         for (int j = 0; j < nlocal_fine_dofs; ++j)
         {
             ptr = Pvertices_i[local_fine_dofs[j]];
@@ -103,8 +112,7 @@ void GraphCoarsen::BuildPVertices(
 
     // Generate the "start" array for coarse vertex dofs
     MPI_Comm comm = graph_topology_.face_d_td_->GetComm();
-    mfem::Array<HYPRE_Int>* start[1] = {&vertex_cd_start_};
-    GenerateOffsets(comm, 1, &coarse_vertex_dof_counter, start);
+    GenerateOffsets(comm, coarse_vertex_dof_counter, vertex_cd_start_);
 
     // Construct the aggregate to coarse vertex dofs relation table
     if (build_coarse_relation)
@@ -112,7 +120,7 @@ void GraphCoarsen::BuildPVertices(
         int* Agg_dof_i = new int[nAggs + 1];
         Agg_dof_i[0] = 0;
         for (unsigned int i = 0; i < nAggs; ++i)
-            Agg_dof_i[i + 1] = Agg_dof_i[i] + vertex_target[i]->Width();
+            Agg_dof_i[i + 1] = Agg_dof_i[i] + vertex_target[i].Width();
         int Agg_cdof_vertex_nnz = Agg_dof_i[nAggs];
         int* Agg_dof_j = new int[Agg_cdof_vertex_nnz];
         std::iota(Agg_dof_j, Agg_dof_j + Agg_cdof_vertex_nnz, 0);
@@ -140,34 +148,37 @@ void GraphCoarsen::BuildPVertices(
    face_dof is coarse, coarse faces and coarse dofs for the new coarse graph
 */
 void GraphCoarsen::BuildPEdges(
-    std::vector<unique_ptr<mfem::DenseMatrix> >& edge_traces,
-    std::vector<unique_ptr<mfem::DenseMatrix> >& vertex_target,
+    std::vector<mfem::DenseMatrix>& edge_traces,
+    std::vector<mfem::DenseMatrix>& vertex_target,
     mfem::SparseMatrix& face_cdof,
     mfem::SparseMatrix& Pedges,
-    std::vector<unique_ptr<mfem::DenseMatrix>>& CM_el,
+    std::vector<mfem::DenseMatrix>& CM_el,
     bool build_coarse_relation)
 {
     // put trace_extensions and bubble_functions in Pedges
     // the coarse dof numbering is as follows: first loop over each face, count
     // the traces, then loop over each aggregate, count the bubble functions
 
-    const mfem::SparseMatrix& Agg_edge(*graph_topology_.Agg_edge_);
-    const mfem::SparseMatrix& Agg_vertex(*graph_topology_.Agg_vertex_);
-    const mfem::SparseMatrix& face_edge(*graph_topology_.face_edge_);
-    const mfem::SparseMatrix& Agg_face(*graph_topology_.Agg_face_);
+    const mfem::SparseMatrix& Agg_edge(graph_topology_.Agg_edge_);
+    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
+    const mfem::SparseMatrix& face_edge(graph_topology_.face_edge_);
+    const mfem::SparseMatrix& Agg_face(graph_topology_.Agg_face_);
 
     const unsigned int nAggs = vertex_target.size();
     const unsigned int nfaces = face_edge.Height();
     const unsigned int nedges = Agg_edge.Width();
 
     // element matrices for hybridization
-    CM_el.resize(nAggs);
+    if (build_coarse_relation)
+    {
+        CM_el.resize(nAggs);
+    }
 
     // construct face to coarse edge dof relation table
     int* face_cdof_i = new int[nfaces + 1];
     face_cdof_i[0] = 0;
     for (unsigned int i = 0; i < nfaces; ++i)
-        face_cdof_i[i + 1] = face_cdof_i[i] + edge_traces[i]->Width();
+        face_cdof_i[i + 1] = face_cdof_i[i] + edge_traces[i].Width();
     int total_num_traces = face_cdof_i[nfaces];
     int* face_cdof_j = new int[total_num_traces];
     std::iota(face_cdof_j, face_cdof_j + total_num_traces, 0);
@@ -199,21 +210,21 @@ void GraphCoarsen::BuildPEdges(
     {
         GetTableRow(Agg_edge, i, local_fine_dofs);
         GetTableRow(Agg_face, i, faces);
-        nlocal_coarse_dofs = vertex_target[i]->Width() - 1;
+        nlocal_coarse_dofs = vertex_target[i].Width() - 1;
         for (int j = 0; j < faces.Size(); ++j)
-            nlocal_coarse_dofs += edge_traces[faces[j]]->Width();
+            nlocal_coarse_dofs += edge_traces[faces[j]].Width();
         for (int j = 0; j < local_fine_dofs.Size(); ++j)
             Pedges_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
         if (build_coarse_relation)
         {
             Agg_dof_i[i + 1] = Agg_dof_i[i] + nlocal_coarse_dofs;
-            CM_el[i] = make_unique<mfem::DenseMatrix>(nlocal_coarse_dofs);
+            CM_el[i].SetSize(nlocal_coarse_dofs);
         }
     }
     for (unsigned int i = 0; i < nfaces; i++)
     {
         GetTableRow(face_edge, i, local_fine_dofs);
-        nlocal_coarse_dofs = edge_traces[i]->Width();
+        nlocal_coarse_dofs = edge_traces[i].Width();
         for (int j = 0; j < local_fine_dofs.Size(); j++)
             Pedges_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
     }
@@ -236,7 +247,7 @@ void GraphCoarsen::BuildPEdges(
 
     int ncoarse_vertexdofs = 0;
     for (unsigned int i = 0; i < nAggs; i++)
-        ncoarse_vertexdofs += vertex_target[i]->Width();
+        ncoarse_vertexdofs += vertex_target[i].Width();
     CoarseD_ = make_unique<mfem::SparseMatrix>(ncoarse_vertexdofs,
                                                total_num_traces + ncoarse_vertexdofs - nAggs);
     if (!build_coarse_relation)
@@ -249,7 +260,7 @@ void GraphCoarsen::BuildPEdges(
     for (unsigned int iface = 0; iface < nfaces; iface++)
     {
 
-        int Agg0 = graph_topology_.face_Agg_->GetRowColumns(iface)[0];
+        int Agg0 = graph_topology_.face_Agg_.GetRowColumns(iface)[0];
 
         // extract local matrices
         GetTableRow(Agg_vertex, Agg0, local_verts);
@@ -257,13 +268,13 @@ void GraphCoarsen::BuildPEdges(
         auto Dtransfer = ExtractRowAndColumns(D_proc_, local_verts,
                                               facefdofs, colMapper_);
 
-        mfem::DenseMatrix& edge_traces_f(*edge_traces[iface]);
+        mfem::DenseMatrix& edge_traces_f(edge_traces[iface]);
         num_traces = edge_traces_f.Width();
-        mfem::Vector allone(Dtransfer->Height());
+        mfem::Vector allone(Dtransfer.Height());
         allone = 1.;
 
         edge_traces_f.GetColumnReference(0, PV_trace);
-        double oneDpv = Dtransfer->InnerProduct(PV_trace, allone);
+        double oneDpv = Dtransfer.InnerProduct(PV_trace, allone);
 
         if (oneDpv < 0)
         {
@@ -278,7 +289,7 @@ void GraphCoarsen::BuildPEdges(
         for (int k = 1; k < num_traces; k++)
         {
             edge_traces_f.GetColumnReference(k, trace);
-            double alpha = Dtransfer->InnerProduct(trace, allone);
+            double alpha = Dtransfer.InnerProduct(trace, allone);
 
             if (sign_flip)
                 alpha *= -1.;
@@ -309,13 +320,13 @@ void GraphCoarsen::BuildPEdges(
                                          local_fine_dofs, colMapper_);
         auto Dloc = ExtractRowAndColumns(D_proc_, local_verts,
                                          local_fine_dofs, colMapper_);
-        LocalGraphEdgeSolver solver(*Mloc, *Dloc);
+        LocalGraphEdgeSolver solver(Mloc, Dloc);
 
         nlocal_fine_dofs = local_fine_dofs.Size();
         nlocal_verts = local_verts.Size();
         local_rhs_trace.SetSize(nlocal_verts);
 
-        mfem::DenseMatrix& vertex_target_i(*vertex_target[i]);
+        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
         scale = vertex_target_i(0, 0);
 
         // solving bubble functions
@@ -341,8 +352,6 @@ void GraphCoarsen::BuildPEdges(
         F_potentials.SetSize(nlocal_verts, nlocal_traces);
         local_facecdofs.SetSize(nlocal_traces);
 
-        mfem::DenseMatrix& CM_el_loc(*CM_el[i]);
-
         nlocal_traces = 0;
         for (int j = 0; j < faces.Size(); j++)
         {
@@ -351,9 +360,9 @@ void GraphCoarsen::BuildPEdges(
             GetTableRow(face_edge, face, facefdofs);
             auto Dtransfer = ExtractRowAndColumns(D_proc_, local_verts,
                                                   facefdofs, colMapper_);
-            unique_ptr<mfem::SparseMatrix> DtransferT( Transpose(*Dtransfer) );
+            mfem::SparseMatrix DtransferT = smoothg::Transpose(Dtransfer);
 
-            mfem::DenseMatrix& edge_traces_f(*edge_traces[face]);
+            mfem::DenseMatrix& edge_traces_f(edge_traces[face]);
             num_traces = edge_traces_f.Width();
             for (int k = 0; k < num_traces; k++)
             {
@@ -362,7 +371,7 @@ void GraphCoarsen::BuildPEdges(
                 if (build_coarse_relation)
                     edge_cdof_marker[row] = cdof_loc;
                 edge_traces_f.GetColumnReference(k, trace);
-                Dtransfer->Mult(trace, local_rhs_trace);
+                Dtransfer.Mult(trace, local_rhs_trace);
 
                 // compute and store local coarse D
                 if (k == 0)
@@ -384,12 +393,13 @@ void GraphCoarsen::BuildPEdges(
                         ref_vec3.SetSize(trace.Size());
                         ref_vec3 = 0.;
                         B_potentials.GetColumnReference(l, B_potential);
-                        DtransferT->Mult(B_potential, ref_vec3);
+                        DtransferT.Mult(B_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
                         col = total_num_traces + bubble_counter + l;
 
                         if (build_coarse_relation)
                         {
+                            mfem::DenseMatrix& CM_el_loc(CM_el[i]);
                             CM_el_loc(l, cdof_loc) = entry_value;
                             CM_el_loc(cdof_loc, l) = entry_value;
                         }
@@ -404,11 +414,11 @@ void GraphCoarsen::BuildPEdges(
                     ref_vec3.SetSize(trace.Size());
                     ref_vec3 = 0.;
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
-                    DtransferT->Mult(F_potential, ref_vec3);
+                    DtransferT.Mult(F_potential, ref_vec3);
                     entry_value = smoothg::InnerProduct(ref_vec3, trace);
 
                     if (build_coarse_relation)
-                        CM_el_loc(cdof_loc, cdof_loc) = entry_value;
+                        CM_el[i](cdof_loc, cdof_loc) = entry_value;
                     else
                         CoarseM_->Add(row, row, entry_value);
 
@@ -417,12 +427,13 @@ void GraphCoarsen::BuildPEdges(
                         ref_vec3.SetSize(trace.Size());
                         ref_vec3 = 0.;
                         F_potentials.GetColumnReference(l, F_potential);
-                        DtransferT->Mult(F_potential, ref_vec3);
+                        DtransferT.Mult(F_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
                         col = local_facecdofs[l];
 
                         if (build_coarse_relation)
                         {
+                            mfem::DenseMatrix& CM_el_loc(CM_el[i]);
                             CM_el_loc(edge_cdof_marker[col], cdof_loc) = entry_value;
                             CM_el_loc(cdof_loc, edge_cdof_marker[col]) = entry_value;
                         }
@@ -474,7 +485,7 @@ void GraphCoarsen::BuildPEdges(
             entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
 
             if (build_coarse_relation)
-                CM_el_loc(l, l) = entry_value;
+                CM_el[i](l, l) = entry_value;
             else
                 CoarseM_->Set(row, row, entry_value);
 
@@ -486,6 +497,7 @@ void GraphCoarsen::BuildPEdges(
 
                 if (build_coarse_relation)
                 {
+                    mfem::DenseMatrix& CM_el_loc(CM_el[i]);
                     CM_el_loc(l, j) = entry_value;
                     CM_el_loc(j, l) = entry_value;
                 }
@@ -506,7 +518,7 @@ void GraphCoarsen::BuildPEdges(
         Agg_cdof_edge_ = make_unique<mfem::SparseMatrix>(Agg_dof_i, Agg_dof_j,
                                                          Agg_dof_d, nAggs, total_num_traces + bubble_counter);
 
-    unique_ptr<mfem::SparseMatrix> face_Agg( Transpose(Agg_face) );
+    mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
     mfem::Array<int> Aggs;
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
 
@@ -521,7 +533,7 @@ void GraphCoarsen::BuildPEdges(
     // put traces into Pedges
     for (unsigned int i = 0; i < nfaces; i++)
     {
-        mfem::DenseMatrix& edge_traces_i(*edge_traces[i]);
+        mfem::DenseMatrix& edge_traces_i(edge_traces[i]);
         GetTableRow(face_edge, i, local_fine_dofs);
         GetTableRow(face_cdof, i, facecdofs);
         nlocal_fine_dofs = local_fine_dofs.Size();
@@ -539,7 +551,7 @@ void GraphCoarsen::BuildPEdges(
         // store global and local coarse M
         if (build_coarse_relation)
         {
-            GetTableRow(*face_Agg, i, Aggs);
+            GetTableRow(face_Agg, i, Aggs);
             Agg1 = Aggs[0];
             GetTableRow(*Agg_cdof_edge_, Agg1, local_Agg_edge_cdof);
             for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
@@ -555,9 +567,6 @@ void GraphCoarsen::BuildPEdges(
         else
             Agg1 = Agg2 = 0;
 
-        mfem::DenseMatrix& CM_el_loc1(*CM_el[Agg1]);
-        mfem::DenseMatrix& CM_el_loc2(*CM_el[Agg2]);
-
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
         for (int l = 0; l < facecdofs.Size(); l++)
         {
@@ -567,6 +576,9 @@ void GraphCoarsen::BuildPEdges(
 
             if (build_coarse_relation)
             {
+                mfem::DenseMatrix& CM_el_loc1(CM_el[Agg1]);
+                mfem::DenseMatrix& CM_el_loc2(CM_el[Agg2]);
+
                 id1_in_Agg1 = edge_cdof_marker[row];
                 if (Aggs.Size() == 1)
                     CM_el_loc1(id1_in_Agg1, id1_in_Agg1) += entry_value;
@@ -591,6 +603,9 @@ void GraphCoarsen::BuildPEdges(
 
                 if (build_coarse_relation)
                 {
+                    mfem::DenseMatrix& CM_el_loc1(CM_el[Agg1]);
+                    mfem::DenseMatrix& CM_el_loc2(CM_el[Agg2]);
+
                     id2_in_Agg1 = edge_cdof_marker[col];
                     if (Aggs.Size() == 1)
                     {
@@ -623,21 +638,35 @@ void GraphCoarsen::BuildPEdges(
         CoarseM_->Finalize(0);
 }
 
+void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
+{
+    if (W_proc_)
+    {
+        unique_ptr<mfem::SparseMatrix> W_tmp(mfem::RAP(Pvertices, *W_proc_, Pvertices));
+        mfem::SparseMatrix W_thresh(*W_tmp);
+
+        CoarseW_ = make_unique<mfem::SparseMatrix>();
+        CoarseW_->Swap(W_thresh);
+    }
+}
+
 /**
    This should more or less mimic parelag::DeRhamSequence::hFacetExtension()
 */
 void GraphCoarsen::BuildInterpolation(
-    std::vector<unique_ptr<mfem::DenseMatrix> >& edge_traces,
-    std::vector<unique_ptr<mfem::DenseMatrix> >& vertex_targets,
+    std::vector<mfem::DenseMatrix>& edge_traces,
+    std::vector<mfem::DenseMatrix>& vertex_targets,
     mfem::SparseMatrix& Pvertices, mfem::SparseMatrix& Pedges,
     mfem::SparseMatrix& face_cdof,
-    std::vector<unique_ptr<mfem::DenseMatrix>>& CM_el,
+    std::vector<mfem::DenseMatrix>& CM_el,
     bool build_coarse_relation)
 {
     BuildPVertices(vertex_targets, Pvertices, build_coarse_relation);
 
     BuildPEdges(edge_traces, vertex_targets, face_cdof, Pedges, CM_el,
                 build_coarse_relation);
+
+    BuildW(Pvertices);
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
@@ -675,18 +704,19 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
                                      edge_cd_start_.Last(), face_start,
                                      edge_cd_start_, &face_cdof_tmp);
 
-    unique_ptr<mfem::HypreParMatrix> d_td_d_tmp(RAP(&face_d_td_d, &face_cdof_d));
+    unique_ptr<mfem::HypreParMatrix> d_td_d_tmp(smoothg::RAP(face_d_td_d, face_cdof_d));
 
     mfem::SparseMatrix d_td_d_tmp_offd;
     HYPRE_Int* d_td_d_map;
     d_td_d_tmp->GetOffd(d_td_d_tmp_offd, d_td_d_map);
 
-    int* d_td_d_diag_i = new int[ncdofs + 1];
-    std::iota(d_td_d_diag_i, d_td_d_diag_i + ncdofs + 1, 0);
-    double* d_td_d_diag_data = new double[ncdofs];
-    std::fill_n(d_td_d_diag_data, ncdofs, 1.0);
-    mfem::SparseMatrix d_td_d_diag(d_td_d_diag_i, d_td_d_diag_i,
-                                   d_td_d_diag_data, ncdofs, ncdofs,
+    mfem::Array<int> d_td_d_diag_i(ncdofs + 1);
+    std::iota(d_td_d_diag_i.begin(), d_td_d_diag_i.begin() + ncdofs + 1, 0);
+
+    mfem::Array<double> d_td_d_diag_data(ncdofs);
+    std::fill_n(d_td_d_diag_data.begin(), ncdofs, 1.0);
+    mfem::SparseMatrix d_td_d_diag(d_td_d_diag_i.GetData(), d_td_d_diag_i.GetData(),
+                                   d_td_d_diag_data.GetData(), ncdofs, ncdofs,
                                    false, false, false);
 
     int* d_td_d_offd_i = new int[ncdofs + 1];
@@ -721,7 +751,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
         }
     assert(d_td_d_offd_i[ncdofs] == d_td_d_offd_nnz);
     mfem::SparseMatrix d_td_d_offd(d_td_d_offd_i, d_td_d_offd_j,
-                                   d_td_d_diag_data, ncdofs, d_td_d_offd_nnz,
+                                   d_td_d_diag_data.GetData(), ncdofs, d_td_d_offd_nnz,
                                    true, false, false);
 
     mfem::HypreParMatrix d_td_d(
@@ -757,15 +787,12 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
     assert(cdof_counter == ncdofs);
     int* select_j = new int[ntruecdofs];
     std::iota(select_j, select_j + ntruecdofs, 0);
-    mfem::SparseMatrix select(select_i, select_j, d_td_d_diag_data, ncdofs,
+    mfem::SparseMatrix select(select_i, select_j, d_td_d_diag_data.GetData(), ncdofs,
                               ntruecdofs, true, false, false);
     mfem::HypreParMatrix select_d(comm, edge_cd_start_.Last(),
                                   edge_ctd_start_.Last(), edge_cd_start_,
                                   edge_ctd_start_, &select);
     mfem::HypreParMatrix* d_td = ParMult(&d_td_d, &select_d);
-
-    delete [] d_td_d_diag_i;
-    delete [] d_td_d_diag_data;
 
     return unique_ptr<mfem::HypreParMatrix>(d_td);
 }

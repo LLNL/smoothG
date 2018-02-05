@@ -55,10 +55,10 @@ public:
        @param partition partition vector for vertices
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
-    GraphTopology(std::shared_ptr<mfem::SparseMatrix> vertex_edge,
-                  std::shared_ptr<mfem::HypreParMatrix> edge_d_td,
+    GraphTopology(mfem::SparseMatrix& vertex_edge,
+                  const mfem::HypreParMatrix& edge_d_td,
                   const mfem::Array<int>& partition,
-                  std::shared_ptr<const mfem::SparseMatrix> edge_boundaryattr = nullptr);
+                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
 
     /**
        @brief Partial graph-based constructor for graph topology.
@@ -80,12 +80,15 @@ public:
     ~GraphTopology() {}
 
     /// Return number of faces in aggregated graph
-    unsigned int get_num_faces() const { return Agg_face_->Width(); }
+    unsigned int get_num_faces() const { return Agg_face_.Width(); }
     /// Return number of aggregates in coarse graph
-    unsigned int get_num_aggregates() const { return Agg_face_->Height(); }
+    unsigned int get_num_aggregates() const { return Agg_face_.Height(); }
 
     ///@name Getters for row/column partitions of tables
     ///@{
+    mfem::Array<HYPRE_Int>& GetVertexStart() { return vertex_start_; }
+    mfem::Array<HYPRE_Int>& GetEdgeStart() { return edge_start_; }
+    mfem::Array<HYPRE_Int>& GetFaceStart() { return face_start_; }
     const mfem::Array<HYPRE_Int>& GetVertexStart() const { return vertex_start_; }
     const mfem::Array<HYPRE_Int>& GetEdgeStart() const { return edge_start_; }
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
@@ -93,7 +96,7 @@ public:
 
     ///@name dof to true_dof tables for edge and face
     ///@{
-    std::shared_ptr<mfem::HypreParMatrix> edge_d_td_;
+    const mfem::HypreParMatrix& edge_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> face_d_td_;
     ///@}
 
@@ -105,11 +108,11 @@ public:
 
     ///@name topology relation tables, connecting aggregates, edges, faces, and vertices
     ///@{
-    std::unique_ptr<mfem::SparseMatrix> Agg_edge_;
-    std::unique_ptr<mfem::SparseMatrix> Agg_vertex_;
-    std::unique_ptr<mfem::SparseMatrix> face_Agg_;
-    std::unique_ptr<mfem::SparseMatrix> Agg_face_;
-    std::unique_ptr<mfem::SparseMatrix> face_edge_;
+    mfem::SparseMatrix Agg_edge_;
+    mfem::SparseMatrix Agg_vertex_;
+    mfem::SparseMatrix face_Agg_;
+    mfem::SparseMatrix Agg_face_;
+    mfem::SparseMatrix face_edge_;
     ///@}
 
     ///@name extended aggregate relation tables, using "true dofs"
@@ -119,7 +122,8 @@ public:
     ///@}
 
     /// "face" to boundary attribute table
-    std::shared_ptr<mfem::SparseMatrix> face_bdratt_;
+    mfem::SparseMatrix face_bdratt_;
+
 private:
     MPI_Comm comm_;
     int num_procs_;

@@ -36,17 +36,28 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
                                         int& num_partitions,
                                         mfem::Array<int>& partitioning)
 {
-    int nvertices = wtable.Size();
+    const int nvertices = wtable.Size();
 
     partitioning.SetSize(nvertices);
 
-    if (num_partitions <= 1)
+    mfem::SparseMatrix sub_table;
+    mfem::Array<int> sub_part;
+    mfem::Array<int> sub_to_global;
+
+    if (pre_isolated_vertices_.Size() > 0)
     {
-        partitioning = 0;
-        return;
+        IsolatePreProcess(wtable, sub_table, sub_to_global);
+        sub_part.SetSize(sub_to_global.Size());
+    }
+    else
+    {
+        sub_table.MakeRef(wtable);
+        sub_part.MakeRef(partitioning);
     }
 
-    auto adjacency = getAdjacency(wtable);
+    int sub_nvertices = sub_table.Size();
+
+    auto adjacency = getAdjacency(sub_table);
     int* i_ptr = adjacency.GetI();
     int* j_ptr = adjacency.GetJ();
 
@@ -82,28 +93,59 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
             mfem::mfem_error("invalid options");
     }
 
-    int err = CallMetis(&nvertices, &ncon, i_ptr, j_ptr,
-                        vertex_weight_ptr, nullptr, edge_weight_ptr,
-                        &num_partitions, nullptr, &unbalance_tol_,
-                        options_, &edgecut, partitioning);
+    if (num_partitions > 1)
+    {
+        int err = CallMetis(&sub_nvertices, &ncon, i_ptr, j_ptr,
+                            vertex_weight_ptr, nullptr, edge_weight_ptr,
+                            &num_partitions, nullptr, &unbalance_tol_,
+                            options_, &edgecut, sub_part);
 
-    assert(err == METIS_OK);
+        assert(err == METIS_OK);
+    }
+    else
+    {
+        sub_part = 0;
+    }
 
-    removeEmptyParts(partitioning, num_partitions);
+    if (pre_isolated_vertices_.Size() > 0)
+    {
+        for (int i = 0; i < sub_part.Size(); ++i)
+        {
+            partitioning[sub_to_global[i]] = sub_part[i];
+        }
 
-    if (isolated_vertices_.Size() > 0)
+        for (auto vertex : pre_isolated_vertices_)
+        {
+            partitioning[vertex] = num_partitions++;
+        }
+    }
+
+    if (post_isolated_vertices_.Size() > 0)
     {
         IsolatePostProcess(wtable, num_partitions, partitioning);
     }
+
+    removeEmptyParts(partitioning, num_partitions);
 }
 
-void MetisGraphPartitioner::SetIsolateVertices(const mfem::Array<int>& indices)
+void MetisGraphPartitioner::SetPreIsolateVertices(int index)
 {
-    isolated_vertices_.SetSize(indices.Size());
-    for (int i = 0; i < indices.Size(); ++i)
-    {
-        isolated_vertices_[i] = indices[i];
-    }
+    pre_isolated_vertices_.Append(index);
+}
+
+void MetisGraphPartitioner::SetPreIsolateVertices(const mfem::Array<int>& indices)
+{
+    pre_isolated_vertices_.Append(indices);
+}
+
+void MetisGraphPartitioner::SetPostIsolateVertices(int index)
+{
+    post_isolated_vertices_.Append(index);
+}
+
+void MetisGraphPartitioner::SetPostIsolateVertices(const mfem::Array<int>& indices)
+{
+    post_isolated_vertices_.Append(indices);
 }
 
 mfem::SparseMatrix MetisGraphPartitioner::getAdjacency(
@@ -165,6 +207,27 @@ void MetisGraphPartitioner::removeEmptyParts(mfem::Array<int>& partitioning,
     num_partitions -= shift;
 }
 
+void MetisGraphPartitioner::IsolatePreProcess(const mfem::SparseMatrix& wtable,
+                                              mfem::SparseMatrix& sub_table,
+                                              mfem::Array<int>& sub_to_global)
+{
+    std::vector<int> indices(wtable.Height());
+    std::iota(std::begin(indices), std::end(indices), 0);
+    indices.erase(std::remove_if(std::begin(indices), std::end(indices),
+    [this](int x) { return pre_isolated_vertices_.Find(x) != -1; }),
+    std::end(indices));
+
+    mfem::Array<int> indices_m(indices.data(), indices.size());
+    indices_m.Copy(sub_to_global);
+
+    mfem::Array<int> col_map(wtable.Height());
+    col_map = -1;
+
+    mfem::SparseMatrix sub_mat = ExtractRowAndColumns(wtable, indices_m,
+                                                      indices_m, col_map);
+    sub_table.Swap(sub_mat);
+}
+
 void MetisGraphPartitioner::IsolatePostProcess(const mfem::SparseMatrix& wtable,
                                                int& num_partitions,
                                                mfem::Array<int>& partitioning)
@@ -172,9 +235,9 @@ void MetisGraphPartitioner::IsolatePostProcess(const mfem::SparseMatrix& wtable,
     // do a post-processing of partitioning to put critical vertices in their own partitions
     {
         int c_elem = num_partitions;
-        for (int i(0); i < isolated_vertices_.Size(); ++i)
+        for (int i(0); i < post_isolated_vertices_.Size(); ++i)
         {
-            int num = isolated_vertices_[i];
+            int num = post_isolated_vertices_[i];
             partitioning[num] = c_elem;
             c_elem++;
         }
@@ -250,6 +313,13 @@ int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
     MFEM_ASSERT(partitioning.Max() + 1 == offset_comp.Last(),
                 "Partitioning inconsistent with components!");
     return offset_comp.Last();
+}
+
+void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning, int num_parts)
+{
+    MetisGraphPartitioner partitioner;
+    partitioner.setUnbalanceTol(2);
+    partitioner.doPartition(w_table, num_parts, partitioning);
 }
 
 } // namespace smoothg

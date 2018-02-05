@@ -18,7 +18,6 @@
     @brief Implements some shared code and utility functions.
 */
 
-#include <fstream>
 #include <mfem.hpp>
 
 #include "utilities.hpp"
@@ -101,8 +100,12 @@ void UpscalingStatistics::ComputeErrorSquare(
         mgLc.get_Pu().Mult(help_[j]->GetBlock(1),
                            help_[j - 1]->GetBlock(1));
     }
-    par_orthogonalize_from_constant(help_[0]->GetBlock(1),
-                                    mgL[0].get_Drow_start().Last());
+
+    if (!mgL[0].CheckW())
+    {
+        par_orthogonalize_from_constant(help_[0]->GetBlock(1),
+                                        mgL[0].get_Drow_start().Last());
+    }
 
     for (int j(0); j <= k; ++j)
     {
@@ -318,74 +321,75 @@ void PostProcess(mfem::SparseMatrix& M_global,
                  mfem::Vector& solp,
                  const mfem::Vector& rhs)
 {
-    std::cout
-            << "Postprocess: correct mass conservation of upscaled velocity"
-            << std::endl;
-    const mfem::SparseMatrix& Agg_face = *graph_topology_.Agg_face_;
+    std::cout << "Postprocess: correct mass conservation of upscaled velocity\n";
+
+    const mfem::SparseMatrix& Agg_face = graph_topology_.Agg_face_;
+    const mfem::SparseMatrix& Agg_edge = graph_topology_.Agg_edge_;
+    const mfem::SparseMatrix& Agg_vertex = graph_topology_.Agg_vertex_;
+
     const int nAEs = Agg_face.Size(); // Number of coarse elements
 
-    int nL2LocalDofs;
-    mfem::Vector diagM, diagM_inv;
-    mfem::SparseMatrix* Aloc, *DlocT;
+    mfem::Vector diagM_inv;
     mfem::Array<int> hdivDofMarker(D_global.Width());
     hdivDofMarker = -1;
+
     mfem::Array<int> HdivLocalDof_tmp, HdivLocalBndDof, HdivLocalDof, L2LocalDof;
     mfem::Vector LocalUBnd, LocalUInt, LocalPInt, LocalRHS, DLocalUBnd;
 
-    unique_ptr<mfem::SparseMatrix> Mloc, Dloc, Dloc_bnd;
-
     mfem::UMFPackSolver LocalSolve;
+
     for (int iAE = 0; iAE < nAEs; ++iAE)
     {
-        HdivLocalDof.MakeRef(graph_topology_.Agg_edge_->GetRowColumns(iAE),
-                             graph_topology_.Agg_edge_->RowSize(iAE));
+        GetTableRow(Agg_edge, iAE, HdivLocalDof);
         HdivLocalBndDof.SetSize(0);
+
         for (int iAF = 0; iAF < Agg_face.RowSize(iAE); iAF++)
         {
             int AF = Agg_face.GetRowColumns(iAE)[iAF];
             HdivLocalDof_tmp.MakeRef(
-                graph_topology_.face_edge_->GetRowColumns(AF),
-                graph_topology_.face_edge_->RowSize(AF));
+                graph_topology_.face_edge_.GetRowColumns(AF),
+                graph_topology_.face_edge_.RowSize(AF));
             HdivLocalBndDof.Append(HdivLocalDof_tmp);
         }
-        L2LocalDof.MakeRef(graph_topology_.Agg_vertex_->GetRowColumns(iAE),
-                           graph_topology_.Agg_vertex_->RowSize(iAE));
-        nL2LocalDofs = L2LocalDof.Size();
 
+        GetTableRow(Agg_vertex, iAE, L2LocalDof);
+        int nL2LocalDofs = L2LocalDof.Size();
 
-        Mloc = ExtractRowAndColumns(M_global, HdivLocalDof, HdivLocalDof,
-                                    hdivDofMarker);
-        Dloc = ExtractRowAndColumns(D_global, L2LocalDof, HdivLocalDof,
-                                    hdivDofMarker);
-        Dloc_bnd = ExtractRowAndColumns(D_global, L2LocalDof, HdivLocalBndDof,
-                                        hdivDofMarker);
+        auto Mloc = ExtractRowAndColumns(M_global, HdivLocalDof, HdivLocalDof, hdivDofMarker);
+        auto Dloc = ExtractRowAndColumns(D_global, L2LocalDof, HdivLocalDof, hdivDofMarker);
+        auto Dloc_bnd = ExtractRowAndColumns(D_global, L2LocalDof, HdivLocalBndDof, hdivDofMarker);
 
-        DlocT = Transpose(*Dloc);
-        Mloc->GetDiag(diagM);
-        diagM_inv.SetSize(diagM.Size());
-        for (int i = 0; i < diagM.Size(); i++)
-            diagM_inv(i) = 1. / diagM(i);
-        DlocT->ScaleRows(diagM_inv);
-        Aloc = Mult(*Dloc, *DlocT);
+        mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc);
+
+        Mloc.GetDiag(diagM_inv);
+        for (int i = 0; i < diagM_inv.Size(); i++)
+        {
+            diagM_inv(i) = 1. / diagM_inv(i);
+        }
+        DlocT.ScaleRows(diagM_inv);
+
+        mfem::SparseMatrix Aloc = smoothg::Mult(Dloc, DlocT);
 
         sol.GetSubVector(HdivLocalBndDof, LocalUBnd);
         rhs.GetSubVector(L2LocalDof, LocalRHS);
 
         DLocalUBnd.SetSize(nL2LocalDofs);
-        Dloc_bnd->Mult(LocalUBnd, DLocalUBnd);
+        Dloc_bnd.Mult(LocalUBnd, DLocalUBnd);
         LocalRHS -= DLocalUBnd;
         LocalRHS(0) = 0.;
 
         LocalPInt.SetSize(nL2LocalDofs);
         solp.GetSubVector(L2LocalDof, LocalPInt);
+
         double AverageLoc = -LocalPInt.Sum() / nL2LocalDofs;
+
         LocalPInt = 0.;
-        Aloc->EliminateRowCol(0);
-        LocalSolve.SetOperator(*Aloc);
+        Aloc.EliminateRowCol(0);
+        LocalSolve.SetOperator(Aloc);
         LocalSolve.Mult(LocalRHS, LocalPInt);
 
         LocalUInt.SetSize(HdivLocalDof.Size());
-        DlocT->Mult(LocalPInt, LocalUInt);
+        DlocT.Mult(LocalPInt, LocalUInt);
         sol.SetSubVector(HdivLocalDof, LocalUInt);
         LocalPInt *= -1;
         orthogonalize_from_constant(LocalPInt);
@@ -397,20 +401,24 @@ void PostProcess(mfem::SparseMatrix& M_global,
 /**
    Construct edge to boundary attribute table (orientation is not considered)
 */
-unique_ptr<mfem::SparseMatrix> GenerateBoundaryAttributeTable(
-    const mfem::Mesh* mesh)
+mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh)
 {
     int nedges = mesh->Dimension() == 2 ? mesh->GetNEdges() : mesh->GetNFaces();
     int nbdr = mesh->bdr_attributes.Max();
     int nbdr_edges = mesh->GetNBE();
-    int* edge_bdrattr_i = new int[nedges + 1](); // init with 0
+
+    int* edge_bdrattr_i = new int[nedges + 1]();
     int* edge_bdrattr_j = new int[nbdr_edges];
-    int count(0), edge;
+
+
     for (int j = 0; j < nbdr_edges; j++)
     {
-        edge = mesh->GetBdrElementEdgeIndex(j);
+        int edge = mesh->GetBdrElementEdgeIndex(j);
         edge_bdrattr_i[edge + 1] = mesh->GetBdrAttribute(j);
     }
+
+    int count = 0;
+
     for (int j = 1; j <= nedges; j++)
     {
         if (edge_bdrattr_i[j])
@@ -419,12 +427,16 @@ unique_ptr<mfem::SparseMatrix> GenerateBoundaryAttributeTable(
             edge_bdrattr_i[j] = edge_bdrattr_i[j - 1] + 1;
         }
         else
+        {
             edge_bdrattr_i[j] = edge_bdrattr_i[j - 1];
+        }
     }
+
     double* edge_bdrattr_data = new double[nbdr_edges];
     std::fill_n(edge_bdrattr_data, nbdr_edges, 1.0);
-    return make_unique<mfem::SparseMatrix>(edge_bdrattr_i, edge_bdrattr_j,
-                                           edge_bdrattr_data, nedges, nbdr);
+
+    return mfem::SparseMatrix(edge_bdrattr_i, edge_bdrattr_j, edge_bdrattr_data,
+                              nedges, nbdr);
 }
 
 int MarkDofsOnBoundary(
@@ -434,39 +446,37 @@ int MarkDofsOnBoundary(
     mfem::Array<int>& dofMarker)
 {
     dofMarker = 0;
-    const int n_fc = face_boundaryatt.Size();
-    const int* i_fc_bndr = face_boundaryatt.GetI();
-    const int* j_fc_bndr = face_boundaryatt.GetJ();
-    const int* i_facet_dof = face_dof.GetI();
-    const int* j_facet_dof = face_dof.GetJ();
+    const int num_faces = face_boundaryatt.Height();
 
-    int start(0), end(0);
-    for (int ifc = 0; ifc < n_fc; ++ifc)
+    const int* i_bndr = face_boundaryatt.GetI();
+    const int* j_bndr = face_boundaryatt.GetJ();
+
+    mfem::Array<int> dofs;
+
+    for (int i = 0; i < num_faces; ++i)
     {
-        end = i_fc_bndr[ifc + 1];
+        int start = i_bndr[i];
+        int end = i_bndr[i + 1];
+
         // Assert one attribute per face. For this to be true on coarse levels,
         // some care must be taken in generating coarse faces (respecting
         // boundary attributes in minimial intersection sets, for example)
         assert(((end - start) == 0) || ((end - start) == 1));
-        if ((end - start) == 1 && bndrAttributesMarker[j_fc_bndr[start]])
+
+        if ((end - start) == 1 && bndrAttributesMarker[j_bndr[start]])
         {
-            for (const int* it = j_facet_dof + i_facet_dof[ifc];
-                 it != j_facet_dof + i_facet_dof[ifc + 1]; ++it)
+            GetTableRow(face_dof, i, dofs);
+
+            for (int dof : dofs)
             {
-                dofMarker[*it] = 1;
+                dofMarker[dof] = 1;
             }
         }
-        start = end;
     }
 
-    int nMarked(0);
-    for (int* it = dofMarker.GetData();
-         it != dofMarker.GetData() + dofMarker.Size(); ++it)
-    {
-        if (*it)
-            ++nMarked;
-    }
-    return nMarked;
+    int num_marked = dofMarker.Sum();
+
+    return num_marked;
 }
 
 ParGraph::ParGraph(MPI_Comm comm,
@@ -486,7 +496,7 @@ ParGraph::ParGraph(MPI_Comm comm,
     int nAgg_leftover = nAggs_global % num_procs;
 
     // Construct the relation table aggregate_vertex from global partition
-    auto Agg_vert = PartitionToMatrix(partition_global, nAggs_global);
+    mfem::SparseMatrix Agg_vert = PartitionToMatrix(partition_global, nAggs_global);
 
     // Construct the relation table proc_aggregate
     int* proc_Agg_i = new int[num_procs + 1];
@@ -506,22 +516,21 @@ ParGraph::ParGraph(MPI_Comm comm,
                                 num_procs, nAggs_global);
 
     // Compute edge_proc relation (for constructing edge to true edge later)
-    unique_ptr<mfem::SparseMatrix> proc_vert( Mult(proc_Agg, *Agg_vert) );
-    unique_ptr<mfem::SparseMatrix> proc_edge(
-        Mult(*proc_vert, vertex_edge_global) );
-    proc_edge->SortColumnIndices();
-    unique_ptr<mfem::SparseMatrix> edge_proc( Transpose(*proc_edge) );
+    mfem::SparseMatrix proc_vert = smoothg::Mult(proc_Agg, Agg_vert);
+    mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vertex_edge_global);
+    proc_edge.SortColumnIndices();
+    mfem::SparseMatrix edge_proc(smoothg::Transpose(proc_edge) );
 
     // Construct vertex local to global index array
-    int nvertices_local = proc_vert->RowSize(myid);
+    int nvertices_local = proc_vert.RowSize(myid);
     mfem::Array<int> vert_loc2glo_tmp;
-    vert_loc2glo_tmp.MakeRef(proc_vert->GetRowColumns(myid), nvertices_local);
+    vert_loc2glo_tmp.MakeRef(proc_vert.GetRowColumns(myid), nvertices_local);
     vert_loc2glo_tmp.Copy(vert_local2global_);
 
     // Construct edge local to global index array
-    int nedges_local = proc_edge->RowSize(myid);
+    int nedges_local = proc_edge.RowSize(myid);
     mfem::Array<int> edge_local2global_tmp;
-    edge_local2global_tmp.MakeRef(proc_edge->GetRowColumns(myid), nedges_local);
+    edge_local2global_tmp.MakeRef(proc_edge.GetRowColumns(myid), nedges_local);
     edge_local2global_tmp.Copy(edge_local2global_);
 
     // Construct local partitioning array for local vertices
@@ -541,7 +550,7 @@ ParGraph::ParGraph(MPI_Comm comm,
     mfem::Array<int> tedge_couters(num_procs + 1);
     tedge_couters = 0;
     for (int i = 0; i < ntedges_global; i++)
-        tedge_couters[edge_proc->GetRowColumns(i)[0] + 1]++;
+        tedge_couters[edge_proc.GetRowColumns(i)[0] + 1]++;
     int ntedges_local = tedge_couters[myid + 1];
     tedge_couters.PartialSum();
     assert(tedge_couters.Last() == ntedges_global);
@@ -549,7 +558,7 @@ ParGraph::ParGraph(MPI_Comm comm,
     // Renumber true edges so that the new numbering is contiguous in processor
     mfem::Array<int> tedge_old2new(ntedges_global);
     for (int i = 0; i < ntedges_global; i++)
-        tedge_old2new[i] = tedge_couters[edge_proc->GetRowColumns(i)[0]]++;
+        tedge_old2new[i] = tedge_couters[edge_proc.GetRowColumns(i)[0]]++;
 
     // Construct edge to true edge table
     int* e_te_diag_i = new int[nedges_local + 1];
@@ -558,6 +567,7 @@ ParGraph::ParGraph(MPI_Comm comm,
     e_te_diag_i[0] = 0;
     std::fill_n(e_te_diag_data, ntedges_local, 1.0);
 
+    assert(nedges_local - ntedges_local >= 0);
     int* e_te_offd_i = new int[nedges_local + 1];
     int* e_te_offd_j = new int[nedges_local - ntedges_local];
     double* e_te_offd_data = new double[nedges_local - ntedges_local];
@@ -618,8 +628,10 @@ ParGraph::ParGraph(MPI_Comm comm,
     // Extract local submatrix of the global vertex to edge relation table
     mfem::Array<int> map(ntedges_global);
     map = -1;
-    vertex_edge_local_ = ExtractRowAndColumns(
-                             vertex_edge_global, vert_local2global_, edge_local2global_, map);
+
+    mfem::SparseMatrix tmp = ExtractRowAndColumns(vertex_edge_global, vert_local2global_,
+                                                  edge_local2global_, map);
+    vertex_edge_local_.Swap(tmp);
 }
 
 /**
@@ -649,8 +661,7 @@ void FiniteVolumeMassIntegrator::AssembleElementMatrix(
     mq.SetSize(dim);
 
     int order = 1;
-    const mfem::IntegrationRule* ir = IntRule;
-    ir = &mfem::IntRules.Get(el.GetGeomType(), order);
+    const mfem::IntegrationRule* ir = &mfem::IntRules.Get(el.GetGeomType(), order);
 
     MFEM_ASSERT(ir->GetNPoints() == 1, "Only implemented for piecewise "
                 "constants!");
@@ -685,25 +696,28 @@ void FiniteVolumeMassIntegrator::AssembleElementMatrix(
     Trans.SetIntPoint(&ip);
     el.CalcVShape(Trans, vshape);
     vshape *= 2.;
-    mfem::DenseMatrix vshapeT(vshape);
-    vshapeT.Transpose();
+
+    mfem::DenseMatrix vshapeT(vshape, 't');
     mfem::DenseMatrix tmp(ndof);
     Mult(vshape, vshapeT, tmp);
+
     mfem::Vector FaceAreaSquareInv(ndof);
     tmp.GetDiag(FaceAreaSquareInv);
     mfem::Vector FaceArea(ndof);
+
     for (int i = 0; i < ndof; i++)
         FaceArea(i) = 1. / std::sqrt(FaceAreaSquareInv(i));
+
     vshape.LeftScaling(FaceArea);
     vshapeT.RightScaling(FaceArea);
 
     // Compute k_{ii}
     mfem::DenseMatrix nk(ndof, dim);
-    nk = 0.0;
     Mult(vshape, mq, nk);
+
     mfem::DenseMatrix nkn(ndof);
-    nkn = 0.0;
     Mult(nk, vshapeT, nkn);
+
     // this is right for grid-aligned permeability, maybe not for full tensor?
     mfem::Vector k(ndof);
     nkn.GetDiag(k);
@@ -728,6 +742,11 @@ void SVD_Calculator::Compute(mfem::DenseMatrix& A, mfem::Vector& singularValues)
 {
     const int nrows = A.Height();
     const int ncols = A.Width();
+
+    if (nrows < 1 || ncols < 1)
+    {
+        return;
+    }
 
     // Allocate optimal size
     std::vector<double> tmp(nrows * ncols, 0.);
@@ -763,6 +782,13 @@ int Eigensolver::Compute(mfem::DenseMatrix& A_mat, mfem::Vector& evals,
 {
     const int n = A_mat.Size();
 
+    if (n < 1)
+    {
+        evects.SetSize(n, 0);
+        evals.SetSize(0);
+        return 0;
+    }
+
     if (n_max_ < n)
         AllocateWorkspace(n);
 
@@ -776,7 +802,7 @@ int Eigensolver::Compute(mfem::DenseMatrix& A_mat, mfem::Vector& evals,
 
     // d_ and e_ changed by dsterf_
     // copy since they are needed for dstein_
-    std::copy(begin(d_), end(d_), evals.GetData());
+    std::copy(std::begin(d_), std::end(d_), evals.GetData());
     auto e_copy = e_;
 
     // Compute all eigenvalues
@@ -869,10 +895,44 @@ void ReadVertexEdge(std::ifstream& graphFile, mfem::SparseMatrix& out)
     for (int i = 0; i < nedges * 2; i++)
         graphFile >> vertex_edge_j[i];
     for (int i = 0; i < nedges * 2; i++)
-        graphFile >> vertex_edge_data[i];
+        vertex_edge_data[i] = 1.0;
+    //graphFile >> vertex_edge_data[i];
     mfem::SparseMatrix vertex_edge(vertex_edge_i, vertex_edge_j,
                                    vertex_edge_data, nvertices, nedges);
     out.Swap(vertex_edge);
+}
+
+mfem::SparseMatrix ReadVertexEdge(const std::string& filename)
+{
+    std::ifstream graph_file(filename);
+    mfem::SparseMatrix out;
+
+    ReadVertexEdge(graph_file, out);
+
+    return out;
+}
+
+void ReadCoordinate(std::ifstream& graphFile, mfem::SparseMatrix& out)
+{
+    int nvertices, nedges;
+    if (!graphFile.is_open())
+        mfem::mfem_error("Error in opening the graph file");
+    graphFile >> nvertices;
+    graphFile >> nedges;
+
+    int i, j;
+    double val;
+
+    mfem::SparseMatrix mat(nvertices, nedges);
+
+    while (graphFile >> i >> j >> val)
+    {
+        mat.Add(i, j, val);
+    }
+
+    mat.Finalize();
+
+    out.Swap(mat);
 }
 
 void InversePermeabilityFunction::SetNumberCells(int Nx_, int Ny_, int Nz_)
@@ -896,7 +956,7 @@ void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
     npos = npos_;
 }
 
-void InversePermeabilityFunction::ReadPermeabilityFile(const std::string fileName)
+void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName)
 {
     std::ifstream permfile(fileName.c_str());
 
@@ -938,7 +998,7 @@ void InversePermeabilityFunction::ReadPermeabilityFile(const std::string fileNam
 
 }
 
-void InversePermeabilityFunction::ReadPermeabilityFile(const std::string fileName,
+void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName,
                                                        MPI_Comm comm)
 {
     int num_procs, myid;
@@ -1031,5 +1091,116 @@ double* InversePermeabilityFunction::inversePermeability(NULL);
 InversePermeabilityFunction::SliceOrientation InversePermeabilityFunction::orientation(
     InversePermeabilityFunction::NONE );
 int InversePermeabilityFunction::npos(-1);
+
+double DivError(MPI_Comm comm, const mfem::SparseMatrix& D, const mfem::Vector& numer,
+                const mfem::Vector& denom)
+{
+    mfem::Vector sigma_diff = denom;
+    sigma_diff -= numer;
+
+    mfem::Vector Dfine(D.Height());
+    mfem::Vector Ddiff(D.Height());
+
+    D.Mult(sigma_diff, Ddiff);
+    D.Mult(denom, Dfine);
+
+    const double error = mfem::ParNormlp(Ddiff, 2, comm) / mfem::ParNormlp(Dfine, 2, comm);
+
+    return error;
+}
+
+double CompareError(MPI_Comm comm, const mfem::Vector& numer, const mfem::Vector& denom)
+{
+    mfem::Vector diff = denom;
+    diff -= numer;
+
+    const double error = mfem::ParNormlp(diff, 2, comm) / ParNormlp(denom, 2, comm);
+
+    return error;
+}
+
+void ShowErrors(const std::vector<double>& error_info, std::ostream& out, bool pretty)
+{
+    assert(error_info.size() >= 3);
+
+    picojson::object serialize;
+    serialize["finest-p-error"] = picojson::value(error_info[0]);
+    serialize["finest-u-error"] = picojson::value(error_info[1]);
+    serialize["finest-div-error"] = picojson::value(error_info[2]);
+
+    if (error_info.size() > 3)
+    {
+        serialize["operator-complexity"] = picojson::value(error_info[3]);
+    }
+
+    out << picojson::value(serialize).serialize(pretty) << std::endl;
+}
+
+std::vector<double> ComputeErrors(MPI_Comm comm, const mfem::SparseMatrix& M,
+                                  const mfem::SparseMatrix& D,
+                                  const mfem::BlockVector& upscaled_sol,
+                                  const mfem::BlockVector& fine_sol)
+{
+    mfem::BlockVector M_scaled_up_sol(upscaled_sol);
+    mfem::BlockVector M_scaled_fine_sol(fine_sol);
+
+    const double* M_data = M.GetData();
+
+    const int num_edges = upscaled_sol.GetBlock(0).Size();
+
+    for (int i = 0; i < num_edges; ++i)
+    {
+        M_scaled_up_sol[i] *= std::sqrt(M_data[i]);
+        M_scaled_fine_sol[i] *= std::sqrt(M_data[i]);
+    }
+
+    std::vector<double> info(3);
+
+    info[0] = CompareError(comm, M_scaled_up_sol.GetBlock(1), M_scaled_fine_sol.GetBlock(1));  // vertex
+    info[1] = CompareError(comm, M_scaled_up_sol.GetBlock(0), M_scaled_fine_sol.GetBlock(0));  // edge
+    info[2] = DivError(comm, D, upscaled_sol.GetBlock(0), fine_sol.GetBlock(0));   // div
+
+    return info;
+}
+
+double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result, int max_iter,
+                    double tol, bool verbose)
+{
+    int myid;
+    MPI_Comm_rank(comm, &myid);
+
+    mfem::Vector temp(result.Size());
+
+    auto rayleigh = 0.0;
+    auto old_rayleigh = 0.0;
+
+    for (int i = 0; i < max_iter; ++i)
+    {
+        A.Mult(result, temp);
+
+        rayleigh = mfem::InnerProduct(comm, temp, result) / mfem::InnerProduct(comm, result, result);
+        temp /= mfem::ParNormlp(temp, 2, comm);
+
+        mfem::Swap(temp, result);
+
+        if (verbose && myid == 0)
+        {
+            std::cout << std::scientific;
+            std::cout << " i: " << i << " ray: " << rayleigh;
+            std::cout << " inverse: " << (1.0 / rayleigh);
+            std::cout << " rate: " << (std::fabs(rayleigh - old_rayleigh) / rayleigh) << "\n";
+        }
+
+        if (std::fabs(rayleigh - old_rayleigh) / std::fabs(rayleigh) < tol)
+        {
+            break;
+        }
+
+        old_rayleigh = rayleigh;
+    }
+
+    return rayleigh;
+}
+
 
 } // namespace smoothg

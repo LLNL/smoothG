@@ -30,7 +30,7 @@
 
 */
 
-/** @file graphcoarsen.hpp
+/** @file GraphCoarsen.hpp
 
     @brief The main graph coarsening routines.
 */
@@ -68,6 +68,11 @@ public:
                  const mfem::SparseMatrix& D_proc,
                  const GraphTopology& graph_topology);
 
+    GraphCoarsen(const mfem::SparseMatrix& M_proc,
+                 const mfem::SparseMatrix& D_proc,
+                 const mfem::SparseMatrix* W_proc,
+                 const GraphTopology& graph_topology);
+
     /**
        @brief Constructor based on the fine graph and a vertex partitioning.
 
@@ -78,7 +83,8 @@ public:
     */
     GraphCoarsen(const MixedMatrix& mgL,
                  const GraphTopology& graph_topology)
-        : GraphCoarsen(mgL.getWeight(), mgL.getD(), graph_topology) { }
+        : GraphCoarsen( mgL.getWeight(), mgL.getD(), mgL.getW(), graph_topology)
+    { }
 
     /**
        @brief Given edge_trace and vertex_targets functions, construct the
@@ -104,12 +110,12 @@ public:
        @todo document CM_el properly
     */
     void BuildInterpolation(
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& edge_trace,
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& vertex_targets,
+        std::vector<mfem::DenseMatrix>& edge_trace,
+        std::vector<mfem::DenseMatrix>& vertex_targets,
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,
         mfem::SparseMatrix& face_dof,
-        std::vector<std::unique_ptr<mfem::DenseMatrix>>& CM_el,
+        std::vector<mfem::DenseMatrix>& CM_el,
         bool build_coarse_relation = false);
 
     /**
@@ -158,11 +164,19 @@ public:
     {
         return std::move(CoarseD_);
     }
+
+    /**
+       @brief Get the coarse W matrix
+    */
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseW()
+    {
+        return std::move(CoarseW_);
+    }
 private:
     /// @brief take vertex-based target functions and assemble them in matrix
-    void BuildPVertices(
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& vertex_targets,
-        mfem::SparseMatrix& Pvertices, bool build_coarse_relation);
+    void BuildPVertices(std::vector<mfem::DenseMatrix>& vertex_targets,
+                        mfem::SparseMatrix& Pvertices,
+                        bool build_coarse_relation);
 
     /**
        @brief take edge-based traces functions, extend them, find bubbles,
@@ -175,15 +189,18 @@ private:
        @param Pedges is out
     */
     void BuildPEdges(
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& edge_traces,
-        std::vector<std::unique_ptr<mfem::DenseMatrix> >& vertex_target,
+        std::vector<mfem::DenseMatrix>& edge_traces,
+        std::vector<mfem::DenseMatrix>& vertex_target,
         mfem::SparseMatrix& face_cdof,
         mfem::SparseMatrix& Pedges,
-        std::vector<std::unique_ptr<mfem::DenseMatrix>>& CM_el,
+        std::vector<mfem::DenseMatrix>& CM_el,
         bool build_coarse_relation);
+
+    void BuildW(const mfem::SparseMatrix& Pvertices);
 
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
+    const mfem::SparseMatrix* W_proc_;
     const GraphTopology& graph_topology_;
 
     /// Aggregate-to-coarse vertex dofs relation table
@@ -210,6 +227,9 @@ private:
 
     /// Coarse M operator
     std::unique_ptr<mfem::SparseMatrix> CoarseM_;
+
+    /// Coarse W operator
+    std::unique_ptr<mfem::SparseMatrix> CoarseW_;
 };
 
 } // namespace smoothg

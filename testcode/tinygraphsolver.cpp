@@ -27,6 +27,7 @@
 #include "../src/utilities.hpp"
 #include "../src/MixedMatrix.hpp"
 #include "../src/MinresBlockSolver.hpp"
+#include "../src/HybridSolver.hpp"
 #include "../src/MatrixUtilities.hpp"
 
 using namespace smoothg;
@@ -54,6 +55,10 @@ int main(int argc, char* argv[])
     bool weighted = false;
     args.AddOption(&weighted, "-w", "--weighted", "-no-w",
                    "--no-weighted", "Use weighted graph.");
+    bool w_block = false;
+    args.AddOption(&w_block, "-m", "--w_block", "-no-m",
+                   "--no-w_block", "Use W block.");
+
     args.Parse();
     if (!args.Good())
     {
@@ -75,8 +80,10 @@ int main(int argc, char* argv[])
         std::ifstream graphFile(graphFileName);
         ReadVertexEdge(graphFile, vertex_edge);
     }
-    int nvertices = vertex_edge.Height();
-    int nedges = vertex_edge.Width();
+    const int nvertices = vertex_edge.Height();
+    const int nedges = vertex_edge.Width();
+
+    assert(nvertices == 6 && nedges == 7);
 
     mfem::Vector weight(nedges);
     if (weighted)
@@ -89,6 +96,19 @@ int main(int argc, char* argv[])
     else
     {
         weight = 1.0;
+    }
+
+    mfem::Vector w(nvertices);
+    if (w_block)
+    {
+        for (int i = 0; i < nvertices; ++i)
+        {
+            w[i] = i + 1;
+        }
+    }
+    else
+    {
+        w = 0.0;
     }
 
     // set the appropriate right hand side and weights for graph problem
@@ -104,48 +124,44 @@ int main(int argc, char* argv[])
     mfem::Array<HYPRE_Int> edge_start(2);
     edge_start[0] = 0;
     edge_start[1] = nedges;
-    auto edge_d_td = make_shared<mfem::HypreParMatrix>(comm, nedges, edge_start,
-                                                       edge_d_td_diag.get());
 
-    MixedMatrix mixed_graph_laplacian(vertex_edge, weight, edge_d_td);
-    mfem::SparseMatrix& Mref = mixed_graph_laplacian.getWeight();
-    mfem::SparseMatrix& Dref = mixed_graph_laplacian.getD();
-    const int num_blocks = 2;
-    mfem::Array<int> blockOffsets(num_blocks + 1);
-    blockOffsets[0] = 0;
-    blockOffsets[1] = Mref.Height();
-    blockOffsets[2] = blockOffsets[1] + Dref.Height();
-    mfem::BlockVector rhs(blockOffsets);
-    rhs.GetBlock(0) = rhs_u_fine;
-    rhs.GetBlock(1) = rhs_p_fine;
+    mfem::HypreParMatrix edge_d_td(comm, nedges, edge_start,
+                                   &edge_d_td_diag);
+
+    MixedMatrix mixed_graph_laplacian(vertex_edge, weight, w, edge_d_td);
+
+    mfem::Array<int>& blockOffsets(mixed_graph_laplacian.get_blockoffsets());
+    mfem::BlockVector rhs = *mixed_graph_laplacian.subvecs_to_blockvector(rhs_u_fine, rhs_p_fine);
     mfem::BlockVector sol(blockOffsets);
     sol = 0.0;
 
     // solve
-    HYPRE_Int row_starts_M[2];
-    row_starts_M[0] = 0;
-    row_starts_M[1] = Mref.Height();
-    mfem::HypreParMatrix hM(comm, Mref.Height(), row_starts_M, &Mref);
-    HYPRE_Int row_starts_D[2];
-    row_starts_D[0] = 0;
-    row_starts_D[1] = Dref.Height();
-    HYPRE_Int col_starts_D[2];
-    col_starts_D[0] = 0;
-    col_starts_D[1] = Dref.Width();
-    mfem::HypreParMatrix hD(comm, Dref.Height(), Dref.Width(),
-                            row_starts_D, col_starts_D, &Dref);
-    MinresBlockSolver mgp(comm, &hM, &hD, blockOffsets);
+    MinresBlockSolver mgp(comm, mixed_graph_laplacian);
+    mgp.SetPrintLevel(1);
     mgp.Mult(rhs, sol);
+
     int iter = mgp.GetNumIterations();
     int nnz = mgp.GetNNZ();
     std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
     std::cout << "Minres converged in " << iter << " iterations." << std::endl;
-    orthogonalize_from_constant(sol.GetBlock(1));
+
+    if (!w_block)
+    {
+        orthogonalize_from_constant(sol.GetBlock(1));
+    }
 
     // truesol was found "independently" with python: testcode/tinygraph.py
     mfem::Vector truesol(nvertices);
-    // [1.84483857 0.29938403 0.11756585  -0.63243415  -0.81935004  -0.81000425]
-    if (weighted)
+    if (weighted && w_block)
+    {
+        truesol[0] = -5.46521374685666e-01;
+        truesol[1] = -4.43419949706622e-01;
+        truesol[2] = -3.71332774518022e-01;
+        truesol[3] = -2.58172673931266e-01;
+        truesol[4] = -2.23976847914538e-01;
+        truesol[5] = -2.16677577841545e-01;
+    }
+    else if (weighted)
     {
         truesol[0] = 1.84483857264231e+00;
         truesol[1] = 2.99384027187765e-01;
@@ -154,8 +170,16 @@ int main(int argc, char* argv[])
         truesol[4] = -8.19350042480884e-01;
         truesol[5] = -8.10004248088361e-01;
     }
+    else if (w_block)
+    {
+        truesol[0] = -6.36443964459280e-01;
+        truesol[1] = -5.09155171567424e-01;
+        truesol[2] = -4.00176721810417e-01;
+        truesol[3] = -2.55461194835796e-01;
+        truesol[4] = -2.05439104609494e-01;
+        truesol[5] = -1.82612537430661e-01;
+    }
     else
-        // [ 4.16666667  2.16666667  1.16666667 -1.83333333 -2.83333333 -2.83333333]
     {
         truesol[0] = 4.16666666666667e+00;
         truesol[1] = 2.16666666666667e+00;
@@ -165,7 +189,8 @@ int main(int argc, char* argv[])
         truesol[5] = -2.83333333333333e+00;
     }
 
-    sol.GetBlock(1).Print();
+    std::cout.precision(16);
+    sol.GetBlock(1).Print(std::cout, 1);
 
     truesol -= sol.GetBlock(1);
     double norm = truesol.Norml2();

@@ -95,8 +95,8 @@ public:
     std::unique_ptr<mfem::HypreParMatrix> face_d_td;
     std::unique_ptr<mfem::HypreParMatrix> face_d_td_d;
 
-    unique_ptr<mfem::SparseMatrix> edge_identity;
-    unique_ptr<mfem::SparseMatrix> face_identity;
+    mfem::SparseMatrix edge_identity_;
+    mfem::SparseMatrix face_identity_;
 
     mfem::Array<HYPRE_Int> Agg_start;
     mfem::Array<HYPRE_Int> face_start;
@@ -116,7 +116,9 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     Agg_edge(partitions, n_ - 1),
     AggExt_vertex(partitions, n_),
     AggExt_edge(partitions, n_ - 1),
-    Agg_face(partitions, partitions - 1)
+    Agg_face(partitions, partitions - 1),
+    edge_identity_(SparseIdentity(n_ - 1)),
+    face_identity_(SparseIdentity(partitions - 1))
 {
     // dividing line between partitions
     int line = graph.GetN() / partitions;
@@ -174,14 +176,12 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
                        MPI_COMM_WORLD, partitions, n_ - 1,
                        Agg_start, edge_start, &AggExt_edge);
 
-    edge_identity = SparseIdentity(n_ - 1);
-    face_identity = SparseIdentity(partitions - 1);
     edge_d_td = make_unique<mfem::HypreParMatrix>(
-                    MPI_COMM_WORLD, n_ - 1, edge_start, edge_identity.get());
+                    MPI_COMM_WORLD, n_ - 1, edge_start, &edge_identity_);
     face_d_td = make_unique<mfem::HypreParMatrix>(
-                    MPI_COMM_WORLD, partitions - 1, face_start, face_identity.get());
+                    MPI_COMM_WORLD, partitions - 1, face_start, &face_identity_);
     face_d_td_d = make_unique<mfem::HypreParMatrix>(
-                      MPI_COMM_WORLD, partitions - 1, face_start, face_identity.get());
+                      MPI_COMM_WORLD, partitions - 1, face_start, &face_identity_);
 }
 
 int main(int argc, char* argv[])
@@ -220,8 +220,8 @@ int main(int argc, char* argv[])
                                  *partition.face_d_td,
                                  *partition.face_d_td_d);
 
-    std::vector<unique_ptr<mfem::DenseMatrix> > local_edge_traces(num_partitions - 1);
-    std::vector<unique_ptr<mfem::DenseMatrix> > local_spectral_vertex_targets(num_partitions);
+    std::vector<mfem::DenseMatrix> local_edge_traces(num_partitions - 1);
+    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets(num_partitions);
 
     LocalMixedGraphSpectralTargets localtargets(
         spect_tol, max_evects, graph.GetM(), graph.GetD(), graph_topology);
@@ -240,12 +240,12 @@ int main(int argc, char* argv[])
     int thisresult = 0;
     for (unsigned int i = 0; i < local_spectral_vertex_targets.size(); ++i)
     {
-        for (int j = 0; j < local_spectral_vertex_targets[i]->Width(); ++j)
+        for (int j = 0; j < local_spectral_vertex_targets[i].Width(); ++j)
         {
-            double val = local_spectral_vertex_targets[i]->Elem(0, j);
-            for (int k = 0; k < local_spectral_vertex_targets[i]->Height(); ++k)
+            double val = local_spectral_vertex_targets[i].Elem(0, j);
+            for (int k = 0; k < local_spectral_vertex_targets[i].Height(); ++k)
             {
-                if (fabs(local_spectral_vertex_targets[i]->Elem(k, j) - val) > test_tol)
+                if (fabs(local_spectral_vertex_targets[i].Elem(k, j) - val) > test_tol)
                 {
                     thisresult += 1;
                     break;
@@ -262,7 +262,7 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
     mfem::SparseMatrix face_dof; // not used in this example
-    std::vector<unique_ptr<mfem::DenseMatrix> > CM_el_;
+    std::vector<mfem::DenseMatrix> CM_el_;
 
     GraphCoarsen graph_coarsen(graph.GetM(), graph.GetD(), graph_topology);
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
@@ -270,28 +270,28 @@ int main(int argc, char* argv[])
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;
-    mfem::SparseMatrix* left_mat = Mult(graph.GetD(), Pu);
+    mfem::SparseMatrix left_mat = smoothg::Mult(graph.GetD(), Pu);
     mfem::SparseMatrix minusone_one(2, 1);
-    if (local_spectral_vertex_targets[0]->Elem(0, 0) > 0)
+    if (local_spectral_vertex_targets[0].Elem(0, 0) > 0)
         minusone_one.Add(0, 0, -1.0);
     else
         minusone_one.Add(0, 0, 1.0);
-    if (local_spectral_vertex_targets[1]->Elem(0, 0) > 0)
+    if (local_spectral_vertex_targets[1].Elem(0, 0) > 0)
         minusone_one.Add(1, 0, 1.0);
     else
         minusone_one.Add(1, 0, -1.0);
     minusone_one.Finalize();
-    mfem::SparseMatrix* right_mat = Mult(Pp, minusone_one);
-    double left_scale = left_mat->GetData()[0];
-    double right_scale = right_mat->GetData()[0];
+    mfem::SparseMatrix right_mat = smoothg::Mult(Pp, minusone_one);
+    double left_scale = left_mat.GetData()[0];
+    double right_scale = right_mat.GetData()[0];
 
     thisresult = 0;
-    for (int i = 0; i < left_mat->NumNonZeroElems(); ++i)
-        if (fabs(left_mat->GetData()[i] / left_scale -
-                 right_mat->GetData()[i] / right_scale) > test_tol)
+    for (int i = 0; i < left_mat.NumNonZeroElems(); ++i)
+        if (fabs(left_mat.GetData()[i] / left_scale -
+                 right_mat.GetData()[i] / right_scale) > test_tol)
         {
-            std::cout << fabs(left_mat->GetData()[i] / left_scale -
-                              right_mat->GetData()[i] / right_scale) << "\n";
+            std::cout << fabs(left_mat.GetData()[i] / left_scale -
+                              right_mat.GetData()[i] / right_scale) << "\n";
             thisresult += 1;
             break;
         }
@@ -301,9 +301,6 @@ int main(int argc, char* argv[])
     else
         std::cout << "Divergence of coarse velocity is fine." << std::endl;
     result += thisresult;
-
-    delete left_mat;
-    delete right_mat;
 
     MPI_Finalize();
     return result;

@@ -19,11 +19,17 @@
 add_executable(finitevolume finitevolume.cpp)
 target_link_libraries(finitevolume smoothg ${TPL_LIBRARIES})
 
-add_executable(fv_weakscaling fv_weakscaling.cpp)
-target_link_libraries(fv_weakscaling smoothg ${TPL_LIBRARIES})
-
 add_executable(generalgraph generalgraph.cpp)
 target_link_libraries(generalgraph smoothg ${TPL_LIBRARIES})
+
+add_executable(timestep timestep.cpp)
+target_link_libraries(timestep smoothg ${TPL_LIBRARIES})
+
+add_executable(graphupscale graphupscale.cpp)
+target_link_libraries(graphupscale smoothg ${TPL_LIBRARIES})
+
+add_executable(poweriter poweriter.cpp)
+target_link_libraries(poweriter smoothg ${TPL_LIBRARIES})
 
 # add tests
 configure_file(
@@ -41,6 +47,10 @@ add_test(slice19 python stest.py slice19)
 add_test(samplegraph1 python stest.py samplegraph1)
 add_test(samplegraph4 python stest.py samplegraph4)
 add_test(graph-hybridization python stest.py graph-hybridization)
+add_test(poweriter python stest.py poweriter)
+add_test(graph-weight python stest.py graph-weight)
+add_test(timestep python stest.py timestep)
+
 add_test(pareigenvector1 python stest.py pareigenvector1)
 add_test(pareigenvector4 python stest.py pareigenvector4)
 add_test(parfv-hybridization python stest.py parfv-hybridization)
@@ -48,6 +58,8 @@ add_test(parslice19 python stest.py parslice19)
 add_test(parsamplegraph1 python stest.py parsamplegraph1)
 add_test(parsamplegraph4 python stest.py parsamplegraph4)
 add_test(pargraph-hybridization python stest.py pargraph-hybridization)
+add_test(parpoweriter python stest.py parpoweriter)
+add_test(partimestep python stest.py partimestep)
 
 if (APPLE)
   add_test(fv-metis python stest.py fv-metis-mac)
@@ -63,6 +75,9 @@ else()
   add_test(pargraph-metis python stest.py pargraph-metis)
 endif()
 add_test(isolate_coarsen python stest.py isolate-coarsen)
+
+add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
+add_test(vgraph-small-usegenerator-hb python stest.py vgraph-small-usegenerator-hb)
 
 add_test(NAME style
   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp

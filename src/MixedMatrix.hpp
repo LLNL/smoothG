@@ -22,6 +22,7 @@
 #define __MIXEDMATRIX_HPP__
 
 #include "mfem.hpp"
+#include "MatrixUtilities.hpp"
 #include "utilities.hpp"
 
 namespace smoothg
@@ -48,13 +49,25 @@ public:
        @param dist_weight true if edges shared between processors should be cut in half
     */
     MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                mfem::Vector& weight,
-                const std::shared_ptr<mfem::HypreParMatrix>& edge_d_td,
+                const mfem::Vector& weight,
+                const mfem::HypreParMatrix& edge_d_td,
+                DistributeWeight dist_weight = DistributeWeight::True);
+
+    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
+                const mfem::Vector& weight,
+                const mfem::SparseMatrix& w_block,
+                const mfem::HypreParMatrix& edge_d_td,
+                DistributeWeight dist_weight = DistributeWeight::True);
+
+    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
+                const mfem::Vector& weight,
+                const mfem::Vector& w_block,
+                const mfem::HypreParMatrix& edge_d_td,
                 DistributeWeight dist_weight = DistributeWeight::True);
 
     /// build with weights all equal to 1
     MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const std::shared_ptr<mfem::HypreParMatrix>& edge_d_td);
+                const mfem::HypreParMatrix& edge_d_td);
 
     /**
         @brief Create a MixedMatrix directly from M and D matrices.
@@ -63,13 +76,19 @@ public:
     */
     MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
                 std::unique_ptr<mfem::SparseMatrix> D,
-                const std::shared_ptr<mfem::HypreParMatrix>& edge_d_td)
-        :
-        M_(std::move(M)),
-        D_(std::move(D)),
-        edge_d_td_(edge_d_td),
-        edge_td_d_(edge_d_td_->Transpose())
+                const mfem::HypreParMatrix& edge_d_td)
+        : MixedMatrix(std::move(M), std::move(D), nullptr, edge_d_td)
     {}
+
+    /**
+        @brief Create a MixedMatrix directly from M and D matrices.
+
+        Takes ownership of the M and D unique pointers.
+    */
+    MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
+                std::unique_ptr<mfem::SparseMatrix> D,
+                std::unique_ptr<mfem::SparseMatrix> W,
+                const mfem::HypreParMatrix& edge_d_td);
 
     /**
        @brief Construct a coarse mixed graph Laplacian from a finer one and some projections
@@ -79,7 +98,7 @@ public:
     MixedMatrix(const MixedMatrix& fine_mgL,
                 const mfem::SparseMatrix& Pu,
                 const mfem::SparseMatrix& Pp,
-                const std::shared_ptr<mfem::HypreParMatrix>& edge_d_td)
+                const mfem::HypreParMatrix& edge_d_td)
         : MixedMatrix(std::unique_ptr<mfem::SparseMatrix>(RAP(Pu, fine_mgL.getWeight(), Pu)),
                       std::unique_ptr<mfem::SparseMatrix>(RAP(Pp, fine_mgL.getD(), Pu)),
                       edge_d_td)
@@ -98,6 +117,23 @@ public:
     mfem::SparseMatrix& getD() const
     {
         return *D_;
+    }
+
+    /**
+     * Get a reference to the matrix W.
+     */
+    mfem::SparseMatrix* getW() const
+    {
+        return W_.get();
+    }
+
+    /**
+     * Set the matrix W.
+     */
+    void setW(mfem::SparseMatrix W_in)
+    {
+        W_ = make_unique<mfem::SparseMatrix>();
+        W_->Swap(W_in);
     }
 
     /** Get the number of vertex dofs in this matrix.
@@ -119,6 +155,34 @@ public:
     int get_num_total_dofs() const
     {
         return D_->Width() + D_->Height();
+    }
+
+    int NNZ() const
+    {
+        int total = 0;
+
+        if (M_)
+            total += M_->NumNonZeroElems();
+        if (D_)
+            total += D_->NumNonZeroElems();
+        if (W_)
+            total += W_->NumNonZeroElems();
+
+        return total;
+    }
+
+    int GlobalNNZ() const
+    {
+        int total = 0;
+
+        if (M_)
+            total += get_pM().NNZ();
+        if (D_)
+            total += 2 * get_pD().NNZ();
+        if (W_)
+            total += get_pW()->NNZ();
+
+        return total;
     }
 
     /**
@@ -146,7 +210,15 @@ public:
     /// return edge dof_truedof relation
     const mfem::HypreParMatrix& get_edge_d_td() const
     {
+        assert(edge_d_td_);
         return *edge_d_td_;
+    }
+
+    /// return edge dof_truedof relation
+    const mfem::HypreParMatrix& get_edge_td_d() const
+    {
+        assert(edge_td_d_);
+        return *edge_td_d_;
     }
 
     /// return the row starts (parallel partitioning) of \f$ D \f$
@@ -154,38 +226,55 @@ public:
     {
         if (!Drow_start_)
             Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
+        assert(Drow_start_);
         return *Drow_start_;
     }
 
-    /// set the row starts (parallel partitioning) of \f$ D \f$
-    void set_Drow_start(const mfem::Array<HYPRE_Int>& arr)
-    {
-        if (!Drow_start_)
-            Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
-        arr.Copy(*Drow_start_);
-    }
-
     /// get the edge weight matrix
-    mfem::HypreParMatrix& get_pM() const
+    mfem::HypreParMatrix& get_pM(bool recompute = false) const
     {
-        if (!pM_)
+        if (!pM_ || recompute)
         {
-            Mtmp_.reset(edge_d_td_->LeftDiagMult(getWeight()));
-            pM_.reset(ParMult(edge_td_d_.get(), Mtmp_.get()));
+            assert(M_);
+            mfem::HypreParMatrix M_diag(edge_d_td_->GetComm(), edge_d_td_->M(),
+                                        edge_d_td_->GetRowStarts(), M_.get());
+
+            std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M_diag, edge_d_td_));
+            pM_.reset(ParMult(const_cast<mfem::HypreParMatrix*>(edge_td_d_.get()), M_tmp.get()));
             hypre_ParCSRMatrixSetNumNonzeros(*pM_);
         }
+
+        assert(pM_);
         return *pM_;
     }
 
     /// get the signed vertex_edge (divergence) matrix
-    mfem::HypreParMatrix& get_pD() const
+    mfem::HypreParMatrix& get_pD(bool recompute = false) const
     {
-        if (!pD_)
+        if (!pD_ || recompute)
         {
+            assert(D_);
             pD_.reset(edge_d_td_->LeftDiagMult(*D_, *Drow_start_));
         }
+
+        assert(pD_);
         return *pD_;
     }
+
+    /// get the W matrix
+    mfem::HypreParMatrix* get_pW() const
+    {
+        if (W_ && !pW_)
+        {
+            pW_ = make_unique<mfem::HypreParMatrix>(edge_d_td_->GetComm(), Drow_start_->Last(),
+                                                    Drow_start_->GetData(), W_.get());
+        }
+
+        return pW_.get();
+    }
+
+    /// Determine if W block is nonzero
+    bool CheckW() const;
 
 private:
     /**
@@ -195,17 +284,23 @@ private:
     */
     void Init(const mfem::SparseMatrix& vertex_edge,
               const mfem::Vector& weight,
-              const mfem::HypreParMatrix& edge_d_td);
+              const mfem::SparseMatrix& w_block);
+
+    void GenerateRowStarts();
 
     std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
+    std::unique_ptr<mfem::SparseMatrix> W_;
 
-    std::shared_ptr<mfem::HypreParMatrix> edge_d_td_;
-    std::shared_ptr<mfem::HypreParMatrix> edge_td_d_;
+    const mfem::HypreParMatrix* edge_d_td_;
+    std::unique_ptr<mfem::HypreParMatrix> edge_td_d_;
 
-    mutable std::shared_ptr<mfem::HypreParMatrix> Mtmp_;
-    mutable std::shared_ptr<mfem::HypreParMatrix> pM_;
-    mutable std::shared_ptr<mfem::HypreParMatrix> pD_;
+    int nedges_;
+    int ntrue_edges_;
+
+    mutable std::unique_ptr<mfem::HypreParMatrix> pM_;
+    mutable std::unique_ptr<mfem::HypreParMatrix> pD_;
+    mutable std::unique_ptr<mfem::HypreParMatrix> pW_;
     mutable std::unique_ptr<mfem::Array<HYPRE_Int>> Drow_start_;
     mutable std::unique_ptr<mfem::Array<int>> blockOffsets_;
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;

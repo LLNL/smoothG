@@ -13,6 +13,10 @@
  *
  ***********************************************************************EHEADER*/
 
+/** @file smoothG.hpp
+    @brief Contains all header files for easy include
+*/
+
 #include "LocalMixedGraphSpectralTargets.hpp"
 #include "GraphCoarsen.hpp"
 #include "utilities.hpp"
@@ -25,3 +29,7 @@
 #include "MetisGraphPartitioner.hpp"
 #include "MatrixUtilities.hpp"
 #include "GraphGenerator.hpp"
+#include "Upscale.hpp"
+#include "UpscaleOperators.hpp"
+#include "GraphUpscale.hpp"
+#include "FiniteVolumeUpscale.hpp"

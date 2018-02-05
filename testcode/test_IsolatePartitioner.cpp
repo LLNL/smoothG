@@ -46,31 +46,45 @@ int main(int argc, char* argv[])
     // partition
     int num_partitions = 2;
     mfem::Array<int> global_partitioning;
+    mfem::Array<int> isolated_vertices;
     {
         smoothg::MetisGraphPartitioner metis_partitioner;
-        metis_partitioner.setUnbalanceTol(2);
-        mfem::SparseMatrix* edge_vertex = Transpose(vertex_edge_global);
-        mfem::SparseMatrix* vertex_vertex = Mult(vertex_edge_global,
-                                                 *edge_vertex);
-        delete edge_vertex;
-        mfem::Array<int> isolated_vertices(1);
-        isolated_vertices[0] = 2;
-        metis_partitioner.SetIsolateVertices(isolated_vertices);
-        metis_partitioner.doPartition(*vertex_vertex, num_partitions,
+        metis_partitioner.setUnbalanceTol(1);
+        mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge_global);
+        mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge_global,
+                                                         edge_vertex);
+
+        mfem::Array<int> pre_isolated_vertices(2);
+        pre_isolated_vertices[0] = 0;
+        pre_isolated_vertices[1] = 5;
+        isolated_vertices.Append(pre_isolated_vertices);
+
+        mfem::Array<int> post_isolated_vertices(1);
+        post_isolated_vertices[0] = 2;
+        isolated_vertices.Append(post_isolated_vertices);
+
+        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices);
+        metis_partitioner.SetPostIsolateVertices(post_isolated_vertices);
+
+        metis_partitioner.doPartition(vertex_vertex, num_partitions,
                                       global_partitioning);
-        delete vertex_vertex;
     }
 
     for (int i = 0; i < global_partitioning.Size(); ++i)
     {
         std::cout << "partition[" << i << "] = " << global_partitioning[i] << std::endl;
     }
-    if (global_partitioning[0] != 1) result++;
-    if (global_partitioning[1] != 1) result++;
-    if (global_partitioning[2] != 2) result++;
-    if (global_partitioning[3] != 0) result++;
-    if (global_partitioning[4] != 0) result++;
-    if (global_partitioning[5] != 0) result++;
+
+    // Check if each isolated vertex does form a partition itself
+    for (auto isolated_vertex : isolated_vertices)
+    {
+        int singleton_partition = global_partitioning[isolated_vertex];
+        for (int i = 0; i < global_partitioning.Size(); i++)
+        {
+            if ( (i != isolated_vertex) && (global_partitioning[i] == singleton_partition) )
+                result++;
+        }
+    }
 
     if (result > 0)
         std::cerr << "Unexpected partitioning from IsolatePartitioner!" << std::endl;
