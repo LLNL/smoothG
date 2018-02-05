@@ -220,8 +220,8 @@ int main(int argc, char* argv[])
                                  *partition.face_d_td,
                                  *partition.face_d_td_d);
 
-    std::vector<mfem::DenseMatrix> local_edge_traces(num_partitions - 1);
-    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets(num_partitions);
+    std::vector<mfem::DenseMatrix> local_edge_traces;
+    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(
         spect_tol, max_evects, 1, graph.GetM(), graph.GetD(), graph_topology);

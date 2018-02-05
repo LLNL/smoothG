@@ -179,10 +179,12 @@ void LocalMixedGraphSpectralTargets::CheckMinimalEigenvalue(
 }
 
 void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
-    std::vector<mfem::DenseMatrix>& AggExt_sigma,
+    std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
     const int nAggs = graph_topology_.Agg_vertex_.Height();
+    AggExt_sigmaT.resize(nAggs);
+    local_vertex_targets.resize(nAggs);
 
     // Construct permutation matrices to obtain M, D on extended aggregates
     const mfem::HypreParMatrix& pAggExt_vertex(*graph_topology_.pAggExt_vertex_);
@@ -410,8 +412,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
             // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
             // transposed for extraction later
-            AggExt_sigma[iAgg].SetSize(evects_tmp.Width(), DlocT.Height());
-            MultSparseDenseTranspose(DlocT, evects_tmp, AggExt_sigma[iAgg]);
+            AggExt_sigmaT[iAgg].SetSize(evects_tmp.Width(), DlocT.Height());
+            MultSparseDenseTranspose(DlocT, evects_tmp, AggExt_sigmaT[iAgg]);
         }
         else
         {
@@ -419,22 +421,22 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             auto EES = BuildEdgeEigenSystem(DMinvDt, Dloc, Mloc_diag_inv);
             if (trace_method_ == 2 || trace_method_ == 3)
             {
-                eval_min = eigs.Compute(EES[0], AggExt_sigma[iAgg]);
+                eval_min = eigs.Compute(EES[0], evects);
             }
             else
             {
-                eval_min = eigs.Compute(EES[0], EES[1], AggExt_sigma[iAgg]);
+                eval_min = eigs.Compute(EES[0], EES[1], evects);
             }
             CheckMinimalEigenvalue(eval_min, iAgg, "edge");
 
-            // Transpose all for extraction later
-            AggExt_sigma[iAgg].Transpose();
+            // Transpose all edge eigenvectors for extraction later
+            AggExt_sigmaT[iAgg].Transpose(evects);
         }
     }
 }
 
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
-    const std::vector<mfem::DenseMatrix>& AggExt_sigma,
+    const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets)
 {
     const mfem::SparseMatrix& face_Agg(graph_topology_.face_Agg_);
@@ -444,6 +446,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const mfem::HypreParMatrix& pAggExt_edge(*graph_topology_.pAggExt_edge_);
 
     const int nfaces = face_Agg.Height(); // Number of coarse faces
+    local_edge_trace_targets.resize(nfaces);
 
     mfem::Array<int> edge_local_dof, face_edge_dof;
     mfem::DenseMatrix collected_sigma;
@@ -485,7 +488,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         {
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
-                total_vects += AggExt_sigma[neighbor_aggs[i]].Height();
+                total_vects += AggExt_sigmaT[neighbor_aggs[i]].Height();
             face_sigma_tmp.SetSize(total_vects, num_iface_edge_dof);
 
             // loop over all neighboring aggregates, collect traces
@@ -507,10 +510,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                             j + nedges_diag_loc;
                 }
 
-                const mfem::DenseMatrix& sigma(AggExt_sigma[iAgg]);
-                ExtractColumns(sigma, edge_dof_marker, face_edge_dof, start,
+                const mfem::DenseMatrix& sigmaT(AggExt_sigmaT[iAgg]);
+                ExtractColumns(sigmaT, edge_dof_marker, face_edge_dof, start,
                                face_sigma_tmp);
-                start += sigma.Height();
+                start += sigmaT.Height();
             }
 
             face_sigma_tmp = mfem::DenseMatrix(face_sigma_tmp, 't');
@@ -812,12 +815,9 @@ void LocalMixedGraphSpectralTargets::Compute(std::vector<mfem::DenseMatrix>&
                                              std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
     assert(trace_method_ < 6 && trace_method_ > 0);
-    const int nAggs = graph_topology_.Agg_vertex_.Height();
-
-    std::vector<mfem::DenseMatrix> AggExt_sigma(nAggs);
-
-    ComputeVertexTargets(AggExt_sigma, local_vertex_targets);
-    ComputeEdgeTargets(AggExt_sigma, local_edge_trace_targets);
+    std::vector<mfem::DenseMatrix> AggExt_sigmaT;
+    ComputeVertexTargets(AggExt_sigmaT, local_vertex_targets);
+    ComputeEdgeTargets(AggExt_sigmaT, local_edge_trace_targets);
 }
 
 } // namespace smoothg

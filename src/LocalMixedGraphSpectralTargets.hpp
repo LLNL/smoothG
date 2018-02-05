@@ -97,7 +97,7 @@ private:
            When it comes out, each entry is a DenseMatrix with one column for each
            eigenvector selected.
     */
-    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigma,
+    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                               std::vector<mfem::DenseMatrix>& local_vertex_targets);
 
     /**
@@ -107,7 +107,7 @@ private:
        @param AggExt_sigma (IN)
        @param local_edge_trace_targets (OUT)
     */
-    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigma,
+    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(

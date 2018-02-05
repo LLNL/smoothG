@@ -48,8 +48,8 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
 {
     using LMGST = LocalMixedGraphSpectralTargets;
 
-    std::vector<mfem::DenseMatrix> local_edge_traces(graph_topology_->get_num_faces());
-    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets(graph_topology_->get_num_aggregates());
+    std::vector<mfem::DenseMatrix> local_edge_traces;
+    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LMGST localtargets(spectral_tol_, max_evecs_per_agg_, trace_method_,
                        mgL_.getWeight(), mgL_.getD(), mgL_.getW(),
