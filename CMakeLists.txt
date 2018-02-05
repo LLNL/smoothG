@@ -42,6 +42,8 @@ set(TPL_LIBRARIES "")
 # This is a list of linker flags to be used with TPLs for all targets
 set(TPL_LINKER_FLAGS "")
 
+MESSAGE("DIRS:" ${MFEM_DIR}  ${HYPRE_DIR} ${METIS_DIR})
+
 # MFEM
 find_package(MFEM REQUIRED)
 include_directories(${MFEM_INCLUDE_DIRS})

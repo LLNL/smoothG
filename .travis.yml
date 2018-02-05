@@ -145,9 +145,18 @@ script:
    - ls ../../metis-install/include;
    - cmake \
      -DMFEM_DIR=../../mfem-install \
+     -DMFEM_LIBRARIES=../../mfem-install/lib/libmfem.a \
+     -DMFEM_INCLUDE_DIRS=../../mfem-install/include \
+     \
      -DHYPRE_DIR=../../hypre-install \
+     -DHYPRE_LIBRARIES=../../hypre-install/lib/libHYPRE.a \
+     -DHYPRE_INCLUDE_DIRS=../../hypre-install/include \
+     \
      -DSuiteSparse_DIR=../../SuiteSparse-install \
-     -DMETIS_DIR=../../metis-install \
+     \
+     -DMETIS_DIRS=../../metis-install \
+     -DMETIS_LIBRARIES=../../metis-install/lib/libmetis.a \
+     -DMETIS_INCLUDE_DIRS=../../metis-install/include/metis.h \
      -DUSE_ARPACK=OFF \
      -DCMAKE_BUILD_TYPE=DEBUG \
      -DSPE10_DIR=../../spe10 ..;
