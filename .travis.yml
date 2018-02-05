@@ -61,8 +61,9 @@ install:
         wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
         tar xzf SuiteSparse-4.5.4.tar.gz;
         cd SuiteSparse;
-        make config
+        make config;
         make install BLAS=-lblas MY_METIS_LIB=../metis-install/lib/metis.a MY_METIS_INC=../metis-install/include/metis.h INSTALL=../SuiteSparse-install;
+        cd ..;
      else
         echo "Reusing cached SuiteSparse-4.5.4";
      fi;
