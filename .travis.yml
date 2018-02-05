@@ -56,9 +56,10 @@ install:
 
    # spe10 dataset
    - if [ ! -e spe10-install/spe_perm.dat ]; then
-        wget http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
-        unzip -d spe10-install por_perm_case2a.zip;
-        rm por_per_case2a.zip;
+     wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"\\
+        http://www.spe.org/web/csp/datasets/por_perm_case2a.zip \
+        && unzip -d spe10-install por_perm_case2a.zip \
+        && rm por_per_case2a.zip;
      else
         echo "Reusing cached spe10";
      fi;
