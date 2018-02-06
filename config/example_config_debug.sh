@@ -39,7 +39,7 @@ cmake \
     -DSPE10_DIR=/path/to/the/directory/where/spe_perm.dat/is/located \
     \
     -DMEMORYCHECK_COMMAND=/path/to/valgrind/binary \
-    -DASTYLE_DIR=/path/to/astyle
+    -DASTYLE_DIR=/path/to/astyle \
     \
     -DUSE_ARPACK=OFF \
     \
