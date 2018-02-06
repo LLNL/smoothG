@@ -168,8 +168,5 @@ script:
    - make -j3
 
    # Run tests
-   - cd testcode;
-   - env CTEST_OUTPUT_ON_FAILURE=1 make test;
-   - cd ../examples;
-   - env CTEST_OUTPUT_ON_FAILURE=1 travis_wait 30 make test;
+   - travis_wait 30 env CTEST_OUTPUT_ON_FAILURE=1 make test;
 
