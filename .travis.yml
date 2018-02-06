@@ -49,9 +49,10 @@ install:
         rm mpich-3.2.1.tar.gz;
         cd mpich-3.2.1;
         ./configure --prefix=/home/travis/build/LLNL/mpich-install --disable-fortran;
-        make;
+        make -j3;
         make install;
         export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
+        cd ..;
      else
         export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
         echo "Reusing cached spe10";
