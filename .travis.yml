@@ -46,7 +46,7 @@ install:
    - cd ..
 
    # Astyle
-   - if [ ! -e astyle-install/bin/mpirun ]; then
+   - if [ ! -e astyle-install/bin/astyle ]; then
         svn checkout https://svn.code.sf.net/p/astyle/code/trunk@638 astyle-code;
         pushd astyle-code/AStyle/build/gcc;
         make;
