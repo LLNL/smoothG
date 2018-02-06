@@ -130,7 +130,6 @@ find_file(SPE10_PERM spe_perm.dat
   HINTS ${SPE10_DIR})
 
 # for valgrind memory testing
-include(CTest)
 find_program(MEMORYCHECK_COMMAND valgrind)
 set(MEMORYCHECK_COMMAND_OPTIONS "")
 list(APPEND MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full")
