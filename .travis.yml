@@ -166,7 +166,4 @@ script:
 
    # Run tests
    - export CTEST_OUTPUT_ON_FAILURE=1;
-   - cd testcode;
-   - make test | tee travis_wait 30;
-   - cd ../examples;
-   - make test | tee travis_wait 30;
+   - cd testco;
