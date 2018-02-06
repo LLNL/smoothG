@@ -41,3 +41,8 @@ This code has contributions from:
 - Stephan Gelever (gelever1@llnl.gov)
 - Chak Shing Lee (cslee@llnl.gov)
 - Colin Ponce (ponce11@llnl.gov)
+
+Copyright (c) 2018, Lawrence Livermore National Security, LLC.
+This work was performed under the auspices of the U.S. Department of Energy by
+Lawrence Livermore National Laboratory under Contract DE-AC52-07NA27344.
+LLNL-CODE-745247.

@@ -87,12 +87,5 @@ add_test(isolate_coarsen python stest.py isolate-coarsen)
 add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
 add_test(vgraph-small-usegenerator-hb python stest.py vgraph-small-usegenerator-hb)
 
-add_test(NAME style
-  COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-set_tests_properties(style
-  PROPERTIES FAIL_REGULAR_EXPRESSION
-  "Formatted")
-
 # this test takes too long so we are deprecating it, but you should run it once in a while
 # add_test(veigenvector python stest.py veigenvector)
