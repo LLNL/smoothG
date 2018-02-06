@@ -168,5 +168,6 @@ script:
    - make -j3
 
    # Run tests
-   - travis_wait 30 env CTEST_OUTPUT_ON_FAILURE=1 make test;
+   - export CTEST_OUTPUT_ON_FAILURE=1;
+   - make test | tee travis_wait 30;
 
