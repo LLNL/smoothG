@@ -20,9 +20,9 @@ smoothG [![Build Status](https://travis-ci.org/LLNL/smoothG.svg?branch=master)](
 
 Mixed graph-Laplacian upscaling and solvers.
 
-For installation instructions, see INSTALL.md.
+For installation instructions, see [INSTALL.md](INSTALL.md).
 
-For a tutorial walkthrough of the example code, see EXAMPLE.md.
+For a tutorial walkthrough of the example code, see [EXAMPLE.md](doc/EXAMPLE.md).
 
 This project is intended to take a graph and build a smaller (upscaled)
 graph that is representative of the original in some way. We represent
