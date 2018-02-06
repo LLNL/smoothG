@@ -1,0 +1,37 @@
+\form#0:$ A $
+\form#1:$ x $
+\form#2:\[ Ax = \lambda x , \]
+\form#3:$ A_c $
+\form#4:$ x_c $
+\form#5:\[ A_c x_c = \lambda P^T x \]
+\form#6:\[ \left( \begin{array}{cc} M& D^T \\ D& 0 \end{array} \right) \left( \begin{array}{cc} \sigma \\ u \end{array} \right) =\left( \begin{array}{cc} 0 \\ f \end{array} \right) \]
+\form#7:$ \widehat{M}, \widehat{D} $
+\form#8:$M$
+\form#9:$D$
+\form#10:\[ H = C (\widehat{M}^{-1}-\widehat{M}^{-1}\widehat{D}^T (\widehat{D}\widehat{M}^{-1}\widehat{D}^T)^{-1} \widehat{D}\widehat{M}^{-1}) C^T \]
+\form#11:$C$
+\form#12:$ \mu $
+\form#13:\[ \left( \begin{array}{c} u \\ p \end{array} \right) = \left( \begin{array}{c} f \\ g \end{array} \right) - \left( \begin{array}{cc} M& B^T \\ B& \end{array} \right)^{-1} \left( \begin{array}{c} C \\ 0 \end{array} \right) \mu \]
+\form#14:\[ \left( \begin{array}{cc} M& D^T \\ D& \end{array} \right) \]
+\form#15:$ C = AB $
+\form#16:$ B $
+\form#17:$ a v v^T $
+\form#18:\[ \left( \begin{array}{cc} M& D^T \\ D& \end{array} \right) \left( \begin{array}{c} \sigma \\ u \end{array} \right) = \left( \begin{array}{c} 0 \\ -g \end{array} \right) \]
+\form#19:$ M $
+\form#20:$ D $
+\form#21:$ A = D M^{-1} D^T $
+\form#22:$ (D M^{-1} D^T) u = g$
+\form#23:$ \sigma = M^{-1} D^T u $
+\form#24:$ g $
+\form#25:$ \sigma $
+\form#26:$ u $
+\form#27:\[ \left( \begin{array}{cc} M& D^T \\ D& -W \end{array} \right) \left( \begin{array}{c} u \\ p \end{array} \right) = \left( \begin{array}{c} f \\ g \end{array} \right) \]
+\form#28:$ P_u $
+\form#29:$ P_\sigma $
+\form#30:$ P_\sigma, P_u $
+\form#31:\[ \begin{bmatrix} M & D^T \\ D & 0 \end{bmatrix} \begin{bmatrix} \sigma \\ u \end{bmatrix} = \begin{bmatrix} g \\ -f \end{bmatrix} \]
+\form#32:$ f $
+\form#33:$ u_c $
+\form#34:$ f_c $
+\form#35:$ sigma_c $
+\form#36:$ g_c $
