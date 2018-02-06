@@ -17,8 +17,8 @@ matrix:
             # GCC 4.9
             # - g++-4.9
             # MPICH
-            - mpich
-            - libmpich-dev
+            #- mpich
+            #- libmpich-dev
             # Other
             - liblapack-dev
             - libblas-dev
@@ -38,8 +38,24 @@ matrix:
           - $TRAVIS_BUILD_DIR/../SuiteSparse-install
           - $TRAVIS_BUILD_DIR/../metis-install
           - $TRAVIS_BUILD_DIR/../spe10-install
+          - $TRAVIS_BUILD_DIR/../mpich-install
 
 install:
+   # mpich
+   - if [ ! -e mpich-install/bin/mpirun ]; then
+        wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz;
+        tar xzf mpich-3.2.1.tar.gz;
+        rm mpich-3.2.1.tar.gz;
+        cd mpich-3.2.1;
+        ./configure --prefix=/home/travis/build/LLNL/mpich-install;
+        make;
+        make install;
+        export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
+     else
+        export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
+        echo "Reusing cached spe10";
+     fi;
+
    # Set MPI compilers, print compiler version
    - if [ $MPI == "YES" ]; then
         if [ "$TRAVIS_OS_NAME" == "linux" ]; then
@@ -63,7 +79,7 @@ install:
 
    # spe10 dataset
    - if [ ! -e spe10-install/spe_perm.dat ]; then
-     wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
+        wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
         unzip -d spe10-install por_perm_case2a.zip;
         rm por_perm_case2a.zip;
      else
