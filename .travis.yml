@@ -42,6 +42,9 @@ matrix:
           - $TRAVIS_BUILD_DIR/../mpich-install
 
 install:
+   # Back out of the smoothG directory to install the libraries
+   - cd ..
+
    # mpich
    - if [ ! -e mpich-install/bin/mpirun ]; then
         wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz;
@@ -72,9 +75,6 @@ install:
      else
         $CXX -v;
      fi
-
-   # Back out of the smoothG directory to install the libraries
-   - cd ..
 
    #- rm -r mfem-install;
    #- rm -r hypre-install;
