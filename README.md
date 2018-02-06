@@ -16,7 +16,7 @@ smoothG [![Build Status](https://travis-ci.org/LLNL/smoothG.svg?branch=master)](
  +
  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ EHEADER -->
 
-![](smoothg_logo.png)
+!["smoothG logo](doc/smoothg_logo.png)
 
 Mixed graph-Laplacian upscaling and solvers.
 
