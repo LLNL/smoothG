@@ -201,6 +201,7 @@ int main(int argc, char* argv[])
     const int num_partitions = 2;
     const int max_evects = 1;
     const double spect_tol = 0.0;
+    const double trace_method = 1;
     const double test_tol = 1.e-8;
     args.Parse();
     if (myid == 0)
@@ -224,7 +225,7 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(
-        spect_tol, max_evects, 1, graph.GetM(), graph.GetD(), graph_topology);
+        spect_tol, max_evects, trace_method, graph.GetM(), graph.GetD(), graph_topology);
 
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
