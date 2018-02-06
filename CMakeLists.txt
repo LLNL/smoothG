@@ -115,6 +115,26 @@ else()
   set(${PROJECT_NAME}_USE_ARPACK 0)
 endif()
 
+# SAAMGE_PARALLEL
+option(USE_SAAMGE "Should SAAMGE be enabled?" OFF)
+if(USE_SAAMGE)
+  find_path(SAAMGE_INCLUDE_PATH saamge.hpp
+    HINTS ${SAAMGE_DIR}/include $ENV{SAAMGE_DIR}/include)
+  set(SAAMGE_LIB_NAME libsaamge.a)
+  find_path(SAAMGE_LIBRARY_PATH ${SAAMGE_LIB_NAME}
+             HINTS ${SAAMGE_DIR}
+                   ${SAAMGE_DIR}/lib
+                   $ENV{SAAMGE_DIR}/lib)
+  include_directories(${SAAMGE_INCLUDE_PATH})
+  add_library(SAAMGE_LIB STATIC IMPORTED)
+  set_property(TARGET SAAMGE_LIB PROPERTY IMPORTED_LOCATION
+    ${SAAMGE_LIBRARY_PATH}/${SAAMGE_LIB_NAME})
+  set(${PROJECT_NAME}_USE_SAAMGE 1)
+  list(APPEND TPL_LIBRARIES ${SAAMGE_LIBRARY_PATH}/${SAAMGE_LIB_NAME})
+else()
+  set(${PROJECT_NAME}_USE_SAAMGE 0)
+endif()
+
 # BLAS/LAPACK
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)

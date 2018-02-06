@@ -109,7 +109,7 @@ mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
     return out;
 }
 
-mfem::SparseMatrix TableToSparse(const mfem::Table& table)
+mfem::SparseMatrix TableToMatrix(const mfem::Table& table)
 {
     const int height = table.Size();
     const int width = table.Width();
@@ -124,6 +124,22 @@ mfem::SparseMatrix TableToSparse(const mfem::Table& table)
     std::fill_n(data, nnz, 1.);
 
     return mfem::SparseMatrix(i, j, data, height, width);
+}
+
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat)
+{
+    const int nrows = mat.Height();
+    const int nnz = mat.NumNonZeroElems();
+
+    int* i = new int[nrows + 1];
+    int* j = new int[nnz];
+
+    std::copy_n(mat.GetI(), nrows + 1, i);
+    std::copy_n(mat.GetJ(), nnz, j);
+
+    mfem::Table table;
+    table.SetIJ(i, j, nrows);
+    return table;
 }
 
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,

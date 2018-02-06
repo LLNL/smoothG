@@ -101,7 +101,8 @@ public:
                  const MixedMatrix& mgL,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 bool spectralAMGe = false);
+                 const int rescale_iter = 0,
+                 const bool use_spectralAMGe = false);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
@@ -119,7 +120,8 @@ public:
                  const Mixed_GL_Coarsener& mgLc,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 bool spectralAMGe = false);
+                 const int rescale_iter = 0,
+                 const bool use_spectralAMGe = false);
 
     virtual ~HybridSolver() {}
 
@@ -181,7 +183,16 @@ protected:
 
     void AssembleHybridSystem(
         const std::vector<mfem::Vector>& M_el,
-        const mfem::Array<int>& j_multiplier_edgedof);
+            const mfem::Array<int>& j_multiplier_edgedof);
+
+    // Compute scaling vector and the scaled hybridized system
+    void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
+
+    // Rescale input vector by diagonal_scaling_
+    void RescaleVector(mfem::Vector& vec) const;
+
+    // Construct spectral AMGe preconditioner
+    void BuildSpectralAMGePreconditioner();
 
 private:
     MPI_Comm comm_;
@@ -198,7 +209,7 @@ private:
     std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
     std::unique_ptr<mfem::SparseMatrix> HybridSystemElim_;
     std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_;
-    std::unique_ptr<mfem::HypreBoomerAMG> prec_;
+    std::unique_ptr<mfem::Solver> prec_;
     std::unique_ptr<mfem::CGSolver> cg_;
 
 
@@ -227,8 +238,11 @@ private:
     int num_edge_dofs_;
     int num_multiplier_dofs_;
 
-    bool spectralAMGe_;
+    bool use_spectralAMGe_;
     bool use_w_;
+
+    int rescale_iter_;
+    mfem::Vector diagonal_scaling_;
 };
 
 } // namespace smoothg

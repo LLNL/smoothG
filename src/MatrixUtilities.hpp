@@ -41,18 +41,21 @@ void Print(const mfem::SparseMatrix& mat, const std::string& label = "",
 */
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol = 1e-8);
 
-
 /**
     @brief Creates a sparse matrix from a table
 */
-mfem::SparseMatrix TableToSparse(const mfem::Table& table);
+mfem::SparseMatrix TableToMatrix(const mfem::Table& table);
+
+/**
+    @brief Creates a table from a sparse matrix's graph
+*/
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat);
 
 // Rap by hand that seems to be faster than the mfem rap but uses more memory
 // Use mfem::RAP if memory is more important than cycles
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
                           const mfem::HypreParMatrix& P);
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& P);
-
 
 /**
     @brief Broadcast a SparseMatrix on processor 0 to all other processors
