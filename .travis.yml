@@ -165,5 +165,5 @@ script:
    - make -j3
 
    # Run tests
-   - export CTEST_OUTPUT_ON_FAILURE=1;
-   - cd testco;
+   - cd testcode;
+   - env CTEST_OUTPUT_ON_FAILURE=1 make test;
