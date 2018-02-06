@@ -177,6 +177,6 @@ script:
    - make -j3
 
    # Run tests
-   - [ ! $(make style | grep "Formatted") ];
+   # - [ ! $(make style | grep "Formatted") ];
    - cd testcode;
    - env CTEST_OUTPUT_ON_FAILURE=1 make test;
