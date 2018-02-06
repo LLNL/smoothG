@@ -40,9 +40,6 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
 {
-                // BREAK STYLE TEST
-                //
-
     // 1. Initialize MPI
     int num_procs, myid;
     MPI_Init(&argc, &argv);
