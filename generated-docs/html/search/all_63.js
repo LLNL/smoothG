@@ -13,5 +13,5 @@ var searchData=
   ['computeerrorsquare',['ComputeErrorSquare',['../classsmoothg_1_1UpscalingStatistics.html#a964809e9a5667b9bac025ca400e8d0bb',1,'smoothg::UpscalingStatistics']]],
   ['concatenate',['Concatenate',['../namespacesmoothg.html#a2264079f7cc4cecd453569a1c0354ad3',1,'smoothg']]],
   ['construct_5fcoarse_5fsubspace',['construct_coarse_subspace',['../classsmoothg_1_1Mixed__GL__Coarsener.html#a76e951b6deca37ebeebecfc505deb8cb',1,'smoothg::Mixed_GL_Coarsener']]],
-  ['contributing',['CONTRIBUTING',['../md__home_barker29_graph-laplacian_gh-pages_doc_CONTRIBUTING.html',1,'']]]
+  ['contributing',['CONTRIBUTING',['../md_doc_CONTRIBUTING.html',1,'']]]
 ];

@@ -53,12 +53,12 @@ var searchData=
   ['graphgenerator',['GraphGenerator',['../classsmoothg_1_1GraphGenerator.html',1,'smoothg']]],
   ['graphgenerator_2ecpp',['GraphGenerator.cpp',['../GraphGenerator_8cpp.html',1,'']]],
   ['graphgenerator_2ehpp',['GraphGenerator.hpp',['../GraphGenerator_8hpp.html',1,'']]],
-  ['graphtopology',['GraphTopology',['../classsmoothg_1_1GraphTopology.html',1,'smoothg']]],
   ['graphtopology',['GraphTopology',['../classsmoothg_1_1GraphTopology.html#aae6e9f8b62b93ced2797cf79f6c060d6',1,'smoothg::GraphTopology::GraphTopology(mfem::SparseMatrix &amp;vertex_edge, const mfem::HypreParMatrix &amp;edge_d_td, const mfem::Array&lt; int &gt; &amp;partition, const mfem::SparseMatrix *edge_boundaryattr=nullptr)'],['../classsmoothg_1_1GraphTopology.html#a1c8f5ff633c3d78207d21437c8b92a90',1,'smoothg::GraphTopology::GraphTopology(const mfem::SparseMatrix &amp;face_edge, const mfem::SparseMatrix &amp;Agg_vertex, const mfem::SparseMatrix &amp;Agg_edge, const mfem::HypreParMatrix &amp;pAggExt_vertex, const mfem::HypreParMatrix &amp;pAggExt_edge, const mfem::SparseMatrix &amp;Agg_face, const mfem::HypreParMatrix &amp;edge_d_td, const mfem::HypreParMatrix &amp;face_d_td, const mfem::HypreParMatrix &amp;face_d_td_d)']]],
+  ['graphtopology',['GraphTopology',['../classsmoothg_1_1GraphTopology.html',1,'smoothg']]],
   ['graphtopology_2ecpp',['GraphTopology.cpp',['../GraphTopology_8cpp.html',1,'']]],
   ['graphtopology_2ehpp',['GraphTopology.hpp',['../GraphTopology_8hpp.html',1,'']]],
-  ['graphupscale',['GraphUpscale',['../classsmoothg_1_1GraphUpscale.html',1,'smoothg']]],
   ['graphupscale',['GraphUpscale',['../classsmoothg_1_1GraphUpscale.html#a99b459f9924b5ba3d2b4f0f66f84b2a1',1,'smoothg::GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix &amp;vertex_edge, const mfem::Array&lt; int &gt; &amp;global_partitioning, double spect_tol=0.001, int max_evects=4, bool hybridization=false, const mfem::Vector &amp;weight=mfem::Vector())'],['../classsmoothg_1_1GraphUpscale.html#ac405b0e8f6e1d1bd548ef4381e69b66b',1,'smoothg::GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix &amp;vertex_edge, int coarse_factor, double spect_tol=0.001, int max_evects=4, bool hybridization=false, const mfem::Vector &amp;weight=mfem::Vector())']]],
-  ['graphupscale_2ecpp',['GraphUpscale.cpp',['../GraphUpscale_8cpp.html',1,'(Global Namespace)'],['../graphupscale_8cpp.html',1,'(Global Namespace)']]],
+  ['graphupscale',['GraphUpscale',['../classsmoothg_1_1GraphUpscale.html',1,'smoothg']]],
+  ['graphupscale_2ecpp',['graphupscale.cpp',['../graphupscale_8cpp.html',1,'(Global Namespace)'],['../GraphUpscale_8cpp.html',1,'(Global Namespace)']]],
   ['graphupscale_2ehpp',['GraphUpscale.hpp',['../GraphUpscale_8hpp.html',1,'']]]
 ];
