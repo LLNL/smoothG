@@ -17,7 +17,7 @@ matrix:
             # GCC 4.9
             # - g++-4.9
             # MPICH
-            #- mpich
+            - mpich
             - libmpich-dev
             # Other
             - liblapack-dev
