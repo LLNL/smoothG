@@ -23,7 +23,6 @@ matrix:
             - liblapack-dev
             - libblas-dev
             - doxygen
-            - astyle
             - valgrind
             - gfortran
             # OpenMPI
@@ -40,10 +39,23 @@ matrix:
           - $TRAVIS_BUILD_DIR/../metis-install
           - $TRAVIS_BUILD_DIR/../spe10-install
           - $TRAVIS_BUILD_DIR/../mpich-install
+          - $TRAVIS_BUILD_DIR/../astyle-install
 
 install:
    # Back out of the smoothG directory to install the libraries
    - cd ..
+
+   # Astyle
+   - if [ ! -e astyle-install/bin/mpirun ]; then
+        svn checkout https://svn.code.sf.net/p/astyle/code/trunk@638 astyle-code;
+        pushd astyle-code/AStyle/build/gcc;
+        make;
+        make install prefix=/home/travis/build/LLNL/astyle-install;
+        popd;
+     else
+        echo "Reusing cached astyle";
+     fi;
+   - export PATH="/home/travis/build/LLNL/astyle-install/bin":$PATH;
 
    # mpich
    - if [ ! -e mpich-install/bin/mpirun ]; then
@@ -58,7 +70,7 @@ install:
         cd ..;
      else
         export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
-        echo "Reusing cached spe10";
+        echo "Reusing cached mpich";
      fi;
 
    # Set MPI compilers, print compiler version
