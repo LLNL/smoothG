@@ -76,9 +76,6 @@ install:
         $CXX -v;
      fi
 
-   #- rm -r mfem-install;
-   #- rm -r hypre-install;
-
    # spe10 dataset
    - if [ ! -e spe10-install/spe_perm.dat ]; then
         wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
@@ -169,5 +166,7 @@ script:
 
    # Run tests
    - export CTEST_OUTPUT_ON_FAILURE=1;
+   - cd testcode;
    - make test | tee travis_wait 30;
-
+   - cd ../examples;
+   - make test | tee travis_wait 30;
