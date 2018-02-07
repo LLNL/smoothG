@@ -201,6 +201,9 @@ int main(int argc, char* argv[])
     const int num_partitions = 2;
     const int max_evects = 1;
     const double spect_tol = 0.0;
+    const bool dual_target = false;
+    const bool scaled_dual = false;
+    const bool energy_dual = false;
     const double test_tol = 1.e-8;
     args.Parse();
     if (myid == 0)
@@ -220,11 +223,12 @@ int main(int argc, char* argv[])
                                  *partition.face_d_td,
                                  *partition.face_d_td_d);
 
-    std::vector<mfem::DenseMatrix> local_edge_traces(num_partitions - 1);
-    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets(num_partitions);
+    std::vector<mfem::DenseMatrix> local_edge_traces;
+    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(
-        spect_tol, max_evects, graph.GetM(), graph.GetD(), graph_topology);
+        spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
+        graph.GetM(), graph.GetD(), graph_topology);
 
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 

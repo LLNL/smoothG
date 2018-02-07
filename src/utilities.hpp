@@ -322,49 +322,6 @@ private:
 }; // class SVD_Calculator
 
 /**
-   @brief Dense eigensolver based on LAPACK dsyevx
-*/
-class Eigensolver
-{
-public:
-    Eigensolver();
-    /**
-       Calculate smallest eigenvalues and eigenvectors corresponding
-       for matrix A. Returns eigenvalues < rel_tol * eig_max, up
-       to maxEvals total.
-    */
-    int Compute(
-        mfem::DenseMatrix& A, mfem::Vector& evals,
-        mfem::DenseMatrix& evects, double rel_tol, int maxEvals);
-    ~Eigensolver() = default;
-private:
-    void AllocateWorkspace(int n);
-
-    char uplo_;
-    char side_;
-    char trans_;
-    double abstol_;
-
-    int info_;
-    int n_max_;
-    int lwork_;
-
-    std::vector<double> A_;
-    std::vector<double> work_;
-    std::vector<int> iwork_;
-
-    // Triangularization info
-    std::vector<double> d_;
-    std::vector<double> e_;
-    std::vector<double> tau_;
-
-    // Block info for dstein_ / dormtr_
-    std::vector<int> iblock_;
-    std::vector<int> isplit_;
-    std::vector<int> ifail_;
-}; // class Eigensolver
-
-/**
    @brief Read a graph from a file.
 
    The graph is represented as a vertex_edge table.
