@@ -155,48 +155,52 @@ def make_tests():
           "finest-u-error": 0.2031768008190909,
           "operator-complexity": 1.0398091940641514}]
 
-    tests["fv-trace-method-2"] = \
+    tests["dual-trace"] = \
         [["./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "2",
+          "--dual-target",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2049690562060094e-08,
           "finest-p-error": 0.055207481027916193,
           "finest-u-error": 0.06430185063505546,
           "operator-complexity": 1.3017591339648173}]
 
-    tests["fv-trace-method-3"] = \
+    tests["scaled-dual-trace"] = \
         [["./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "3",
+          "--dual-target",
+          "--scaled-dual",
           "--perm", spe10_perm_file],
          {"finest-div-error": 1.9821133537907875e-08,
           "finest-p-error": 0.055054636384856817,
           "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
 
-    tests["fv-trace-method-4"] = \
+    tests["energy-dual-trace"] = \
         [["./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "4",
+          "--dual-target",
+          "--energy-dual",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2032854597960414e-8,
           "finest-p-error": 0.055279347333696799,
           "finest-u-error": 0.068336534035533678,
           "operator-complexity": 1.3017591339648173}]
 
-    tests["fv-trace-method-5"] = \
+    tests["scaled-energy-dual-trace"] = \
         [["./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "5",
+          "--dual-target",
+          "--scaled-dual",
+          "--energy-dual",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2079666982238907e-8,
           "finest-p-error": 0.055052992284074398,
@@ -340,48 +344,52 @@ def make_tests():
           "finest-u-error": 0.16419932734829923,
           "operator-complexity": 1.0221724964280585}]
 
-    tests["parfv-trace-method-2"] = \
+    tests["pardual-trace"] = \
         [["mpirun", "-n", "4", "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "2",
+          "--dual-target",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2049690562060094e-08,
           "finest-p-error": 0.055207481027916193,
           "finest-u-error": 0.06430185063505546,
           "operator-complexity": 1.3017591339648173}]
 
-    tests["parfv-trace-method-3"] = \
+    tests["parscaled-dual-trace"] = \
         [["mpirun", "-n", "4", "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "3",
+          "--dual-target",
+          "--scaled-dual",
           "--perm", spe10_perm_file],
          {"finest-div-error": 1.9821133537907875e-08,
           "finest-p-error": 0.055054636384856817,
           "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
 
-    tests["parfv-trace-method-4"] = \
+    tests["parenergy-dual-trace"] = \
         [["mpirun", "-n", "4", "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "4",
+          "--dual-target",
+          "--energy-dual",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2032854597960414e-8,
           "finest-p-error": 0.055279347333696799,
           "finest-u-error": 0.068336534035533678,
           "operator-complexity": 1.3017591339648173}]
 
-    tests["parfv-trace-method-5"] = \
+    tests["parscaled-energy-dual-trace"] = \
         [["mpirun", "-n", "4", "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
-          "--trace-method", "5",
+          "--dual-target",
+          "--scaled-dual",
+          "--energy-dual",
           "--perm", spe10_perm_file],
          {"finest-div-error": 3.2079666982238907e-8,
           "finest-p-error": 0.055052992284074398,

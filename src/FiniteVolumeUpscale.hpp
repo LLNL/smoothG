@@ -60,8 +60,8 @@ public:
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
                         double spect_tol = 0.001, int max_evects = 4,
-                        TraceMethod trace_method = TraceMethod::MATVEC,
-                        bool hybridization = false);
+                        bool dual_target = false, bool scaled_dual = false,
+                        bool energy_dual = false, bool hybridization = false);
 
     /**
        @brief Constructor with W block specified
@@ -86,8 +86,8 @@ public:
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
                         double spect_tol = 0.001, int max_evects = 4,
-                        TraceMethod trace_method = TraceMethod::MATVEC,
-                        bool hybridization = false);
+                        bool dual_target = false, bool scaled_dual = false,
+                        bool energy_dual = false, bool hybridization = false);
 
     void MakeFineSolver(const mfem::Array<int>& marker) const;
 

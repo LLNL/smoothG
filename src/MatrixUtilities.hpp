@@ -192,13 +192,13 @@ void ExtractSubMatrix(
    @param A the matrix to extract from
    @param ref_to_col mapping from reference index to column index of A
    @param subcol_to_ref mapping from column index of A_sub to reference index
+   @param A_sub the returned matrix where the extracted columns are collected
    @param row_offset which row of A_sub to start putting the extracted columns
-   @param A_sub the returned matrix where the extracted columns are collected)
 */
 void ExtractColumns(
     const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
-    const mfem::Array<int>& subcol_to_ref, const int row_offset,
-    mfem::DenseMatrix& A_sub);
+    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
+    const int row_offset = 0);
 
 /**
    @brief Fill a DenseMatrix with the entries of a SparseMatrix

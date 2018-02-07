@@ -41,25 +41,17 @@ namespace smoothg
 class LocalMixedGraphSpectralTargets
 {
 public:
-    // TODO: Better documentation
-    /**
-       @brief Different methods for generating traces
-    */
-    enum TraceMethod
-    {
-        MATVEC = 1, /**< Multiply \f$M^{-1}D^T\f$ to graph Laplacian eigenvectors */
-        EIG,        /**< Solve eigen problem on dual graph */
-        SEIG,       /**< Solve scaled eigen problem on dual graph */
-        GEIG,       /**< Solve generalized eigen problem on dual graph */
-        SGEIG       /**< Solve scaled generalized eigen problem on dual graph */
-    };
-
     /**
        @brief Construct based on mixed form graph Laplacian.
 
        @param rel_tol tolerance for including small eigenvectors
        @param max_evects max eigenvectors to include per aggregate
-       @param trace_method methods for getting edge trace samples
+       @param dual_target get traces from eigenvectors of dual graph Laplacian
+       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
+              Typically coarse problem gets better accuracy but becomes harder
+              to solve when this option is turned on.
+       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
+              (guarantees approximation property in edge energy norm)
        @param M_local is mass matrix on edge-based (velocity) space
        @param D_local is a divergence-like operator
        @param graph_topology the partitioning relations for coarsening
@@ -76,13 +68,15 @@ public:
        \f]
     */
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects, TraceMethod trace_method,
+        double rel_tol, int max_evects,
+        bool dual_target, bool scaled_dual, bool energy_dual,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const GraphTopology& graph_topology);
 
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects, TraceMethod trace_method,
+        double rel_tol, int max_evects,
+        bool dual_target, bool scaled_dual, bool energy_dual,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const mfem::SparseMatrix* W_local,
@@ -138,7 +132,9 @@ private:
 
     const double rel_tol_;
     const int max_evects_;
-    const TraceMethod trace_method_;
+    const bool dual_target_;
+    const bool scaled_dual_;
+    const bool energy_dual_;
 
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
@@ -160,8 +156,6 @@ private:
 
     mfem::Array<int> colMapper;
 };
-
-using TraceMethod = LocalMixedGraphSpectralTargets::TraceMethod;
 
 } // namespace smoothg
 
