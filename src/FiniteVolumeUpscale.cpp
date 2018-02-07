@@ -51,8 +51,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                                      &edge_boundary_att_);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-            mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-            max_evects, dual_target, scaled_dual, energy_dual, hybridization);
+                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
+                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -70,8 +70,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     if (hybridization) // Hybridization solver
     {
         coarse_solver_ = make_unique<HybridSolver>(
-                comm, mixed_laplacians_.back(), *coarsener_,
-                &coarsener_->get_GraphTopology_ref().face_bdratt_, &marker);
+                             comm, mixed_laplacians_.back(), *coarsener_,
+                             &coarsener_->get_GraphTopology_ref().face_bdratt_, &marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -118,11 +118,11 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                    MixedMatrix::DistributeWeight::False);
 
     auto graph_topology = make_unique<GraphTopology>(
-            ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
+                              ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-            mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-            max_evects, dual_target, scaled_dual, energy_dual, hybridization);
+                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
+                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());

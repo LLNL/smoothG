@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
     bool energy_dual = false;
     args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
                    "--no-energy-dual", "Use energy matrix in trace generation.");
-   bool visualization = false;
+    bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
     args.Parse();
