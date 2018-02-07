@@ -48,14 +48,15 @@ public:
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods (1-4) for getting edge trace samples
+       @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
                  const mfem::Array<int>& global_partitioning,
                  double spect_tol = 0.001, int max_evects = 4,
-                 int trace_method = 1, bool hybridization = false,
+                 TraceMethod trace_method = TraceMethod::MATVEC,
+                 bool hybridization = false,
                  const mfem::Vector& weight = mfem::Vector());
     /**
        @brief Constructor
@@ -67,14 +68,15 @@ public:
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods (1-4) for getting edge trace samples
+       @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
                  int coarse_factor,
                  double spect_tol = 0.001, int max_evects = 4,
-                 int trace_method = 1, bool hybridization = false,
+                 TraceMethod trace_method = TraceMethod::MATVEC,
+                 bool hybridization = false,
                  const mfem::Vector& weight = mfem::Vector());
 
     /// Read permuted vertex vector
@@ -102,7 +104,7 @@ private:
     void Init(const mfem::SparseMatrix& vertex_edge,
               const mfem::Array<int>& global_partitioning,
               const mfem::Vector& weight,
-              double spect_tol, int max_evects, int trace_method);
+              double spect_tol, int max_evects, TraceMethod trace_method);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;

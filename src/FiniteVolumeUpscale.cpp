@@ -32,7 +32,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
                                          double spect_tol, int max_evects,
-                                         int trace_method, bool hybridization)
+                                         TraceMethod trace_method, bool hybridization)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)
@@ -101,7 +101,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
                                          double spect_tol, int max_evects,
-                                         int trace_method, bool hybridization)
+                                         TraceMethod trace_method, bool hybridization)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)

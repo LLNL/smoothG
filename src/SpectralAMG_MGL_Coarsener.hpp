@@ -46,7 +46,7 @@ public:
               accurate, more expensive coarse space.
        @param max_evecs_per_agg cap the number of eigenvectors per aggregate that will
               be used in the coarse space.
-       @param trace_method methods (1-4) for getting edge trace samples
+       @param trace_method methods for getting edge trace samples
        @param is_hybridization_used whether to prepare the coarse space to use the
               HybridSolver
     */
@@ -54,7 +54,7 @@ public:
                               std::unique_ptr<GraphTopology> gt,
                               double spectral_tol,
                               unsigned int max_evecs_per_agg,
-                              int trace_method,
+                              TraceMethod trace_method,
                               bool is_hybridization_used);
 
 private:
@@ -67,7 +67,7 @@ private:
     bool is_hybridization_used_;
     double spectral_tol_;
     unsigned int max_evecs_per_agg_;
-    int trace_method_;
+    TraceMethod trace_method_;
 
 }; // SpectralAMG_MGL_Coarsener
 

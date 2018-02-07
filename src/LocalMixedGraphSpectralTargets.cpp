@@ -62,7 +62,7 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
 }
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-    double rel_tol, int max_evects, int trace_method,
+    double rel_tol, int max_evects, TraceMethod trace_method,
     const mfem::SparseMatrix& M_local, const mfem::SparseMatrix& D_local,
     const GraphTopology& graph_topology)
     :
@@ -72,7 +72,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 }
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-    double rel_tol, int max_evects, int trace_method,
+    double rel_tol, int max_evects, TraceMethod trace_method,
     const mfem::SparseMatrix& M_local, const mfem::SparseMatrix& D_local,
     const mfem::SparseMatrix* W_local, const GraphTopology& graph_topology)
     :
@@ -139,8 +139,8 @@ LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
     mfem::SparseMatrix L_edge = smoothg::Mult_AtDA(B, X_inv);
     smoothg::Add(-1.0, L_edge, 1.0, M_diag_inv);
 
-    // Scale L_edge by M if trace_method_ = 3 or 5
-    if (trace_method_ == 3 || trace_method_ == 5)
+    // Scale L_edge by M if trace_method_ = SEIG or SEIG
+    if (trace_method_ == TraceMethod::SEIG || trace_method_ == TraceMethod::SGEIG)
     {
         mfem::Vector M_diag(M_diag_inv.Size());
         for (int i = 0; i < D.Width() ; i++)
@@ -154,9 +154,9 @@ LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
     std::vector<mfem::SparseMatrix> EigSys;
     EigSys.push_back(L_edge);
 
-    if (trace_method_ == 4 || trace_method_ == 5)
+    // Compute rhs matrix M + D^T D if trace_method_ = GEIG or SGEIG
+    if (trace_method_ == TraceMethod::GEIG || trace_method_ == TraceMethod::SGEIG)
     {
-        // Compute M + D^T D
         mfem::SparseMatrix DT( smoothg::Transpose(D) );
         mfem::SparseMatrix edge_product( smoothg::Mult(DT, D) );
         smoothg::Add(edge_product, M_diag_inv, true);
@@ -290,7 +290,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     }
 
     // ---
-    // solve eigenvalue problem on each (extended) neighbor_agg, our (3.1)
+    // solve eigenvalue problem on each (extended) extended aggregate, our (3.1)
     // ---
     LocalEigenSolver eigs(max_evects_, rel_tol_);
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
@@ -404,7 +404,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[iAgg]);
 
         // Compute edge trace samples (before restriction and SVD)
-        if (trace_method_ == 1 || use_w || max_evects_ == 1)
+        if (trace_method_ == TraceMethod::MATVEC || use_w || max_evects_ == 1)
         {
             // Do not consider the first vertex eigenvector, which is constant
             evects_tmp.UseExternalData(evects.Data() + evects.Height(),
@@ -419,7 +419,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         {
             // Collect trace samples from eigenvectors of dual graph Laplacian
             auto EES = BuildEdgeEigenSystem(DMinvDt, Dloc, Mloc_diag_inv);
-            if (trace_method_ == 2 || trace_method_ == 3)
+            if (trace_method_ == TraceMethod::EIG || trace_method_ == TraceMethod::SEIG)
             {
                 eval_min = eigs.Compute(EES[0], evects);
             }
@@ -814,7 +814,6 @@ void LocalMixedGraphSpectralTargets::Compute(std::vector<mfem::DenseMatrix>&
                                              local_edge_trace_targets,
                                              std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
-    assert(trace_method_ < 6 && trace_method_ > 0);
     std::vector<mfem::DenseMatrix> AggExt_sigmaT;
     ComputeVertexTargets(AggExt_sigmaT, local_vertex_targets);
     ComputeEdgeTargets(AggExt_sigmaT, local_edge_trace_targets);

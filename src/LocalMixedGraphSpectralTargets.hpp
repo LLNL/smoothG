@@ -41,12 +41,25 @@ namespace smoothg
 class LocalMixedGraphSpectralTargets
 {
 public:
+    // TODO: Better documentation
+    /**
+       @brief Different methods for generating traces
+    */
+    enum TraceMethod
+    {
+        MATVEC = 1, /**< Multiply \f$M^{-1}D^T\f$ to graph Laplacian eigenvectors */
+        EIG,        /**< Solve eigen problem on dual graph */
+        SEIG,       /**< Solve scaled eigen problem on dual graph */
+        GEIG,       /**< Solve generalized eigen problem on dual graph */
+        SGEIG       /**< Solve scaled generalized eigen problem on dual graph */
+    };
+
     /**
        @brief Construct based on mixed form graph Laplacian.
 
        @param rel_tol tolerance for including small eigenvectors
        @param max_evects max eigenvectors to include per aggregate
-       @param trace_method methods (1-4) for getting edge trace samples
+       @param trace_method methods for getting edge trace samples
        @param M_local is mass matrix on edge-based (velocity) space
        @param D_local is a divergence-like operator
        @param graph_topology the partitioning relations for coarsening
@@ -63,13 +76,13 @@ public:
        \f]
     */
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects, int trace_method,
+        double rel_tol, int max_evects, TraceMethod trace_method,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const GraphTopology& graph_topology);
 
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects, int trace_method,
+        double rel_tol, int max_evects, TraceMethod trace_method,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const mfem::SparseMatrix* W_local,
@@ -125,7 +138,7 @@ private:
 
     const double rel_tol_;
     const int max_evects_;
-    const int trace_method_;
+    const TraceMethod trace_method_;
 
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
@@ -147,6 +160,8 @@ private:
 
     mfem::Array<int> colMapper;
 };
+
+using TraceMethod = LocalMixedGraphSpectralTargets::TraceMethod;
 
 } // namespace smoothg
 

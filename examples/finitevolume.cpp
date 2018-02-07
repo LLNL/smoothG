@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
                    "--no-hybridization", "Enable hybridization.");
     int trace_method = 1;
     args.AddOption(&trace_method, "-tm", "--trace-method",
-                   "Different methods (1-4) to get edge trace samples.");
+                   "Different methods (1-5) to get edge trace samples.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
@@ -196,9 +196,9 @@ int main(int argc, char* argv[])
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
     // Create Upscaler and Solve
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning,
-                                  *edge_d_td, edge_boundary_att, ess_attr,
-                                  spect_tol, max_evects, trace_method, hybridization);
+    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
+                                  edge_boundary_att, ess_attr, spect_tol, max_evects,
+                                  static_cast<TraceMethod>(trace_method), hybridization);
 
     mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
     marker = 0;

@@ -34,7 +34,7 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                                                      std::unique_ptr<GraphTopology> gt,
                                                      double spectral_tol,
                                                      unsigned int max_evecs_per_agg,
-                                                     int trace_method,
+                                                     TraceMethod trace_method,
                                                      bool is_hybridization_used)
     : Mixed_GL_Coarsener(mgL, std::move(gt)),
       is_hybridization_used_(is_hybridization_used),

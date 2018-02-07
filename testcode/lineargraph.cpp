@@ -31,6 +31,7 @@ using namespace smoothg;
 using std::unique_ptr;
 using std::shared_ptr;
 using std::make_shared;
+using TraceMethod = LocalMixedGraphSpectralTargets::TraceMethod;
 
 class LinearGraph
 {
@@ -201,7 +202,7 @@ int main(int argc, char* argv[])
     const int num_partitions = 2;
     const int max_evects = 1;
     const double spect_tol = 0.0;
-    const double trace_method = 1;
+    const auto trace_method = TraceMethod::MATVEC;
     const double test_tol = 1.e-8;
     args.Parse();
     if (myid == 0)

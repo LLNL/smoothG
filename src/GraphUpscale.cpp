@@ -25,7 +25,7 @@ namespace smoothg
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
                            const mfem::Array<int>& global_partitioning,
-                           double spect_tol, int max_evects, int trace_method,
+                           double spect_tol, int max_evects, TraceMethod trace_method,
                            bool hybridization, const mfem::Vector& global_weight)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
@@ -35,7 +35,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
                            int coarse_factor,
-                           double spect_tol, int max_evects, int trace_method,
+                           double spect_tol, int max_evects, TraceMethod trace_method,
                            bool hybridization, const mfem::Vector& weight)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
@@ -63,7 +63,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
 void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
                         const mfem::Array<int>& global_partitioning,
                         const mfem::Vector& global_weight,
-                        double spect_tol, int max_evects, int trace_method)
+                        double spect_tol, int max_evects, TraceMethod trace_method)
 {
     mfem::StopWatch chrono;
     chrono.Start();

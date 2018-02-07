@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
                    "Isolate a single vertex (for debugging so far).");
     int trace_method = 1;
     args.AddOption(&trace_method, "-tm", "--trace-method",
-                   "Different methods (1-4) to get edge trace samples.");
+                   "Different methods (1-5) to get edge trace samples.");
     args.Parse();
     if (!args.Good())
     {
@@ -123,6 +123,7 @@ int main(int argc, char* argv[])
     }
 
     assert(num_partitions >= num_procs);
+
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix vertex_edge_global;
@@ -173,7 +174,8 @@ int main(int argc, char* argv[])
     {
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning, spect_tol,
-                             max_evects, trace_method, hybridization, weight);
+                             max_evects, static_cast<TraceMethod>(trace_method),
+                             hybridization, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

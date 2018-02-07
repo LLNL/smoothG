@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
     constexpr auto num_partitions = 10;
     constexpr auto max_evects = 4;
     constexpr auto spect_tol = 1.e-3;
-    constexpr auto trace_method = 1;
+    constexpr auto trace_method = TraceMethod::MATVEC;
     constexpr auto hybridization = false;
 
     const auto vertex_edge = ReadVertexEdge(ve_filename);

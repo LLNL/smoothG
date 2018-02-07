@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
     constexpr auto coarse_factor = 80;
     constexpr auto max_evects = 4;
     constexpr auto spect_tol = 1.0;
-    constexpr auto trace_method = 1.0;
+    constexpr auto trace_method = TraceMethod::MATVEC;
     constexpr auto hybridization = false;
 
     // Solve Parameters
