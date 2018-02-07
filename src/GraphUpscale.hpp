@@ -36,6 +36,11 @@ namespace smoothg
 
 class GraphUpscale : public Upscale
 {
+    using Vector = linalgcpp::Vector<double>;
+    using VectorView = linalgcpp::VectorView<double>;
+    using BlockVector = linalgcpp::BlockVector<double>;
+    using SparseMatrix = linalgcpp::SparseMatrix<int>;
+
 public:
     /**
        @brief Constructor
@@ -49,10 +54,10 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
     */
     GraphUpscale(MPI_Comm comm,
-                 linalgcpp::SparseMatrix<int> vertex_edge_global,
+                 const SparseMatrix& vertex_edge_global,
                  const std::vector<int>& partitioning_global,
                  double spect_tol = 0.001, int max_evects = 4,
-                 std::vector<double> weight_global = {});
+                 const std::vector<double>& weight_global = {});
     /**
        @brief Constructor
 
@@ -65,42 +70,42 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
     */
     GraphUpscale(MPI_Comm comm,
-                 linalgcpp::SparseMatrix<int> vertex_edge_global,
+                 const SparseMatrix& vertex_edge_global,
                  double coarse_factor,
                  double spect_tol = 0.001, int max_evects = 4,
-                 std::vector<double> weight_global = {});
+                 const std::vector<double>& weight_global = {});
 
     /// Read permuted vertex vector
-    linalgcpp::Vector<double> ReadVertexVector(const std::string& filename) const;
+    Vector ReadVertexVector(const std::string& filename) const;
 
     /// Read permuted edge vector
-    linalgcpp::Vector<double> ReadEdgeVector(const std::string& filename) const;
+    Vector ReadEdgeVector(const std::string& filename) const;
 
     /// Read permuted vertex vector, in mixed form
-    linalgcpp::BlockVector<double> ReadVertexBlockVector(const std::string& filename) const;
+    BlockVector ReadVertexBlockVector(const std::string& filename) const;
 
     /// Read permuted edge vector, in mixed form
-    linalgcpp::BlockVector<double> ReadEdgeBlockVector(const std::string& filename) const;
+    BlockVector ReadEdgeBlockVector(const std::string& filename) const;
 
     /// Write permuted vertex vector
-    void WriteVertexVector(const linalgcpp::VectorView<double>& vect, const std::string& filename) const;
+    void WriteVertexVector(const VectorView& vect, const std::string& filename) const;
 
     /// Write permuted edge vector
-    void WriteEdgeVector(const linalgcpp::VectorView<double>& vect, const std::string& filename) const;
+    void WriteEdgeVector(const VectorView& vect, const std::string& filename) const;
 
     // Create Fine Level Solver
     void MakeFineSolver() const;
 
 private:
-    void Init(linalgcpp::SparseMatrix<int> vertex_edge,
-              const std::vector<int>& global_partitioning,
-              std::vector<double> weight,
+    void Init(const SparseMatrix& vertex_edge_global,
+              const std::vector<int>& partitioning_global,
+              const std::vector<double>& weight_global,
               double spect_tol, int max_evects);
 
-    linalgcpp::Vector<double> ReadVector(const std::string& filename, int global_size,
+    Vector ReadVector(const std::string& filename, int global_size,
                                          const std::vector<int>& local_to_global) const;
 
-    void WriteVector(const linalgcpp::VectorView<double>& vect, const std::string& filename, int global_size,
+    void WriteVector(const VectorView& vect, const std::string& filename, int global_size,
                      const std::vector<int>& local_to_global) const;
 
     //std::unique_ptr<smoothg::ParGraph> pgraph_;

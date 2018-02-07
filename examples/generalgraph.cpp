@@ -94,32 +94,30 @@ int main(int argc, char* argv[])
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
                              spect_tol, max_evects, weight);
-    /*
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
         /// [Upscale]
 
         /// [Right Hand Side]
-        mfem::Vector rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
+        Vector<double> rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
 
-        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+        BlockVector<double> fine_rhs(upscale.GetFineBlockVector());
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
 
         /// [Solve]
-        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
+        BlockVector<double> upscaled_sol = upscale.Solve(fine_rhs);
         upscale.ShowCoarseSolveInfo();
 
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
+        BlockVector<double> fine_sol = upscale.SolveFine(fine_rhs);
         upscale.ShowFineSolveInfo();
         /// [Solve]
 
         /// [Check Error]
         upscale.ShowErrors(upscaled_sol, fine_sol);
         /// [Check Error]
-    */
     }
 
     MPI_Finalize();

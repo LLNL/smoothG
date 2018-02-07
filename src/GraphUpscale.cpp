@@ -20,26 +20,27 @@
 
 #include "GraphUpscale.hpp"
 
+
 namespace smoothg
 {
 
 GraphUpscale::GraphUpscale(MPI_Comm comm,
-                 linalgcpp::SparseMatrix<int> vertex_edge_global,
+                 const linalgcpp::SparseMatrix<int>& vertex_edge_global,
                  const std::vector<int>& partitioning_global,
                  double spect_tol, int max_evects,
-                 std::vector<double> weight_global)
+                 const std::vector<double>& weight_global)
     : Upscale(comm, vertex_edge_global.Rows()),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols())
 {
-    Init(std::move(vertex_edge_global), partitioning_global,
-         std::move(weight_global), spect_tol, max_evects);
+    Init(vertex_edge_global, partitioning_global,
+         weight_global, spect_tol, max_evects);
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm,
-                 linalgcpp::SparseMatrix<int> vertex_edge_global,
+                 const linalgcpp::SparseMatrix<int>& vertex_edge_global,
                  double coarse_factor,
                  double spect_tol, int max_evects,
-                 std::vector<double> weight_global)
+                 const std::vector<double>& weight_global)
     : Upscale(comm, vertex_edge_global.Rows()),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols())
 {
@@ -50,13 +51,13 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 
     auto partitioning_global = Partition(vertex_vertex, num_parts);
 
-    Init(std::move(vertex_edge_global), partitioning_global,
-         std::move(weight_global), spect_tol, max_evects);
+    Init(vertex_edge_global, partitioning_global,
+         weight_global, spect_tol, max_evects);
 }
 
-void GraphUpscale::Init(linalgcpp::SparseMatrix<int> vertex_edge,
+void GraphUpscale::Init(const linalgcpp::SparseMatrix<int>& vertex_edge,
               const std::vector<int>& global_partitioning,
-              std::vector<double> weight,
+              const std::vector<double>& weight,
               double spect_tol, int max_evects)
 {
 

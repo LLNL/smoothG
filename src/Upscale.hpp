@@ -32,50 +32,54 @@ namespace smoothg
 */
 class Upscale : public linalgcpp::Operator
 {
+    using Vector = linalgcpp::Vector<double>;
+    using VectorView = linalgcpp::VectorView<double>;
+    using BlockVector = linalgcpp::BlockVector<double>;
+
 public:
     /// Wrapper for applying the upscaling, in linalgcpp terminology
-    virtual void Mult(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const override;
+    virtual void Mult(const VectorView& x, VectorView& y) const override;
 
     /// Wrapper for applying the upscaling
-    virtual void Solve(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
-    virtual linalgcpp::Vector<double> Solve(const linalgcpp::VectorView<double>& x) const;
+    virtual void Solve(const VectorView& x, VectorView& y) const;
+    virtual linalgcpp::Vector<double> Solve(const VectorView& x) const;
 
     /// Wrapper for applying the upscaling in mixed form
-    virtual void Solve(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
-    virtual linalgcpp::BlockVector<double> Solve(const linalgcpp::BlockVector<double>& x) const;
+    virtual void Solve(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector Solve(const BlockVector& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level
-    virtual void SolveCoarse(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
-    virtual linalgcpp::Vector<double> SolveCoarse(const linalgcpp::VectorView<double>& x) const;
+    virtual void SolveCoarse(const VectorView& x, VectorView& y) const;
+    virtual Vector SolveCoarse(const VectorView& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level,
     //  in mixed form
-    virtual void SolveCoarse(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
-    virtual linalgcpp::BlockVector<double> SolveCoarse(const linalgcpp::BlockVector<double>& x) const;
+    virtual void SolveCoarse(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector SolveCoarse(const BlockVector& x) const;
 
     /// Solve Fine Level
-    virtual void SolveFine(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
-    virtual linalgcpp::Vector<double> SolveFine(const linalgcpp::VectorView<double>& x) const;
+    virtual void SolveFine(const VectorView& x, VectorView& y) const;
+    virtual Vector SolveFine(const VectorView& x) const;
 
     /// Solve Fine Level, in mixed form
-    virtual void SolveFine(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
-    virtual linalgcpp::BlockVector<double> SolveFine(const linalgcpp::BlockVector<double>& x) const;
+    virtual void SolveFine(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector SolveFine(const BlockVector& x) const;
 
     /// Interpolate a coarse vector to the fine level
-    virtual void Interpolate(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
-    virtual linalgcpp::Vector<double> Interpolate(const linalgcpp::VectorView<double>& x) const;
+    virtual void Interpolate(const VectorView& x, VectorView& y) const;
+    virtual Vector Interpolate(const VectorView& x) const;
 
     /// Interpolate a coarse vector to the fine level, in mixed form
-    virtual void Interpolate(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
-    virtual linalgcpp::BlockVector<double> Interpolate(const linalgcpp::BlockVector<double>& x) const;
+    virtual void Interpolate(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector Interpolate(const BlockVector& x) const;
 
     /// Coarsen a fine vector to the coarse level
-    virtual void Coarsen(const linalgcpp::VectorView<double>& x, linalgcpp::VectorView<double>& y) const;
-    virtual linalgcpp::Vector<double> Coarsen(const linalgcpp::VectorView<double>& x) const;
+    virtual void Coarsen(const VectorView& x, VectorView& y) const;
+    virtual Vector Coarsen(const VectorView& x) const;
 
     /// Coarsen a fine vector to the coarse level, in mixed form
-    virtual void Coarsen(const linalgcpp::BlockVector<double>& x, linalgcpp::BlockVector<double>& y) const;
-    virtual linalgcpp::BlockVector<double> Coarsen(const linalgcpp::BlockVector<double>& x) const;
+    virtual void Coarsen(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector Coarsen(const BlockVector& x) const;
 
     /// Get block offsets
     virtual std::vector<HYPRE_Int> FineBlockOffsets() const;
@@ -86,26 +90,26 @@ public:
     virtual std::vector<HYPRE_Int> CoarseTrueBlockOffsets() const;
 
     /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(linalgcpp::VectorView<double>& vect) const;
-    virtual void Orthogonalize(linalgcpp::BlockVector<double>& vect) const;
+    virtual void Orthogonalize(VectorView& vect) const;
+    virtual void Orthogonalize(BlockVector& vect) const;
 
     /// Create a coarse vertex space vector
-    virtual linalgcpp::Vector<double> GetCoarseVector() const;
+    virtual Vector GetCoarseVector() const;
 
     /// Create a fine vertex space vector
-    virtual linalgcpp::Vector<double> GetFineVector() const;
+    virtual Vector GetFineVector() const;
 
     /// Create a coarse mixed form vector
-    virtual linalgcpp::BlockVector<double> GetCoarseBlockVector() const;
+    virtual BlockVector GetCoarseBlockVector() const;
 
     /// Create a fine mixed form vector
-    virtual linalgcpp::BlockVector<double> GetFineBlockVector() const;
+    virtual BlockVector GetFineBlockVector() const;
 
     /// Create a coarse mixed form vector on true dofs
-    virtual linalgcpp::BlockVector<double> GetCoarseTrueBlockVector() const;
+    virtual BlockVector GetCoarseTrueBlockVector() const;
 
     /// Create a fine mixed form vector on true dofs
-    virtual linalgcpp::BlockVector<double> GetFineTrueBlockVector() const;
+    virtual BlockVector GetFineTrueBlockVector() const;
 
     // Get Mixed Matrix
     //virtual MixedMatrix& GetMatrix(int level);
@@ -163,13 +167,13 @@ public:
 
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
-    std::vector<double> ComputeErrors(const linalgcpp::BlockVector<double>& upscaled_sol,
-                                      const linalgcpp::BlockVector<double>& fine_sol) const;
+    std::vector<double> ComputeErrors(const BlockVector& upscaled_sol,
+                                      const BlockVector& fine_sol) const;
 
     /// Compare errors between upscaled and fine solution.
     /// Displays error to stdout on processor 0
-    void ShowErrors(const linalgcpp::BlockVector<double>& upscaled_sol,
-                    const linalgcpp::BlockVector<double>& fine_sol) const;
+    void ShowErrors(const BlockVector& upscaled_sol,
+                    const BlockVector& fine_sol) const;
 
     size_t Rows() const override { return size_; }
     size_t Cols() const override { return size_; }
@@ -202,8 +206,8 @@ protected:
 
     double setup_time_;
 
-    linalgcpp::BlockVector<double> rhs_coarse_;
-    linalgcpp::BlockVector<double> sol_coarse_;
+    BlockVector rhs_coarse_;
+    BlockVector sol_coarse_;
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
     //mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
