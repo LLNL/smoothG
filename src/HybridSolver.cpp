@@ -910,7 +910,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
         nparts_arr[i] = nparts_arr[i - 1] / saamge_param_.coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
-    for (int i = 0; i < Hybrid_el_.size(); i++)
+    for (unsigned int i = 0; i < Hybrid_el_.size(); i++)
         elmats[i] = &(Hybrid_el_[i]);
     auto emp = new saamge::ElementMatrixDenseArray(*apr, elmats);
 
@@ -928,7 +928,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 #else
     if (myid_ == 0)
         std::cout << "SAAMGE needs to be enabled! \n";
-    assert(!use_spectralAMGe_);
+    std::abort();
 #endif
 }
 
