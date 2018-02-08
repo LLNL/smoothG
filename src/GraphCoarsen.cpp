@@ -681,7 +681,6 @@ void GraphCoarsen::BuildPEdges(
                     for (int l = 0; l < num_bubbles_i; l++)
                     {
                         ref_vec3.SetSize(trace.Size());
-                        ref_vec3 = 0.;
                         B_potentials.GetColumnReference(l, B_potential);
                         DtransferT.Mult(B_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
@@ -690,7 +689,6 @@ void GraphCoarsen::BuildPEdges(
 
                     // compute and store diagonal block of coarse M
                     ref_vec3.SetSize(trace.Size());
-                    ref_vec3 = 0.;
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     DtransferT.Mult(F_potential, ref_vec3);
                     entry_value = smoothg::InnerProduct(ref_vec3, trace);
@@ -699,11 +697,10 @@ void GraphCoarsen::BuildPEdges(
                     for (int l = 0; l < nlocal_traces; l++)
                     {
                         ref_vec3.SetSize(trace.Size());
-                        ref_vec3 = 0.;
                         F_potentials.GetColumnReference(l, F_potential);
                         DtransferT.Mult(F_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
-                        mbuilder.AddTrace(local_facecdofs[l], entry_value); // 2/8/18
+                        mbuilder.AddTrace(local_facecdofs[l], entry_value);
                     }
                 }
 
