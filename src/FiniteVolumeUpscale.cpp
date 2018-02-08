@@ -32,7 +32,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
                                          double spect_tol, int max_evects,
-                                         int trace_method, bool hybridization)
+                                         bool dual_target, bool scaled_dual,
+                                         bool energy_dual, bool hybridization)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)
@@ -50,8 +51,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                                      &edge_boundary_att_);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology),
-                     spect_tol, max_evects, trace_method, hybridization);
+                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
+                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -101,7 +102,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
                                          double spect_tol, int max_evects,
-                                         int trace_method, bool hybridization)
+                                         bool dual_target, bool scaled_dual,
+                                         bool energy_dual, bool hybridization)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)
@@ -115,12 +117,12 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mixed_laplacians_.emplace_back(ve_copy, weight, w_block, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, global_partitioning,
-                                                     &edge_boundary_att_);
+    auto graph_topology = make_unique<GraphTopology>(
+                              ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology),
-                     spect_tol, max_evects, trace_method, hybridization);
+                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
+                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());

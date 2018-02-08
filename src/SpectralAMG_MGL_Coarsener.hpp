@@ -46,7 +46,12 @@ public:
               accurate, more expensive coarse space.
        @param max_evecs_per_agg cap the number of eigenvectors per aggregate that will
               be used in the coarse space.
-       @param trace_method methods (1-4) for getting edge trace samples
+       @param dual_target get traces from eigenvectors of dual graph Laplacian
+       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
+              Typically coarse problem gets better accuracy but becomes harder
+              to solve when this option is turned on.
+       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
+              (guarantees approximation property in edge energy norm)
        @param is_hybridization_used whether to prepare the coarse space to use the
               HybridSolver
     */
@@ -54,7 +59,9 @@ public:
                               std::unique_ptr<GraphTopology> gt,
                               double spectral_tol,
                               unsigned int max_evecs_per_agg,
-                              int trace_method,
+                              bool dual_target,
+                              bool scaled_dual,
+                              bool energy_dual,
                               bool is_hybridization_used);
 
 private:
@@ -67,7 +74,9 @@ private:
     bool is_hybridization_used_;
     double spectral_tol_;
     unsigned int max_evecs_per_agg_;
-    int trace_method_;
+    bool dual_target_;
+    bool scaled_dual_;
+    bool energy_dual_;
 
 }; // SpectralAMG_MGL_Coarsener
 

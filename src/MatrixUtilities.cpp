@@ -672,8 +672,8 @@ void ExtractSubMatrix(
 
 void ExtractColumns(
     const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
-    const mfem::Array<int>& subcol_to_ref, const int row_offset,
-    mfem::DenseMatrix& A_sub)
+    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
+    const int row_offset)
 {
     const int A_width = A.Width();
     const int A_height = A.Height();

@@ -46,7 +46,12 @@ public:
 
        @param rel_tol tolerance for including small eigenvectors
        @param max_evects max eigenvectors to include per aggregate
-       @param trace_method methods (1-4) for getting edge trace samples
+       @param dual_target get traces from eigenvectors of dual graph Laplacian
+       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
+              Typically coarse problem gets better accuracy but becomes harder
+              to solve when this option is turned on.
+       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
+              (guarantees approximation property in edge energy norm)
        @param M_local is mass matrix on edge-based (velocity) space
        @param D_local is a divergence-like operator
        @param graph_topology the partitioning relations for coarsening
@@ -63,13 +68,15 @@ public:
        \f]
     */
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects, int trace_method,
+        double rel_tol, int max_evects,
+        bool dual_target, bool scaled_dual, bool energy_dual,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const GraphTopology& graph_topology);
 
     LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects, int trace_method,
+        double rel_tol, int max_evects,
+        bool dual_target, bool scaled_dual, bool energy_dual,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const mfem::SparseMatrix* W_local,
@@ -125,7 +132,9 @@ private:
 
     const double rel_tol_;
     const int max_evects_;
-    const int trace_method_;
+    const bool dual_target_;
+    const bool scaled_dual_;
+    const bool energy_dual_;
 
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;

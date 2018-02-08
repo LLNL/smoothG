@@ -44,10 +44,10 @@ add_test(eigenvector1 python stest.py eigenvector1)
 add_test(eigenvector4 python stest.py eigenvector4)
 add_test(fv-hybridization python stest.py fv-hybridization)
 add_test(slice19 python stest.py slice19)
-add_test(fv-trace-method-2 python stest.py fv-trace-method-2)
-add_test(fv-trace-method-3 python stest.py fv-trace-method-3)
-add_test(fv-trace-method-4 python stest.py fv-trace-method-4)
-add_test(fv-trace-method-5 python stest.py fv-trace-method-5)
+add_test(dual-trace python stest.py dual-trace)
+add_test(scaled-dual-trace python stest.py scaled-dual-trace)
+add_test(energy-dual-trace python stest.py energy-dual-trace)
+add_test(scaled-energy-dual-trace python stest.py scaled-energy-dual-trace)
 add_test(samplegraph1 python stest.py samplegraph1)
 add_test(samplegraph4 python stest.py samplegraph4)
 add_test(graph-hybridization python stest.py graph-hybridization)
@@ -59,10 +59,10 @@ add_test(pareigenvector1 python stest.py pareigenvector1)
 add_test(pareigenvector4 python stest.py pareigenvector4)
 add_test(parfv-hybridization python stest.py parfv-hybridization)
 add_test(parslice19 python stest.py parslice19)
-add_test(parfv-trace-method-2 python stest.py parfv-trace-method-2)
-add_test(parfv-trace-method-3 python stest.py parfv-trace-method-3)
-add_test(parfv-trace-method-4 python stest.py parfv-trace-method-4)
-add_test(parfv-trace-method-5 python stest.py parfv-trace-method-5)
+add_test(pardual-trace python stest.py pardual-trace)
+add_test(parscaled-dual-trace python stest.py parscaled-dual-trace)
+add_test(parenergy-dual-trace python stest.py parenergy-dual-trace)
+add_test(parscaled-energy-dual-trace python stest.py parscaled-energy-dual-trace)
 add_test(parsamplegraph1 python stest.py parsamplegraph1)
 add_test(parsamplegraph4 python stest.py parsamplegraph4)
 add_test(pargraph-hybridization python stest.py pargraph-hybridization)
@@ -86,13 +86,6 @@ add_test(isolate_coarsen python stest.py isolate-coarsen)
 
 add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
 add_test(vgraph-small-usegenerator-hb python stest.py vgraph-small-usegenerator-hb)
-
-add_test(NAME style
-  COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-set_tests_properties(style
-  PROPERTIES FAIL_REGULAR_EXPRESSION
-  "Formatted")
 
 # this test takes too long so we are deprecating it, but you should run it once in a while
 # add_test(veigenvector python stest.py veigenvector)

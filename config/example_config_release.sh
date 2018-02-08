@@ -38,6 +38,9 @@ cmake \
     -DSuiteSparse_DIR=/path/to/the/directory/where/SuiteSparse/is/installed \
     -DSPE10_DIR=/path/to/the/directory/where/spe_perm.dat/is/located \
     \
+    -DMEMORYCHECK_COMMAND=/path/to/valgrind/binary \
+    -DASTYLE_DIR=/path/to/astyle \
+    \
     -DUSE_ARPACK=OFF \
     \
     -DCMAKE_BUILD_TYPE=Release \
