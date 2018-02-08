@@ -579,7 +579,6 @@ void GraphCoarsen::BuildPEdges(
 
     int* Pedges_j = new int[Pedges_i[nedges]];
     double* Pedges_data = new double[Pedges_i[nedges]];
-    int ptr, face, nlocal_verts, nlocal_traces;
     int bubble_counter = 0;
     mfem::Array<int> facecdofs, local_facecdofs;
 
@@ -602,9 +601,8 @@ void GraphCoarsen::BuildPEdges(
                             CM_el, total_num_traces,
                             ncoarse_vertexdofs, build_coarse_relation);
 
-    int row, col, cdof_loc;
-    int nlocal_fine_dofs;
-    double entry_value, scale;
+    int row, col;
+    double entry_value;
     mfem::Vector B_potential, F_potential;
     mfem::DenseMatrix traces_extensions, bubbles, B_potentials, F_potentials;
     mfem::Vector ref_vec1, ref_vec2, ref_vec3;
@@ -622,12 +620,12 @@ void GraphCoarsen::BuildPEdges(
                                          local_fine_dofs, colMapper_);
         LocalGraphEdgeSolver solver(Mloc, Dloc);
 
-        nlocal_fine_dofs = local_fine_dofs.Size();
-        nlocal_verts = local_verts.Size();
+        int nlocal_fine_dofs = local_fine_dofs.Size();
+        int nlocal_verts = local_verts.Size();
         local_rhs_trace.SetSize(nlocal_verts);
 
         mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
-        scale = vertex_target_i(0, 0);
+        double scale = vertex_target_i(0, 0);
 
         // solving bubble functions
         int num_bubbles_i = vertex_target_i.Width() - 1;
@@ -645,7 +643,7 @@ void GraphCoarsen::BuildPEdges(
         }
 
         // solving trace extensions and store coarse matrices
-        nlocal_traces = 0;
+        int nlocal_traces = 0;
         for (int j = 0; j < faces.Size(); j++)
             nlocal_traces += face_cdof.RowSize(faces[j]);
         traces_extensions.SetSize(nlocal_fine_dofs, nlocal_traces);
@@ -653,6 +651,7 @@ void GraphCoarsen::BuildPEdges(
         local_facecdofs.SetSize(nlocal_traces);
 
         nlocal_traces = 0;
+        int face;
         for (int j = 0; j < faces.Size(); j++)
         {
             face = faces[j];
@@ -667,7 +666,7 @@ void GraphCoarsen::BuildPEdges(
             for (int k = 0; k < num_traces; k++)
             {
                 row = local_facecdofs[nlocal_traces] = facecdofs[k];
-                cdof_loc = num_bubbles_i + nlocal_traces;
+                const int cdof_loc = num_bubbles_i + nlocal_traces;
                 mbuilder.RegisterRow(i, row, cdof_loc, bubble_counter); // 2/8/18
                 edge_traces_f.GetColumnReference(k, trace);
                 Dtransfer.Mult(trace, local_rhs_trace);
@@ -726,7 +725,7 @@ void GraphCoarsen::BuildPEdges(
         // put trace extensions and bubbles into Pedges
         for (int l = 0; l < nlocal_fine_dofs; l++)
         {
-            ptr = Pedges_i[local_fine_dofs[l]];
+            int ptr = Pedges_i[local_fine_dofs[l]];
             for (int j = 0; j < nlocal_traces; j++)
             {
                 Pedges_j[ptr] = local_facecdofs[j];
@@ -787,10 +786,10 @@ void GraphCoarsen::BuildPEdges(
         mfem::DenseMatrix& edge_traces_i(edge_traces[i]);
         GetTableRow(face_edge, i, local_fine_dofs);
         GetTableRow(face_cdof, i, facecdofs);
-        nlocal_fine_dofs = local_fine_dofs.Size();
+        int nlocal_fine_dofs = local_fine_dofs.Size();
         for (int j = 0; j < nlocal_fine_dofs; j++)
         {
-            ptr = Pedges_i[local_fine_dofs[j]];
+            int ptr = Pedges_i[local_fine_dofs[j]];
             for (int k = 0; k < facecdofs.Size(); k++)
             {
                 Pedges_j[ptr] = facecdofs[k];
