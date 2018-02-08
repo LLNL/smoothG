@@ -191,6 +191,18 @@ private:
                          const mfem::SparseMatrix& face_edge);
 
     /**
+       Figure out NNZ for each row of PEdges, which is to say, for each fine
+       edge dof, figure out how many coarse dofs it gets interpolated from.
+
+       @returns the I array of PEdges for CSR format.
+    */
+    int* InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_traces,
+                             std::vector<mfem::DenseMatrix>& vertex_target,
+                             const mfem::SparseMatrix& Agg_edge,
+                             const mfem::SparseMatrix& face_edge,
+                             const mfem::SparseMatrix& Agg_face);
+
+    /**
        @brief take edge-based traces functions, extend them, find bubbles,
        and assemble into interpolation matrix.
 
