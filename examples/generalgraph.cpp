@@ -29,10 +29,15 @@
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
-using namespace linalgcpp;
-using namespace parlinalgcpp;
 
-std::vector<int> MetisPart(const SparseMatrix<int>& vertex_edge, int num_parts);
+using Vector = linalgcpp::Vector<double>;
+using VectorView = linalgcpp::VectorView<double>;
+using BlockVector = linalgcpp::BlockVector<double>;
+using SparseMatrix = linalgcpp::SparseMatrix<int>;
+using linalgcpp::ReadText;
+using linalgcpp::ReadCSR;
+
+std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts);
 
 int main(int argc, char* argv[])
 {
@@ -59,7 +64,7 @@ int main(int argc, char* argv[])
     assert(num_partitions >= num_procs);
 
     /// [Load graph from file or generate one]
-    SparseMatrix<int> vertex_edge_global = ReadCSR<int>(graphFileName);
+    SparseMatrix vertex_edge_global = ReadCSR<int>(graphFileName);
 
     const int nvertices_global = vertex_edge_global.Rows();
     const int nedges_global = vertex_edge_global.Cols();
@@ -81,7 +86,7 @@ int main(int argc, char* argv[])
     std::vector<double> weight;
     if (weight_filename.size() > 0)
     {
-        weight = ReadText(weight_filename);
+        weight = linalgcpp::ReadText(weight_filename);
     }
     else
     {
@@ -100,18 +105,18 @@ int main(int argc, char* argv[])
         /// [Upscale]
 
         /// [Right Hand Side]
-        Vector<double> rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
+        Vector rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
 
-        BlockVector<double> fine_rhs(upscale.GetFineBlockVector());
+        BlockVector fine_rhs(upscale.GetFineBlockVector());
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
 
         /// [Solve]
-        BlockVector<double> upscaled_sol = upscale.Solve(fine_rhs);
+        BlockVector upscaled_sol = upscale.Solve(fine_rhs);
         upscale.ShowCoarseSolveInfo();
 
-        BlockVector<double> fine_sol = upscale.SolveFine(fine_rhs);
+        BlockVector fine_sol = upscale.SolveFine(fine_rhs);
         upscale.ShowFineSolveInfo();
         /// [Solve]
 
@@ -124,10 +129,10 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-std::vector<int> MetisPart(const SparseMatrix<int>& vertex_edge, int num_parts)
+std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts)
 {
-    SparseMatrix<int> edge_vertex = vertex_edge.Transpose();
-    SparseMatrix<int> vertex_vertex = vertex_edge.Mult(edge_vertex);
+    SparseMatrix edge_vertex = vertex_edge.Transpose();
+    SparseMatrix vertex_vertex = vertex_edge.Mult(edge_vertex);
 
     return Partition(vertex_vertex, num_parts);
 }
