@@ -261,8 +261,8 @@ class CoarseMBuilder
 public:
     CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
                    std::vector<mfem::DenseMatrix>& vertex_target,
-                   mfem::SparseMatrix& CoarseM,
                    std::vector<mfem::DenseMatrix>& CM_el,
+                   const mfem::SparseMatrix& Agg_face,
                    int total_num_traces, int ncoarse_vertexdofs,
                    bool build_coarse_relation);
 
@@ -292,13 +292,16 @@ public:
 
     void AddTraceAcross(int row, int col, double value);
 
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
+
 private:
     std::vector<mfem::DenseMatrix>& edge_traces_;
     std::vector<mfem::DenseMatrix>& vertex_target_;
-    mfem::SparseMatrix& CoarseM_;
     std::vector<mfem::DenseMatrix>& CM_el_;
     int total_num_traces_;
     bool build_coarse_relation_;
+
+    std::unique_ptr<mfem::SparseMatrix> CoarseM_;
 
     mfem::Array<int> edge_cdof_marker_;
     mfem::Array<int> edge_cdof_marker2_;
@@ -313,26 +316,39 @@ private:
 
 CoarseMBuilder::CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
                                std::vector<mfem::DenseMatrix>& vertex_target,
-                               mfem::SparseMatrix& CoarseM,
                                std::vector<mfem::DenseMatrix>& CM_el,
+                               const mfem::SparseMatrix& Agg_face,
                                int total_num_traces, int ncoarse_vertexdofs,
                                bool build_coarse_relation)
     :
     edge_traces_(edge_traces),
     vertex_target_(vertex_target),
-    CoarseM_(CoarseM),
     CM_el_(CM_el),
     total_num_traces_(total_num_traces),
     build_coarse_relation_(build_coarse_relation)
 {
     const unsigned int nAggs = vertex_target.size();
-    // const unsigned int nfaces = face_edge.Height();
-    // const unsigned int nedges = Agg_edge.Width();
 
     if (build_coarse_relation_)
     {
+        CM_el.resize(nAggs);
+        mfem::Array<int> faces;
+        for (unsigned int i = 0; i < nAggs; i++)
+        {
+            int nlocal_coarse_dofs = vertex_target[i].Width() - 1;
+            GetTableRow(Agg_face, i, faces);
+            for (int j = 0; j < faces.Size(); ++j)
+                nlocal_coarse_dofs += edge_traces[faces[j]].Width();
+            CM_el[i].SetSize(nlocal_coarse_dofs);
+        }
         edge_cdof_marker_.SetSize(total_num_traces + ncoarse_vertexdofs - nAggs);
         edge_cdof_marker_ = -1;
+    }
+    else
+    {
+        CoarseM_ = make_unique<mfem::SparseMatrix>(
+                       total_num_traces + ncoarse_vertexdofs - nAggs,
+                       total_num_traces + ncoarse_vertexdofs - nAggs);
     }
 }
 
@@ -357,8 +373,8 @@ void CoarseMBuilder::SetBubbleOffd(int l, double value)
     }
     else
     {
-        CoarseM_.Set(row_, global_col, value);
-        CoarseM_.Set(global_col, row_, value);
+        CoarseM_->Set(row_, global_col, value);
+        CoarseM_->Set(global_col, row_, value);
     }
 }
 
@@ -367,7 +383,7 @@ void CoarseMBuilder::AddDiag(double value)
     if (build_coarse_relation_)
         CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
     else
-        CoarseM_.Add(row_, row_, value);
+        CoarseM_->Add(row_, row_, value);
 }
 
 void CoarseMBuilder::AddTrace(int l, double value)
@@ -380,8 +396,8 @@ void CoarseMBuilder::AddTrace(int l, double value)
     }
     else
     {
-        CoarseM_.Add(row_, l, value);
-        CoarseM_.Add(l, row_, value);
+        CoarseM_->Add(row_, l, value);
+        CoarseM_->Add(l, row_, value);
     }
 }
 
@@ -397,8 +413,8 @@ void CoarseMBuilder::SetBubbleLocal(int l, int j, double value)
     {
         int global_row = total_num_traces_ + bubble_counter_ + l;
         int global_col = total_num_traces_ + bubble_counter_ + j;
-        CoarseM_.Set(global_row, global_col, value);
-        CoarseM_.Set(global_col, global_row, value);
+        CoarseM_->Set(global_row, global_col, value);
+        CoarseM_->Set(global_col, global_row, value);
     }
 }
 
@@ -458,24 +474,27 @@ void CoarseMBuilder::AddTraceAcross(int row, int col, double value)
         if (Agg1_ == -1)
         {
             CM_el_loc1(id0_in_Agg0, id1_in_Agg0) += value;
-            // CM_el_loc1(id1_in_Agg0, id0_in_Agg0) += value;
         }
         else
         {
             mfem::DenseMatrix& CM_el_loc2(CM_el_[Agg1_]);
             CM_el_loc1(id0_in_Agg0, id1_in_Agg0) += value / 2.;
-            // CM_el_loc1(id1_in_Agg0, id0_in_Agg0) += value / 2.;
             int id0_in_Agg1 = edge_cdof_marker2_[row];
             int id1_in_Agg1 = edge_cdof_marker2_[col];
             CM_el_loc2(id0_in_Agg1, id1_in_Agg1) += value / 2.;
-            // CM_el_loc2(id1_in_Agg1, id0_in_Agg1) += value / 2.;
         }
     }
     else
     {
-        CoarseM_.Add(row, col, value);
-        // CoarseM_.Add(col, row, value);
+        CoarseM_->Add(row, col, value);
     }
+}
+
+std::unique_ptr<mfem::SparseMatrix> CoarseMBuilder::GetCoarseM()
+{
+    if (!build_coarse_relation_)
+        CoarseM_->Finalize(0);
+    return std::move(CoarseM_);
 }
 
 /**
@@ -520,12 +539,9 @@ void GraphCoarsen::BuildPEdges(
     int* Agg_dof_j;
     double* Agg_dof_d;
     int Agg_dof_nnz = 0;
-    // TODO: CM_el stuff in next block, and CoarseM_ = make_unique<>, should
-    //       be in some form in CoarseMBuilder
+
     if (build_coarse_relation)
     {
-        // element matrices for hybridization
-        CM_el.resize(nAggs);
         Agg_dof_i = new int[nAggs + 1];
         Agg_dof_i[0] = 0;
 
@@ -537,7 +553,6 @@ void GraphCoarsen::BuildPEdges(
             for (int j = 0; j < faces.Size(); ++j)
                 nlocal_coarse_dofs += edge_traces[faces[j]].Width();
             Agg_dof_i[i + 1] = Agg_dof_i[i] + nlocal_coarse_dofs;
-            CM_el[i].SetSize(nlocal_coarse_dofs);
         }
         Agg_dof_j = new int[Agg_dof_i[nAggs]];
         Agg_dof_d = new double[Agg_dof_i[nAggs]];
@@ -554,18 +569,12 @@ void GraphCoarsen::BuildPEdges(
         ncoarse_vertexdofs += vertex_target[i].Width();
     CoarseD_ = make_unique<mfem::SparseMatrix>(ncoarse_vertexdofs,
                                                total_num_traces + ncoarse_vertexdofs - nAggs);
-    if (!build_coarse_relation)
-    {
-        CoarseM_ = make_unique<mfem::SparseMatrix>(
-                       total_num_traces + ncoarse_vertexdofs - nAggs,
-                       total_num_traces + ncoarse_vertexdofs - nAggs);
-    }
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     NormalizeTraces(edge_traces, Agg_vertex, face_edge);
 
-    CoarseMBuilder mbuilder(edge_traces, vertex_target, *CoarseM_,
-                            CM_el, total_num_traces,
+    CoarseMBuilder mbuilder(edge_traces, vertex_target,
+                            CM_el, Agg_face, total_num_traces,
                             ncoarse_vertexdofs, build_coarse_relation);
 
     int row, col;
@@ -786,11 +795,7 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
-    // CoarseM_ = mbuilder.GetCoarseM();
-    //%
-    if (!build_coarse_relation)
-        CoarseM_->Finalize(0);
-    //%
+    CoarseM_ = mbuilder.GetCoarseM();
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
