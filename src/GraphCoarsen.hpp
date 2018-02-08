@@ -178,6 +178,11 @@ private:
                         mfem::SparseMatrix& Pvertices,
                         bool build_coarse_relation);
 
+    /// @brief helper for BuildPEdges
+    int BuildCoarseFaceCoarseDof(unsigned int nfaces,
+                                 std::vector<mfem::DenseMatrix>& edge_traces,
+                                 mfem::SparseMatrix& face_cdof);
+
     /**
        @brief take edge-based traces functions, extend them, find bubbles,
        and assemble into interpolation matrix.

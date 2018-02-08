@@ -133,12 +133,40 @@ void GraphCoarsen::BuildPVertices(
 }
 
 /**
+   Subroutine called from BuildPEdges
+
+   @param (in) nfaces number of faces
+   @param (in) edge_traces lives on a face
+   @param (out) face_cdof the coarseface_coarsedof relation table
+
+   @return total_num_traces on all faces
+*/
+int GraphCoarsen::BuildCoarseFaceCoarseDof(unsigned int nfaces,
+                                           std::vector<mfem::DenseMatrix>& edge_traces,
+                                           mfem::SparseMatrix& face_cdof)
+{
+    int* face_cdof_i = new int[nfaces + 1];
+    face_cdof_i[0] = 0;
+    for (unsigned int i = 0; i < nfaces; ++i)
+        face_cdof_i[i + 1] = face_cdof_i[i] + edge_traces[i].Width();
+    int total_num_traces = face_cdof_i[nfaces];
+    int* face_cdof_j = new int[total_num_traces];
+    std::iota(face_cdof_j, face_cdof_j + total_num_traces, 0);
+    double* face_cdof_data = new double[total_num_traces];
+    std::fill_n(face_cdof_data, total_num_traces, 1.0);
+    mfem::SparseMatrix newface_cdof(face_cdof_i, face_cdof_j, face_cdof_data,
+                                    nfaces, total_num_traces);
+    face_cdof.Swap(newface_cdof);
+    return total_num_traces;
+}
+
+/**
    Construct Pedges, the projector from coarse edge degrees of freedom
    to fine edge degrees of freedom.
 
    @param edge_traces lives on a *face*, not an aggregate
 
-   @param face_cdof is coarse, coarse faces and coarse dofs for the new coarse graph
+   @param (out) face_cdof is coarse, coarse faces and coarse dofs for the new coarse graph
 
    @todo this is a monster and should be refactored
 */
@@ -170,18 +198,7 @@ void GraphCoarsen::BuildPEdges(
     }
 
     // construct face to coarse edge dof relation table
-    int* face_cdof_i = new int[nfaces + 1];
-    face_cdof_i[0] = 0;
-    for (unsigned int i = 0; i < nfaces; ++i)
-        face_cdof_i[i + 1] = face_cdof_i[i] + edge_traces[i].Width();
-    int total_num_traces = face_cdof_i[nfaces];
-    int* face_cdof_j = new int[total_num_traces];
-    std::iota(face_cdof_j, face_cdof_j + total_num_traces, 0);
-    double* face_cdof_data = new double[total_num_traces];
-    std::fill_n(face_cdof_data, total_num_traces, 1.0);
-    mfem::SparseMatrix newface_cdof(face_cdof_i, face_cdof_j, face_cdof_data,
-                                    nfaces, total_num_traces);
-    face_cdof.Swap(newface_cdof);
+    int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
 
     mfem::Vector local_rhs_trace, local_rhs_bubble, local_sol, trace, PV_trace;
     mfem::Vector B_potential, F_potential;
@@ -256,7 +273,6 @@ void GraphCoarsen::BuildPEdges(
     bool sign_flip;
     for (unsigned int iface = 0; iface < nfaces; iface++)
     {
-
         int Agg0 = graph_topology_.face_Agg_.GetRowColumns(iface)[0];
 
         // extract local matrices
@@ -382,7 +398,6 @@ void GraphCoarsen::BuildPEdges(
                     traces_extensions.GetColumnReference(nlocal_traces, local_sol);
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     solver.Mult(local_rhs_trace, local_sol, F_potential);
-
 
                     // compute and store off diagonal block of coarse M
                     for (int l = 0; l < num_bubbles_i; l++)
@@ -510,6 +525,8 @@ void GraphCoarsen::BuildPEdges(
     }
 
     CoarseD_->Finalize();
+
+    // good place to split up this method?
 
     if (build_coarse_relation)
     {
