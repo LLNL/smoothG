@@ -274,11 +274,23 @@ public:
 
     void SetBubbleOffd(int l, double value);
 
+    /// @todo improve method name
     void AddDiag(double value);
 
+    /// @todo improve method name
     void AddTrace(int l, double value);
 
     void SetBubbleLocalDiag(int l, double value);
+
+    /// The methods after this could even be a different object?
+    void ResetEdgeCdofMarkers(int size);
+
+    void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
+                           const mfem::SparseMatrix& Agg_cdof_edge);
+
+    void AddTraceDiag(int row, double value);
+
+    void AddTraceOffd(int row, int col, double value);
 
 private:
     std::vector<mfem::DenseMatrix>& edge_traces_;
@@ -289,10 +301,14 @@ private:
     bool build_coarse_relation_;
 
     mfem::Array<int> edge_cdof_marker_;
+    mfem::Array<int> edge_cdof_marker2_;
     int agg_index_;
     int row_;
     int cdof_loc_;
     int bubble_counter_;
+
+    int Agg0_;
+    int Agg1_;
 };
 
 CoarseMBuilder::CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
@@ -376,6 +392,106 @@ void CoarseMBuilder::SetBubbleLocalDiag(int l, double value)
         CM_el_[agg_index_](l, l) = value;
     else
         CoarseM_.Set(global_row, global_row, value);
+}
+
+void CoarseMBuilder::ResetEdgeCdofMarkers(int size)
+{
+    if (build_coarse_relation_)
+    {
+        edge_cdof_marker_.SetSize(size);
+        edge_cdof_marker_ = -1;
+        edge_cdof_marker2_.SetSize(size);
+        edge_cdof_marker2_ = -1;
+    }
+}
+
+void CoarseMBuilder::RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
+                                       const mfem::SparseMatrix& Agg_cdof_edge)
+{
+    mfem::Array<int> Aggs;
+    mfem::Array<int> local_Agg_edge_cdof;
+    if (build_coarse_relation_)
+    {
+        GetTableRow(face_Agg, face_num, Aggs);
+        Agg0_ = Aggs[0];
+        GetTableRow(Agg_cdof_edge, Agg0_, local_Agg_edge_cdof);
+        for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
+        {
+            edge_cdof_marker_[local_Agg_edge_cdof[k]] = k;
+        }
+        if (Aggs.Size() == 2)
+        {
+            Agg1_ = Aggs[1];
+            GetTableRow(Agg_cdof_edge, Agg1_, local_Agg_edge_cdof);
+            for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
+            {
+                edge_cdof_marker2_[local_Agg_edge_cdof[k]] = k;
+            }
+        }
+        else
+        {
+            Agg1_ = -1;
+        }
+    }
+    else
+    {
+        Agg0_ = Agg1_ = 0;
+    }
+}
+
+void CoarseMBuilder::AddTraceDiag(int row, double value)
+{
+    if (build_coarse_relation_)
+    {
+        mfem::DenseMatrix& CM_el_loc1(CM_el_[Agg0_]);
+        int id0_in_Agg0 = edge_cdof_marker_[row];
+        if (Agg1_ == -1)
+        {
+            CM_el_loc1(id0_in_Agg0, id0_in_Agg0) += value;
+        }
+        else
+        {
+            mfem::DenseMatrix& CM_el_loc2(CM_el_[Agg1_]);
+            CM_el_loc1(id0_in_Agg0, id0_in_Agg0) += value / 2.;
+            int id0_in_Agg1 = edge_cdof_marker2_[row];
+            CM_el_loc2(id0_in_Agg1, id0_in_Agg1) += value / 2.;
+        }
+    }
+    else
+    {
+        CoarseM_.Add(row, row, value);
+    }
+}
+
+void CoarseMBuilder::AddTraceOffd(int row, int col, double value)
+{
+    if (build_coarse_relation_)
+    {
+        mfem::DenseMatrix& CM_el_loc1(CM_el_[Agg0_]);
+
+        int id0_in_Agg0 = edge_cdof_marker_[row];
+        int id1_in_Agg0 = edge_cdof_marker_[col];
+        if (Agg1_ == -1)
+        {
+            CM_el_loc1(id0_in_Agg0, id1_in_Agg0) += value;
+            CM_el_loc1(id1_in_Agg0, id0_in_Agg0) += value;
+        }
+        else
+        {
+            mfem::DenseMatrix& CM_el_loc2(CM_el_[Agg1_]);
+            CM_el_loc1(id0_in_Agg0, id1_in_Agg0) += value / 2.;
+            CM_el_loc1(id1_in_Agg0, id0_in_Agg0) += value / 2.;
+            int id0_in_Agg1 = edge_cdof_marker2_[row];
+            int id1_in_Agg1 = edge_cdof_marker2_[col];
+            CM_el_loc2(id0_in_Agg1, id1_in_Agg1) += value / 2.;
+            CM_el_loc2(id1_in_Agg1, id0_in_Agg1) += value / 2.;
+        }
+    }
+    else
+    {
+        CoarseM_.Add(row, col, value);
+        CoarseM_.Add(col, row, value);
+    }
 }
 
 /**
@@ -657,6 +773,8 @@ void GraphCoarsen::BuildPEdges(
     mfem::Array<int> Aggs;
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
 
+    // mbuilder.ResetEdgeCdofMarkers(Agg_cdof_edge_->Width());
+    //%
     mfem::Array<int> edge_cdof_marker2, local_Agg_edge_cdof;
     mfem::Array<int> edge_cdof_marker; // should go in mbuilder 2/8/18
     if (build_coarse_relation)
@@ -667,6 +785,7 @@ void GraphCoarsen::BuildPEdges(
         edge_cdof_marker2 = -1;
     }
     int Agg0, Agg1, id0_in_Agg0, id1_in_Agg0, id0_in_Agg1, id1_in_Agg1;
+    //%
 
     // put traces into Pedges
     for (unsigned int i = 0; i < nfaces; i++)
@@ -687,6 +806,8 @@ void GraphCoarsen::BuildPEdges(
         }
 
         // store global and local coarse M
+        // mbuilder.RegisterTraceFace(i, face_Agg, *Agg_cdof_edge_);
+        //%
         if (build_coarse_relation)
         {
             GetTableRow(face_Agg, i, Aggs);
@@ -706,6 +827,7 @@ void GraphCoarsen::BuildPEdges(
         {
             Agg0 = Agg1 = 0;
         }
+        //%
 
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
         for (int l = 0; l < facecdofs.Size(); l++)
@@ -713,7 +835,8 @@ void GraphCoarsen::BuildPEdges(
             row = facecdofs[l];
             edge_traces_i.GetColumnReference(l, ref_vec1);
             entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec1);
-
+            // mbuilder.AddTraceDiag(row, entry_value);
+            //%
             if (build_coarse_relation)
             {
                 mfem::DenseMatrix& CM_el_loc1(CM_el[Agg0]);
@@ -736,13 +859,15 @@ void GraphCoarsen::BuildPEdges(
             {
                 CoarseM_->Add(row, row, entry_value);
             }
+            //%
 
             for (int j = l + 1; j < facecdofs.Size(); j++)
             {
                 col = facecdofs[j];
                 edge_traces_i.GetColumnReference(j, ref_vec2);
                 entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec2);
-
+                // mbuilder.AddTraceOffd(row, col, entry_value);
+                //%
                 if (build_coarse_relation)
                 {
                     mfem::DenseMatrix& CM_el_loc1(CM_el[Agg0]);
@@ -769,6 +894,7 @@ void GraphCoarsen::BuildPEdges(
                     CoarseM_->Add(row, col, entry_value);
                     CoarseM_->Add(col, row, entry_value);
                 }
+                //%
             }
         }
     }
