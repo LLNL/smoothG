@@ -288,6 +288,10 @@ void GraphCoarsen::BuildPEdges(
     // construct face to coarse edge dof relation table
     int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
 
+    // compute nnz in each row (fine edge)
+    int* Pedges_i = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
+                                        face_edge, Agg_face);
+
     int* Agg_dof_i;
     int* Agg_dof_j;
     double* Agg_dof_d;
@@ -298,14 +302,7 @@ void GraphCoarsen::BuildPEdges(
         CM_el.resize(nAggs);
         Agg_dof_i = new int[nAggs + 1];
         Agg_dof_i[0] = 0;
-    }
 
-    // compute nnz in each row (fine edge)
-    int* Pedges_i = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
-                                        face_edge, Agg_face);
-
-    if (build_coarse_relation)
-    {
         mfem::Array<int> faces; // this is repetitive of InitializePEdgesNNZ
         for (unsigned int i = 0; i < nAggs; i++)
         {
@@ -518,8 +515,10 @@ void GraphCoarsen::BuildPEdges(
 
         // storing local coarse D
         for (int l = 0; l < num_bubbles_i; l++)
+        {
             CoarseD_->Set(bubble_counter + i + 1 + l,
                           total_num_traces + bubble_counter + l, 1.);
+        }
 
         // storing local coarse M (bubble part)
         for (int l = 0; l < num_bubbles_i; l++)
