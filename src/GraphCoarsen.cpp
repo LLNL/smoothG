@@ -254,6 +254,130 @@ int* GraphCoarsen::InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_trac
     return Pedges_i;
 }
 
+class CoarseMBuilder
+{
+public:
+    /// build_coarse_relation = true;
+    CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
+                   std::vector<mfem::DenseMatrix>& vertex_target,
+                   mfem::SparseMatrix& CoarseM,
+                   std::vector<mfem::DenseMatrix>& CM_el,
+                   int total_num_traces, int ncoarse_vertexdofs,
+                   bool build_coarse_relation);
+
+    ~CoarseMBuilder() {}
+
+    /// names of next several methods are not descriptive, we
+    /// are just removing lines of code from BuildPEdges and putting
+    /// it here without understanding it
+    void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
+
+    void SetBubbleOffd(int l, double value);
+
+    void AddDiag(double value);
+
+    void AddTrace(int l, double value);
+
+    void SetBubbleLocalDiag(int l, double value);
+
+private:
+    std::vector<mfem::DenseMatrix>& edge_traces_;
+    std::vector<mfem::DenseMatrix>& vertex_target_;
+    mfem::SparseMatrix& CoarseM_;
+    std::vector<mfem::DenseMatrix>& CM_el_;
+    int total_num_traces_;
+    bool build_coarse_relation_;
+
+    mfem::Array<int> edge_cdof_marker_;
+    int agg_index_;
+    int row_;
+    int cdof_loc_;
+    int bubble_counter_;
+};
+
+CoarseMBuilder::CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
+                               std::vector<mfem::DenseMatrix>& vertex_target,
+                               mfem::SparseMatrix& CoarseM,
+                               std::vector<mfem::DenseMatrix>& CM_el,
+                               int total_num_traces, int ncoarse_vertexdofs,
+                               bool build_coarse_relation)
+    :
+    edge_traces_(edge_traces),
+    vertex_target_(vertex_target),
+    CoarseM_(CoarseM),
+    CM_el_(CM_el),
+    total_num_traces_(total_num_traces),
+    build_coarse_relation_(build_coarse_relation)
+{
+    const unsigned int nAggs = vertex_target.size();
+    // const unsigned int nfaces = face_edge.Height();
+    // const unsigned int nedges = Agg_edge.Width();
+
+    if (build_coarse_relation_)
+    {
+        edge_cdof_marker_.SetSize(total_num_traces + ncoarse_vertexdofs - nAggs);
+        edge_cdof_marker_ = -1;
+    }
+}
+
+void CoarseMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
+{
+    agg_index_ = agg_index;
+    row_ = row;
+    cdof_loc_ = cdof_loc;
+    bubble_counter_ = bubble_counter;
+    if (build_coarse_relation_)
+        edge_cdof_marker_[row] = cdof_loc;
+}
+
+void CoarseMBuilder::SetBubbleOffd(int l, double value)
+{
+    const int global_col = total_num_traces_ + bubble_counter_ + l;
+    if (build_coarse_relation_)
+    {
+        mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
+        CM_el_loc(l, cdof_loc_) = value;
+        CM_el_loc(cdof_loc_, l) = value;
+    }
+    else
+    {
+        CoarseM_.Set(row_, global_col, value);
+        CoarseM_.Set(global_col, row_, value);
+    }
+}
+
+void CoarseMBuilder::AddDiag(double value)
+{
+    if (build_coarse_relation_)
+        CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
+    else
+        CoarseM_.Add(row_, row_, value);
+}
+
+void CoarseMBuilder::AddTrace(int l, double value)
+{
+    if (build_coarse_relation_)
+    {
+        mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
+        CM_el_loc(edge_cdof_marker_[l], cdof_loc_) = value;
+        CM_el_loc(cdof_loc_, edge_cdof_marker_[l]) = value;
+    }
+    else
+    {
+        CoarseM_.Add(row_, l, value);
+        CoarseM_.Add(l, row_, value);
+    }
+}
+
+void CoarseMBuilder::SetBubbleLocalDiag(int l, double value)
+{
+    int global_row = total_num_traces_ + bubble_counter_ + l;
+    if (build_coarse_relation_)
+        CM_el_[agg_index_](l, l) = value;
+    else
+        CoarseM_.Set(global_row, global_row, value);
+}
+
 /**
    Construct Pedges, the projector from coarse edge degrees of freedom
    to fine edge degrees of freedom.
@@ -339,12 +463,9 @@ void GraphCoarsen::BuildPEdges(
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     NormalizeTraces(edge_traces, Agg_vertex, face_edge);
 
-    mfem::Array<int> edge_cdof_marker;
-    if (build_coarse_relation)
-    {
-        edge_cdof_marker.SetSize(CoarseD_->Width());
-        edge_cdof_marker = -1;
-    }
+    CoarseMBuilder mbuilder(edge_traces, vertex_target, *CoarseM_,
+                            CM_el, total_num_traces,
+                            ncoarse_vertexdofs, build_coarse_relation);
 
     int row, col, cdof_loc;
     int nlocal_fine_dofs;
@@ -412,8 +533,7 @@ void GraphCoarsen::BuildPEdges(
             {
                 row = local_facecdofs[nlocal_traces] = facecdofs[k];
                 cdof_loc = num_bubbles_i + nlocal_traces;
-                if (build_coarse_relation)
-                    edge_cdof_marker[row] = cdof_loc;
+                mbuilder.RegisterRow(i, row, cdof_loc, bubble_counter); // 2/8/18
                 edge_traces_f.GetColumnReference(k, trace);
                 Dtransfer.Mult(trace, local_rhs_trace);
 
@@ -438,19 +558,7 @@ void GraphCoarsen::BuildPEdges(
                         B_potentials.GetColumnReference(l, B_potential);
                         DtransferT.Mult(B_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
-                        col = total_num_traces + bubble_counter + l;
-
-                        if (build_coarse_relation)
-                        {
-                            mfem::DenseMatrix& CM_el_loc(CM_el[i]);
-                            CM_el_loc(l, cdof_loc) = entry_value;
-                            CM_el_loc(cdof_loc, l) = entry_value;
-                        }
-                        else
-                        {
-                            CoarseM_->Set(row, col, entry_value);
-                            CoarseM_->Set(col, row, entry_value);
-                        }
+                        mbuilder.SetBubbleOffd(l, entry_value); // 2/8/18
                     }
 
                     // compute and store diagonal block of coarse M
@@ -459,11 +567,7 @@ void GraphCoarsen::BuildPEdges(
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     DtransferT.Mult(F_potential, ref_vec3);
                     entry_value = smoothg::InnerProduct(ref_vec3, trace);
-
-                    if (build_coarse_relation)
-                        CM_el[i](cdof_loc, cdof_loc) = entry_value;
-                    else
-                        CoarseM_->Add(row, row, entry_value);
+                    mbuilder.AddDiag(entry_value); // 2/8/18
 
                     for (int l = 0; l < nlocal_traces; l++)
                     {
@@ -472,19 +576,8 @@ void GraphCoarsen::BuildPEdges(
                         F_potentials.GetColumnReference(l, F_potential);
                         DtransferT.Mult(F_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
-                        col = local_facecdofs[l];
-
-                        if (build_coarse_relation)
-                        {
-                            mfem::DenseMatrix& CM_el_loc(CM_el[i]);
-                            CM_el_loc(edge_cdof_marker[col], cdof_loc) = entry_value;
-                            CM_el_loc(cdof_loc, edge_cdof_marker[col]) = entry_value;
-                        }
-                        else
-                        {
-                            CoarseM_->Add(row, col, entry_value);
-                            CoarseM_->Add(col, row, entry_value);
-                        }
+                        // col = local_facecdofs[l]; // 2/8/18
+                        mbuilder.AddTrace(local_facecdofs[l], entry_value); // 2/8/18
                     }
                 }
 
@@ -523,16 +616,12 @@ void GraphCoarsen::BuildPEdges(
         // storing local coarse M (bubble part)
         for (int l = 0; l < num_bubbles_i; l++)
         {
-            row = total_num_traces + bubble_counter + l;
             B_potentials.GetColumnReference(l, ref_vec1);
 
             vertex_target_i.GetColumnReference(l + 1, ref_vec2);
             entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-
-            if (build_coarse_relation)
-                CM_el[i](l, l) = entry_value;
-            else
-                CoarseM_->Set(row, row, entry_value);
+            row = total_num_traces + bubble_counter + l;
+            mbuilder.SetBubbleLocalDiag(l, entry_value);
 
             for (int j = l + 1; j < num_bubbles_i; j++)
             {
@@ -559,7 +648,7 @@ void GraphCoarsen::BuildPEdges(
 
     CoarseD_->Finalize();
 
-    // good place to split up this method?
+    // good place to split up this method? maybe not?
 
     if (build_coarse_relation)
     {
@@ -572,8 +661,11 @@ void GraphCoarsen::BuildPEdges(
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
 
     mfem::Array<int> edge_cdof_marker2, local_Agg_edge_cdof;
+    mfem::Array<int> edge_cdof_marker; // should go in mbuilder 2/8/18
     if (build_coarse_relation)
     {
+        edge_cdof_marker.SetSize(Agg_cdof_edge_->Width());
+        edge_cdof_marker = -1;
         edge_cdof_marker2.SetSize(Agg_cdof_edge_->Width());
         edge_cdof_marker2 = -1;
     }
@@ -632,7 +724,9 @@ void GraphCoarsen::BuildPEdges(
 
                 id1_in_Agg1 = edge_cdof_marker[row];
                 if (Aggs.Size() == 1)
+                {
                     CM_el_loc1(id1_in_Agg1, id1_in_Agg1) += entry_value;
+                }
                 else
                 {
                     assert(Aggs.Size() == 2);
