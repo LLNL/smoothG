@@ -763,21 +763,6 @@ void GraphCoarsen::BuildPEdges(
                 vertex_target_i.GetColumnReference(j + 1, ref_vec2);
                 entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
                 mbuilder.SetBubbleLocalOffd(l, j, entry_value);
-                //%
-                /*
-                if (build_coarse_relation)
-                {
-                    mfem::DenseMatrix& CM_el_loc(CM_el[i]);
-                    CM_el_loc(l, j) = entry_value;
-                    CM_el_loc(j, l) = entry_value;
-                }
-                else
-                {
-                    CoarseM_->Set(row, col, entry_value);
-                    CoarseM_->Set(col, row, entry_value);
-                }
-                */
-                //%
             }
         }
 
@@ -793,7 +778,6 @@ void GraphCoarsen::BuildPEdges(
     }
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
-    mfem::Array<int> Aggs;
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
     mbuilder.ResetEdgeCdofMarkers(total_num_traces + bubble_counter);
 
