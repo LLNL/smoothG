@@ -243,19 +243,8 @@ void GraphCoarsen::BuildPEdges(
     const unsigned int nfaces = face_edge.Height();
     const unsigned int nedges = Agg_edge.Width();
 
-    // element matrices for hybridization
-    if (build_coarse_relation)
-    {
-        CM_el.resize(nAggs);
-    }
-
     // construct face to coarse edge dof relation table
     int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
-
-    mfem::Vector B_potential, F_potential;
-    int nlocal_fine_dofs, nlocal_coarse_dofs;
-    mfem::Array<int> local_fine_dofs;
-    mfem::Array<int> faces;
 
     int* Agg_dof_i;
     int* Agg_dof_j;
@@ -263,12 +252,17 @@ void GraphCoarsen::BuildPEdges(
     int Agg_dof_nnz = 0;
     if (build_coarse_relation)
     {
+        // element matrices for hybridization
+        CM_el.resize(nAggs);
         Agg_dof_i = new int[nAggs + 1];
         Agg_dof_i[0] = 0;
     }
 
     // compute nnz in each row (fine edge)
     int* Pedges_i = new int[nedges + 1]();
+    int nlocal_fine_dofs, nlocal_coarse_dofs;
+    mfem::Array<int> local_fine_dofs;
+    mfem::Array<int> faces;
     for (unsigned int i = 0; i < nAggs; i++)
     {
         GetTableRow(Agg_edge, i, local_fine_dofs);
@@ -308,7 +302,6 @@ void GraphCoarsen::BuildPEdges(
     int ptr, face, nlocal_verts, nlocal_traces;
     int bubble_counter = 0;
     mfem::Array<int> facecdofs, local_facecdofs;
-    mfem::DenseMatrix traces_extensions, bubbles, B_potentials, F_potentials;
 
     int ncoarse_vertexdofs = 0;
     for (unsigned int i = 0; i < nAggs; i++)
@@ -334,6 +327,8 @@ void GraphCoarsen::BuildPEdges(
 
     int row, col, cdof_loc;
     double entry_value, scale;
+    mfem::Vector B_potential, F_potential;
+    mfem::DenseMatrix traces_extensions, bubbles, B_potentials, F_potentials;
     mfem::Vector ref_vec1, ref_vec2, ref_vec3;
     mfem::Vector local_rhs_trace, local_rhs_bubble, local_sol, trace;
     mfem::Array<int> local_verts, facefdofs;
