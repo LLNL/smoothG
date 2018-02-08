@@ -773,7 +773,7 @@ void GraphCoarsen::BuildPEdges(
     mfem::Array<int> Aggs;
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
 
-    // mbuilder.ResetEdgeCdofMarkers(Agg_cdof_edge_->Width());
+    mbuilder.ResetEdgeCdofMarkers(total_num_traces + bubble_counter);
     //%
     mfem::Array<int> edge_cdof_marker2, local_Agg_edge_cdof;
     mfem::Array<int> edge_cdof_marker; // should go in mbuilder 2/8/18
