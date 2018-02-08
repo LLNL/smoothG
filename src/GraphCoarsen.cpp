@@ -254,10 +254,11 @@ int* GraphCoarsen::InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_trac
     return Pedges_i;
 }
 
+/// @todo (after some of the others), abstract class with two realizations,
+/// one for CoarseM, one for CM_el
 class CoarseMBuilder
 {
 public:
-    /// build_coarse_relation = true;
     CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
                    std::vector<mfem::DenseMatrix>& vertex_target,
                    mfem::SparseMatrix& CoarseM,
@@ -270,6 +271,7 @@ public:
     /// names of next several methods are not descriptive, we
     /// are just removing lines of code from BuildPEdges and putting
     /// it here without understanding it
+    /// @TODO some of the below can be probably be combined, into some more general (i, j, value) thing
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
 
     void SetBubbleOffd(int l, double value);
@@ -280,9 +282,7 @@ public:
     /// @todo improve method name
     void AddTrace(int l, double value);
 
-    void SetBubbleLocalDiag(int l, double value);
-
-    void SetBubbleLocalOffd(int l, int j, double value);
+    void SetBubbleLocal(int l, int j, double value);
 
     /// The methods after this could even be a different object?
     void ResetEdgeCdofMarkers(int size);
@@ -387,16 +387,7 @@ void CoarseMBuilder::AddTrace(int l, double value)
     }
 }
 
-void CoarseMBuilder::SetBubbleLocalDiag(int l, double value)
-{
-    int global_row = total_num_traces_ + bubble_counter_ + l;
-    if (build_coarse_relation_)
-        CM_el_[agg_index_](l, l) = value;
-    else
-        CoarseM_.Set(global_row, global_row, value);
-}
-
-void CoarseMBuilder::SetBubbleLocalOffd(int l, int j, double value)
+void CoarseMBuilder::SetBubbleLocal(int l, int j, double value)
 {
     if (build_coarse_relation_)
     {
@@ -555,6 +546,8 @@ void GraphCoarsen::BuildPEdges(
     int* Agg_dof_j;
     double* Agg_dof_d;
     int Agg_dof_nnz = 0;
+    // TODO: CM_el stuff in next block, and CoarseM_ = make_unique<>, should
+    //       be in some form in CoarseMBuilder
     if (build_coarse_relation)
     {
         // element matrices for hybridization
@@ -754,14 +747,14 @@ void GraphCoarsen::BuildPEdges(
             vertex_target_i.GetColumnReference(l + 1, ref_vec2);
             entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
             row = total_num_traces + bubble_counter + l;
-            mbuilder.SetBubbleLocalDiag(l, entry_value);
+            mbuilder.SetBubbleLocal(l, l, entry_value);
 
             for (int j = l + 1; j < num_bubbles_i; j++)
             {
                 col = total_num_traces + bubble_counter + j;
                 vertex_target_i.GetColumnReference(j + 1, ref_vec2);
                 entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-                mbuilder.SetBubbleLocalOffd(l, j, entry_value);
+                mbuilder.SetBubbleLocal(l, j, entry_value);
             }
         }
 
@@ -800,7 +793,6 @@ void GraphCoarsen::BuildPEdges(
 
         // store global and local coarse M
         mbuilder.RegisterTraceFace(i, face_Agg, *Agg_cdof_edge_);
-
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
         for (int l = 0; l < facecdofs.Size(); l++)
         {
@@ -822,8 +814,11 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
+    // CoarseM_ = mbuilder.GetCoarseM();
+    //%
     if (!build_coarse_relation)
         CoarseM_->Finalize(0);
+    //%
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
