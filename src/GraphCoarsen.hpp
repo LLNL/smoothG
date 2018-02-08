@@ -184,6 +184,13 @@ private:
                                  mfem::SparseMatrix& face_cdof);
 
     /**
+       Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
+    */
+    void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
+                         const mfem::SparseMatrix& Agg_vertex,
+                         const mfem::SparseMatrix& face_edge);
+
+    /**
        @brief take edge-based traces functions, extend them, find bubbles,
        and assemble into interpolation matrix.
 
