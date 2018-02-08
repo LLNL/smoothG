@@ -69,14 +69,13 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
-                           const int rescale_iter,
-                           const bool use_spectralAMGe)
+                           const int rescale_iter)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    use_spectralAMGe_(use_spectralAMGe),
+    use_spectralAMGe_(false),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter)
 {
@@ -103,16 +102,41 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const Mixed_GL_Coarsener& mgLc,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
-                           const int rescale_iter,
-                           const bool use_spectralAMGe)
+                           const int rescale_iter)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    use_spectralAMGe_(use_spectralAMGe),
+    use_spectralAMGe_(false),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter)
+{
+    MPI_Comm_rank(comm, &myid_);
+    const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
+
+    Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
+    Agg_edgedof_.MakeRef(mgLc.construct_Agg_cedgedof_table());
+
+    Init(face_edgedof, mgLc.get_CM_el(), mgL.get_edge_d_td(),
+         face_bdrattr, ess_edge_dofs);
+}
+
+HybridSolver::HybridSolver(MPI_Comm comm,
+                           const MixedMatrix& mgL,
+                           const Mixed_GL_Coarsener& mgLc,
+                           const SAAMGeParam& saamge_param,
+                           const mfem::SparseMatrix* face_bdrattr,
+                           const mfem::Array<int>* ess_edge_dofs)
+    :
+    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    comm_(comm),
+    D_(mgL.getD()),
+    W_(mgL.getW()),
+    use_spectralAMGe_(true),
+    use_w_(mgL.CheckW()),
+    rescale_iter_(0),
+    saamge_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
     const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
@@ -857,50 +881,45 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 #if SMOOTHG_USE_SAAMGE
     saamge::proc_init(comm_);
 
-    mfem::Table elem_dof_table = MatrixToTable(Agg_multiplier_);
+    mfem::Table elem_dof = MatrixToTable(Agg_multiplier_);
     mfem::SparseMatrix multiplier_Agg = smoothg::Transpose(Agg_multiplier_);
     mfem::SparseMatrix Agg_Agg = smoothg::Mult(Agg_multiplier_, multiplier_Agg);
-    auto elem_elem = MetisGraphPartitioner::getAdjacency(Agg_Agg);
-    mfem::Table elem_elem_table = MatrixToTable(elem_elem);
+    auto elem_adjacency_matrix = MetisGraphPartitioner::getAdjacency(Agg_Agg);
+    mfem::Table elem_elem = MatrixToTable(elem_adjacency_matrix);
 
     // Mark dofs that are shared by more than one processor
     saamge::SharedEntityCommunication<mfem::Vector> sec(comm_, *multiplier_d_td_);
-    std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof_table.Width(), 0);
+    std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof.Width(), 0);
     for (unsigned int i = 0; i < bdr_dofs.size(); i++)
     {
         if (sec.NumNeighbors(i) > 1)
             SA_SET_FLAGS(bdr_dofs[i], AGG_ON_PROC_IFACE_FLAG);
     }
 
-    int num_part((elem_dof_table.Size() / 36) + 1);
-    bool do_aggregates = false; // aggregation or minimal intersection set partition
+    int num_elems = elem_elem.Size();
+    std::vector<int> nparts_arr(saamge_param_.num_levels-1);
+    nparts_arr[0] = (num_elems / saamge_param_.first_coarsen_factor) + 1;
 
     auto apr = saamge::agg_create_partitioning_fine(
-        *pHybridSystem_, Agg_Agg.Width(), &elem_dof_table, &elem_elem_table,
-        nullptr, bdr_dofs.data(), &num_part, multiplier_d_td_.get(), do_aggregates);
+        *pHybridSystem_, num_elems, &elem_dof, &elem_elem, nullptr, bdr_dofs.data(),
+        &(nparts_arr[0]), multiplier_d_td_.get(), saamge_param_.do_aggregates);
 
-    // TODO: the user probably wants/needs to change these parameters
-    int nlev = 3;
-    int * nparts_arr = new int[nlev-1];
-    nparts_arr[0] = num_part;
-    nparts_arr[1] = num_part / 8 + 1;
-    int first_nu_pro = 1;
-    int nu_pro = 1;
-    int nu_relax = 2;
-    double first_theta = 1e-3;
-    double theta = 1e-3;
-    int polynomial_coarse = -1;
-    bool sparse_eigensolver = false;
-    bool correct_nulspace = false;
+    // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
+    // of nparts_arr[0] in some cases, so I define the rest of the array here
+    for (int i = 1; i < saamge_param_.num_levels-1; i++)
+        nparts_arr[i] = nparts_arr[i-1] / saamge_param_.coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (int i = 0; i < Hybrid_el_.size(); i++)
         elmats[i] = &(Hybrid_el_[i]);
     auto emp = new saamge::ElementMatrixDenseArray(*apr, elmats);
 
+    int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        nlev-1, nparts_arr, first_nu_pro, nu_pro, nu_relax, first_theta,
-        theta, polynomial_coarse, correct_nulspace, sparse_eigensolver, do_aggregates);
+        saamge_param_.num_levels-1, nparts_arr.data(), saamge_param_.first_nu_pro,
+        saamge_param_.nu_pro, saamge_param_.nu_relax, saamge_param_.first_theta,
+        saamge_param_.theta, polynomial_coarse, saamge_param_.correct_nulspace,
+        saamge_param_.use_arpack, saamge_param_.do_aggregates);
     auto ml_data = saamge::ml_produce_data(*pHybridSystem_, apr, emp, mlp);
     auto level = levels_list_get_level(ml_data->levels_list, 0);
 

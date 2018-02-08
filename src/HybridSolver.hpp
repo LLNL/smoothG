@@ -42,6 +42,28 @@
 namespace smoothg
 {
 
+/// Container for SAAMGe parameters
+struct SAAMGeParam
+{
+    int num_levels = 2;
+
+    /// Parameters for all levels
+    int nu_relax = 2;
+    bool use_arpack = false;
+    bool correct_nulspace = false;
+    bool do_aggregates = true;
+
+    /// Parameters for the first coarsening
+    int first_coarsen_factor = 64;
+    int first_nu_pro = 1;
+    double first_theta = 1e-3;
+
+    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
+    int coarsen_factor = 8;
+    int nu_pro = 1;
+    double theta = 1e-3;
+};
+
 /**
    @brief Hybridization solver for saddle point problems
 
@@ -90,38 +112,59 @@ public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
 
+       BoomerAMG is used as preconditioner.
+
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the fine level
        @param face_bdrattr Boundary edge to boundary attribute table
        @param ess_edge_dofs An array indicating essential edge dofs
-       @param spectralAMGe Whether to use spectral AMGe as the preconditioner
-              for the CG iteration (not implemented yet).
+       @param rescale_iter number of iterations to compute diagonal scaling
+              vector for hybridized system. No rescaling if set to 0.
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 const int rescale_iter = 0,
-                 const bool use_spectralAMGe = false);
+                 const int rescale_iter = 0);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
+
+       BoomerAMG is used as preconditioner.
 
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the coarse level
        @param mgLc Mixed graph Laplacian Coarsener from fine to coarse level
        @param face_bdrattr Boundary edge to boundary attribute table
        @param ess_edge_dofs An array indicating essential edge dofs
-       @param spectralAMGe Whether to use spectral AMGe as the preconditioner
-              for the CG iteration (not implemented yet).
+       @param rescale_iter number of iterations to compute diagonal scaling
+              vector for hybridized system. No rescaling if set to 0.
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const Mixed_GL_Coarsener& mgLc,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 const int rescale_iter = 0,
-                 const bool use_spectralAMGe = false);
+                 const int rescale_iter = 0);
+
+    /**
+       @brief Constructor for coarse-level hybridiziation solver.
+
+       SAAMGe is used as preconditioner.
+
+       @param comm MPI communicator
+       @param mgL Mixed matrices for the graph Laplacian in the coarse level
+       @param mgLc Mixed graph Laplacian Coarsener from fine to coarse level
+       @param saamge_param SAAMGe paramters
+       @param face_bdrattr Boundary edge to boundary attribute table
+       @param ess_edge_dofs An array indicating essential edge dofs
+    */
+    HybridSolver(MPI_Comm comm,
+                 const MixedMatrix& mgL,
+                 const Mixed_GL_Coarsener& mgLc,
+                 const SAAMGeParam& saamge_param,
+                 const mfem::SparseMatrix* face_bdrattr = nullptr,
+                 const mfem::Array<int>* ess_edge_dofs = nullptr);
 
     virtual ~HybridSolver() {}
 
@@ -243,6 +286,8 @@ private:
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
+
+    SAAMGeParam saamge_param_;
 };
 
 } // namespace smoothg
