@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
             std::cout.precision(3);
         }
 
-#if 1 //SMOOTHG_USE_SAAMGE
+#if SMOOTHG_USE_SAAMGE
         SAAMGeParam saamge_param;
         const auto hbsa_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
                                                spect_tol, max_evects, dual_target,
