@@ -900,9 +900,10 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     std::vector<int> nparts_arr(saamge_param_.num_levels - 1);
     nparts_arr[0] = (num_elems / saamge_param_.first_coarsen_factor) + 1;
 
+    bool first_do_aggregates = (saamge_param_.num_levels <= 2 && saamge_param_.do_aggregates);
     auto apr = saamge::agg_create_partitioning_fine(
                    *pHybridSystem_, num_elems, &elem_dof, &elem_elem, nullptr, bdr_dofs.data(),
-                   &(nparts_arr[0]), multiplier_d_td_.get(), saamge_param_.do_aggregates);
+                   &(nparts_arr[0]), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
     // of nparts_arr[0] in some cases, so I define the rest of the array here
