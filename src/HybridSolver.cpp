@@ -23,7 +23,10 @@
 #include "utilities.hpp"
 #include "MatrixUtilities.hpp"
 #include "MetisGraphPartitioner.hpp"
+
+#if SMOOTHG_USE_SAAMGE
 #include "saamge.hpp"
+#endif
 
 using std::unique_ptr;
 
