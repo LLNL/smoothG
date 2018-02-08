@@ -133,19 +133,14 @@ void GraphCoarsen::BuildPVertices(
 }
 
 /**
-   This may be a hack, I am a bit worried about the numbering of the coarse
-   degrees of freedom (columns of P) that parelag worries about a whole lot and
-   which I don't worry about here.
+   Construct Pedges, the projector from coarse edge degrees of freedom
+   to fine edge degrees of freedom.
 
-   In particular I think this dof numbering is a pain in parallel, and I'm only
-   thinking serial right now, so it's kinda easy.
+   @param edge_traces lives on a *face*, not an aggregate
 
-   This originally copied Parelag hFacetExtension(), especially in terms of
-   boundary/internal dof separation.
+   @param face_cdof is coarse, coarse faces and coarse dofs for the new coarse graph
 
-   edge_traces lives on a *face*, not an aggregate...
-
-   face_dof is coarse, coarse faces and coarse dofs for the new coarse graph
+   @todo this is a monster and should be refactored
 */
 void GraphCoarsen::BuildPEdges(
     std::vector<mfem::DenseMatrix>& edge_traces,
@@ -229,7 +224,9 @@ void GraphCoarsen::BuildPEdges(
             Pedges_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
     }
     for (unsigned int i = 0; i < nedges; i++)
+    {
         Pedges_i[i + 1] += Pedges_i[i];
+    }
 
     if (build_coarse_relation)
     {
@@ -515,8 +512,10 @@ void GraphCoarsen::BuildPEdges(
     CoarseD_->Finalize();
 
     if (build_coarse_relation)
-        Agg_cdof_edge_ = make_unique<mfem::SparseMatrix>(Agg_dof_i, Agg_dof_j,
-                                                         Agg_dof_d, nAggs, total_num_traces + bubble_counter);
+    {
+        Agg_cdof_edge_ = make_unique<mfem::SparseMatrix>(
+            Agg_dof_i, Agg_dof_j, Agg_dof_d, nAggs, total_num_traces + bubble_counter);
+    }
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
     mfem::Array<int> Aggs;
