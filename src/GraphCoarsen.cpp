@@ -775,8 +775,9 @@ void GraphCoarsen::BuildPEdges(
 
     mbuilder.ResetEdgeCdofMarkers(total_num_traces + bubble_counter);
     //%
+    /*
     mfem::Array<int> edge_cdof_marker2, local_Agg_edge_cdof;
-    mfem::Array<int> edge_cdof_marker; // should go in mbuilder 2/8/18
+    mfem::Array<int> edge_cdof_marker;
     if (build_coarse_relation)
     {
         edge_cdof_marker.SetSize(Agg_cdof_edge_->Width());
@@ -785,6 +786,7 @@ void GraphCoarsen::BuildPEdges(
         edge_cdof_marker2 = -1;
     }
     int Agg0, Agg1, id0_in_Agg0, id1_in_Agg0, id0_in_Agg1, id1_in_Agg1;
+    */
     //%
 
     // put traces into Pedges
@@ -806,8 +808,9 @@ void GraphCoarsen::BuildPEdges(
         }
 
         // store global and local coarse M
-        // mbuilder.RegisterTraceFace(i, face_Agg, *Agg_cdof_edge_);
+        mbuilder.RegisterTraceFace(i, face_Agg, *Agg_cdof_edge_);
         //%
+        /*
         if (build_coarse_relation)
         {
             GetTableRow(face_Agg, i, Aggs);
@@ -827,6 +830,7 @@ void GraphCoarsen::BuildPEdges(
         {
             Agg0 = Agg1 = 0;
         }
+        */
         //%
 
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
@@ -835,8 +839,9 @@ void GraphCoarsen::BuildPEdges(
             row = facecdofs[l];
             edge_traces_i.GetColumnReference(l, ref_vec1);
             entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec1);
-            // mbuilder.AddTraceDiag(row, entry_value);
+            mbuilder.AddTraceDiag(row, entry_value);
             //%
+            /*
             if (build_coarse_relation)
             {
                 mfem::DenseMatrix& CM_el_loc1(CM_el[Agg0]);
@@ -859,6 +864,7 @@ void GraphCoarsen::BuildPEdges(
             {
                 CoarseM_->Add(row, row, entry_value);
             }
+            */
             //%
 
             for (int j = l + 1; j < facecdofs.Size(); j++)
@@ -866,8 +872,9 @@ void GraphCoarsen::BuildPEdges(
                 col = facecdofs[j];
                 edge_traces_i.GetColumnReference(j, ref_vec2);
                 entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec2);
-                // mbuilder.AddTraceOffd(row, col, entry_value);
+                mbuilder.AddTraceOffd(row, col, entry_value);
                 //%
+                /*
                 if (build_coarse_relation)
                 {
                     mfem::DenseMatrix& CM_el_loc1(CM_el[Agg0]);
@@ -894,6 +901,7 @@ void GraphCoarsen::BuildPEdges(
                     CoarseM_->Add(row, col, entry_value);
                     CoarseM_->Add(col, row, entry_value);
                 }
+                */
                 //%
             }
         }
