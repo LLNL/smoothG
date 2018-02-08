@@ -861,8 +861,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     mfem::Table elem_elem_table = MatrixToTable(elem_elem);
 
     // Mark dofs that are shared by more than one processor
-    saamge::SharedEntityCommunication<mfem::Vector> sec(comm_,
-                                                        *multiplier_d_td_);
+    saamge::SharedEntityCommunication<mfem::Vector> sec(comm_, *multiplier_d_td_);
     std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof_table.Width(), 0);
     for (unsigned int i = 0; i < bdr_dofs.size(); i++)
     {
@@ -870,33 +869,39 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
             SA_SET_FLAGS(bdr_dofs[i], AGG_ON_PROC_IFACE_FLAG);
     }
 
-    int num_part((elem_dof_table.Size() / 64) + 1);
+    int num_part((elem_dof_table.Size() / 36) + 1);
+    bool do_aggregates = false; // aggregation or minimal intersection set partition
 
     auto apr = saamge::agg_create_partitioning_fine(
         *pHybridSystem_, Agg_Agg.Width(), &elem_dof_table, &elem_elem_table,
-        NULL, bdr_dofs.data(), &num_part, multiplier_d_td_.get(), 1);
+        nullptr, bdr_dofs.data(), &num_part, multiplier_d_td_.get(), do_aggregates);
 
     // TODO: the user probably wants/needs to change these parameters
-    int nlev = 2;
+    int nlev = 3;
     int * nparts_arr = new int[nlev-1];
     nparts_arr[0] = num_part;
-    int nu_pro = 2;
-    int nu_relax = 1;
-    double theta = 1e-2;
+    nparts_arr[1] = num_part / 8 + 1;
+    int first_nu_pro = 1;
+    int nu_pro = 1;
+    int nu_relax = 2;
+    double first_theta = 1e-3;
+    double theta = 1e-3;
     int polynomial_coarse = -1;
     bool sparse_eigensolver = false;
+    bool correct_nulspace = false;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (int i = 0; i < Hybrid_el_.size(); i++)
         elmats[i] = &(Hybrid_el_[i]);
     auto emp = new saamge::ElementMatrixDenseArray(*apr, elmats);
 
-    auto tg_data = saamge::tg_produce_data(
-        *pHybridSystem_, *apr, nu_pro, nu_relax, emp, theta,
-        (nu_pro > 0), polynomial_coarse, sparse_eigensolver, false);
-    saamge::tg_fillin_coarse_operator(*pHybridSystem_, tg_data, true);
+    saamge::MultilevelParameters mlp(
+        nlev-1, nparts_arr, first_nu_pro, nu_pro, nu_relax, first_theta,
+        theta, polynomial_coarse, correct_nulspace, sparse_eigensolver, do_aggregates);
+    auto ml_data = saamge::ml_produce_data(*pHybridSystem_, apr, emp, mlp);
+    auto level = levels_list_get_level(ml_data->levels_list, 0);
 
-    prec_ = make_unique<saamge::VCycleSolver>(tg_data, false);
+    prec_ = make_unique<saamge::VCycleSolver>(level->tg_data, false);
     prec_->SetOperator(*pHybridSystem_);
 #else
     if (myid_ == 0)
