@@ -74,14 +74,14 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
         if (saamge_param)
         {
             coarse_solver_ = make_unique<HybridSolver>(
-                        comm, mixed_laplacians_.back(), *coarsener_,
-                        *saamge_param, &face_bdratt, &marker);
+                                 comm, mixed_laplacians_.back(), *coarsener_,
+                                 *saamge_param, &face_bdratt, &marker);
         }
         else
         {
             coarse_solver_ = make_unique<HybridSolver>(
-                        comm, mixed_laplacians_.back(), *coarsener_,
-                        &face_bdratt, &marker);
+                                 comm, mixed_laplacians_.back(), *coarsener_,
+                                 &face_bdratt, &marker);
         }
     }
     else // L2-H1 block diagonal preconditioner
@@ -155,14 +155,14 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
         if (saamge_param)
         {
             coarse_solver_ = make_unique<HybridSolver>(
-                        comm, mixed_laplacians_.back(), *coarsener_,
-                        *saamge_param, &face_bdratt, &marker);
+                                 comm, mixed_laplacians_.back(), *coarsener_,
+                                 *saamge_param, &face_bdratt, &marker);
         }
         else
         {
             coarse_solver_ = make_unique<HybridSolver>(
-                        comm, mixed_laplacians_.back(), *coarsener_,
-                        &face_bdratt, &marker);
+                                 comm, mixed_laplacians_.back(), *coarsener_,
+                                 &face_bdratt, &marker);
         }
     }
     else // L2-H1 block diagonal preconditioner

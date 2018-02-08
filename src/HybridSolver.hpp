@@ -226,7 +226,7 @@ protected:
 
     void AssembleHybridSystem(
         const std::vector<mfem::Vector>& M_el,
-            const mfem::Array<int>& j_multiplier_edgedof);
+        const mfem::Array<int>& j_multiplier_edgedof);
 
     // Compute scaling vector and the scaled hybridized system
     void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);

@@ -145,8 +145,8 @@ int main(int argc, char* argv[])
                                                  scaled_dual, energy_dual, !use_hybridization);
 
         const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                                spect_tol, max_evects, dual_target,
-                                                scaled_dual, energy_dual, use_hybridization);
+                                             spect_tol, max_evects, dual_target,
+                                             scaled_dual, energy_dual, use_hybridization);
 
         const auto rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 

@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
 
     // Construct vertex_edge table in mfem::SparseMatrix format
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                                               : pmesh->ElementToFaceTable();
+                              : pmesh->ElementToFaceTable();
     mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration

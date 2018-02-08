@@ -897,17 +897,17 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     }
 
     int num_elems = elem_elem.Size();
-    std::vector<int> nparts_arr(saamge_param_.num_levels-1);
+    std::vector<int> nparts_arr(saamge_param_.num_levels - 1);
     nparts_arr[0] = (num_elems / saamge_param_.first_coarsen_factor) + 1;
 
     auto apr = saamge::agg_create_partitioning_fine(
-        *pHybridSystem_, num_elems, &elem_dof, &elem_elem, nullptr, bdr_dofs.data(),
-        &(nparts_arr[0]), multiplier_d_td_.get(), saamge_param_.do_aggregates);
+                   *pHybridSystem_, num_elems, &elem_dof, &elem_elem, nullptr, bdr_dofs.data(),
+                   &(nparts_arr[0]), multiplier_d_td_.get(), saamge_param_.do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
     // of nparts_arr[0] in some cases, so I define the rest of the array here
-    for (int i = 1; i < saamge_param_.num_levels-1; i++)
-        nparts_arr[i] = nparts_arr[i-1] / saamge_param_.coarsen_factor + 1;
+    for (int i = 1; i < saamge_param_.num_levels - 1; i++)
+        nparts_arr[i] = nparts_arr[i - 1] / saamge_param_.coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (int i = 0; i < Hybrid_el_.size(); i++)
@@ -916,7 +916,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        saamge_param_.num_levels-1, nparts_arr.data(), saamge_param_.first_nu_pro,
+        saamge_param_.num_levels - 1, nparts_arr.data(), saamge_param_.first_nu_pro,
         saamge_param_.nu_pro, saamge_param_.nu_relax, saamge_param_.first_theta,
         saamge_param_.theta, polynomial_coarse, saamge_param_.correct_nulspace,
         saamge_param_.use_arpack, saamge_param_.do_aggregates);
@@ -927,7 +927,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     prec_->SetOperator(*pHybridSystem_);
 #else
     if (myid_ == 0)
-        std::cout<<"SAAMGE needs to be enabled! \n";
+        std::cout << "SAAMGE needs to be enabled! \n";
     assert(!use_spectralAMGe_);
 #endif
 }
