@@ -576,7 +576,6 @@ void GraphCoarsen::BuildPEdges(
                         F_potentials.GetColumnReference(l, F_potential);
                         DtransferT.Mult(F_potential, ref_vec3);
                         entry_value = smoothg::InnerProduct(ref_vec3, trace);
-                        // col = local_facecdofs[l]; // 2/8/18
                         mbuilder.AddTrace(local_facecdofs[l], entry_value); // 2/8/18
                     }
                 }
@@ -648,8 +647,6 @@ void GraphCoarsen::BuildPEdges(
 
     CoarseD_->Finalize();
 
-    // good place to split up this method? maybe not?
-
     if (build_coarse_relation)
     {
         Agg_cdof_edge_ = make_unique<mfem::SparseMatrix>(
@@ -669,7 +666,7 @@ void GraphCoarsen::BuildPEdges(
         edge_cdof_marker2.SetSize(Agg_cdof_edge_->Width());
         edge_cdof_marker2 = -1;
     }
-    int Agg1, Agg2, id1_in_Agg1, id2_in_Agg1, id1_in_Agg2, id2_in_Agg2;
+    int Agg0, Agg1, id0_in_Agg0, id1_in_Agg0, id0_in_Agg1, id1_in_Agg1;
 
     // put traces into Pedges
     for (unsigned int i = 0; i < nfaces; i++)
@@ -693,21 +690,21 @@ void GraphCoarsen::BuildPEdges(
         if (build_coarse_relation)
         {
             GetTableRow(face_Agg, i, Aggs);
-            Agg1 = Aggs[0];
-            GetTableRow(*Agg_cdof_edge_, Agg1, local_Agg_edge_cdof);
+            Agg0 = Aggs[0];
+            GetTableRow(*Agg_cdof_edge_, Agg0, local_Agg_edge_cdof);
             for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
                 edge_cdof_marker[local_Agg_edge_cdof[k]] = k;
             if (Aggs.Size() == 2)
             {
-                Agg2 = Aggs[1];
-                GetTableRow(*Agg_cdof_edge_, Agg2, local_Agg_edge_cdof);
+                Agg1 = Aggs[1];
+                GetTableRow(*Agg_cdof_edge_, Agg1, local_Agg_edge_cdof);
                 for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
                     edge_cdof_marker2[local_Agg_edge_cdof[k]] = k;
             }
         }
         else
         {
-            Agg1 = Agg2 = 0;
+            Agg0 = Agg1 = 0;
         }
 
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
@@ -719,20 +716,20 @@ void GraphCoarsen::BuildPEdges(
 
             if (build_coarse_relation)
             {
-                mfem::DenseMatrix& CM_el_loc1(CM_el[Agg1]);
-                mfem::DenseMatrix& CM_el_loc2(CM_el[Agg2]);
+                mfem::DenseMatrix& CM_el_loc1(CM_el[Agg0]);
+                mfem::DenseMatrix& CM_el_loc2(CM_el[Agg1]);
 
-                id1_in_Agg1 = edge_cdof_marker[row];
+                id0_in_Agg0 = edge_cdof_marker[row];
                 if (Aggs.Size() == 1)
                 {
-                    CM_el_loc1(id1_in_Agg1, id1_in_Agg1) += entry_value;
+                    CM_el_loc1(id0_in_Agg0, id0_in_Agg0) += entry_value;
                 }
                 else
                 {
                     assert(Aggs.Size() == 2);
-                    CM_el_loc1(id1_in_Agg1, id1_in_Agg1) += entry_value / 2.;
-                    id1_in_Agg2 = edge_cdof_marker2[row];
-                    CM_el_loc2(id1_in_Agg2, id1_in_Agg2) += entry_value / 2.;
+                    CM_el_loc1(id0_in_Agg0, id0_in_Agg0) += entry_value / 2.;
+                    id0_in_Agg1 = edge_cdof_marker2[row];
+                    CM_el_loc2(id0_in_Agg1, id0_in_Agg1) += entry_value / 2.;
                 }
             }
             else
@@ -748,23 +745,23 @@ void GraphCoarsen::BuildPEdges(
 
                 if (build_coarse_relation)
                 {
-                    mfem::DenseMatrix& CM_el_loc1(CM_el[Agg1]);
-                    mfem::DenseMatrix& CM_el_loc2(CM_el[Agg2]);
+                    mfem::DenseMatrix& CM_el_loc1(CM_el[Agg0]);
+                    mfem::DenseMatrix& CM_el_loc2(CM_el[Agg1]);
 
-                    id2_in_Agg1 = edge_cdof_marker[col];
+                    id1_in_Agg0 = edge_cdof_marker[col];
                     if (Aggs.Size() == 1)
                     {
-                        CM_el_loc1(id1_in_Agg1, id2_in_Agg1) += entry_value;
-                        CM_el_loc1(id2_in_Agg1, id1_in_Agg1) += entry_value;
+                        CM_el_loc1(id0_in_Agg0, id1_in_Agg0) += entry_value;
+                        CM_el_loc1(id1_in_Agg0, id0_in_Agg0) += entry_value;
                     }
                     else
                     {
                         assert(Aggs.Size() == 2);
-                        CM_el_loc1(id1_in_Agg1, id2_in_Agg1) += entry_value / 2.;
-                        CM_el_loc1(id2_in_Agg1, id1_in_Agg1) += entry_value / 2.;
-                        id2_in_Agg2 = edge_cdof_marker2[col];
-                        CM_el_loc2(id1_in_Agg2, id2_in_Agg2) += entry_value / 2.;
-                        CM_el_loc2(id2_in_Agg2, id1_in_Agg2) += entry_value / 2.;
+                        CM_el_loc1(id0_in_Agg0, id1_in_Agg0) += entry_value / 2.;
+                        CM_el_loc1(id1_in_Agg0, id0_in_Agg0) += entry_value / 2.;
+                        id1_in_Agg1 = edge_cdof_marker2[col];
+                        CM_el_loc2(id0_in_Agg1, id1_in_Agg1) += entry_value / 2.;
+                        CM_el_loc2(id1_in_Agg1, id0_in_Agg1) += entry_value / 2.;
                     }
                 }
                 else
