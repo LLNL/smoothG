@@ -203,6 +203,19 @@ private:
                              const mfem::SparseMatrix& Agg_face);
 
     /**
+       @brief takes the column column of potentials, multiplies
+       DtransferT by it, and returns the inner product with trace
+
+       helper for BuildPEdges
+
+       this is an odd routine, but it is used three times, so...
+    */
+    double DTTraceProduct(const mfem::SparseMatrix& DtransferT,
+                          mfem::DenseMatrix& potentials,
+                          int column,
+                          const mfem::Vector& trace);
+
+    /**
        @brief take edge-based traces functions, extend them, find bubbles,
        and assemble into interpolation matrix.
 
