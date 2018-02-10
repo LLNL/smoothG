@@ -60,6 +60,43 @@ void GraphUpscale::Init(const linalgcpp::SparseMatrix<int>& vertex_edge,
               const std::vector<double>& weight,
               double spect_tol, int max_evects)
 {
+    DistributeGraph(vertex_edge, global_partitioning);
+
+}
+
+void GraphUpscale::DistributeGraph(const linalgcpp::SparseMatrix<int>& vertex_edge,
+                                   const std::vector<int>& global_part)
+{
+    int num_procs;
+    MPI_Comm_size(comm_, &num_procs);
+
+    int num_aggs_global = *std::max(std::begin(global_part), std::end(global_part)) + 1;
+
+    SparseMatrix agg_vert = MakeAggVertex(global_part);
+    SparseMatrix proc_agg = MakeProcAgg(num_procs, num_aggs_global);
+
+    SparseMatrix proc_vert = proc_agg.Mult(agg_vert);
+    SparseMatrix proc_edge = proc_vert.Mult(vertex_edge);
+
+    // TODO(gelever1): Check if this sort has to go before the transpose
+    proc_edge.SortIndices();
+
+    vertex_map_ = proc_vert.GetIndices(myid_);
+    edge_map_ = proc_edge.GetIndices(myid_);
+
+    vertex_edge_local_ = vertex_edge.GetSubMatrix(vertex_map_, edge_map_);
+
+    int nvertices_local = proc_vert.RowSize(myid_);
+
+    part_local_.resize(nvertices_local);
+    const int agg_begin = proc_agg.GetIndptr()[myid_];
+
+    for (int i = 0; i < nvertices_local; ++i)
+    {
+        part_local_[i] = global_part[vertex_map_[i]] - agg_begin;
+    }
+
+    edge_true_edge_ = MakeEdgeTrueEdge(comm_, proc_edge, edge_map_);
 
 }
 

@@ -26,6 +26,7 @@
 #include "partition.hpp"
 
 #include "Upscale.hpp"
+#include "Utilities.hpp"
 
 namespace smoothg
 {
@@ -40,6 +41,7 @@ class GraphUpscale : public Upscale
     using VectorView = linalgcpp::VectorView<double>;
     using BlockVector = linalgcpp::BlockVector<double>;
     using SparseMatrix = linalgcpp::SparseMatrix<int>;
+    using ParMatrix = parlinalgcpp::ParMatrix;
 
 public:
     /**
@@ -102,6 +104,9 @@ private:
               const std::vector<double>& weight_global,
               double spect_tol, int max_evects);
 
+    void DistributeGraph(const linalgcpp::SparseMatrix<int>& vertex_edge,
+              const std::vector<int>& global_partitioning);
+
     Vector ReadVector(const std::string& filename, int global_size,
                                          const std::vector<int>& local_to_global) const;
 
@@ -112,6 +117,14 @@ private:
 
     const int global_edges_;
     const int global_vertices_;
+
+    // ParGraph Stuff
+    std::vector<int> edge_map_;
+    std::vector<int> vertex_map_;
+    std::vector<int> part_local_;
+
+    SparseMatrix vertex_edge_local_;
+    ParMatrix edge_true_edge_;
 };
 
 } // namespace smoothg
