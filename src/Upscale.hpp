@@ -185,6 +185,7 @@ protected:
     Upscale(MPI_Comm comm, int size)
         : size_(size), comm_(comm), setup_time_(0.0)
     {
+        MPI_Comm_size(comm_, &num_procs_);
         MPI_Comm_rank(comm_, &myid_);
     }
 
@@ -203,6 +204,7 @@ protected:
 
     MPI_Comm comm_;
     int myid_;
+    int num_procs_;
 
     double setup_time_;
 

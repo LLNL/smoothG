@@ -61,19 +61,17 @@ void GraphUpscale::Init(const linalgcpp::SparseMatrix<int>& vertex_edge,
               double spect_tol, int max_evects)
 {
     DistributeGraph(vertex_edge, global_partitioning);
+    MakeFineLevel(weight);
 
 }
 
 void GraphUpscale::DistributeGraph(const linalgcpp::SparseMatrix<int>& vertex_edge,
                                    const std::vector<int>& global_part)
 {
-    int num_procs;
-    MPI_Comm_size(comm_, &num_procs);
-
     int num_aggs_global = *std::max(std::begin(global_part), std::end(global_part)) + 1;
 
     SparseMatrix agg_vert = MakeAggVertex(global_part);
-    SparseMatrix proc_agg = MakeProcAgg(num_procs, num_aggs_global);
+    SparseMatrix proc_agg = MakeProcAgg(num_procs_, num_aggs_global);
 
     SparseMatrix proc_vert = proc_agg.Mult(agg_vert);
     SparseMatrix proc_edge = proc_vert.Mult(vertex_edge);
@@ -97,7 +95,84 @@ void GraphUpscale::DistributeGraph(const linalgcpp::SparseMatrix<int>& vertex_ed
     }
 
     edge_true_edge_ = MakeEdgeTrueEdge(comm_, proc_edge, edge_map_);
+}
 
+void GraphUpscale::MakeFineLevel(const std::vector<double>& global_weight)
+{
+    int size = edge_map_.size();
+
+    std::vector<double> local_weight(size);
+
+    if (global_weight.size() == edge_true_edge_.Cols())
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            assert(std::fabs(global_weight[edge_map_[i]]) > 1e-12);
+            local_weight[i] = 1.0 / std::fabs(global_weight[edge_map_[i]]);
+        }
+    }
+    else
+    {
+        std::fill(std::begin(local_weight), std::end(local_weight), 1.0);
+    }
+
+    ParMatrix edge_true_edge_T = edge_true_edge_.Transpose();
+    ParMatrix edge_edge = edge_true_edge_.Mult(edge_true_edge_T);
+
+    const auto& offd = edge_edge.GetOffd();
+
+    assert(offd.Rows() == local_weight.size());
+
+    for (int i = 0; i < size; ++i)
+    {
+        if (offd.RowSize(i))
+        {
+            local_weight[i] /= 2.0;
+        }
+    }
+
+    auto DT = vertex_edge_local_.Transpose<double>();
+    const auto& indptr(DT.GetIndptr());
+    auto& data(DT.GetData());
+
+    int num_vertices = DT.Cols();
+    int num_edges = DT.Rows();
+
+    const auto& edge_diag = edge_true_edge_.GetDiag();
+
+    for (int i = 0; i < num_edges; i++)
+    {
+        const int row_size = DT.RowSize(i);
+        assert(row_size == 1 || row_size == 2);
+
+        data[indptr[i]] = 1.;
+
+        if (row_size == 2)
+        {
+            data[indptr[i] + 1] = -1.;
+        }
+        else if (edge_diag.RowSize(i) == 0)
+        {
+            assert(row_size == 1);
+            data[indptr[i]] = -1.;
+        }
+    }
+
+    linalgcpp::SparseMatrix<double> M(std::move(local_weight));
+    linalgcpp::SparseMatrix<double> D(DT.Transpose());
+    linalgcpp::SparseMatrix<double> W(std::vector<double>(num_vertices, 0.0));
+
+    std::vector<size_t> offsets(3);
+    offsets[0] = 0;
+    offsets[1] = num_edges;
+    offsets[2] = num_edges + num_vertices;
+
+    fine_level_ = BlockMatrix(offsets);
+
+    fine_level_.SetBlock(0, 0, std::move(M));
+    fine_level_.SetBlock(0, 1, std::move(DT));
+    fine_level_.SetBlock(1, 0, std::move(D));
+    fine_level_.SetBlock(1, 1, std::move(W));
 }
 
 } // namespace smoothg
