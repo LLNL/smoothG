@@ -610,32 +610,8 @@ void GraphCoarsen::BuildPEdges(
     // construct face to coarse edge dof relation table
     int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
 
-    // Agg_cdof_edge_Builder agg_dof_builder(edge_traces, vertex_target, Agg_face,
-    //                                    build_coarse_relation);
-    //%
-    int* Agg_dof_i;
-    int* Agg_dof_j;
-    double* Agg_dof_d;
-    int Agg_dof_nnz = 0;
-    if (build_coarse_relation)
-    {
-        Agg_dof_i = new int[nAggs + 1];
-        Agg_dof_i[0] = 0;
-
-        mfem::Array<int> faces; // this is repetitive of InitializePEdgesNNZ
-        for (unsigned int i = 0; i < nAggs; i++)
-        {
-            int nlocal_coarse_dofs = vertex_target[i].Width() - 1;
-            GetTableRow(Agg_face, i, faces);
-            for (int j = 0; j < faces.Size(); ++j)
-                nlocal_coarse_dofs += edge_traces[faces[j]].Width();
-            Agg_dof_i[i + 1] = Agg_dof_i[i] + nlocal_coarse_dofs;
-        }
-        Agg_dof_j = new int[Agg_dof_i[nAggs]];
-        Agg_dof_d = new double[Agg_dof_i[nAggs]];
-        std::fill(Agg_dof_d, Agg_dof_d + Agg_dof_i[nAggs], 1.);
-    }
-    //%
+    Agg_cdof_edge_Builder agg_dof_builder(edge_traces, vertex_target, Agg_face,
+                                        build_coarse_relation);
 
     int* Pedges_i = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
                                         face_edge, Agg_face);
@@ -655,7 +631,6 @@ void GraphCoarsen::BuildPEdges(
                             CM_el, Agg_face, total_num_traces,
                             ncoarse_vertexdofs, build_coarse_relation);
 
-    int row, col;
     int bubble_counter = 0;
     double entry_value;
     mfem::Vector B_potential, F_potential;
@@ -695,11 +670,7 @@ void GraphCoarsen::BuildPEdges(
             bubbles.GetColumnReference(j, local_sol);
             B_potentials.GetColumnReference(j, B_potential);
             solver.Mult(local_rhs_bubble, local_sol, B_potential);
-            // agg_dof_builder.Register(total_num_traces + bubble_counter + j);
-            //%
-            if (build_coarse_relation)
-                Agg_dof_j[Agg_dof_nnz++] = total_num_traces + bubble_counter + j;
-            //%
+            agg_dof_builder.Register(total_num_traces + bubble_counter + j);
         }
 
         // ---
@@ -727,7 +698,7 @@ void GraphCoarsen::BuildPEdges(
             int num_traces = edge_traces_f.Width();
             for (int k = 0; k < num_traces; k++)
             {
-                row = local_facecdofs[nlocal_traces] = facecdofs[k];
+                const int row = local_facecdofs[nlocal_traces] = facecdofs[k];
                 const int cdof_loc = num_bubbles_i + nlocal_traces;
                 mbuilder.RegisterRow(i, row, cdof_loc, bubble_counter);
                 edge_traces_f.GetColumnReference(k, trace);
@@ -764,13 +735,8 @@ void GraphCoarsen::BuildPEdges(
                         mbuilder.AddTrace(local_facecdofs[l], entry_value);
                     }
                 }
-
                 nlocal_traces++;
-                // agg_dof_builder.Register(row);
-                //%
-                if (build_coarse_relation)
-                    Agg_dof_j[Agg_dof_nnz++] = row;
-                //%
+                agg_dof_builder.Register(row);
             }
         }
         assert(nlocal_traces == traces_extensions.Width());
@@ -811,26 +777,17 @@ void GraphCoarsen::BuildPEdges(
 
             for (int j = l + 1; j < num_bubbles_i; j++)
             {
-                col = total_num_traces + bubble_counter + j;
                 vertex_target_i.GetColumnReference(j + 1, ref_vec2);
                 entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
                 mbuilder.SetBubbleLocal(l, j, entry_value);
             }
         }
-
         bubble_counter += num_bubbles_i;
     }
 
     CoarseD_->Finalize();
 
-    // Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
-    //%
-    if (build_coarse_relation)
-    {
-        Agg_cdof_edge_ = make_unique<mfem::SparseMatrix>(
-            Agg_dof_i, Agg_dof_j, Agg_dof_d, nAggs, total_num_traces + bubble_counter);
-    }
-    //%
+    Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
@@ -859,14 +816,14 @@ void GraphCoarsen::BuildPEdges(
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
         for (int l = 0; l < facecdofs.Size(); l++)
         {
-            row = facecdofs[l];
+            const int row = facecdofs[l];
             edge_traces_i.GetColumnReference(l, ref_vec1);
             entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec1);
             mbuilder.AddTraceAcross(row, row, entry_value);
 
             for (int j = l + 1; j < facecdofs.Size(); j++)
             {
-                col = facecdofs[j];
+                const int col = facecdofs[j];
                 edge_traces_i.GetColumnReference(j, ref_vec2);
                 entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec2);
                 mbuilder.AddTraceAcross(row, col, entry_value);
