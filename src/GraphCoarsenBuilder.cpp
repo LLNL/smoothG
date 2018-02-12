@@ -52,8 +52,8 @@ AssembleMBuilder::AssembleMBuilder(
 {
     const unsigned int nAggs = vertex_target.size();
     CoarseM_ = make_unique<mfem::SparseMatrix>(
-        total_num_traces + ncoarse_vertexdofs - nAggs,
-        total_num_traces + ncoarse_vertexdofs - nAggs);
+                   total_num_traces + ncoarse_vertexdofs - nAggs,
+                   total_num_traces + ncoarse_vertexdofs - nAggs);
 }
 
 void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
@@ -137,7 +137,7 @@ void AssembleMBuilder::ResetEdgeCdofMarkers(int size)
 }
 
 void ElementMBuilder::RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                                       const mfem::SparseMatrix& Agg_cdof_edge)
+                                        const mfem::SparseMatrix& Agg_cdof_edge)
 {
     mfem::Array<int> Aggs;
     mfem::Array<int> local_Agg_edge_cdof;
@@ -245,7 +245,7 @@ std::unique_ptr<mfem::SparseMatrix> Agg_cdof_edge_Builder::GetAgg_cdof_edge(int 
     if (build_coarse_relation_)
     {
         return make_unique<mfem::SparseMatrix>(
-            Agg_dof_i_, Agg_dof_j_, Agg_dof_d_, rows, cols);
+                   Agg_dof_i_, Agg_dof_j_, Agg_dof_d_, rows, cols);
     }
     return std::unique_ptr<mfem::SparseMatrix>(nullptr);
 }

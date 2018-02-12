@@ -234,7 +234,7 @@ private:
 
        @param[in] edge_trace lives on faces, not aggregates
        @param[in] vertex_target usually eigenvectors, lives on aggregate
-       @param[out] face_cdof is out, the face_cdof relation on coarse mesh 
+       @param[out] face_cdof is out, the face_cdof relation on coarse mesh
                    (coarse faces, coarse dofs)
        @param[out] Pedges the interpolation
        @param[out] CM_el the coarse element mass matrices in case build_coarse_relation is true

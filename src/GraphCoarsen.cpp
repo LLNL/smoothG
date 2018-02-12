@@ -281,7 +281,7 @@ void GraphCoarsen::BuildPEdges(
     int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
 
     Agg_cdof_edge_Builder agg_dof_builder(edge_traces, vertex_target, Agg_face,
-                                        build_coarse_relation);
+                                          build_coarse_relation);
 
     int* Pedges_i = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
                                         face_edge, Agg_face);
@@ -301,13 +301,13 @@ void GraphCoarsen::BuildPEdges(
     if (build_coarse_relation)
     {
         mbuilder_ptr = make_unique<ElementMBuilder>(
-            edge_traces, vertex_target, CM_el, Agg_face, total_num_traces,
-            ncoarse_vertexdofs);
+                           edge_traces, vertex_target, CM_el, Agg_face, total_num_traces,
+                           ncoarse_vertexdofs);
     }
     else
     {
         mbuilder_ptr = make_unique<AssembleMBuilder>(
-            vertex_target, total_num_traces, ncoarse_vertexdofs);
+                           vertex_target, total_num_traces, ncoarse_vertexdofs);
     }
     CoarseMBuilder& mbuilder = *mbuilder_ptr;
 

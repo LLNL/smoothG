@@ -53,7 +53,7 @@ public:
     virtual void ResetEdgeCdofMarkers(int size) = 0;
 
     virtual void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                           const mfem::SparseMatrix& Agg_cdof_edge) = 0;
+                                   const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
     /// Deal with shared dofs for trace
     virtual void AddTraceAcross(int row, int col, double value) = 0;
