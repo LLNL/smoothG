@@ -51,7 +51,7 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
-       @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
               coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeUpscale(MPI_Comm comm,
@@ -64,7 +64,7 @@ public:
                         double spect_tol = 0.001, int max_evects = 4,
                         bool dual_target = false, bool scaled_dual = false,
                         bool energy_dual = false, bool hybridization = false,
-                        SAAMGeParam* saamge_param = nullptr);
+                        const SAAMGeParam* saamge_param = nullptr);
 
     /**
        @brief Constructor with W block specified
@@ -79,7 +79,7 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
-       @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
               coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeUpscale(MPI_Comm comm,
@@ -93,7 +93,7 @@ public:
                         double spect_tol = 0.001, int max_evects = 4,
                         bool dual_target = false, bool scaled_dual = false,
                         bool energy_dual = false, bool hybridization = false,
-                        SAAMGeParam* saamge_param = nullptr);
+                        const SAAMGeParam* saamge_param = nullptr);
 
     void MakeFineSolver(const mfem::Array<int>& marker) const;
 

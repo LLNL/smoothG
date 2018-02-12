@@ -34,7 +34,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          double spect_tol, int max_evects,
                                          bool dual_target, bool scaled_dual,
                                          bool energy_dual, bool hybridization,
-                                         SAAMGeParam* saamge_param)
+                                         const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)
@@ -71,18 +71,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     if (hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
-        if (saamge_param)
-        {
-            coarse_solver_ = make_unique<HybridSolver>(
-                                 comm, mixed_laplacians_.back(), *coarsener_,
-                                 *saamge_param, &face_bdratt, &marker);
-        }
-        else
-        {
-            coarse_solver_ = make_unique<HybridSolver>(
-                                 comm, mixed_laplacians_.back(), *coarsener_,
-                                 &face_bdratt, &marker);
-        }
+        coarse_solver_ = make_unique<HybridSolver>(
+                    comm, mixed_laplacians_.back(), *coarsener_,
+                    &face_bdratt, &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -115,7 +106,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          double spect_tol, int max_evects,
                                          bool dual_target, bool scaled_dual,
                                          bool energy_dual, bool hybridization,
-                                         SAAMGeParam* saamge_param)
+                                         const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)
@@ -152,18 +143,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     if (hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
-        if (saamge_param)
-        {
-            coarse_solver_ = make_unique<HybridSolver>(
-                                 comm, mixed_laplacians_.back(), *coarsener_,
-                                 *saamge_param, &face_bdratt, &marker);
-        }
-        else
-        {
-            coarse_solver_ = make_unique<HybridSolver>(
-                                 comm, mixed_laplacians_.back(), *coarsener_,
-                                 &face_bdratt, &marker);
-        }
+        coarse_solver_ = make_unique<HybridSolver>(
+                    comm, mixed_laplacians_.back(), *coarsener_,
+                    &face_bdratt, &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {

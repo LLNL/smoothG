@@ -27,7 +27,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
                            const mfem::Array<int>& global_partitioning,
                            double spect_tol, int max_evects, bool dual_target,
                            bool scaled_dual, bool energy_dual, bool hybridization,
-                           const mfem::Vector& global_weight, SAAMGeParam* saamge_param)
+                           const mfem::Vector& global_weight, const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
@@ -39,7 +39,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
                            int coarse_factor, double spect_tol, int max_evects,
                            bool dual_target, bool scaled_dual, bool energy_dual,
                            bool hybridization, const mfem::Vector& weight,
-                           SAAMGeParam* saamge_param)
+                           const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
@@ -69,7 +69,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
                         const mfem::Vector& global_weight,
                         double spect_tol, int max_evects,
                         bool dual_target, bool scaled_dual, bool energy_dual,
-                        SAAMGeParam* saamge_param)
+                        const SAAMGeParam* saamge_param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -108,16 +108,8 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     if (hybridization_)
     {
-        if (saamge_param)
-        {
-            coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(),
-                                                       *coarsener_, *saamge_param);
-        }
-        else
-        {
-            coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(),
-                                                       *coarsener_);
-        }
+        coarse_solver_ = make_unique<HybridSolver>(
+                    comm_, GetCoarseMatrix(), *coarsener_, nullptr, nullptr, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {

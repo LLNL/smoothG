@@ -69,15 +69,17 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
-                           const int rescale_iter)
+                           const int rescale_iter,
+                           const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    use_spectralAMGe_(false),
+    use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
-    rescale_iter_(rescale_iter)
+    rescale_iter_(rescale_iter),
+    saamge_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
 
@@ -102,40 +104,16 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const Mixed_GL_Coarsener& mgLc,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
-                           const int rescale_iter)
+                           const int rescale_iter,
+                           const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    use_spectralAMGe_(false),
+    use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
-    rescale_iter_(rescale_iter)
-{
-    MPI_Comm_rank(comm, &myid_);
-    const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
-
-    Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
-    Agg_edgedof_.MakeRef(mgLc.construct_Agg_cedgedof_table());
-
-    Init(face_edgedof, mgLc.get_CM_el(), mgL.get_edge_d_td(),
-         face_bdrattr, ess_edge_dofs);
-}
-
-HybridSolver::HybridSolver(MPI_Comm comm,
-                           const MixedMatrix& mgL,
-                           const Mixed_GL_Coarsener& mgLc,
-                           const SAAMGeParam& saamge_param,
-                           const mfem::SparseMatrix* face_bdrattr,
-                           const mfem::Array<int>* ess_edge_dofs)
-    :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
-    comm_(comm),
-    D_(mgL.getD()),
-    W_(mgL.getW()),
-    use_spectralAMGe_(true),
-    use_w_(mgL.CheckW()),
-    rescale_iter_(0),
+    rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
@@ -897,18 +875,18 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     }
 
     int num_elems = elem_elem.Size();
-    std::vector<int> nparts_arr(saamge_param_.num_levels - 1);
-    nparts_arr[0] = (num_elems / saamge_param_.first_coarsen_factor) + 1;
+    std::vector<int> nparts_arr(saamge_param_->num_levels - 1);
+    nparts_arr[0] = (num_elems / saamge_param_->first_coarsen_factor) + 1;
 
-    bool first_do_aggregates = (saamge_param_.num_levels <= 2 && saamge_param_.do_aggregates);
+    bool first_do_aggregates = (saamge_param_->num_levels <= 2 && saamge_param_->do_aggregates);
     auto apr = saamge::agg_create_partitioning_fine(
                    *pHybridSystem_, num_elems, &elem_dof, &elem_elem, nullptr, bdr_dofs.data(),
                    &(nparts_arr[0]), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
     // of nparts_arr[0] in some cases, so I define the rest of the array here
-    for (int i = 1; i < saamge_param_.num_levels - 1; i++)
-        nparts_arr[i] = nparts_arr[i - 1] / saamge_param_.coarsen_factor + 1;
+    for (int i = 1; i < saamge_param_->num_levels - 1; i++)
+        nparts_arr[i] = nparts_arr[i - 1] / saamge_param_->coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (unsigned int i = 0; i < Hybrid_el_.size(); i++)
@@ -917,10 +895,10 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        saamge_param_.num_levels - 1, nparts_arr.data(), saamge_param_.first_nu_pro,
-        saamge_param_.nu_pro, saamge_param_.nu_relax, saamge_param_.first_theta,
-        saamge_param_.theta, polynomial_coarse, saamge_param_.correct_nulspace,
-        saamge_param_.use_arpack, saamge_param_.do_aggregates);
+        saamge_param_->num_levels - 1, nparts_arr.data(), saamge_param_->first_nu_pro,
+        saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
+        saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
+        saamge_param_->use_arpack, saamge_param_->do_aggregates);
     auto ml_data = saamge::ml_produce_data(*pHybridSystem_, apr, emp, mlp);
     auto level = levels_list_get_level(ml_data->levels_list, 0);
 
