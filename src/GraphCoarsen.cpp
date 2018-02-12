@@ -136,9 +136,9 @@ void GraphCoarsen::BuildPVertices(
 /**
    Subroutine called from BuildPEdges
 
-   @param (in) nfaces number of faces
-   @param (in) edge_traces lives on a face
-   @param (out) face_cdof the coarseface_coarsedof relation table
+   @param[in] nfaces number of faces
+   @param[in] edge_traces lives on a face
+   @param[out] face_cdof the coarseface_coarsedof relation table
 
    @return total_num_traces on all faces
 */

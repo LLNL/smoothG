@@ -196,7 +196,7 @@ private:
        Figure out NNZ for each row of PEdges, which is to say, for each fine
        edge dof, figure out how many coarse dofs it gets interpolated from.
 
-       @returns the I array of PEdges for CSR format.
+       @return the I array of PEdges for CSR format.
     */
     int* InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_traces,
                              std::vector<mfem::DenseMatrix>& vertex_target,
