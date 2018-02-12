@@ -28,20 +28,13 @@
 namespace smoothg
 {
 
-/// @todo (after some of the others), abstract class with two realizations,
-/// one for CoarseM, one for CM_el
+/**
+   Abstract base class to help building the coarse mass matrix in
+   GraphCoarsen::BuildPEdges()
+*/
 class CoarseMBuilder
 {
 public:
-    /*
-    CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
-                   std::vector<mfem::DenseMatrix>& vertex_target,
-                   std::vector<mfem::DenseMatrix>& CM_el,
-                   const mfem::SparseMatrix& Agg_face,
-                   int total_num_traces, int ncoarse_vertexdofs,
-                   bool build_coarse_relation);
-    */
-
     virtual ~CoarseMBuilder() {}
 
     /// The names of the next several methods are not that descriptive or
