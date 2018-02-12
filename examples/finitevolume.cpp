@@ -81,10 +81,18 @@ int main(int argc, char* argv[])
     bool hybridization = false;
     args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
                    "--no-hybridization", "Enable hybridization.");
+    bool dual_target = false;
+    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
+    bool scaled_dual = false;
+    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
+    bool energy_dual = false;
+    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+                   "--no-energy-dual", "Use energy matrix in trace generation.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
-
     args.Parse();
     if (!args.Good())
     {
@@ -120,7 +128,6 @@ int main(int argc, char* argv[])
 
     mfem::Array<int> ess_attr;
     mfem::Vector weight;
-    mfem::Vector rhs_sigma_fine;
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
@@ -195,9 +202,9 @@ int main(int argc, char* argv[])
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
     // Create Upscaler and Solve
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight,
-                                  partitioning, *edge_d_td, edge_boundary_att,
-                                  ess_attr, spect_tol, max_evects, hybridization);
+    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
+                                  edge_boundary_att, ess_attr, spect_tol, max_evects,
+                                  dual_target, scaled_dual, energy_dual, hybridization);
 
     mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
     marker = 0;

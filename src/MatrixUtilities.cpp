@@ -196,9 +196,9 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
 void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C)
 {
-    MFEM_ASSERT(C.Height() == A.Height() && C.Width() == B.Width() &&
-                A.Width() == B.Height(), "incompatible dimensions");
-    //    auto B_ref = const_cast<DenseMatrix&>(B);
+    C.SetSize(A.Height(), B.Width());
+    MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
+
     mfem::Vector column_in, column_out;
     for (int j = 0; j < B.Width(); ++j)
     {
@@ -320,6 +320,45 @@ mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset, int col_of
     std::fill_n(Data, diag_size, 1.0);
 
     return mfem::SparseMatrix(I, J, Data, rows, cols);
+}
+
+void Add(const double a, mfem::SparseMatrix& mat, const double b,
+         const mfem::Vector& vec, const bool invert_vec)
+{
+    assert(mat.Height() == vec.Size());
+    assert(mat.Width() == vec.Size());
+
+    if (a != 1.0)
+        mat *= a;
+
+    if (invert_vec)
+    {
+        for (int i = 0; i < vec.Size() ; i++)
+        {
+            mat(i, i) += (b / vec(i));
+        }
+    }
+    else
+    {
+        for (int i = 0; i < vec.Size() ; i++)
+        {
+            mat(i, i) += (b * vec(i));
+        }
+    }
+}
+
+void Add(mfem::SparseMatrix& mat, const mfem::Vector& vec, const bool invert_vec)
+{
+    smoothg::Add(1.0, mat, 1.0, vec, invert_vec);
+}
+
+mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D)
+{
+    std::unique_ptr<mfem::SparseMatrix> AtDA_ptr(mfem::Mult_AtDA(A, D));
+    mfem::SparseMatrix AtDA;
+    AtDA.Swap(*AtDA_ptr);
+
+    return AtDA;
 }
 
 mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect)
@@ -612,6 +651,27 @@ void ExtractSubMatrix(
             if (col >= 0)
                 A_sub(i, col) = A_data[j];
         }
+    }
+}
+
+void ExtractColumns(
+    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
+    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
+    const int row_offset)
+{
+    const int A_width = A.Width();
+    const int A_height = A.Height();
+    const int A_sub_height = A_sub.Height();
+
+    assert((A_height + row_offset) <= A_sub_height);
+
+    for (int j = 0; j < subcol_to_ref.Size(); ++j)
+    {
+        int A_col = ref_to_col[subcol_to_ref[j]];
+        assert(A_col >= 0);
+        assert(A_col < A_width);
+        std::copy_n(A.Data() + A_col * A_height, A_height,
+                    A_sub.Data() + j * A_sub_height + row_offset);
     }
 }
 

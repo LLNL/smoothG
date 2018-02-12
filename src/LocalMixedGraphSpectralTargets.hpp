@@ -46,6 +46,12 @@ public:
 
        @param rel_tol tolerance for including small eigenvectors
        @param max_evects max eigenvectors to include per aggregate
+       @param dual_target get traces from eigenvectors of dual graph Laplacian
+       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
+              Typically coarse problem gets better accuracy but becomes harder
+              to solve when this option is turned on.
+       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
+              (guarantees approximation property in edge energy norm)
        @param M_local is mass matrix on edge-based (velocity) space
        @param D_local is a divergence-like operator
        @param graph_topology the partitioning relations for coarsening
@@ -63,12 +69,14 @@ public:
     */
     LocalMixedGraphSpectralTargets(
         double rel_tol, int max_evects,
+        bool dual_target, bool scaled_dual, bool energy_dual,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const GraphTopology& graph_topology);
 
     LocalMixedGraphSpectralTargets(
         double rel_tol, int max_evects,
+        bool dual_target, bool scaled_dual, bool energy_dual,
         const mfem::SparseMatrix& M_local,
         const mfem::SparseMatrix& D_local,
         const mfem::SparseMatrix* W_local,
@@ -96,7 +104,7 @@ private:
            When it comes out, each entry is a DenseMatrix with one column for each
            eigenvector selected.
     */
-    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigma,
+    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                               std::vector<mfem::DenseMatrix>& local_vertex_targets);
 
     /**
@@ -106,16 +114,27 @@ private:
        @param AggExt_sigma (IN)
        @param local_edge_trace_targets (OUT)
     */
-    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigma,
+    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
+
+    std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
+        const mfem::SparseMatrix& Lloc,
+        const mfem::SparseMatrix& Dloc,
+        const mfem::Vector& Mloc_diag_inv);
 
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
+    void CheckMinimalEigenvalue(
+        double eval_min, int aggregate_id, std::string entity);
+
     MPI_Comm comm_;
 
-    double rel_tol_;
-    int max_evects_;
+    const double rel_tol_;
+    const int max_evects_;
+    const bool dual_target_;
+    const bool scaled_dual_;
+    const bool energy_dual_;
 
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
@@ -126,7 +145,7 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> W_global_;
 
     const GraphTopology& graph_topology_;
-    double zero_eigenvalue_threshold_;
+    const double zero_eigenvalue_threshold_;
 
     /// face to permuted edge relation table
     std::unique_ptr<mfem::HypreParMatrix> face_permedge_;

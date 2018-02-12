@@ -25,18 +25,20 @@ namespace smoothg
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
                            const mfem::Array<int>& global_partitioning,
-                           double spect_tol, int max_evects, bool hybridization,
-                           const mfem::Vector& global_weight)
+                           double spect_tol, int max_evects,
+                           bool dual_target, bool scaled_dual, bool energy_dual,
+                           bool hybridization, const mfem::Vector& global_weight)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
-    Init(vertex_edge_global, global_partitioning, global_weight, spect_tol, max_evects);
+    Init(vertex_edge_global, global_partitioning, global_weight, spect_tol,
+         max_evects, dual_target, scaled_dual, energy_dual);
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
-                           int coarse_factor,
-                           double spect_tol, int max_evects, bool hybridization,
-                           const mfem::Vector& weight)
+                           int coarse_factor, double spect_tol, int max_evects,
+                           bool dual_target, bool scaled_dual, bool energy_dual,
+                           bool hybridization, const mfem::Vector& weight)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
@@ -54,7 +56,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     mfem::Array<int> global_partitioning;
     Partition(vertex_vertex, global_partitioning, num_parts);
 
-    Init(vertex_edge_global, global_partitioning, weight, spect_tol, max_evects);
+    Init(vertex_edge_global, global_partitioning, weight, spect_tol,
+         max_evects, dual_target, scaled_dual, energy_dual);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -63,7 +66,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
 void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
                         const mfem::Array<int>& global_partitioning,
                         const mfem::Vector& global_weight,
-                        double spect_tol, int max_evects)
+                        double spect_tol, int max_evects,
+                        bool dual_target, bool scaled_dual, bool energy_dual)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -94,7 +98,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
-                     spect_tol, max_evects, hybridization_);
+                     spect_tol, max_evects, dual_target, scaled_dual, energy_dual, hybridization_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());

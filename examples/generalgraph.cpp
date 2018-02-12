@@ -104,6 +104,15 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
+    bool dual_target = false;
+    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
+    bool scaled_dual = false;
+    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
+    bool energy_dual = false;
+    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+                   "--no-energy-dual", "Use energy matrix in trace generation.");
     args.Parse();
     if (!args.Good())
     {
@@ -120,6 +129,7 @@ int main(int argc, char* argv[])
     }
 
     assert(num_partitions >= num_procs);
+
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix vertex_edge_global;
@@ -170,7 +180,8 @@ int main(int argc, char* argv[])
     {
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, hybridization, weight);
+                             spect_tol, max_evects, dual_target, scaled_dual,
+                             energy_dual, hybridization, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
