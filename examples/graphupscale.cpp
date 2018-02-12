@@ -171,12 +171,14 @@ int main(int argc, char* argv[])
                                                mfem::Vector(), &saamge_param);
 
         const auto hbsa_sol = hbsa_upscale.Solve(rhs_u_fine);
-        const auto error_sa = CompareError(comm, hbsa_sol, minres_sol);
+        const auto error_sa_mr = CompareError(comm, hbsa_sol, minres_sol);
+        const auto error_sa_ba = CompareError(comm, hbsa_sol, hb_sol);
         if (myid == 0)
         {
             std::cout.precision(3);
             std::cout << "---------------------\n";
-            std::cout << "HB (SAAMGe) vs Minres Error: " <<  error_sa << "\n";
+            std::cout << "HB (SAAMGe) vs Minres Error: " <<  error_sa_mr << "\n";
+            std::cout << "HB (SAAMGe) vs HB (BoomerAMG): " <<  error_sa_ba << "\n";
             std::cout.precision(3);
         }
 #endif

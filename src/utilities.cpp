@@ -1072,5 +1072,10 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
     return rayleigh;
 }
 
+void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
+{
+    for (int i = 0; i < vec.Size(); i++)
+        vec[i] *= scaling[i];
+}
 
 } // namespace smoothg

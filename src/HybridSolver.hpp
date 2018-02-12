@@ -218,9 +218,6 @@ protected:
     // Compute scaling vector and the scaled hybridized system
     void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
 
-    // Rescale input vector by diagonal_scaling_
-    void RescaleVector(mfem::Vector& vec) const;
-
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();
 

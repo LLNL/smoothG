@@ -685,7 +685,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
 
     if (diagonal_scaling_.Size() > 0)
-        RescaleVector(trueHrhs_);
+        RescaleVector(diagonal_scaling_, trueHrhs_);
 
     // solve the parallel global hybridized system
     mfem::StopWatch chrono;
@@ -724,7 +724,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     chrono.Start();
 
     if (diagonal_scaling_.Size() > 0)
-        RescaleVector(trueMu_);
+        RescaleVector(diagonal_scaling_, trueMu_);
 
     multiplier_d_td_->Mult(trueMu_, Mu_);
     RecoverOriginalSolution(Mu_, Sol);
@@ -846,12 +846,6 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d)
     auto Scale = VectorToMatrix(diagonal_scaling_);
     mfem::HypreParMatrix pScale(comm_, tmpH->N(), tmpH->ColPart(), &Scale);
     pHybridSystem_.reset(smoothg::RAP(*tmpH, pScale));
-}
-
-void HybridSolver::RescaleVector(mfem::Vector& vec) const
-{
-    for (int i = 0; i < vec.Size(); i++)
-        vec[i] *= diagonal_scaling_[i];
 }
 
 void HybridSolver::BuildSpectralAMGePreconditioner()
