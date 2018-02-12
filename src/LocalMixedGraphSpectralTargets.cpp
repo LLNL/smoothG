@@ -67,7 +67,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     const mfem::SparseMatrix& D_local, const GraphTopology& graph_topology)
     :
     LocalMixedGraphSpectralTargets(rel_tol, max_evects, dual_target, scaled_dual,
-                                  energy_dual, M_local, D_local, nullptr, graph_topology)
+                                   energy_dual, M_local, D_local, nullptr, graph_topology)
 {
 }
 
