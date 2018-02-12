@@ -180,13 +180,23 @@ private:
                         mfem::SparseMatrix& Pvertices,
                         bool build_coarse_relation);
 
-    /// @brief helper for BuildPEdges
+    /**
+       Method called from BuildPEdges
+
+       @param[in] nfaces number of faces
+       @param[in] edge_traces lives on a face
+       @param[out] face_cdof the coarseface_coarsedof relation table
+
+       @return total_num_traces on all faces
+    */
     int BuildCoarseFaceCoarseDof(unsigned int nfaces,
                                  std::vector<mfem::DenseMatrix>& edge_traces,
                                  mfem::SparseMatrix& face_cdof);
 
     /**
        Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
+
+       Helper for BuildPEdges
     */
     void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                          const mfem::SparseMatrix& Agg_vertex,
@@ -209,8 +219,6 @@ private:
        DtransferT by it, and returns the inner product with trace
 
        helper for BuildPEdges
-
-       this is an odd routine, but it is used three times, so...
     */
     double DTTraceProduct(const mfem::SparseMatrix& DtransferT,
                           mfem::DenseMatrix& potentials,
@@ -218,14 +226,18 @@ private:
                           const mfem::Vector& trace);
 
     /**
-       @brief take edge-based traces functions, extend them, find bubbles,
-       and assemble into interpolation matrix.
+       @brief Construct Pedges, the projector from coarse edge degrees of freedom
+       to fine edge dofs.
 
-       @param edge_trace is in
-       @param vertex_target is in
-       @param face_cdof is out, the face_cdof relation on coarse mesh (coarse
-       faces, coarse dofs)
-       @param Pedges is out
+       This takes edge-based traces functions, extends them, finds bubbles,
+       and assembles into interpolation matrix.
+
+       @param[in] edge_trace lives on faces, not aggregates
+       @param[in] vertex_target usually eigenvectors, lives on aggregate
+       @param[out] face_cdof is out, the face_cdof relation on coarse mesh 
+                   (coarse faces, coarse dofs)
+       @param[out] Pedges the interpolation
+       @param[out] CM_el the coarse element mass matrices in case build_coarse_relation is true
     */
     void BuildPEdges(
         std::vector<mfem::DenseMatrix>& edge_traces,

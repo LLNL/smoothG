@@ -133,15 +133,6 @@ void GraphCoarsen::BuildPVertices(
     }
 }
 
-/**
-   Subroutine called from BuildPEdges
-
-   @param[in] nfaces number of faces
-   @param[in] edge_traces lives on a face
-   @param[out] face_cdof the coarseface_coarsedof relation table
-
-   @return total_num_traces on all faces
-*/
 int GraphCoarsen::BuildCoarseFaceCoarseDof(unsigned int nfaces,
                                            std::vector<mfem::DenseMatrix>& edge_traces,
                                            mfem::SparseMatrix& face_cdof)
@@ -161,7 +152,6 @@ int GraphCoarsen::BuildCoarseFaceCoarseDof(unsigned int nfaces,
     return total_num_traces;
 }
 
-/// helper for BuildPEdges
 void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                                    const mfem::SparseMatrix& Agg_vertex,
                                    const mfem::SparseMatrix& face_edge)
@@ -213,7 +203,6 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
     }
 }
 
-/// helper for BuildPEdges
 int* GraphCoarsen::InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_traces,
                                        std::vector<mfem::DenseMatrix>& vertex_target,
                                        const mfem::SparseMatrix& Agg_edge,
@@ -267,16 +256,6 @@ double GraphCoarsen::DTTraceProduct(const mfem::SparseMatrix& DtransferT,
     return smoothg::InnerProduct(ref_vec3, trace);
 }
 
-/**
-   Construct Pedges, the projector from coarse edge degrees of freedom
-   to fine edge degrees of freedom.
-
-   @param edge_traces lives on a *face*, not an aggregate
-
-   @param (out) face_cdof is coarse, coarse faces and coarse dofs for the new coarse graph
-
-   @todo this is a monster and should be refactored
-*/
 void GraphCoarsen::BuildPEdges(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,

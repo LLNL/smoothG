@@ -42,28 +42,25 @@ public:
 
     ~CoarseMBuilder() {}
 
-    /// names of next several methods are not descriptive, we
-    /// are just removing lines of code from BuildPEdges and putting
-    /// it here without understanding it
-    /// @TODO some of the below can be probably be combined, into some more general (i, j, value) thing
+    /// The names of the next several methods are not that descriptive or
+    /// informative; they result from removing lines from BuildPEdges()
+    /// and putting it here.
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
 
     void SetBubbleOffd(int l, double value);
 
-    /// @todo improve method name
     void AddDiag(double value);
 
-    /// @todo improve method name
     void AddTrace(int l, double value);
 
     void SetBubbleLocal(int l, int j, double value);
 
-    /// The methods after this could even be a different object?
     void ResetEdgeCdofMarkers(int size);
 
     void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
                            const mfem::SparseMatrix& Agg_cdof_edge);
 
+    /// Deal with shared dofs for trace
     void AddTraceAcross(int row, int col, double value);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
@@ -97,8 +94,10 @@ public:
                           bool build_coarse_relation);
     ~Agg_cdof_edge_Builder() {}
 
+    /// Register the bubble size
     void Register(int k);
 
+    /// Get the resulting coarse relation table
     std::unique_ptr<mfem::SparseMatrix> GetAgg_cdof_edge(int rows, int cols);
 
 private:
