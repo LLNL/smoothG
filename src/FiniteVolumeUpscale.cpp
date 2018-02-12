@@ -72,8 +72,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
-                    comm, mixed_laplacians_.back(), *coarsener_,
-                    &face_bdratt, &marker, 0, saamge_param);
+                             comm, mixed_laplacians_.back(), *coarsener_,
+                             &face_bdratt, &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -144,8 +144,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
-                    comm, mixed_laplacians_.back(), *coarsener_,
-                    &face_bdratt, &marker, 0, saamge_param);
+                             comm, mixed_laplacians_.back(), *coarsener_,
+                             &face_bdratt, &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
