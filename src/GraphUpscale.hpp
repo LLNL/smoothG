@@ -109,9 +109,9 @@ private:
               const std::vector<int>& global_partitioning);
     void MakeFineLevel(const std::vector<double>& global_weight);
     void MakeD(const std::vector<double>& global_weight);
+    void MakeTopology();
 
-    Vector ReadVector(const std::string& filename, int global_size,
-                                         const std::vector<int>& local_to_global) const;
+    Vector ReadVector(const std::string& filename, const std::vector<int>& local_to_global) const;
 
     void WriteVector(const VectorView& vect, const std::string& filename, int global_size,
                      const std::vector<int>& local_to_global) const;
@@ -126,10 +126,15 @@ private:
 
     SparseMatrix vertex_edge_local_;
     ParMatrix edge_true_edge_;
+    ParMatrix edge_edge_;
 
     // Mixed Matrix stuff
     BlockMatrix fine_level_;
     BlockMatrix coarse_level_;
+
+    // GraphTopology stuff
+    SparseMatrix agg_vertex_local_;
+    SparseMatrix agg_edge_local_;
 };
 
 } // namespace smoothg

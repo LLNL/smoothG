@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
         /// [Upscale]
 
         /// [Right Hand Side]
+        /*
         Vector rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
 
         BlockVector fine_rhs(upscale.GetFineBlockVector());
@@ -123,6 +124,8 @@ int main(int argc, char* argv[])
         /// [Check Error]
         upscale.ShowErrors(upscaled_sol, fine_sol);
         /// [Check Error]
+
+        */
     }
 
     MPI_Finalize();

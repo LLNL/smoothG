@@ -94,8 +94,9 @@ parlinalgcpp::ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const linalgcpp::SparseM
         }
         else
         {
-            offd_map[offd_counter].first = offd_counter;
-            offd_map[offd_counter++].second = tedge;
+            offd_map[offd_counter].first = tedge;
+            offd_map[offd_counter].second = offd_counter;
+            offd_counter++;
         }
 
         diag_indptr[i + 1] = diag_counter;
@@ -130,5 +131,145 @@ parlinalgcpp::ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const linalgcpp::SparseM
                                    std::move(col_map));
 }
 
+linalgcpp::SparseMatrix<int> RestrictInterior(const linalgcpp::SparseMatrix<int>& mat)
+{
+    int rows = mat.Rows();
+    int cols = mat.Cols();
+
+    const auto& mat_indptr(mat.GetIndptr());
+    const auto& mat_indices(mat.GetIndices());
+    const auto& mat_data(mat.GetData());
+
+    std::vector<int> indptr(rows + 1);
+    std::vector<int> indices;
+
+    indices.reserve(mat.nnz());
+
+    for (int i = 0; i < rows; ++i)
+    {
+        indptr[i] = indices.size();
+
+        for (int j = mat_indptr[i]; j < mat_indptr[i + 1]; ++j)
+        {
+            if (mat_data[j] > 1)
+            {
+                indices.push_back(mat_indices[j]);
+            }
+        }
+    }
+
+    indptr[rows] = indices.size();
+
+    std::vector<int> data(indices.size(), 1);
+
+    return linalgcpp::SparseMatrix<int>(std::move(indptr), std::move(indices), std::move(data), rows, cols);
+}
+
+linalgcpp::SparseMatrix<int> MakeFaceAggInt(const parlinalgcpp::ParMatrix& agg_agg)
+{
+    const auto& agg_agg_diag = agg_agg.GetDiag();
+    const auto& agg_agg_offd = agg_agg.GetOffd();
+
+    int num_aggs = agg_agg_diag.Rows();
+    int num_faces_int = agg_agg_diag.nnz() - agg_agg_diag.Rows();
+
+    assert(num_faces_int % 2 == 0);
+    num_faces_int /= 2;
+
+    int num_faces = num_faces_int + agg_agg_offd.nnz();
+    std::vector<int> indptr(num_faces + 1);
+    std::vector<int> indices(num_faces_int);
+    std::vector<int> data(num_faces_int, 1);
+
+    indptr[0] = 0;
+
+    const auto& agg_indptr = agg_agg_diag.GetIndptr();
+    const auto& agg_indices = agg_agg_diag.GetIndices();
+    int rows = agg_agg_diag.Rows();
+    int count = 0;
+
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = agg_indptr[i]; j < agg_indptr[i + 1]; ++j)
+        {
+            if (agg_indices[j] > i)
+            {
+                indices[count * 2] = i;
+                indices[count * 2 + 1] = agg_indices[j];
+
+                count++;
+
+                indptr[count] = count * 2;
+            }
+        }
+    }
+
+    assert(count == num_faces_int);
+
+    return linalgcpp::SparseMatrix<int>(std::move(indptr), std::move(indices), std::move(data), num_faces, num_aggs);
+}
+
+linalgcpp::SparseMatrix<int> MakeFaceEdge(const parlinalgcpp::ParMatrix& agg_agg, const linalgcpp::SparseMatrix<int>& face_edge_ext)
+{
+    const auto& agg_agg_diag = agg_agg.GetDiag();
+    const auto& agg_agg_offd = agg_agg.GetOffd();
+    const auto& col_map = agg_agg.GetColMap();
+
+    int num_aggs = agg_agg_diag.Rows();
+    int num_edges = face_edge_ext.Cols();
+    int num_faces = face_edge_ext.Rows();
+    int num_faces_int = num_faces - agg_agg_offd.nnz();
+
+    std::vector<int> indptr;
+    std::vector<int> indices;
+
+    indptr.reserve(num_faces + 1);
+
+    const auto& ext_indptr = face_edge_ext.GetIndptr();
+    const auto& ext_indices = face_edge_ext.GetIndices();
+    const auto& ext_data = face_edge_ext.GetData();
+
+    indptr.push_back(0);
+
+    for (int i = 0; i < num_faces_int; i++)
+    {
+        for (int j = ext_indptr[i]; j < ext_indptr[i + 1]; j++)
+        {
+            if (ext_data[j] > 1)
+            {
+                indices.push_back(ext_indices[j]);
+            }
+        }
+        indptr.push_back(indices.size());
+    }
+
+    const auto& offd_indptr = agg_agg_offd.GetIndptr();
+    const auto& offd_indices = agg_agg_offd.GetIndices();
+    const auto& offd_data = agg_agg_offd.GetData();
+
+    for (int i = 0; i < num_aggs; ++i)
+    {
+        for (int j = offd_indptr[i]; j < offd_indptr[i + 1]; ++j)
+        {
+            int shared = col_map[offd_indices[j]];
+            for (int k = agg_edge_i[i]; k < agg_edge_i[i + 1]; k++)
+            {
+                edge = agg_edge_j[k];
+                if (edge_shareattr_i[edge + 1] > edge_shareattr_i[edge])
+                {
+                    edge_shareattr_loc =
+                        edge_shareattr_j[edge_shareattr_i[edge]];
+                    if (edge_shareattr_map[edge_shareattr_loc] == sharedattr)
+                        face_edge_j[face_edge_nnz++] = edge;
+                }
+            }
+        }
+    }
+
+    std::vector<int> data(indices.size(), 1);
+
+    return linalgcpp::SparseMatrix<int>(std::move(indptr), std::move(indices), std::move(data),
+                                        num_faces, num_edges);
+}
 
 } // namespace smoothg

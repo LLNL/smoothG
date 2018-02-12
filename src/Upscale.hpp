@@ -38,78 +38,78 @@ class Upscale : public linalgcpp::Operator
 
 public:
     /// Wrapper for applying the upscaling, in linalgcpp terminology
-    virtual void Mult(const VectorView& x, VectorView& y) const override;
+    virtual void Mult(const VectorView& x, VectorView& y) const override {}
 
     /// Wrapper for applying the upscaling
-    virtual void Solve(const VectorView& x, VectorView& y) const;
-    virtual linalgcpp::Vector<double> Solve(const VectorView& x) const;
+    virtual void Solve(const VectorView& x, VectorView& y) const {}
+    virtual linalgcpp::Vector<double> Solve(const VectorView& x) const {}
 
     /// Wrapper for applying the upscaling in mixed form
-    virtual void Solve(const BlockVector& x, BlockVector& y) const;
-    virtual BlockVector Solve(const BlockVector& x) const;
+    virtual void Solve(const BlockVector& x, BlockVector& y) const {}
+    virtual BlockVector Solve(const BlockVector& x) const {}
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level
-    virtual void SolveCoarse(const VectorView& x, VectorView& y) const;
-    virtual Vector SolveCoarse(const VectorView& x) const;
+    virtual void SolveCoarse(const VectorView& x, VectorView& y) const {}
+    virtual Vector SolveCoarse(const VectorView& x) const {}
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level,
     //  in mixed form
-    virtual void SolveCoarse(const BlockVector& x, BlockVector& y) const;
-    virtual BlockVector SolveCoarse(const BlockVector& x) const;
+    virtual void SolveCoarse(const BlockVector& x, BlockVector& y) const {}
+    virtual BlockVector SolveCoarse(const BlockVector& x) const {}
 
     /// Solve Fine Level
-    virtual void SolveFine(const VectorView& x, VectorView& y) const;
-    virtual Vector SolveFine(const VectorView& x) const;
+    virtual void SolveFine(const VectorView& x, VectorView& y) const {}
+    virtual Vector SolveFine(const VectorView& x) const {}
 
     /// Solve Fine Level, in mixed form
-    virtual void SolveFine(const BlockVector& x, BlockVector& y) const;
-    virtual BlockVector SolveFine(const BlockVector& x) const;
+    virtual void SolveFine(const BlockVector& x, BlockVector& y) const {}
+    virtual BlockVector SolveFine(const BlockVector& x) const {}
 
     /// Interpolate a coarse vector to the fine level
-    virtual void Interpolate(const VectorView& x, VectorView& y) const;
-    virtual Vector Interpolate(const VectorView& x) const;
+    virtual void Interpolate(const VectorView& x, VectorView& y) const {}
+    virtual Vector Interpolate(const VectorView& x) const {}
 
     /// Interpolate a coarse vector to the fine level, in mixed form
-    virtual void Interpolate(const BlockVector& x, BlockVector& y) const;
-    virtual BlockVector Interpolate(const BlockVector& x) const;
+    virtual void Interpolate(const BlockVector& x, BlockVector& y) const {}
+    virtual BlockVector Interpolate(const BlockVector& x) const {}
 
     /// Coarsen a fine vector to the coarse level
-    virtual void Coarsen(const VectorView& x, VectorView& y) const;
-    virtual Vector Coarsen(const VectorView& x) const;
+    virtual void Coarsen(const VectorView& x, VectorView& y) const {}
+    virtual Vector Coarsen(const VectorView& x) const {}
 
     /// Coarsen a fine vector to the coarse level, in mixed form
-    virtual void Coarsen(const BlockVector& x, BlockVector& y) const;
-    virtual BlockVector Coarsen(const BlockVector& x) const;
+    virtual void Coarsen(const BlockVector& x, BlockVector& y) const {}
+    virtual BlockVector Coarsen(const BlockVector& x) const {}
 
     /// Get block offsets
-    virtual std::vector<HYPRE_Int> FineBlockOffsets() const;
-    virtual std::vector<HYPRE_Int> CoarseBlockOffsets() const;
+    virtual std::vector<HYPRE_Int> FineBlockOffsets() const {}
+    virtual std::vector<HYPRE_Int> CoarseBlockOffsets() const {}
 
     /// Get true block offsets
-    virtual std::vector<HYPRE_Int> FineTrueBlockOffsets() const;
-    virtual std::vector<HYPRE_Int> CoarseTrueBlockOffsets() const;
+    virtual std::vector<HYPRE_Int> FineTrueBlockOffsets() const {}
+    virtual std::vector<HYPRE_Int> CoarseTrueBlockOffsets() const {}
 
     /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(VectorView& vect) const;
-    virtual void Orthogonalize(BlockVector& vect) const;
+    virtual void Orthogonalize(VectorView& vect) const {}
+    virtual void Orthogonalize(BlockVector& vect) const {}
 
     /// Create a coarse vertex space vector
-    virtual Vector GetCoarseVector() const;
+    virtual Vector GetCoarseVector() const {}
 
     /// Create a fine vertex space vector
-    virtual Vector GetFineVector() const;
+    virtual Vector GetFineVector() const {}
 
     /// Create a coarse mixed form vector
-    virtual BlockVector GetCoarseBlockVector() const;
+    virtual BlockVector GetCoarseBlockVector() const {}
 
     /// Create a fine mixed form vector
-    virtual BlockVector GetFineBlockVector() const;
+    virtual BlockVector GetFineBlockVector() const {}
 
     /// Create a coarse mixed form vector on true dofs
-    virtual BlockVector GetCoarseTrueBlockVector() const;
+    virtual BlockVector GetCoarseTrueBlockVector() const {}
 
     /// Create a fine mixed form vector on true dofs
-    virtual BlockVector GetFineTrueBlockVector() const;
+    virtual BlockVector GetFineTrueBlockVector() const {}
 
     // Get Mixed Matrix
     //virtual MixedMatrix& GetMatrix(int level);
@@ -124,10 +124,10 @@ public:
     //virtual const MixedMatrix& GetCoarseMatrix() const;
 
     /// Show Solver Information
-    virtual void PrintInfo(std::ostream& out = std::cout) const;
+    virtual void PrintInfo(std::ostream& out = std::cout) const {}
 
     /// Compute Operator Complexity
-    double OperatorComplexity() const;
+    double OperatorComplexity() const {}
 
     /// Get Row Starts
     //virtual std::vector<HYPRE_Int>& get_Drow_start() const { return mixed_laplacians_[0].get_Drow_start();};
@@ -136,44 +136,44 @@ public:
     virtual MPI_Comm GetComm() const { return comm_; }
 
     /// Set solver parameters
-    virtual void SetPrintLevel(int print_level);
-    virtual void SetMaxIter(int max_num_iter);
-    virtual void SetRelTol(double rtol);
-    virtual void SetAbsTol(double atol);
+    virtual void SetPrintLevel(int print_level) {}
+    virtual void SetMaxIter(int max_num_iter) {}
+    virtual void SetRelTol(double rtol) {}
+    virtual void SetAbsTol(double atol) {}
 
     /// Show Total Solve time on the coarse level, negative id will show on all processors
-    void ShowCoarseSolveInfo(std::ostream& out = std::cout) const;
+    void ShowCoarseSolveInfo(std::ostream& out = std::cout) const {}
 
     /// Show Total Solve time on the fine level, negative id will show on all processors
-    void ShowFineSolveInfo(std::ostream& out = std::cout) const;
+    void ShowFineSolveInfo(std::ostream& out = std::cout) const {}
 
     /// Show Total setup time, negative id will show on all processors
-    void ShowSetupTime(std::ostream& out = std::cout) const;
+    void ShowSetupTime(std::ostream& out = std::cout) const {}
 
     /// Get Total Solve time on the coarse level
-    double GetCoarseSolveTime() const;
+    double GetCoarseSolveTime() const {}
 
     /// Get Total Solve time on the fine level
-    double GetFineSolveTime() const;
+    double GetFineSolveTime() const {}
 
     /// Get Total Solve iterations on the coarse level
-    int GetCoarseSolveIters() const;
+    int GetCoarseSolveIters() const {}
 
     /// Get Total Solve iterations on the fine level
-    int GetFineSolveIters() const;
+    int GetFineSolveIters() const {}
 
     /// Get Total setup time
-    double GetSetupTime() const;
+    double GetSetupTime() const {}
 
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
     std::vector<double> ComputeErrors(const BlockVector& upscaled_sol,
-                                      const BlockVector& fine_sol) const;
+                                      const BlockVector& fine_sol) const {}
 
     /// Compare errors between upscaled and fine solution.
     /// Displays error to stdout on processor 0
     void ShowErrors(const BlockVector& upscaled_sol,
-                    const BlockVector& fine_sol) const;
+                    const BlockVector& fine_sol) const {}
 
     size_t Rows() const override { return size_; }
     size_t Cols() const override { return size_; }
