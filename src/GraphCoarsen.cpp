@@ -297,9 +297,19 @@ void GraphCoarsen::BuildPEdges(
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     NormalizeTraces(edge_traces, Agg_vertex, face_edge);
 
-    CoarseMBuilder mbuilder(edge_traces, vertex_target,
-                            CM_el, Agg_face, total_num_traces,
-                            ncoarse_vertexdofs, build_coarse_relation);
+    std::unique_ptr<CoarseMBuilder> mbuilder_ptr;
+    if (build_coarse_relation)
+    {
+        mbuilder_ptr = make_unique<ElementMBuilder>(
+            edge_traces, vertex_target, CM_el, Agg_face, total_num_traces,
+            ncoarse_vertexdofs);
+    }
+    else
+    {
+        mbuilder_ptr = make_unique<AssembleMBuilder>(
+            vertex_target, total_num_traces, ncoarse_vertexdofs);
+    }
+    CoarseMBuilder& mbuilder = *mbuilder_ptr;
 
     int bubble_counter = 0;
     double entry_value;

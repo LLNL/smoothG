@@ -33,18 +33,52 @@ namespace smoothg
 class CoarseMBuilder
 {
 public:
+    /*
     CoarseMBuilder(std::vector<mfem::DenseMatrix>& edge_traces,
                    std::vector<mfem::DenseMatrix>& vertex_target,
                    std::vector<mfem::DenseMatrix>& CM_el,
                    const mfem::SparseMatrix& Agg_face,
                    int total_num_traces, int ncoarse_vertexdofs,
                    bool build_coarse_relation);
+    */
 
-    ~CoarseMBuilder() {}
+    virtual ~CoarseMBuilder() {}
 
     /// The names of the next several methods are not that descriptive or
     /// informative; they result from removing lines from BuildPEdges()
     /// and putting it here.
+    virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) = 0;
+
+    virtual void SetBubbleOffd(int l, double value) = 0;
+
+    virtual void AddDiag(double value) = 0;
+
+    virtual void AddTrace(int l, double value) = 0;
+
+    virtual void SetBubbleLocal(int l, int j, double value) = 0;
+
+    virtual void ResetEdgeCdofMarkers(int size) = 0;
+
+    virtual void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
+                           const mfem::SparseMatrix& Agg_cdof_edge) = 0;
+
+    /// Deal with shared dofs for trace
+    virtual void AddTraceAcross(int row, int col, double value) = 0;
+
+    virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM() = 0;
+};
+
+/**
+   Used when build_coarse_relation is false, generally when we are *not*
+   doing hybridization.
+*/
+class AssembleMBuilder : public CoarseMBuilder
+{
+public:
+    AssembleMBuilder(
+        std::vector<mfem::DenseMatrix>& vertex_target,
+        int total_num_traces, int ncoarse_vertexdofs);
+
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
 
     void SetBubbleOffd(int l, double value);
@@ -66,13 +100,52 @@ public:
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
 private:
-    std::vector<mfem::DenseMatrix>& edge_traces_;
-    std::vector<mfem::DenseMatrix>& vertex_target_;
-    std::vector<mfem::DenseMatrix>& CM_el_;
     int total_num_traces_;
-    bool build_coarse_relation_;
 
     std::unique_ptr<mfem::SparseMatrix> CoarseM_;
+
+    int agg_index_;
+    int row_;
+    int bubble_counter_;
+};
+
+/**
+   Used when build_coarse_relation is true, generally when we use
+   hybridization solvers.
+*/
+class ElementMBuilder : public CoarseMBuilder
+{
+public:
+    ElementMBuilder(
+        std::vector<mfem::DenseMatrix>& edge_traces,
+        std::vector<mfem::DenseMatrix>& vertex_target,
+        std::vector<mfem::DenseMatrix>& CM_el,
+        const mfem::SparseMatrix& Agg_face,
+        int total_num_traces, int ncoarse_vertexdofs);
+
+    void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
+
+    void SetBubbleOffd(int l, double value);
+
+    void AddDiag(double value);
+
+    void AddTrace(int l, double value);
+
+    void SetBubbleLocal(int l, int j, double value);
+
+    void ResetEdgeCdofMarkers(int size);
+
+    void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
+                           const mfem::SparseMatrix& Agg_cdof_edge);
+
+    /// Deal with shared dofs for trace
+    void AddTraceAcross(int row, int col, double value);
+
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
+
+private:
+    std::vector<mfem::DenseMatrix>& CM_el_;
+    int total_num_traces_;
 
     mfem::Array<int> edge_cdof_marker_;
     mfem::Array<int> edge_cdof_marker2_;
