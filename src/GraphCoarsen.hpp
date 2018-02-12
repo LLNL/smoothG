@@ -90,6 +90,8 @@ public:
        @brief Given edge_trace and vertex_targets functions, construct the
        interpolation matrices Pvertices and Pedges.
 
+       The key method of the GraphCoarsen class.
+
        The aggregate to coarse dofs relation tables Agg_cdof_vertex_ and
        Agg_cdof_edge_ will be constructed only if the flag build_coarse_relation
        is true.
