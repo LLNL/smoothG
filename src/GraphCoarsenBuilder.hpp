@@ -66,7 +66,7 @@ public:
     virtual void ResetEdgeCdofMarkers(int size) = 0;
 
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                                    const mfem::SparseMatrix& Agg_cdof_edge) = 0;
+                                     const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM() = 0;
 };
