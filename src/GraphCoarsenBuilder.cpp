@@ -25,9 +25,9 @@ ElementMBuilder::ElementMBuilder(
     const mfem::SparseMatrix& Agg_face,
     int total_num_traces, int ncoarse_vertexdofs)
     :
-    CM_el_(CM_el),
-    total_num_traces_(total_num_traces)
+    CM_el_(CM_el)
 {
+    total_num_traces_ = total_num_traces;
     const unsigned int nAggs = vertex_target.size();
 
     CM_el.resize(nAggs);
@@ -47,9 +47,9 @@ ElementMBuilder::ElementMBuilder(
 AssembleMBuilder::AssembleMBuilder(
     std::vector<mfem::DenseMatrix>& vertex_target,
     int total_num_traces, int ncoarse_vertexdofs)
-    :
-    total_num_traces_(total_num_traces)
 {
+    total_num_traces_ = total_num_traces;
+
     const unsigned int nAggs = vertex_target.size();
     CoarseM_ = make_unique<mfem::SparseMatrix>(
                    total_num_traces + ncoarse_vertexdofs - nAggs,
@@ -59,15 +59,12 @@ AssembleMBuilder::AssembleMBuilder(
 void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
 {
     agg_index_ = agg_index;
-    row_ = row;
     cdof_loc_ = cdof_loc;
-    bubble_counter_ = bubble_counter;
     edge_cdof_marker_[row] = cdof_loc;
 }
 
 void AssembleMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
 {
-    agg_index_ = agg_index;
     row_ = row;
     bubble_counter_ = bubble_counter;
 }

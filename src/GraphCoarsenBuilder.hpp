@@ -69,6 +69,9 @@ public:
                                      const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM() = 0;
+
+protected:
+    int total_num_traces_;
 };
 
 /**
@@ -105,11 +108,8 @@ public:
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
 private:
-    int total_num_traces_;
-
     std::unique_ptr<mfem::SparseMatrix> CoarseM_;
 
-    int agg_index_;
     int row_;
     int bubble_counter_;
 };
@@ -152,14 +152,11 @@ public:
 
 private:
     std::vector<mfem::DenseMatrix>& CM_el_;
-    int total_num_traces_;
 
     mfem::Array<int> edge_cdof_marker_;
     mfem::Array<int> edge_cdof_marker2_;
     int agg_index_;
-    int row_;
     int cdof_loc_;
-    int bubble_counter_;
 
     int Agg0_;
     int Agg1_;
