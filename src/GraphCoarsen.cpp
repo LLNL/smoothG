@@ -403,16 +403,16 @@ void GraphCoarsen::BuildPEdges(
                     for (int l = 0; l < num_bubbles_i; l++)
                     {
                         entry_value = DTTraceProduct(DtransferT, B_potentials, l, trace);
-                        mbuilder.SetBubbleOffd(l, entry_value);
+                        mbuilder.SetTraceBubbleBlock(l, entry_value);
                     }
 
                     // compute and store diagonal block of coarse M
                     entry_value = DTTraceProduct(DtransferT, F_potentials, nlocal_traces, trace);
-                    mbuilder.AddDiag(entry_value);
+                    mbuilder.AddTraceTraceBlockDiag(entry_value);
                     for (int l = 0; l < nlocal_traces; l++)
                     {
                         entry_value = DTTraceProduct(DtransferT, F_potentials, l, trace);
-                        mbuilder.AddTrace(local_facecdofs[l], entry_value);
+                        mbuilder.AddTraceTraceBlock(local_facecdofs[l], entry_value);
                     }
                 }
                 nlocal_traces++;
@@ -453,13 +453,13 @@ void GraphCoarsen::BuildPEdges(
             B_potentials.GetColumnReference(l, ref_vec1);
             vertex_target_i.GetColumnReference(l + 1, ref_vec2);
             entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-            mbuilder.SetBubbleLocal(l, l, entry_value);
+            mbuilder.SetBubbleBubbleBlock(l, l, entry_value);
 
             for (int j = l + 1; j < num_bubbles_i; j++)
             {
                 vertex_target_i.GetColumnReference(j + 1, ref_vec2);
                 entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-                mbuilder.SetBubbleLocal(l, j, entry_value);
+                mbuilder.SetBubbleBubbleBlock(l, j, entry_value);
             }
         }
         bubble_counter += num_bubbles_i;
@@ -492,7 +492,7 @@ void GraphCoarsen::BuildPEdges(
         }
 
         // store global and local coarse M
-        mbuilder.RegisterTraceFace(i, face_Agg, *Agg_cdof_edge_);
+        mbuilder.FillEdgeCdofMarkers(i, face_Agg, *Agg_cdof_edge_);
         M_v.GetSubVector(local_fine_dofs, Mloc_v);
         for (int l = 0; l < facecdofs.Size(); l++)
         {

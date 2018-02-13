@@ -72,51 +72,51 @@ void AssembleMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bub
     bubble_counter_ = bubble_counter;
 }
 
-void ElementMBuilder::SetBubbleOffd(int l, double value)
+void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
     CM_el_loc(l, cdof_loc_) = value;
     CM_el_loc(cdof_loc_, l) = value;
 }
 
-void AssembleMBuilder::SetBubbleOffd(int l, double value)
+void AssembleMBuilder::SetTraceBubbleBlock(int l, double value)
 {
     const int global_col = total_num_traces_ + bubble_counter_ + l;
     CoarseM_->Set(row_, global_col, value);
     CoarseM_->Set(global_col, row_, value);
 }
 
-void ElementMBuilder::AddDiag(double value)
+void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 {
     CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
 }
 
-void AssembleMBuilder::AddDiag(double value)
+void AssembleMBuilder::AddTraceTraceBlockDiag(double value)
 {
     CoarseM_->Add(row_, row_, value);
 }
 
-void ElementMBuilder::AddTrace(int l, double value)
+void ElementMBuilder::AddTraceTraceBlock(int l, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
     CM_el_loc(edge_cdof_marker_[l], cdof_loc_) = value;
     CM_el_loc(cdof_loc_, edge_cdof_marker_[l]) = value;
 }
 
-void AssembleMBuilder::AddTrace(int l, double value)
+void AssembleMBuilder::AddTraceTraceBlock(int l, double value)
 {
     CoarseM_->Add(row_, l, value);
     CoarseM_->Add(l, row_, value);
 }
 
-void ElementMBuilder::SetBubbleLocal(int l, int j, double value)
+void ElementMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
     CM_el_loc(l, j) = value;
     CM_el_loc(j, l) = value;
 }
 
-void AssembleMBuilder::SetBubbleLocal(int l, int j, double value)
+void AssembleMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
 {
     const int global_row = total_num_traces_ + bubble_counter_ + l;
     const int global_col = total_num_traces_ + bubble_counter_ + j;
@@ -136,8 +136,8 @@ void AssembleMBuilder::ResetEdgeCdofMarkers(int size)
 {
 }
 
-void ElementMBuilder::RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                                        const mfem::SparseMatrix& Agg_cdof_edge)
+void ElementMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                                          const mfem::SparseMatrix& Agg_cdof_edge)
 {
     mfem::Array<int> Aggs;
     mfem::Array<int> local_Agg_edge_cdof;
@@ -163,8 +163,8 @@ void ElementMBuilder::RegisterTraceFace(int face_num, const mfem::SparseMatrix& 
     }
 }
 
-void AssembleMBuilder::RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                                         const mfem::SparseMatrix& Agg_cdof_edge)
+void AssembleMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                                           const mfem::SparseMatrix& Agg_cdof_edge)
 {
 }
 

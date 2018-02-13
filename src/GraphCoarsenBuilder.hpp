@@ -29,8 +29,18 @@ namespace smoothg
 {
 
 /**
-   Abstract base class to help building the coarse mass matrix in
+   @brief Abstract base class to help building the coarse mass matrix in
    GraphCoarsen::BuildPEdges()
+
+   The coarse element mass matrices are of the form
+   \f[
+     \left( \begin{array}{cc}
+       M_{TT}&  M_{TB} \\
+       M_{BT}&  M_{BB}
+     \end{array} \right)
+   \f]
+   where \f$ T \f$ signifies trace extension degrees of freedom, and
+   \f$ B \f$ signifies bubble degrees of freedom on the coarse graph.
 */
 class CoarseMBuilder
 {
@@ -42,26 +52,28 @@ public:
     /// and putting it here.
     virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) = 0;
 
-    virtual void SetBubbleOffd(int l, double value) = 0;
+    virtual void SetTraceBubbleBlock(int l, double value) = 0;
 
-    virtual void AddDiag(double value) = 0;
+    virtual void AddTraceTraceBlockDiag(double value) = 0;
 
-    virtual void AddTrace(int l, double value) = 0;
+    virtual void AddTraceTraceBlock(int l, double value) = 0;
 
-    virtual void SetBubbleLocal(int l, int j, double value) = 0;
+    /// Deal with shared dofs for Trace-Trace block
+    virtual void AddTraceAcross(int row, int col, double value) = 0;
+
+    virtual void SetBubbleBubbleBlock(int l, int j, double value) = 0;
 
     virtual void ResetEdgeCdofMarkers(int size) = 0;
 
-    virtual void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                                   const mfem::SparseMatrix& Agg_cdof_edge) = 0;
-
-    /// Deal with shared dofs for trace
-    virtual void AddTraceAcross(int row, int col, double value) = 0;
+    virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                                    const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM() = 0;
 };
 
 /**
+   @brief Actually assembles global coarse mass matrix.
+
    Used when build_coarse_relation is false, generally when we are *not*
    doing hybridization.
 */
@@ -74,21 +86,21 @@ public:
 
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
 
-    void SetBubbleOffd(int l, double value);
+    void SetTraceBubbleBlock(int l, double value);
 
-    void AddDiag(double value);
+    void AddTraceTraceBlockDiag(double value);
 
-    void AddTrace(int l, double value);
+    void AddTraceTraceBlock(int l, double value);
 
-    void SetBubbleLocal(int l, int j, double value);
+    /// Deal with shared dofs for Trace-Trace block
+    void AddTraceAcross(int row, int col, double value);
+
+    void SetBubbleBubbleBlock(int l, int j, double value);
 
     void ResetEdgeCdofMarkers(int size);
 
-    void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                           const mfem::SparseMatrix& Agg_cdof_edge);
-
-    /// Deal with shared dofs for trace
-    void AddTraceAcross(int row, int col, double value);
+    void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                             const mfem::SparseMatrix& Agg_cdof_edge);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
@@ -103,6 +115,8 @@ private:
 };
 
 /**
+   @brief Assembles local (coarse) mass matrices
+
    Used when build_coarse_relation is true, generally when we use
    hybridization solvers.
 */
@@ -118,21 +132,21 @@ public:
 
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
 
-    void SetBubbleOffd(int l, double value);
+    void SetTraceBubbleBlock(int l, double value);
 
-    void AddDiag(double value);
+    void AddTraceTraceBlockDiag(double value);
 
-    void AddTrace(int l, double value);
+    void AddTraceTraceBlock(int l, double value);
 
-    void SetBubbleLocal(int l, int j, double value);
+    /// Deal with shared dofs for Trace-Trace block
+    void AddTraceAcross(int row, int col, double value);
+
+    void SetBubbleBubbleBlock(int l, int j, double value);
 
     void ResetEdgeCdofMarkers(int size);
 
-    void RegisterTraceFace(int face_num, const mfem::SparseMatrix& face_Agg,
-                           const mfem::SparseMatrix& Agg_cdof_edge);
-
-    /// Deal with shared dofs for trace
-    void AddTraceAcross(int row, int col, double value);
+    void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                             const mfem::SparseMatrix& Agg_cdof_edge);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
@@ -151,6 +165,9 @@ private:
     int Agg1_;
 };
 
+/**
+   @brief Used to help build the coarse dof-edge relation table.
+*/
 class Agg_cdof_edge_Builder
 {
 public:

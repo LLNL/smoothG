@@ -215,8 +215,8 @@ private:
                              const mfem::SparseMatrix& Agg_face);
 
     /**
-       @brief takes the column column of potentials, multiplies
-       DtransferT by it, and returns the inner product with trace
+       @brief takes the column 'column' from the matrix 'potentials',
+       left-multiplies by DtransferT, and returns the inner product with trace
 
        helper for BuildPEdges
     */
