@@ -954,8 +954,8 @@ void LocalGraphEdgeSolver::Init(double* M_data, const mfem::SparseMatrix& D)
     solver_ = make_unique<mfem::UMFPackSolver>(A_);
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::
-                                Vector& sol_sigma)
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
+                                mfem::Vector& sol_sigma)
 {
     // Set rhs(0)=0 so that the modified system after
     // the elimination is consistent with the original one
