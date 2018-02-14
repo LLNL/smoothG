@@ -130,13 +130,13 @@ private:
 };
 
 /// UpscaleCoarseSolve Solves the coarse problem in the primal form as its operation
-class UpscaleCoarseSolve : public mfem::Operator
+class UpscaleCoarseSolve : public mfem::Solver
 {
 public:
-    UpscaleCoarseSolve(const Upscale& A) : mfem::Operator(A.GetCoarseMatrix().getD().Height()),
+    UpscaleCoarseSolve(const Upscale& A) : mfem::Solver(A.GetCoarseMatrix().getD().Height()),
         A_(A)  {}
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.SolveCoarse(x, y); }
-
+    void SetOperator(const mfem::Operator& op) {}
 private:
     const Upscale& A_;
 };

@@ -544,6 +544,12 @@ void GraphCoarsen::BuildInterpolation(
                 build_coarse_relation);
 
     BuildW(Pvertices);
+
+    // TODO: coarse graph Laplacian operator in the case of hybridization
+    if (!CoarseM_)
+    {
+        CoarseM_.reset(mfem::RAP(Pedges, M_proc_, Pedges));
+    }
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
