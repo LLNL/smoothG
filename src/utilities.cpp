@@ -782,6 +782,46 @@ mfem::SparseMatrix ReadVertexEdge(const std::string& filename)
     return out;
 }
 
+mfem::SparseMatrix ReadVertexVertex(const std::string& filename)
+{
+    std::ifstream graph_file(filename);
+    if (!graph_file.is_open())
+        mfem::mfem_error("Error in opening the graph file");
+
+    int nvertices, nedges;
+    graph_file >> nvertices;
+    graph_file >> nedges;
+    nedges /= 2;
+
+    int * edge_vertex_i = new int[nedges+1];
+    int * edge_vertex_j = new int[nedges*2];
+    int idxi, idxj, value, edge_count = 0;
+    for (int i = 0; i < nedges*2; i++)
+    {
+        graph_file >> idxi;
+        graph_file >> idxj;
+        if (idxi < idxj)
+        {
+            edge_vertex_j[edge_count*2] = idxi;
+            edge_vertex_j[edge_count*2+1] = idxj;
+            edge_vertex_i[edge_count] = 2*edge_count;
+            edge_count++;
+        }
+        graph_file >> value;
+    }
+    edge_vertex_i[edge_count] = 2*edge_count;
+
+    double * edge_vertex_data = new double[nedges*2];
+    std::fill_n(edge_vertex_data, nedges*2, 1.0);
+
+    mfem::SparseMatrix edge_vertex(edge_vertex_i, edge_vertex_j,
+                                   edge_vertex_data, nedges, nvertices);
+
+    mfem::SparseMatrix vertex_edge = smoothg::Transpose(edge_vertex);
+
+    return vertex_edge;
+}
+
 void ReadCoordinate(std::ifstream& graphFile, mfem::SparseMatrix& out)
 {
     int nvertices, nedges;

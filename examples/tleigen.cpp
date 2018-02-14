@@ -30,7 +30,7 @@ using namespace smoothg;
 mfem::HypreParMatrix* BuildGraphLaplacian(const mfem::SparseMatrix& vertex_edge)
 {
     MPI_Comm comm = MPI_COMM_WORLD;
-    int coarse_factor = 300;
+    int coarse_factor = 600;
 
     mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
     mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
@@ -93,56 +93,18 @@ void ExtractLaplacianGraph(const mfem::SparseMatrix& gl,
     {
         for (int j = gl_i[i]; j < gl_i[i + 1]; j++)
         {
-            e_v_j[2 * edge_counter] = i;
-            e_v_j[2 * edge_counter + 1] = gl_j[j];
-            weight[edge_counter++] = gl_data[j] * -1.0;
+            if (gl_j[j] > i)
+            {
+                e_v_j[2 * edge_counter] = i;
+                e_v_j[2 * edge_counter + 1] = gl_j[j];
+                weight[edge_counter++] = gl_data[j] * -1.0;
+            }
         }
     }
     mfem::SparseMatrix e_v(e_v_i, e_v_j, e_v_data, nedges, nvertices);
     mfem::SparseMatrix v_e_tmp = smoothg::Transpose(e_v);
     v_e.Swap(v_e_tmp);
 }
-
-// Two-level V-cycle with default hypre smoother and smoothG coarse space
-class MixedSpectralAMGe : public mfem::Solver
-{
-private:
-    const mfem::HypreParMatrix& A_;
-    std::unique_ptr<mfem::HypreSmoother> smoother_;
-    std::unique_ptr<GraphUpscale> upscaler_;
-    mutable mfem::Vector correct;
-    mutable mfem::Vector resid;
-
-public:
-    MixedSpectralAMGe(mfem::HypreParMatrix& A,
-                      const mfem::SparseMatrix& vertex_edge)
-        : mfem::Solver(A.Height()), A_(A), correct(A.Height()), resid(A.Height())
-    {
-        smoother_ = make_unique<mfem::HypreSmoother>(A);
-        // needs w_block
-        upscaler_ = make_unique<GraphUpscale>(A.GetComm(), vertex_edge, 300,
-                                              1, 4, true, false, false, true);
-    }
-
-    void SetOperator(const mfem::Operator& op) {}
-
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const
-    {
-        resid = x;
-        y = 0.0;
-
-        smoother_->Mult(resid, correct);
-        y += correct;
-        A_.Mult(-1.0, correct, 1.0, resid);
-
-        upscaler_->Solve(resid, correct);
-        y += correct;
-        A_.Mult(-1.0, correct, 1.0, resid);
-
-        smoother_->Mult(resid, correct);
-        y += correct;
-    }
-};
 
 // DMinvDt + shift * I
 class ShiftedDMinvDt : public mfem::Operator
@@ -233,8 +195,8 @@ public:
         mfem::HypreParVector* evects_c[nev_];
         if (use_coarse_approx_)
         {
-            GraphUpscale upscaler(A_.GetComm(), vertex_edge_, 300, 1, 4,
-                                  true, false, false, true);
+            GraphUpscale upscaler(A_.GetComm(), vertex_edge_, 600, 1, 5,
+                                  false, false, false, true);
             auto& pM_c = upscaler.GetCoarseMatrix().get_pM();
             auto& pD_c = upscaler.GetCoarseMatrix().get_pD();
 
@@ -298,63 +260,17 @@ int main(int argc, char* argv[])
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_rank(comm, &myid);
 
-    constexpr auto print_level = 0;
-    constexpr auto ve_filename = "../../graphdata/vertex_edge_1069524880.txt";
-    const auto vertex_edge = ReadVertexEdge(ve_filename);
+    mfem::OptionsParser args(argc, argv);
+    const char* graph_file_name = "../../graphdata/vertex_vertex_sample.txt";
+    args.AddOption(&graph_file_name, "-g", "--graph",
+                   "File to load for graph connection data.");
+    bool use_coarse_approx = false;
+    args.AddOption(&use_coarse_approx, "-uca", "--use-coarse-approx", "-no-uca",
+                   "--no-use-coarse-approx", "Use coarse approximation as initial guess.");
+    args.Parse();
 
-    // Find eigenpairs of graph Laplacian using LOBPCG + BoomerAMG
-    {
-        auto A = BuildGraphLaplacian(vertex_edge);
-
-        mfem::StopWatch ch; ch.Clear();ch.Start();
-
-        mfem::HypreBoomerAMG prec1(*A);
-        prec1.SetPrintLevel(0);
-
-        mfem::HypreLOBPCG lobpcg(comm);
-        SetDefaultLOBPCGParameters(lobpcg);
-        lobpcg.SetPrintLevel(print_level);
-        lobpcg.SetOperator(*A);
-        lobpcg.SetPreconditioner(prec1);
-        lobpcg.Solve();
-
-        if (myid==0)
-        {
-            mfem::Array<double> eval;
-            lobpcg.GetEigenvalues(eval);
-
-            std::cout<< "LOBPCG + BoomerAMG took " << ch.RealTime() << "s\n";
-            std::cout<< "Eigenvalues: \n";
-            eval.Print();
-        }
-    }
-
-    // Find eigenpairs of graph Laplacian using LOBPCG + Mixed Spectral AMGe
-    if (false) // not working well currently
-    {
-        auto A = BuildGraphLaplacian(vertex_edge);
-
-        mfem::StopWatch ch; ch.Clear();ch.Start();
-
-        MixedSpectralAMGe prec2(*A, vertex_edge);
-
-        mfem::HypreLOBPCG lobpcg(comm);
-        SetDefaultLOBPCGParameters(lobpcg);
-        lobpcg.SetPrintLevel(print_level);
-        lobpcg.SetOperator(*A);
-        lobpcg.SetPreconditioner(prec2);
-        lobpcg.Solve();
-
-        if (myid==0)
-        {
-            mfem::Array<double> eval;
-            lobpcg.GetEigenvalues(eval);
-
-            std::cout<< "LOBPCG + MS-AMGe took " << ch.RealTime() << "s\n";
-            std::cout<< "Eigenvalues: \n";
-            eval.Print();
-        }
-    }
+    constexpr auto print_level = 1;
+    auto vertex_edge = ReadVertexVertex(graph_file_name);
 
     // Two level spectral graph Laplacian eigensolver
     {
@@ -363,6 +279,7 @@ int main(int argc, char* argv[])
         mfem::StopWatch ch; ch.Clear();ch.Start();
 
         TLSGLE tlsgle(*A, vertex_edge);
+
         tlsgle.SetNumModes(4);
         tlsgle.SetPrintLevel(print_level);
         tlsgle.Solve();

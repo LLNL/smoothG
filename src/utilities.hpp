@@ -342,6 +342,7 @@ void ReadVertexEdge(std::ifstream& graphFile, mfem::SparseMatrix& out);
 void ReadCoordinate(std::ifstream& graphFile, mfem::SparseMatrix& out);
 
 mfem::SparseMatrix ReadVertexEdge(const std::string& filename);
+mfem::SparseMatrix ReadVertexVertex(const std::string& filename);
 
 /**
    @brief A utility class for working with the SPE10 data set.
