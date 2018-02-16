@@ -297,6 +297,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     LocalEigenSolver eigs(max_evects_, rel_tol_);
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
     {
+
         mfem::Array<int> edge_local_dof_ext, vertex_local_dof_ext;
         if (AggExt_vertex_offd.RowSize(iAgg))
         {
@@ -330,6 +331,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             nvertex_local_dof_diag = vertex_local_dof_ext.Size();
         }
         assert(nvertex_local_dof_diag > 0);
+
+        std::cout<<"Solving local eigen problem of size "<<vertex_local_dof_ext.Size() <<" in agg "<<iAgg<<"/"<<nAggs<<"\n";
 
         // Single vertex aggregate
         if (edge_local_dof_ext.Size() == 0)
@@ -476,6 +479,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
         int num_iface_edge_dof = face_edge_dof.Size();
         assert(1 <= num_iface_edge_dof);
+        std::cout<<"preparing trace exchange of size "<<num_iface_edge_dof <<" in face "<<iface<<"/"<<nfaces<<"\n";
 
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
         assert(1 <= num_neighbor_aggs && num_neighbor_aggs <= 2);
@@ -579,6 +583,9 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
             auto Dloc = ExtractRowAndColumns(D_local_, vertex_local_dof,
                                              face_nbh_dofs, colMapper);
+            std::cout<<"preparing D exchange of nnz "<<Dloc.NumNonZeroElems()
+                    <<" in face "<<iface<<"/"<<nfaces<<"\n";
+
             sec_D.ReduceSend(iface, Dloc);
         }
         else // global boundary face or only 1 dof on face
@@ -620,6 +627,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                             face_nbh_dofs.GetData() + dof_counter);
                 dof_counter += local_dof.Size();
             }
+            std::cout<<"preparing M exchange of nnz "<<dof_counter
+                    <<" in face "<<iface<<"/"<<nfaces<<"\n";
 
             mfem::Vector Mloc(face_nbh_dofs.Size());
             for (int i = 0; i < face_nbh_dofs.Size(); i++)
@@ -683,6 +692,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 int nvertex_neighbor0 = Dloc_0.Height();
                 int nvertex_local_dofs = nvertex_neighbor0 + Dloc_1.Height();
+                std::cout<<"Solving local bvp of size "<<nvertex_local_dofs <<" in face "<<iface<<"/"<<nfaces<<"\n";
 
                 // set up an average zero vector (so no need to Normalize)
                 OneNegOne.SetSize(nvertex_local_dofs);
@@ -758,6 +768,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
                 int nvertex_local_dofs = Dloc_0.Height();
                 int nvertex_neighbor0 = Agg_vertex.RowSize(neighbor_aggs[0]);
+                std::cout<<"Solving local bvp of size "<<nvertex_local_dofs <<" in face "<<iface<<"/"<<nfaces<<"\n";
 
                 // set up an average zero vector (so no need to Normalize)
                 OneNegOne.SetSize(nvertex_local_dofs);
