@@ -37,6 +37,9 @@ target_link_libraries(test_IsolatePartitioner smoothg ${TPL_LIBRARIES})
 add_executable(wattsstrogatz wattsstrogatz.cpp)
 target_link_libraries(wattsstrogatz smoothg ${TPL_LIBRARIES})
 
+add_executable(mltopo mltopo.cpp)
+target_link_libraries(mltopo smoothg ${TPL_LIBRARIES})
+
 # add tests
 add_test(lineargraph lineargraph)
 add_test(lineargraph64 lineargraph --size 64)

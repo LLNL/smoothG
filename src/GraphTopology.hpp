@@ -61,6 +61,18 @@ public:
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
 
     /**
+       @brief Build agglomerated topology relation tables.
+
+       All of this data is local to a single processor
+
+       @param vertex_edge (unsigned) table describing graph
+       @param edge_d_td "dof_truedof" relation describing parallel data
+       @param partition partition vector for vertices
+       @param edge_boundaryattr boundary attributes for edges with boundary conditions
+    */
+    GraphTopology(GraphTopology& finer_graph_topology, int coarsening_factor);
+
+    /**
        @brief Partial graph-based constructor for graph topology.
 
        Uses given topology relations to construct the aggregated topology.
@@ -125,6 +137,10 @@ public:
     mfem::SparseMatrix face_bdratt_;
 
 private:
+    void Init(mfem::SparseMatrix& vertex_edge,
+              const mfem::Array<int>& partition,
+              const mfem::SparseMatrix* edge_boundaryattr);
+
     MPI_Comm comm_;
     int num_procs_;
     int myid_;

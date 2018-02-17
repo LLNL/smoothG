@@ -21,6 +21,7 @@
 
 #include "GraphTopology.hpp"
 #include "MatrixUtilities.hpp"
+#include "MetisGraphPartitioner.hpp"
 #include "utilities.hpp"
 #include <assert.h>
 
@@ -74,6 +75,13 @@ GraphTopology::GraphTopology(
     const mfem::SparseMatrix* edge_boundaryattr)
     : edge_d_td_(edge_d_td),
       comm_(edge_d_td.GetComm())
+{
+    Init(vertex_edge, partition, edge_boundaryattr);
+}
+
+void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
+                    const mfem::Array<int>& partition,
+                    const mfem::SparseMatrix* edge_boundaryattr)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
@@ -401,6 +409,37 @@ GraphTopology::GraphTopology(
         diag.LoseData();
     }
 }
+
+/**
+   @brief Build agglomerated topology relation tables.
+
+   All of this data is local to a single processor
+
+   @param vertex_edge (unsigned) table describing graph
+   @param edge_d_td "dof_truedof" relation describing parallel data
+   @param partition partition vector for vertices
+   @param edge_boundaryattr boundary attributes for edges with boundary conditions
+*/
+GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening_factor)
+    : edge_d_td_(*(finer_graph_topology.face_d_td_)),
+      comm_(edge_d_td_.GetComm())
+{
+    auto& vertex_edge = finer_graph_topology.Agg_face_;
+    const auto edge_boundaryattr = (finer_graph_topology.edge_d_td_) ?
+                &(finer_graph_topology.face_bdratt_) : nullptr;
+
+    auto edge_vertex = smoothg::Transpose(vertex_edge);
+    auto vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
+
+    const int nvertices = vertex_vertex.Height();
+    int num_partitions = std::max(1, nvertices / coarsening_factor);
+
+    mfem::Array<int> partitioning;
+    Partition(vertex_vertex, partitioning, num_partitions);
+
+    Init(vertex_edge, partitioning, edge_boundaryattr);
+}
+
 
 GraphTopology::GraphTopology(const mfem::SparseMatrix& face_edge,
                              const mfem::SparseMatrix& Agg_vertex,
