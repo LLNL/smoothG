@@ -135,6 +135,9 @@ private:
     // GraphTopology stuff
     SparseMatrix agg_vertex_local_;
     SparseMatrix agg_edge_local_;
+    SparseMatrix face_edge_local_;
+    SparseMatrix face_agg_local_;
+    ParMatrix face_face_;
 };
 
 } // namespace smoothg

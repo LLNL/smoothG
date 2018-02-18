@@ -185,12 +185,15 @@ void GraphUpscale::MakeTopology()
 {
     agg_vertex_local_ = MakeAggVertex(part_local_);
 
+    agg_vertex_local_ = 1;
+    vertex_edge_local_ = 1;
+
     SparseMatrix agg_edge_ext = agg_vertex_local_.Mult(vertex_edge_local_);
     agg_edge_ext.SortIndices();
 
     agg_edge_local_ = RestrictInterior(agg_edge_ext);
 
-    auto edge_agg = agg_edge_local_.Transpose<double>();
+    auto edge_ext_agg = agg_edge_ext.Transpose<double>();
 
     size_t num_vertices = vertex_edge_local_.Rows();
     size_t num_edges = vertex_edge_local_.Cols();
@@ -201,7 +204,7 @@ void GraphUpscale::MakeTopology()
     const auto& edge_starts = starts3[1];
     const auto& agg_starts = starts3[2];
 
-    ParMatrix edge_agg_d(comm_, edge_starts, agg_starts, edge_agg);
+    ParMatrix edge_agg_d(comm_, edge_starts, agg_starts, edge_ext_agg);
     ParMatrix agg_edge_d = edge_agg_d.Transpose();
 
     ParMatrix edge_agg_ext = edge_edge_.Mult(edge_agg_d);
@@ -210,7 +213,19 @@ void GraphUpscale::MakeTopology()
     SparseMatrix face_agg_int = MakeFaceAggInt(agg_agg);
     SparseMatrix face_edge_ext = face_agg_int.Mult(agg_edge_ext);
 
-    SparseMatrix face_edge = MakeFaceEdge(agg_agg, face_edge_ext);
+
+    face_edge_local_ = MakeFaceEdge(agg_agg, edge_edge_,
+                                    agg_edge_ext, face_edge_ext);
+
+    face_agg_local_ = ExtendFaceAgg(agg_agg, face_agg_int);
+
+    auto face_starts = parlinalgcpp::GenerateOffsets(comm_, face_agg_local_.Rows());
+
+    auto edge_face = face_edge_local_.Transpose<double>();
+    ParMatrix edge_face_d(comm_, edge_starts, face_starts, edge_face);
+
+    face_face_ = parlinalgcpp::RAP(edge_edge_, edge_face_d);
+    face_face_ = 1;
 }
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const
@@ -231,7 +246,7 @@ Vector GraphUpscale::ReadVector(const std::string& filename, const std::vector<i
         local_vect[i] = global_vect[local_to_global[i]];
     }
 
-    return Vector(std::move(local_vect));
+    return local_vect;
 }
 
 } // namespace smoothg
