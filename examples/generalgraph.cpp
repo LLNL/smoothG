@@ -33,7 +33,7 @@ using namespace smoothg;
 using Vector = linalgcpp::Vector<double>;
 using VectorView = linalgcpp::VectorView<double>;
 using BlockVector = linalgcpp::BlockVector<double>;
-using SparseMatrix = linalgcpp::SparseMatrix<int>;
+using SparseMatrix = linalgcpp::SparseMatrix<double>;
 using linalgcpp::ReadText;
 using linalgcpp::ReadCSR;
 
@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
     assert(num_partitions >= num_procs);
 
     /// [Load graph from file or generate one]
-    SparseMatrix vertex_edge_global = ReadCSR<int>(graphFileName);
+    SparseMatrix vertex_edge_global = ReadCSR(graphFileName);
 
     const int nvertices_global = vertex_edge_global.Rows();
     const int nedges_global = vertex_edge_global.Cols();

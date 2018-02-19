@@ -40,7 +40,7 @@ class GraphUpscale : public Upscale
     using Vector = linalgcpp::Vector<double>;
     using VectorView = linalgcpp::VectorView<double>;
     using BlockVector = linalgcpp::BlockVector<double>;
-    using SparseMatrix = linalgcpp::SparseMatrix<int>;
+    using SparseMatrix = linalgcpp::SparseMatrix<double>;
     using BlockMatrix = linalgcpp::BlockMatrix<double>;
     using ParMatrix = parlinalgcpp::ParMatrix;
 
@@ -105,7 +105,7 @@ private:
               const std::vector<double>& weight_global,
               double spect_tol, int max_evects);
 
-    void DistributeGraph(const linalgcpp::SparseMatrix<int>& vertex_edge,
+    void DistributeGraph(const SparseMatrix& vertex_edge,
               const std::vector<int>& global_partitioning);
     void MakeFineLevel(const std::vector<double>& global_weight);
     void MakeD(const std::vector<double>& global_weight);
@@ -138,6 +138,9 @@ private:
     SparseMatrix face_edge_local_;
     SparseMatrix face_agg_local_;
     ParMatrix face_face_;
+    ParMatrix face_true_edge_;
+    ParMatrix agg_ext_vertex_;
+    ParMatrix agg_ext_edge_;
 };
 
 } // namespace smoothg
