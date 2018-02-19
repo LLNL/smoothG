@@ -36,22 +36,25 @@
 using namespace smoothg;
 
 void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor);
+               mfem::SparseMatrix& vertex_edge,
+               int coarsening_factor);
 
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
+std::vector<GraphTopology> MultilevelGraphTopology(
+    mfem::SparseMatrix& vertex_edge, mfem::HypreParMatrix& edge_d_td,
+    mfem::SparseMatrix& edge_boundaryattr, int num_levels, int coarsening_factor);
+
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
+void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh);
 
 int main(int argc, char* argv[])
 {
-    int num_procs, myid;
+    int myid;
     picojson::object serialize;
 
     // 1. Initialize MPI
     MPI_Init(&argc, &argv);
     MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
@@ -62,37 +65,6 @@ int main(int argc, char* argv[])
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
                    "Dimension of the physical space.");
-    int slice = 0;
-    args.AddOption(&slice, "-s", "--slice",
-                   "Slice of SPE10 data to take for 2D run.");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
-    bool metis_agglomeration = false;
-    args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
-                   "-nm", "--no-metis-agglomeration",
-                   "Use Metis as the partitioner (instead of geometric).");
-    int spe10_scale = 5;
-    args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
-                   "Scale of problem, 1=small, 5=full SPE10.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
-    bool visualization = false;
-    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
-                   "--no-visualization", "Enable visualization.");
     args.Parse();
     if (!args.Good())
     {
@@ -108,142 +80,214 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 4;
-    coarseningFactor[1] = 5;
-    if (nDimensions == 3)
-        coarseningFactor[2] = 1;
+    constexpr auto spe10_scale = 5;
+    constexpr auto slice = 0;
+    constexpr auto num_levels = 4;
+    constexpr auto metis_agglomeration = true;
+    const int coarsening_factor = nDimensions == 2 ? 8 : 16;
 
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    mfem::Array<int> ess_zeros(nbdr);
-    mfem::Array<int> nat_one(nbdr);
-    mfem::Array<int> nat_zeros(nbdr);
-    ess_zeros = 1;
-    nat_one = 0;
-    nat_zeros = 0;
-
-    mfem::Array<int> ess_attr;
-    mfem::Vector weight;
-    mfem::Vector rhs_u_fine;
-
-    // Setting up finite volume discretization problem
+    // Setting up a mesh for finite volume discretization problem
+    mfem::Array<int> unused_coarsening_factors(nDimensions);
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, coarseningFactor);
-
+                              metis_agglomeration, unused_coarsening_factors);
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
-    if (myid == 0)
-    {
-        std::cout << pmesh->GetNEdges() << " fine edges, " <<
-                  pmesh->GetNFaces() << " fine faces, " <<
-                  pmesh->GetNE() << " fine elements\n";
-    }
+    // Construct vertex_edge, edge_trueedge, edge_boundaryattr tables from mesh
+    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
+                                               : pmesh->ElementToFaceTable();
+    mfem::SparseMatrix vertex_edge = TableToSparse(vertex_edge_table);
 
-    ess_attr.SetSize(nbdr);
-    for (int i(0); i < nbdr; ++i)
-        ess_attr[i] = ess_zeros[i];
-
-    // Construct "finite volume mass" matrix using mfem instead of parelag
     mfem::RT_FECollection sigmafec(0, nDimensions);
     mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-
-    mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight);
-
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        weight[i] = 1.0 / weight[i];
-    }
-
-    mfem::L2_FECollection ufec(0, nDimensions);
-    mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
-
-    mfem::LinearForm q(&ufespace);
-    q.AddDomainIntegrator(
-        new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
-    q.Assemble();
-    rhs_u_fine = q;
+    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
+    auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh);
 
     // Create multilevel graph topology
-    {
-        constexpr int num_levels = 4;
-        constexpr int coarsening_factor = 20;
+    auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, edge_boundaryattr,
+                                               num_levels, coarsening_factor);
 
-        // Construct vertex_edge table in mfem::SparseMatrix format
-        auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                                                   : pmesh->ElementToFaceTable();
-        mfem::SparseMatrix vertex_edge = TableToSparse(vertex_edge_table);
-
-        std::vector<std::unique_ptr<GraphTopology> > graph_topologies(num_levels-1);
-
-        // Construct partition based on METIS
-        mfem::Array<int> partitioning;
-
-        MetisPart(partitioning, sigmafespace, ufespace, coarseningFactor);
-
-        const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-        auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
-
-        graph_topologies[0] = make_unique<GraphTopology>(vertex_edge, *edge_d_td, partitioning, &edge_boundary_att);
-        for (int i = 0; i < num_levels-2; i++)
-        {
-            graph_topologies[i+1] = make_unique<GraphTopology>(*(graph_topologies[i]), coarsening_factor);
-        }
-    }
+    // Show aggregates in all levels
+    ShowAggregates(graph_topos, pmesh);
 
     return EXIT_SUCCESS;
 }
 
 void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor)
+               mfem::SparseMatrix& vertex_edge,
+               int coarsening_factor)
 {
-    mfem::DiscreteLinearOperator DivOp(&sigmafespace, &ufespace);
-    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
-    DivOp.Assemble();
-    DivOp.Finalize();
+    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
+    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
 
-    const mfem::SparseMatrix& DivMat = DivOp.SpMat();
-    const mfem::SparseMatrix DivMatT = smoothg::Transpose(DivMat);
-    const mfem::SparseMatrix vertex_vertex = smoothg::Mult(DivMat, DivMatT);
+    const int nvertices = vert_vert.Height();
+    int num_partitions = std::max(1, nvertices / coarsening_factor);
 
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
-
-    const int nvertices = vertex_vertex.Height();
-    int num_partitions = std::max(1, nvertices / metis_coarsening_factor);
-
-    Partition(vertex_vertex, partitioning, num_partitions);
+    Partition(vert_vert, partitioning, num_partitions);
 }
 
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor)
+std::vector<GraphTopology> MultilevelGraphTopology(
+    mfem::SparseMatrix& vertex_edge, mfem::HypreParMatrix& edge_d_td,
+    mfem::SparseMatrix& edge_boundaryattr, int num_levels, int coarsening_factor)
 {
-    const int nDimensions = num_procs_xyz.size();
-
-    mfem::Array<int> nxyz(nDimensions);
-    nxyz[0] = 60 / num_procs_xyz[0] / coarsening_factor[0];
-    nxyz[1] = 220 / num_procs_xyz[1] / coarsening_factor[1];
-    if (nDimensions == 3)
-        nxyz[2] = 85 / num_procs_xyz[2] / coarsening_factor[2];
-
-    for (int& i : nxyz)
+    std::vector<GraphTopology> graph_topologies;
+    graph_topologies.reserve(num_levels-1);
     {
-        i = std::max(1, i);
+        // Construct finest level graph topology
+        mfem::Array<int> partitioning;
+        MetisPart(partitioning, vertex_edge, coarsening_factor);
+        graph_topologies.emplace_back(vertex_edge, edge_d_td, partitioning, &edge_boundaryattr);
+
+        // Construct coarser level graph topology by recursion
+        for (int i = 0; i < num_levels-2; i++)
+        {
+            graph_topologies.emplace_back(graph_topologies.back(), coarsening_factor);
+        }
+    }
+    return graph_topologies;
+}
+
+// This is a SERIAL coloring algorithm such that colors of adjacent elements
+// (specified by el_el) are distinct.
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el)
+{
+    const int el0 = 0;
+
+    int num_el = el_el.Size(), stack_p, stack_top_p, max_num_colors;
+    mfem::Array<int> el_stack(num_el);
+
+    const int *i_el_el = el_el.GetI();
+    const int *j_el_el = el_el.GetJ();
+
+    colors.SetSize(num_el);
+    colors = -2;
+    max_num_colors = 1;
+    stack_p = stack_top_p = 0;
+    for (int el = el0; stack_top_p < num_el; el = (el + 1) % num_el)
+    {
+        if (colors[el] != -2)
+        {
+            continue;
+        }
+
+        colors[el] = -1;
+        el_stack[stack_top_p++] = el;
+
+        for ( ; stack_p < stack_top_p; stack_p++)
+        {
+            int i = el_stack[stack_p];
+            int num_nb = i_el_el[i+1] - i_el_el[i] - 1;   // assuming non-zeros on diagonal
+            max_num_colors = std::max(max_num_colors, num_nb + 1);
+            for (int j = i_el_el[i]; j < i_el_el[i+1]; j++)
+            {
+                int k = j_el_el[j];
+                if (j == i)
+                {
+                    continue; // skip self-interaction
+                }
+                if (colors[k] == -2)
+                {
+                    colors[k] = -1;
+                    el_stack[stack_top_p++] = k;
+                }
+            }
+        }
     }
 
-    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
-    partitioning.Append(cart_part);
+    mfem::Array<int> color_marker(max_num_colors);
+    for (stack_p = 0; stack_p < stack_top_p; stack_p++)
+    {
+        int i = el_stack[stack_p], color;
+        color_marker = 0;
+        for (int j = i_el_el[i]; j < i_el_el[i+1]; j++)
+        {
+            if (j_el_el[j] == i)
+            {
+                continue;          // skip self-interaction
+            }
+            color = colors[j_el_el[j]];
+            if (color != -1)
+            {
+                color_marker[color] = 1;
+            }
+        }
 
-    cart_part.MakeDataOwner();
+        for (color = 0; color < max_num_colors; color++)
+        {
+            if (color_marker[color] == 0)
+            {
+                break;
+            }
+        }
+
+        colors[i] = color;
+    }
+}
+
+void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)
+{
+    mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
+    mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
+    mfem::ParGridFunction attr(&attr_fespace);
+
+    mfem::socketstream sol_sock;
+    for (unsigned int i = 0; i < graph_topos.size(); i++)
+    {
+        // Compute partitioning vector on level i+1
+        mfem::SparseMatrix Agg_vertex = graph_topos[0].Agg_vertex_;
+        for (unsigned int j = 1; j < i+1; j++)
+        {
+            auto tmp = smoothg::Mult(graph_topos[j].Agg_vertex_, Agg_vertex);
+            Agg_vertex.Swap(tmp);
+        }
+        auto vertex_Agg = smoothg::Transpose(Agg_vertex);
+        int* partitioning = vertex_Agg.GetJ();
+
+        // Make better coloring
+        const auto& Agg_face = graph_topos[i].Agg_face_;
+        auto face_Agg = smoothg::Transpose(Agg_face);
+        auto Agg_Agg = smoothg::Mult(Agg_face, face_Agg);
+        mfem::Array<int> colors;
+        GetElementColoring(colors, Agg_Agg);
+        const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());
+
+        for (int j = 0; j < vertex_Agg.Height(); j++)
+        {
+            attr(j) = (colors[partitioning[j]] + pmesh->GetMyRank()) % num_colors;
+        }
+
+        char vishost[] = "localhost";
+        int  visport   = 19916;
+        sol_sock.open(vishost, visport);
+        if (sol_sock.is_open())
+        {
+            sol_sock.precision(8);
+            sol_sock << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
+            if (pmesh->SpaceDimension() == 2)
+            {
+                sol_sock << "fem2d_gf_data_keys\n";
+            }
+            else
+            {
+                sol_sock << "fem3d_gf_data_keys\n";
+            }
+
+            pmesh->PrintWithPartitioning(partitioning, sol_sock, 0);
+            attr.Save(sol_sock);
+
+            sol_sock << "window_size 500 800\n";
+            sol_sock << "window_title 'Level " << i+1 << " aggregation'\n";
+            if (pmesh->SpaceDimension() == 2)
+            {
+                sol_sock << "view 0 0\n"; // view from top
+                sol_sock << "keys jl\n";  // turn off perspective and light
+                sol_sock << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+                sol_sock << "keys b\n";  // draw interface
+            }
+            else
+            {
+                sol_sock << "keys ]]]]]]]]]]]]]\n";  // increase size
+            }
+            MPI_Barrier(pmesh->GetComm());
+        }
+    }
 }
