@@ -404,6 +404,14 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::
 double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
 
+/**
+   @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
+
+   @param colors at return containing colors of all elements
+   @param el_el element connectivity matrix (assuming nonzero diagonal)
+*/
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
 } // namespace smoothg
 
 #endif /* __UTILITIES_HPP */

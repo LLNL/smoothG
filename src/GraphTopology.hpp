@@ -153,6 +153,10 @@ private:
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology
 
+std::vector<GraphTopology> MultilevelGraphTopology(
+    mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_d_td,
+    const mfem::SparseMatrix* edge_boundaryattr, int num_levels, int coarsening_factor);
+
 } // namespace smoothg
 
 #endif /* __GRAPHTOPOLOGY_HPP__ */

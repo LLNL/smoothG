@@ -504,4 +504,31 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     Swap(face_start_, graph_topology.GetFaceStart());
 }
 
+std::vector<GraphTopology> MultilevelGraphTopology(
+    mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_d_td,
+    const mfem::SparseMatrix* edge_boundaryattr, int num_levels, int coarsening_factor)
+{
+    std::vector<GraphTopology> graph_topologies;
+    graph_topologies.reserve(num_levels-1);
+
+    // Construct finest level graph topology
+    mfem::Array<int> partitioning;
+    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
+    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
+
+    const int nvertices = vert_vert.Height();
+    int num_partitions = std::max(1, nvertices / coarsening_factor);
+
+    Partition(vert_vert, partitioning, num_partitions);
+    graph_topologies.emplace_back(vertex_edge, edge_d_td, partitioning, edge_boundaryattr);
+
+    // Construct coarser levels graph topology by recursion
+    for (int i = 0; i < num_levels-2; i++)
+    {
+        graph_topologies.emplace_back(graph_topologies.back(), coarsening_factor);
+    }
+
+    return graph_topologies;
+}
+
 } // namespace smoothg

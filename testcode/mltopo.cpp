@@ -35,16 +35,6 @@
 
 using namespace smoothg;
 
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::SparseMatrix& vertex_edge,
-               int coarsening_factor);
-
-std::vector<GraphTopology> MultilevelGraphTopology(
-    mfem::SparseMatrix& vertex_edge, mfem::HypreParMatrix& edge_d_td,
-    mfem::SparseMatrix& edge_boundaryattr, int num_levels, int coarsening_factor);
-
-void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
-
 void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh);
 
 int main(int argc, char* argv[])
@@ -103,124 +93,13 @@ int main(int argc, char* argv[])
     auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh);
 
     // Create multilevel graph topology
-    auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, edge_boundaryattr,
+    auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, &edge_boundaryattr,
                                                num_levels, coarsening_factor);
 
-    // Show aggregates in all levels
+    // Visualize aggregates in all levels
     ShowAggregates(graph_topos, pmesh);
 
     return EXIT_SUCCESS;
-}
-
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::SparseMatrix& vertex_edge,
-               int coarsening_factor)
-{
-    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
-    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
-
-    const int nvertices = vert_vert.Height();
-    int num_partitions = std::max(1, nvertices / coarsening_factor);
-
-    Partition(vert_vert, partitioning, num_partitions);
-}
-
-std::vector<GraphTopology> MultilevelGraphTopology(
-    mfem::SparseMatrix& vertex_edge, mfem::HypreParMatrix& edge_d_td,
-    mfem::SparseMatrix& edge_boundaryattr, int num_levels, int coarsening_factor)
-{
-    std::vector<GraphTopology> graph_topologies;
-    graph_topologies.reserve(num_levels-1);
-    {
-        // Construct finest level graph topology
-        mfem::Array<int> partitioning;
-        MetisPart(partitioning, vertex_edge, coarsening_factor);
-        graph_topologies.emplace_back(vertex_edge, edge_d_td, partitioning, &edge_boundaryattr);
-
-        // Construct coarser level graph topology by recursion
-        for (int i = 0; i < num_levels-2; i++)
-        {
-            graph_topologies.emplace_back(graph_topologies.back(), coarsening_factor);
-        }
-    }
-    return graph_topologies;
-}
-
-// This is a SERIAL coloring algorithm such that colors of adjacent elements
-// (specified by el_el) are distinct.
-void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el)
-{
-    const int el0 = 0;
-
-    int num_el = el_el.Size(), stack_p, stack_top_p, max_num_colors;
-    mfem::Array<int> el_stack(num_el);
-
-    const int *i_el_el = el_el.GetI();
-    const int *j_el_el = el_el.GetJ();
-
-    colors.SetSize(num_el);
-    colors = -2;
-    max_num_colors = 1;
-    stack_p = stack_top_p = 0;
-    for (int el = el0; stack_top_p < num_el; el = (el + 1) % num_el)
-    {
-        if (colors[el] != -2)
-        {
-            continue;
-        }
-
-        colors[el] = -1;
-        el_stack[stack_top_p++] = el;
-
-        for ( ; stack_p < stack_top_p; stack_p++)
-        {
-            int i = el_stack[stack_p];
-            int num_nb = i_el_el[i+1] - i_el_el[i] - 1;   // assuming non-zeros on diagonal
-            max_num_colors = std::max(max_num_colors, num_nb + 1);
-            for (int j = i_el_el[i]; j < i_el_el[i+1]; j++)
-            {
-                int k = j_el_el[j];
-                if (j == i)
-                {
-                    continue; // skip self-interaction
-                }
-                if (colors[k] == -2)
-                {
-                    colors[k] = -1;
-                    el_stack[stack_top_p++] = k;
-                }
-            }
-        }
-    }
-
-    mfem::Array<int> color_marker(max_num_colors);
-    for (stack_p = 0; stack_p < stack_top_p; stack_p++)
-    {
-        int i = el_stack[stack_p], color;
-        color_marker = 0;
-        for (int j = i_el_el[i]; j < i_el_el[i+1]; j++)
-        {
-            if (j_el_el[j] == i)
-            {
-                continue;          // skip self-interaction
-            }
-            color = colors[j_el_el[j]];
-            if (color != -1)
-            {
-                color_marker[color] = 1;
-            }
-        }
-
-        for (color = 0; color < max_num_colors; color++)
-        {
-            if (color_marker[color] == 0)
-            {
-                break;
-            }
-        }
-
-        colors[i] = color;
-    }
 }
 
 void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)
@@ -242,7 +121,7 @@ void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmes
         auto vertex_Agg = smoothg::Transpose(Agg_vertex);
         int* partitioning = vertex_Agg.GetJ();
 
-        // Make better coloring
+        // Make better coloring (better with serial run)
         const auto& Agg_face = graph_topos[i].Agg_face_;
         auto face_Agg = smoothg::Transpose(Agg_face);
         auto Agg_Agg = smoothg::Mult(Agg_face, face_Agg);
