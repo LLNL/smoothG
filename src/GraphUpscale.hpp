@@ -41,6 +41,7 @@ class GraphUpscale : public Upscale
     using VectorView = linalgcpp::VectorView<double>;
     using BlockVector = linalgcpp::BlockVector<double>;
     using SparseMatrix = linalgcpp::SparseMatrix<double>;
+    using DenseMatrix = linalgcpp::DenseMatrix;
     using BlockMatrix = linalgcpp::BlockMatrix<double>;
     using ParMatrix = parlinalgcpp::ParMatrix;
 
@@ -102,14 +103,14 @@ public:
 private:
     void Init(const SparseMatrix& vertex_edge_global,
               const std::vector<int>& partitioning_global,
-              const std::vector<double>& weight_global,
-              double spect_tol, int max_evects);
+              const std::vector<double>& weight_global);
 
     void DistributeGraph(const SparseMatrix& vertex_edge,
               const std::vector<int>& global_partitioning);
     void MakeFineLevel(const std::vector<double>& global_weight);
     void MakeD(const std::vector<double>& global_weight);
     void MakeTopology();
+    void MakeCoarseSpace();
 
     Vector ReadVector(const std::string& filename, const std::vector<int>& local_to_global) const;
 
@@ -118,6 +119,9 @@ private:
 
     const int global_edges_;
     const int global_vertices_;
+
+    double spect_tol_;
+    int max_evects_;
 
     // ParGraph Stuff
     std::vector<int> edge_map_;
@@ -129,18 +133,29 @@ private:
     ParMatrix edge_edge_;
 
     // Mixed Matrix stuff
-    BlockMatrix fine_level_;
-    BlockMatrix coarse_level_;
+    SparseMatrix M_local_;
+    SparseMatrix D_local_;
+    SparseMatrix W_local_;
+    std::vector<int> offsets_;
+    std::vector<int> true_offsets_;
+
+    ParMatrix M_global_;
+    ParMatrix D_global_;
+    ParMatrix W_global_;
 
     // GraphTopology stuff
     SparseMatrix agg_vertex_local_;
     SparseMatrix agg_edge_local_;
     SparseMatrix face_edge_local_;
     SparseMatrix face_agg_local_;
+
     ParMatrix face_face_;
     ParMatrix face_true_edge_;
+    ParMatrix face_edge_;
     ParMatrix agg_ext_vertex_;
     ParMatrix agg_ext_edge_;
+
+    // LocalProblem Stuff
 };
 
 } // namespace smoothg

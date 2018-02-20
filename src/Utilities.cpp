@@ -443,4 +443,73 @@ parlinalgcpp::ParMatrix MakeFaceTrueEdge(const parlinalgcpp::ParMatrix& face_fac
     return face_face.Mult(select_d);
 }
 
+parlinalgcpp::ParMatrix MakeExtPermutation(MPI_Comm comm, const parlinalgcpp::ParMatrix& parmat)
+{
+    const auto& diag = parmat.GetDiag();
+    const auto& offd = parmat.GetOffd();
+    const auto& colmap = parmat.GetColMap();
+
+    int num_diag = diag.Cols();
+    int num_offd = offd.Cols();
+    int num_ext = num_diag + num_offd;
+
+    const auto& mat_starts = parmat.GetColStarts();
+    auto ext_starts = parlinalgcpp::GenerateOffsets(comm, num_ext);
+
+    linalgcpp::SparseMatrix<double> perm_diag = SparseIdentity(num_ext, num_diag);
+    linalgcpp::SparseMatrix<double> perm_offd = SparseIdentity(num_ext, num_offd, num_diag);
+
+    return parlinalgcpp::ParMatrix(comm, ext_starts, mat_starts, std::move(perm_diag), std::move(perm_offd), colmap);
+}
+
+linalgcpp::SparseMatrix<double> SparseIdentity(int size)
+{
+    assert(size >= 0);
+
+    return linalgcpp::SparseMatrix<double>(std::vector<double>(size, 1.0));
+}
+
+linalgcpp::SparseMatrix<double> SparseIdentity(int rows, int cols, int row_offset, int col_offset)
+{
+    assert(rows >= 0);
+    assert(cols >= 0);
+    assert(row_offset <= rows);
+    assert(row_offset >= 0);
+    assert(col_offset <= cols);
+    assert(col_offset >= 0);
+
+    const int diag_size = std::min(rows - row_offset, cols - col_offset);
+
+    std::vector<int> indptr(rows + 1);
+
+    std::fill(std::begin(indptr), std::begin(indptr) + row_offset, 0);
+    std::iota(std::begin(indptr) + row_offset, std::begin(indptr) + row_offset + diag_size, 0);
+    std::fill(std::begin(indptr) + row_offset + diag_size, std::begin(indptr) + rows + 1, diag_size);
+
+    std::vector<int> indices(diag_size);
+    std::iota(std::begin(indices), std::begin(indices) + diag_size, col_offset);
+
+    std::vector<double> data(diag_size, 1.0);
+
+    return linalgcpp::SparseMatrix<double>(std::move(indptr), std::move(indices), std::move(data), rows, cols);
+}
+
+std::vector<int> GetExtDofs(const parlinalgcpp::ParMatrix& mat_ext, int row)
+{
+    const auto& diag = mat_ext.GetDiag();
+    const auto& offd = mat_ext.GetOffd();
+
+    auto diag_dofs = diag.GetIndices(row);
+    auto offd_dofs = offd.GetIndices(row);
+
+    int num_diag = diag_dofs.size();
+
+    for (auto i : offd_dofs)
+    {
+        diag_dofs.push_back(i + num_diag);
+    }
+
+    return diag_dofs;
+}
+
 } // namespace smoothg

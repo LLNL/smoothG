@@ -88,6 +88,12 @@ linalgcpp::SparseMatrix<double> ExtendFaceAgg(const parlinalgcpp::ParMatrix& agg
                                            const linalgcpp::SparseMatrix<double>& face_agg_int);
 
 parlinalgcpp::ParMatrix MakeFaceTrueEdge(const parlinalgcpp::ParMatrix& face_face);
+parlinalgcpp::ParMatrix MakeExtPermutation(MPI_Comm comm, const parlinalgcpp::ParMatrix& parmat);
+
+linalgcpp::SparseMatrix<double> SparseIdentity(int size);
+linalgcpp::SparseMatrix<double> SparseIdentity(int rows, int cols, int row_offset = 0, int col_offset = 0);
+
+std::vector<int> GetExtDofs(const parlinalgcpp::ParMatrix& mat_ext, int row);
 
 } //namespace smoothg
 
