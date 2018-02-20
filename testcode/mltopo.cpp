@@ -49,12 +49,12 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
-                   "SPE10 permeability file data.");
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
                    "Dimension of the physical space.");
+    bool visualization = true;
+    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
+                   "--no-visualization", "Enable visualization.");
     args.Parse();
     if (!args.Good())
     {
@@ -70,17 +70,21 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    constexpr auto spe10_scale = 5;
-    constexpr auto slice = 0;
     constexpr auto num_levels = 4;
-    constexpr auto metis_agglomeration = true;
-    const int coarsening_factor = nDimensions == 2 ? 8 : 16;
+    const int coarsening_factor = nDimensions == 2 ? 8 : 32;
 
-    // Setting up a mesh for finite volume discretization problem
-    mfem::Array<int> unused_coarsening_factors(nDimensions);
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, unused_coarsening_factors);
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
+    // Setting up a mesh (2D or 3D SPE10 model)
+    unique_ptr<mfem::ParMesh> pmesh;
+    if (nDimensions == 3)
+    {
+         mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
+         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
+    }
+    else
+    {
+        mfem::Mesh mesh(60, 220, mfem::Element::QUADRILATERAL, 1, 1200, 2200);
+        pmesh = make_unique<mfem::ParMesh>(comm, mesh);
+    }
 
     // Construct vertex_edge, edge_trueedge, edge_boundaryattr tables from mesh
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
@@ -88,16 +92,19 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix vertex_edge = TableToSparse(vertex_edge_table);
 
     mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
+    mfem::ParFiniteElementSpace sigmafespace(pmesh.get(), &sigmafec);
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-    auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh);
+    auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh.get());
 
-    // Create multilevel graph topology
+    // Build multilevel graph topology
     auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, &edge_boundaryattr,
                                                num_levels, coarsening_factor);
 
     // Visualize aggregates in all levels
-    ShowAggregates(graph_topos, pmesh);
+    if (visualization)
+    {
+        ShowAggregates(graph_topos, pmesh.get());
+    }
 
     return EXIT_SUCCESS;
 }
