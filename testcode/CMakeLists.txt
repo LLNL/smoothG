@@ -73,7 +73,7 @@ add_valgrind_test(vwattsstrogatz wattsstrogatz)
 
 add_test(mltopo mltopo --no-visualization)
 add_test(parmltopo mpirun -np 2 ./mltopo --no-visualization)
-add_valgrind_test(vmltopo "mltopo --no-visualization")
+add_valgrind_test(vmltopo mltopo)
 
 add_test(NAME style
   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp
