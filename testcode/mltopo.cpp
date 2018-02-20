@@ -40,7 +40,6 @@ void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmes
 int main(int argc, char* argv[])
 {
     int myid;
-    picojson::object serialize;
 
     // 1. Initialize MPI
     MPI_Init(&argc, &argv);
@@ -105,6 +104,8 @@ int main(int argc, char* argv[])
     {
         ShowAggregates(graph_topos, pmesh.get());
     }
+
+    MPI_Finalize();
 
     return EXIT_SUCCESS;
 }
