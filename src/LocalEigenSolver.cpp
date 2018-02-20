@@ -337,6 +337,27 @@ private:
     mfem::UMFPackSolver B_inv_;
 };
 
+/*! @brief Derived class to avoid uninitialized value Valgrind error */
+template<class ARFLOAT, class ARFOP>
+class ARSymStdEig_: public virtual ARSymStdEig<ARFLOAT, ARFOP>
+{
+public:
+    using ARSymStdEig<ARFLOAT, ARFOP>::HowMny;
+
+    ARSymStdEig_(int np, int nevp, ARFOP* objOPp,
+                 void (ARFOP::* MultOPxp)(ARFLOAT[], ARFLOAT[]),
+                 const std::string& whichp = "LM", int ncvp = 0, ARFLOAT tolp = 0.0,
+                 int maxitp = 0, ARFLOAT* residp = NULL, bool ishiftp = true)
+        : ARSymStdEig<ARFLOAT, ARFOP>(np, nevp, objOPp, MultOPxp,
+                                      whichp, ncvp, tolp, maxitp, residp, ishiftp)
+    {
+        HowMny = 'A';
+    }
+
+    virtual ~ARSymStdEig_() { }
+
+}; // class ARSymStdEig_.
+
 // ncv is the number of Arnoldi vectors generated at each iteration of ARPACK
 int ComputeNCV(int size, int num_evects, int num_arnoldi_vectors)
 {
@@ -373,7 +394,6 @@ void LocalEigenSolver::Compute(
     ARSymStdEig<double, A_B_shift_adapter>
     eigprob(n, max_num_evects, &adapter_A_I_shift, &A_B_shift_adapter::MultOP,
             shift_, "LM", ncv, tolerance_, max_iterations_);
-
     auto data_ptr = EigenPairsSetSizeAndData(n, max_num_evects, evals, evects);
     int num_converged = eigprob.EigenValVectors(data_ptr[0], data_ptr[1]);
     CheckNotConverged(max_num_evects, num_converged);
@@ -382,7 +402,7 @@ void LocalEigenSolver::Compute(
     {
         // Find the largest eigenvalue
         A_adapter adapter_A(A);
-        ARSymStdEig<double, A_adapter>
+        ARSymStdEig_<double, A_adapter>
         eigvalueprob(n, 1, &adapter_A, &A_adapter::MultOP,
                      "LM", ncv, tolerance_, max_iterations_);
         eigvalueprob.Eigenvalues(eig_max_ptr_);
