@@ -358,6 +358,28 @@ public:
 
 }; // class ARSymStdEig_.
 
+/*! @brief Derived class to avoid uninitialized value Valgrind error */
+template<class ARFLOAT, class ARFOP, class ARFB>
+class ARSymGenEig_: public virtual ARSymGenEig<ARFLOAT, ARFOP, ARFB>
+{
+public:
+    using ARSymGenEig<ARFLOAT, ARFOP, ARFB>::HowMny;
+
+    ARSymGenEig_(int np, int nevp, ARFOP* objOPp,
+                void (ARFOP::* MultOPxp)(ARFLOAT[], ARFLOAT[]), ARFB* objBp,
+                void (ARFB::* MultBxp)(ARFLOAT[], ARFLOAT[]),
+                const std::string& whichp = "LM", int ncvp = 0, ARFLOAT tolp = 0.0,
+                int maxitp = 0, ARFLOAT* residp = NULL, bool ishiftp = true)
+        : ARSymGenEig<ARFLOAT, ARFOP, ARFB>(np, nevp, objOPp, MultOPxp, objBp, MultBxp,
+                                            whichp, ncvp, tolp, maxitp, residp, ishiftp)
+    {
+        HowMny = 'A';
+    }
+
+    virtual ~ARSymGenEig_() { }
+
+}; // class ARSymGenEig_.
+
 // ncv is the number of Arnoldi vectors generated at each iteration of ARPACK
 int ComputeNCV(int size, int num_evects, int num_arnoldi_vectors)
 {
@@ -438,7 +460,7 @@ void LocalEigenSolver::Compute(
         // TODO: more efficient way to find eig_max of generalized eigen problem
         // Find the largest eigenvalue
         B_inv_A_adapter adapter_B_inv_A(A, B);
-        ARSymGenEig<double, B_inv_A_adapter, A_adapter>
+        ARSymGenEig_<double, B_inv_A_adapter, A_adapter>
         eigvalueprob(A.Height(), 1,
                      &adapter_B_inv_A, &B_inv_A_adapter::MultOP,
                      &adapter_B, &A_adapter::MultOP,
