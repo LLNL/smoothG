@@ -247,6 +247,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
 SPE10Problem::~SPE10Problem()
 {
+    smoothg::InversePermeabilityFunction::ClearMemory();
     delete source_coeff_;
     delete kinv_;
     delete pmesh_;
