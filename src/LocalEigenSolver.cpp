@@ -366,10 +366,10 @@ public:
     using ARSymGenEig<ARFLOAT, ARFOP, ARFB>::HowMny;
 
     ARSymGenEig_(int np, int nevp, ARFOP* objOPp,
-                void (ARFOP::* MultOPxp)(ARFLOAT[], ARFLOAT[]), ARFB* objBp,
-                void (ARFB::* MultBxp)(ARFLOAT[], ARFLOAT[]),
-                const std::string& whichp = "LM", int ncvp = 0, ARFLOAT tolp = 0.0,
-                int maxitp = 0, ARFLOAT* residp = NULL, bool ishiftp = true)
+                 void (ARFOP::* MultOPxp)(ARFLOAT[], ARFLOAT[]), ARFB* objBp,
+                 void (ARFB::* MultBxp)(ARFLOAT[], ARFLOAT[]),
+                 const std::string& whichp = "LM", int ncvp = 0, ARFLOAT tolp = 0.0,
+                 int maxitp = 0, ARFLOAT* residp = NULL, bool ishiftp = true)
         : ARSymGenEig<ARFLOAT, ARFOP, ARFB>(np, nevp, objOPp, MultOPxp, objBp, MultBxp,
                                             whichp, ncvp, tolp, maxitp, residp, ishiftp)
     {
