@@ -173,6 +173,7 @@ class CoefficientMBuilder : public CoarseMBuilder
 public:
     CoefficientMBuilder(
         const GraphTopology& topology,
+        mfem::SparseMatrix& Pedges,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         std::vector<mfem::DenseMatrix>& CM_el,
@@ -196,12 +197,32 @@ public:
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
-    /// Here returns a null pointer
-    /// @todo change interface so this is optional?
+    /**
+       @brief Set weights on aggregates for assembly of coarse mass matrix.
+
+       The point of this class is to be able to build the coarse mass matrix
+       with different weights, without recoarsening the whole thing.
+
+       weights are (deep) copied (for now)
+    */
+    void SetCoefficient(const mfem::Vector& agg_weights);
+
+    /**
+       @brief Assemble local components, independent of coefficient.
+
+       Call this once, call SetCoefficient afterwards many times, each time
+       you call SetCoefficient you can call GetCoarseM() and get the new
+       global coarse M with different coefficients.
+    */
+    void BuildComponents();
+
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
 private:
     const GraphTopology& topology_;
+    mfem::SparseMatrix& Pedges_;
+
+    mfem::Vector agg_weights_;
 };
 
 /**

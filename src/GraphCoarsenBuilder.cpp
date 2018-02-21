@@ -58,12 +58,14 @@ AssembleMBuilder::AssembleMBuilder(
 
 CoefficientMBuilder::CoefficientMBuilder(
     const GraphTopology& topology,
+    mfem::SparseMatrix& Pedges,
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
     std::vector<mfem::DenseMatrix>& CM_el,
     int total_num_traces, int ncoarse_vertexdofs)
     :
-    topology_(topology)
+    topology_(topology),
+    Pedges_(Pedges)
 {
 }
 
@@ -201,7 +203,7 @@ void AssembleMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatri
 }
 
 void CoefficientMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                                           const mfem::SparseMatrix& Agg_cdof_edge)
+                                              const mfem::SparseMatrix& Agg_cdof_edge)
 {
 }
 
@@ -245,9 +247,83 @@ std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM()
     return std::move(CoarseM_);
 }
 
+void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weights)
+{
+    agg_weights_ = agg_weights;
+}
+
+void CoefficientMBuilder::BuildComponents()
+{
+    // GetCoareFaceDofs(face_num, Array<int>)
+    // comp_F_F[num_faces];
+    // RTR (densematrix Transpose times itself)
+    // RTP
+    // indexing!
+
+    // F_F block
+    const int num_faces = topology_.GetAggFace().Width();
+    const int num_aggs = topology_.GetAggFace().Height();
+    Array<int> local_fine_dofs;
+    Array<int> local_coarse_dofs;
+    comp_F_F.resize(num_faces);
+    for (int face=0; face<num_faces; ++face)
+    {
+        DenseMatrix P_F;
+        GetCoarseFaceDofs(face, local_coarse_dofs);
+        GetTableRow(topology_.GetFaceEdge(), face, local_fine_dofs);
+        Pedges.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_F);
+        comp_F_F[face] = RTR(P_F);
+    }
+
+    // the EF_EFprime block
+    // for (pairs of *faces* that share an *aggregate*)
+    Array<int> local_faces;
+    // not sure what to do here: map pairs of faces to indices?
+    std::map< std::pair<int,int>, int> face_pair_to_index;
+    int counter = 0;
+    for (int agg=0; agg<num_aggs; ++agg)
+    {
+        GetTableRow(topology_.GetAggFace(), agg, local_faces);
+        for (int f1=0; f1<local_faces.Size(); ++f1)
+        {
+            int face1 = local_faces[f1];
+            for (int f2=face1+1; f2<local_faces.Size(); ++f2)
+            {
+                int face2 = local_faces[f2];
+                auto pair = std::make_pair(face1, face2);
+                if (pair not in face_pair_to_index)
+                    face_pair_to_index[pair] = counter++;
+                
+            }
+        }
+    }
+
+    // EF_E block and EE block
+    comp_E_E.resize(num_aggs);
+    for (int agg=0; agg<num_aggs; ++agg)
+    {
+        GetTableRow(topology_.GetAggEdge(), agg, local_fine_dofs);
+        DenseMatrix P_E;
+        Pedges.GetSubMatrix(local_fine_dofs, local_fine_dofs, P_E);
+        comp_E_E[a] = RTR(P_E);
+        GetTableRow(topology_.GetAggFace(), agg, local_faces);
+        for (int af=0; af<faces_in_agg; ++af)
+        {
+            DenseMatrix P_EF;
+            Pedges.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
+            // int index = -1; // ??? todo, how to index these guys
+            // comp_EF_E[index] = RTP(P_EF, P_E);
+            comp_EF_E.push_back(RTP(P_EF, P_E));
+            // also store transpose, or just have it implicitly?
+        }
+    }
+}
+
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
 {
-    return std::unique_ptr<mfem::SparseMatrix>(nullptr);
+
+
+    return std::move(CoarseM_);
 }
 
 Agg_cdof_edge_Builder::Agg_cdof_edge_Builder(std::vector<mfem::DenseMatrix>& edge_traces,

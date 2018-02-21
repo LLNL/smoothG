@@ -617,11 +617,6 @@ ParGraph::ParGraph(MPI_Comm comm,
     vertex_edge_local_.Swap(tmp);
 }
 
-/**
-   This implementation basically taken from
-   DofAgglomeration::GetViewAgglomerateDofGlobalNumbering()
-   as one step to extracting from Parelag.
-*/
 void GetTableRow(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
 {
