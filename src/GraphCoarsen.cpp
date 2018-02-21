@@ -298,11 +298,18 @@ void GraphCoarsen::BuildPEdges(
     NormalizeTraces(edge_traces, Agg_vertex, face_edge);
 
     std::unique_ptr<CoarseMBuilder> mbuilder_ptr;
+    const bool coarse_coefficient = true;
     if (build_coarse_relation)
     {
         mbuilder_ptr = make_unique<ElementMBuilder>(
                            edge_traces, vertex_target, CM_el, Agg_face, total_num_traces,
                            ncoarse_vertexdofs);
+    }
+    else if (coarse_coefficient)
+    {
+        mbuilder_ptr = make_unique<CoefficientMBuilder>(
+                           graph_topology_, edge_traces, vertex_target, CM_el,
+                           total_num_traces, ncoarse_vertexdofs);
     }
     else
     {

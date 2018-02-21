@@ -56,6 +56,17 @@ AssembleMBuilder::AssembleMBuilder(
                    total_num_traces + ncoarse_vertexdofs - nAggs);
 }
 
+CoefficientMBuilder::CoefficientMBuilder(
+    const GraphTopology& topology,
+    std::vector<mfem::DenseMatrix>& edge_traces,
+    std::vector<mfem::DenseMatrix>& vertex_target,
+    std::vector<mfem::DenseMatrix>& CM_el,
+    int total_num_traces, int ncoarse_vertexdofs)
+    :
+    topology_(topology)
+{
+}
+
 void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
 {
     agg_index_ = agg_index;
@@ -67,6 +78,10 @@ void AssembleMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bub
 {
     row_ = row;
     bubble_counter_ = bubble_counter;
+}
+
+void CoefficientMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
+{
 }
 
 void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
@@ -83,6 +98,10 @@ void AssembleMBuilder::SetTraceBubbleBlock(int l, double value)
     CoarseM_->Set(global_col, row_, value);
 }
 
+void CoefficientMBuilder::SetTraceBubbleBlock(int l, double value)
+{
+}
+
 void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 {
     CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
@@ -91,6 +110,10 @@ void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 void AssembleMBuilder::AddTraceTraceBlockDiag(double value)
 {
     CoarseM_->Add(row_, row_, value);
+}
+
+void CoefficientMBuilder::AddTraceTraceBlockDiag(double value)
+{
 }
 
 void ElementMBuilder::AddTraceTraceBlock(int l, double value)
@@ -104,6 +127,10 @@ void AssembleMBuilder::AddTraceTraceBlock(int l, double value)
 {
     CoarseM_->Add(row_, l, value);
     CoarseM_->Add(l, row_, value);
+}
+
+void CoefficientMBuilder::AddTraceTraceBlock(int l, double value)
+{
 }
 
 void ElementMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
@@ -121,6 +148,10 @@ void AssembleMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
     CoarseM_->Set(global_col, global_row, value);
 }
 
+void CoefficientMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
+{
+}
+
 void ElementMBuilder::ResetEdgeCdofMarkers(int size)
 {
     edge_cdof_marker_.SetSize(size);
@@ -130,6 +161,10 @@ void ElementMBuilder::ResetEdgeCdofMarkers(int size)
 }
 
 void AssembleMBuilder::ResetEdgeCdofMarkers(int size)
+{
+}
+
+void CoefficientMBuilder::ResetEdgeCdofMarkers(int size)
 {
 }
 
@@ -165,6 +200,11 @@ void AssembleMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatri
 {
 }
 
+void CoefficientMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                                           const mfem::SparseMatrix& Agg_cdof_edge)
+{
+}
+
 void ElementMBuilder::AddTraceAcross(int row, int col, double value)
 {
     mfem::DenseMatrix& CM_el_loc1(CM_el_[Agg0_]);
@@ -190,6 +230,10 @@ void AssembleMBuilder::AddTraceAcross(int row, int col, double value)
     CoarseM_->Add(row, col, value);
 }
 
+void CoefficientMBuilder::AddTraceAcross(int row, int col, double value)
+{
+}
+
 std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM()
 {
     return std::unique_ptr<mfem::SparseMatrix>(nullptr);
@@ -199,6 +243,11 @@ std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM()
 {
     CoarseM_->Finalize(0);
     return std::move(CoarseM_);
+}
+
+std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
+{
+    return std::unique_ptr<mfem::SparseMatrix>(nullptr);
 }
 
 Agg_cdof_edge_Builder::Agg_cdof_edge_Builder(std::vector<mfem::DenseMatrix>& edge_traces,

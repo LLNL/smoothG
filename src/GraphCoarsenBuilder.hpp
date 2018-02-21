@@ -165,6 +165,46 @@ private:
 };
 
 /**
+   @brief Stores components of local coarse mass matrix so that it can
+   have its coefficients rescaled without re-coarsening.
+*/
+class CoefficientMBuilder : public CoarseMBuilder
+{
+public:
+    CoefficientMBuilder(
+        const GraphTopology& topology,
+        std::vector<mfem::DenseMatrix>& edge_traces,
+        std::vector<mfem::DenseMatrix>& vertex_target,
+        std::vector<mfem::DenseMatrix>& CM_el,
+        int total_num_traces, int ncoarse_vertexdofs);
+
+    void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
+
+    void SetTraceBubbleBlock(int l, double value);
+
+    void AddTraceTraceBlockDiag(double value);
+
+    void AddTraceTraceBlock(int l, double value);
+
+    /// Deal with shared dofs for Trace-Trace block
+    void AddTraceAcross(int row, int col, double value);
+
+    void SetBubbleBubbleBlock(int l, int j, double value);
+
+    void ResetEdgeCdofMarkers(int size);
+
+    void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
+                             const mfem::SparseMatrix& Agg_cdof_edge);
+
+    /// Here returns a null pointer
+    /// @todo change interface so this is optional?
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
+
+private:
+    const GraphTopology& topology_;
+};
+
+/**
    @brief Used to help build the coarse dof-edge relation table.
 */
 class Agg_cdof_edge_Builder
