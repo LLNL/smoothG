@@ -58,10 +58,9 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     operator_.SetBlock(1, 0, D);
 
     std::unique_ptr<mfem::HypreParMatrix> MinvDt(D->Transpose());
-    std::unique_ptr<mfem::HypreParVector> Md = make_unique<mfem::HypreParVector>(
-                                                   comm_, M->GetGlobalNumRows(), M->GetRowStarts());
-    M->GetDiag(*Md);
-    MinvDt->InvScaleRows(*Md);
+    mfem::Vector Md;
+    M->GetDiag(Md);
+    MinvDt->InvScaleRows(Md);
     schur_block_.reset(ParMult(D, MinvDt.get()));
 
     // D retains ownership of rows, but MinvDt will be deleted, so we need to
@@ -147,8 +146,8 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
     mfem::HypreParMatrix M(comm, edge_d_td.M(),
                            edge_d_td.GetRowStarts(), &M_);
 
-    std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M,
-                                                        const_cast<mfem::HypreParMatrix*>(&edge_d_td)));
+    std::unique_ptr<mfem::HypreParMatrix> M_tmp(
+        ParMult(&M, const_cast<mfem::HypreParMatrix*>(&edge_d_td)));
     hM_.reset(ParMult(const_cast<mfem::HypreParMatrix*>(&edge_td_d), M_tmp.get()));
     hypre_ParCSRMatrixSetNumNonzeros(*hM_);
 

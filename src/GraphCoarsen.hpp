@@ -266,9 +266,6 @@ private:
     /// edge coarse dof start array (for HypreParMatrix)
     mfem::Array<HYPRE_Int> edge_cd_start_;
 
-    /// edge coarse true dof start array (for HypreParMatrix)
-    mfem::Array<HYPRE_Int> edge_ctd_start_;
-
     /// vertex coarse dof start array (for HypreParMatrix)
     /// note that vertex coarse dof and coarse true dof is the same
     mfem::Array<HYPRE_Int> vertex_cd_start_;
