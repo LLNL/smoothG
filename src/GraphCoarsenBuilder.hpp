@@ -148,6 +148,8 @@ public:
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
+    /// Here returns a null pointer
+    /// @todo change interface so this is optional?
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
 private:
