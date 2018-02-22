@@ -308,8 +308,8 @@ void GraphCoarsen::BuildPEdges(
     else if (coarse_coefficient)
     {
         mbuilder_ptr = make_unique<CoefficientMBuilder>(
-                           graph_topology_, edge_traces, vertex_target, CM_el,
-                           total_num_traces, ncoarse_vertexdofs);
+                           graph_topology_, Pedges, face_cdof, edge_traces, vertex_target,
+                           CM_el, total_num_traces, ncoarse_vertexdofs);
     }
     else
     {

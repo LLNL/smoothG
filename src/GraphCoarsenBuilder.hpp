@@ -174,6 +174,7 @@ public:
     CoefficientMBuilder(
         const GraphTopology& topology,
         mfem::SparseMatrix& Pedges,
+        const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         std::vector<mfem::DenseMatrix>& CM_el,
@@ -219,10 +220,26 @@ public:
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
 private:
+    /// @todo remove this?
+    void GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs);
+
+    mfem::DenseMatrix RTP(const mfem::DenseMatrix& R, const mfem::DenseMatrix& P);
+
     const GraphTopology& topology_;
     mfem::SparseMatrix& Pedges_;
+    const mfem::SparseMatrix& face_cdof_;
 
+    /// weights on aggregates
     mfem::Vector agg_weights_;
+
+    /// P_F^T M_F P_F
+    std::vector<mfem::DenseMatrix> comp_F_F_;
+    /// P_{E(A),F}^T M_{E(A)} P_{E(A),F'}
+    std::vector<mfem::DenseMatrix> comp_EF_EF_;
+    /// P_{E(A),F}^T M_{E(A)} P_{E(A)}
+    std::vector<mfem::DenseMatrix> comp_EF_E_;
+    /// P_{E(A)}^T M_{E(A)} P_{E(A)}
+    std::vector<mfem::DenseMatrix> comp_E_E_;
 };
 
 /**
