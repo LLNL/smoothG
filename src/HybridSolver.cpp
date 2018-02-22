@@ -252,26 +252,37 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
 
     }
 
-    HybridSystemElim_ = make_unique<mfem::SparseMatrix>(*HybridSystem_, true);
     if (ess_multiplier_bc_)
     {
+        // eliminate the essential dofs and save the eliminated part
+        HybridSystemElim_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
         for (int mm = 0; mm < num_multiplier_dofs_; ++mm)
         {
             if (ess_multiplier_dofs_[mm])
             {
-                HybridSystemElim_->EliminateRowCol(mm);
+                HybridSystem_->EliminateRowCol(mm, *HybridSystemElim_);
             }
         }
+
+        // Only keep H_{ib} block for elimination later
+        for (int mm = 0; mm < num_multiplier_dofs_; ++mm)
+        {
+            if (ess_multiplier_dofs_[mm])
+            {
+                HybridSystemElim_->EliminateRow(mm);
+            }
+        }
+
     }
     else if (!use_w_)
     {
         if (myid_ == 0)
-            HybridSystemElim_->EliminateRowCol(0);
+            HybridSystem_->EliminateRowCol(0);
     }
 
     auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
                               comm_, multiplier_start_.Last(), multiplier_start_,
-                              HybridSystemElim_.get());
+                              HybridSystem_.get());
 
     // This is just doing RAP, but for some reason for large systems this two-
     // step RAP is much faster than a direct RAP, so the two-step way is used
@@ -596,18 +607,21 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 
     // TODO: nonzero b.c.
     // correct right hand side due to boundary condition
-    // can this be calculated w/o copy of data on every mult?
     if (ess_multiplier_bc_)
     {
-        mfem::SparseMatrix mat_hybrid(*HybridSystem_, false);
-        for (int m = 0; m < mat_hybrid.Size(); ++m)
+        for (int m = 0; m < ess_multiplier_dofs_.Size(); ++m)
         {
             if (ess_multiplier_dofs_[m])
             {
-                double ess_data = -1.0 * Rhs(multiplier_to_edgedof_[m]);
-                mat_hybrid.EliminateRowCol(m, ess_data, Hrhs_);
+                Mu_(m) = -1.0 * Rhs(multiplier_to_edgedof_[m]);
+                Hrhs_(m) = Mu_(m);
+            }
+            else
+            {
+                Mu_(m) = 0.0;
             }
         }
+        HybridSystemElim_->AddMult(Mu_, Hrhs_, -1.0);
     }
     else if (!use_w_)
     {
