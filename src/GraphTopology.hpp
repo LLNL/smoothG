@@ -85,8 +85,8 @@ public:
                   const mfem::HypreParMatrix& pAggExt_edge,
                   const mfem::SparseMatrix& Agg_face,
                   const mfem::HypreParMatrix& edge_trueedge,
-                  const mfem::HypreParMatrix& face_d_td,
-                  const mfem::HypreParMatrix& face_d_td_d);
+                  const mfem::HypreParMatrix& face_trueface,
+                  const mfem::HypreParMatrix& face_trueface_face);
 
     /**
        @brief Move constructor
@@ -112,15 +112,15 @@ public:
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
     ///@}
 
-    ///@name dof to true_dof tables for edge and face
+    ///@name entity to true_entity tables for edge and face
     ///@{
     const mfem::HypreParMatrix& edge_trueedge_;
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_;
+    std::unique_ptr<mfem::HypreParMatrix> face_trueface_;
     ///@}
 
-    ///@name dof_truedof_dof tables, which connect dofs across processors that share a true dof
+    ///@name entity_trueentity_entity tables, which connect dofs across processors that share a true entity
     ///@{
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_d_;
+    std::unique_ptr<mfem::HypreParMatrix> face_trueface_face_;
     ///@}
 
     ///@name topology relation tables, connecting aggregates, edges, faces, and vertices
@@ -145,7 +145,7 @@ private:
     void Init(mfem::SparseMatrix& vertex_edge,
               const mfem::Array<int>& partition,
               const mfem::SparseMatrix* edge_boundaryattr,
-              const mfem::HypreParMatrix* edge_d_td_d);
+              const mfem::HypreParMatrix* edge_trueedge_edge_ptr);
 
     mfem::Array<HYPRE_Int> vertex_start_;
     mfem::Array<HYPRE_Int> edge_start_;

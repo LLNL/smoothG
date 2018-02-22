@@ -460,14 +460,14 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     pAggExt_edge.GetOffd(AggExt_edge_offd, junk_map);
 
     mfem::SparseMatrix face_IsShared;
-    graph_topology_.face_d_td_d_->GetOffd(face_IsShared, junk_map);
+    graph_topology_.face_trueface_face_->GetOffd(face_IsShared, junk_map);
 
     mfem::Array<int> edge_dof_marker(AggExt_edge_diag.Width() + AggExt_edge_offd.Width());
     edge_dof_marker = -1;
 
     // Send and receive traces
-    const mfem::HypreParMatrix& face_d_td(*graph_topology_.face_d_td_);
-    SharedEntityCommunication<mfem::DenseMatrix> sec_trace(comm_, face_d_td);
+    const mfem::HypreParMatrix& face_trueface(*graph_topology_.face_trueface_);
+    SharedEntityCommunication<mfem::DenseMatrix> sec_trace(comm_, face_trueface);
     sec_trace.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
     {
@@ -533,7 +533,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     // Send and receive Dloc
     mfem::Array<int> local_dof, face_nbh_dofs, vertex_local_dof;
     int dof_counter;
-    SharedEntityCommunication<mfem::SparseMatrix> sec_D(comm_, face_d_td);
+    SharedEntityCommunication<mfem::SparseMatrix> sec_D(comm_, face_trueface);
     sec_D.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
     {
@@ -591,7 +591,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
     // Send and receive Mloc (only the diagonal values)
     double* M_diag_data = M_local_.GetData();
-    SharedEntityCommunication<mfem::Vector> sec_M(comm_, face_d_td);
+    SharedEntityCommunication<mfem::Vector> sec_M(comm_, face_trueface);
     sec_M.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
     {
