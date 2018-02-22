@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
     picojson::object serialize;
 
     // 1. Initialize MPI
-    MPI_Init(&argc, &argv);
+    mpi_session session(argc, argv);
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
