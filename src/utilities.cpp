@@ -1079,8 +1079,8 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
     int num_el = el_el.Size(), stack_p, stack_top_p, max_num_colors;
     mfem::Array<int> el_stack(num_el);
 
-    const int *i_el_el = el_el.GetI();
-    const int *j_el_el = el_el.GetJ();
+    const int* i_el_el = el_el.GetI();
+    const int* j_el_el = el_el.GetJ();
 
     colors.SetSize(num_el);
     colors = -2;
@@ -1099,9 +1099,9 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
         for ( ; stack_p < stack_top_p; stack_p++)
         {
             int i = el_stack[stack_p];
-            int num_nb = i_el_el[i+1] - i_el_el[i] - 1; // assume nonzero diagonal
+            int num_nb = i_el_el[i + 1] - i_el_el[i] - 1; // assume nonzero diagonal
             max_num_colors = std::max(max_num_colors, num_nb + 1);
-            for (int j = i_el_el[i]; j < i_el_el[i+1]; j++)
+            for (int j = i_el_el[i]; j < i_el_el[i + 1]; j++)
             {
                 int k = j_el_el[j];
                 if (j == i)
@@ -1122,7 +1122,7 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
     {
         int i = el_stack[stack_p], color;
         color_marker = 0;
-        for (int j = i_el_el[i]; j < i_el_el[i+1]; j++)
+        for (int j = i_el_el[i]; j < i_el_el[i + 1]; j++)
         {
             if (j_el_el[j] == i)
             {

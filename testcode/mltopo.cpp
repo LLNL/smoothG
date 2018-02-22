@@ -76,8 +76,8 @@ int main(int argc, char* argv[])
     unique_ptr<mfem::ParMesh> pmesh;
     if (nDimensions == 3)
     {
-         mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
-         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
+        mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
+        pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     else
     {
@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
 
     // Construct vertex_edge, edge_trueedge, edge_boundaryattr tables from mesh
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                                               : pmesh->ElementToFaceTable();
+                              : pmesh->ElementToFaceTable();
     mfem::SparseMatrix vertex_edge = TableToSparse(vertex_edge_table);
 
     mfem::RT_FECollection sigmafec(0, nDimensions);
@@ -121,7 +121,7 @@ void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmes
     {
         // Compute partitioning vector on level i+1
         mfem::SparseMatrix Agg_vertex = graph_topos[0].Agg_vertex_;
-        for (unsigned int j = 1; j < i+1; j++)
+        for (unsigned int j = 1; j < i + 1; j++)
         {
             auto tmp = smoothg::Mult(graph_topos[j].Agg_vertex_, Agg_vertex);
             Agg_vertex.Swap(tmp);
@@ -162,7 +162,7 @@ void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmes
             attr.Save(sol_sock);
 
             sol_sock << "window_size 500 800\n";
-            sol_sock << "window_title 'Level " << i+1 << " aggregation'\n";
+            sol_sock << "window_title 'Level " << i + 1 << " aggregation'\n";
             if (pmesh->SpaceDimension() == 2)
             {
                 sol_sock << "view 0 0\n"; // view from top

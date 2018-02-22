@@ -83,7 +83,7 @@ GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening
 {
     auto& vertex_edge = finer_graph_topology.Agg_face_;
     const auto edge_boundaryattr = (finer_graph_topology.face_bdratt_.Height()) ?
-                &(finer_graph_topology.face_bdratt_) : nullptr;
+                                   &(finer_graph_topology.face_bdratt_) : nullptr;
 
     auto edge_vertex = smoothg::Transpose(vertex_edge);
     auto vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
@@ -509,7 +509,7 @@ std::vector<GraphTopology> MultilevelGraphTopology(
     const mfem::SparseMatrix* edge_boundaryattr, int num_levels, int coarsening_factor)
 {
     std::vector<GraphTopology> graph_topologies;
-    graph_topologies.reserve(num_levels-1);
+    graph_topologies.reserve(num_levels - 1);
 
     // Construct finest level graph topology
     mfem::Array<int> partitioning;
@@ -523,7 +523,7 @@ std::vector<GraphTopology> MultilevelGraphTopology(
     graph_topologies.emplace_back(vertex_edge, edge_d_td, partitioning, edge_boundaryattr);
 
     // Construct coarser levels graph topology by recursion
-    for (int i = 0; i < num_levels-2; i++)
+    for (int i = 0; i < num_levels - 2; i++)
     {
         graph_topologies.emplace_back(graph_topologies.back(), coarsening_factor);
     }
