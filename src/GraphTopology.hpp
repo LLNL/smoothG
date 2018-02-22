@@ -56,7 +56,7 @@ public:
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
     GraphTopology(mfem::SparseMatrix& vertex_edge,
-                  const mfem::HypreParMatrix& edge_d_td,
+                  const mfem::HypreParMatrix& edge_trueedge,
                   const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
 
@@ -84,7 +84,7 @@ public:
                   const mfem::HypreParMatrix& pAggExt_vertex,
                   const mfem::HypreParMatrix& pAggExt_edge,
                   const mfem::SparseMatrix& Agg_face,
-                  const mfem::HypreParMatrix& edge_d_td,
+                  const mfem::HypreParMatrix& edge_trueedge,
                   const mfem::HypreParMatrix& face_d_td,
                   const mfem::HypreParMatrix& face_d_td_d);
 
@@ -114,7 +114,7 @@ public:
 
     ///@name dof to true_dof tables for edge and face
     ///@{
-    const mfem::HypreParMatrix& edge_d_td_;
+    const mfem::HypreParMatrix& edge_trueedge_;
     std::unique_ptr<mfem::HypreParMatrix> face_d_td_;
     ///@}
 

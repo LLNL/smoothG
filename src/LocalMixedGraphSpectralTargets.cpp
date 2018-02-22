@@ -76,7 +76,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     const mfem::SparseMatrix& M_local, const mfem::SparseMatrix& D_local,
     const mfem::SparseMatrix* W_local, const GraphTopology& graph_topology)
     :
-    comm_(graph_topology.edge_d_td_.GetComm()),
+    comm_(graph_topology.edge_trueedge_.GetComm()),
     rel_tol_(rel_tol),
     max_evects_(max_evects),
     dual_target_(dual_target),
@@ -99,12 +99,12 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     mfem::HypreParMatrix M_d(comm_, M_local_rowstart.Last(),
                              M_local_rowstart, M_local_ptr);
 
-    const mfem::HypreParMatrix& edge_d_td(graph_topology.edge_d_td_);
-    M_global_.reset(smoothg::RAP(M_d, edge_d_td));
+    const mfem::HypreParMatrix& edge_trueedge(graph_topology.edge_trueedge_);
+    M_global_.reset(smoothg::RAP(M_d, edge_trueedge));
 
     mfem::HypreParMatrix D_d(comm_, D_local_rowstart.Last(), M_local_rowstart.Last(),
                              D_local_rowstart, M_local_rowstart, D_local_ptr);
-    D_global_.reset( ParMult(&D_d, &edge_d_td) );
+    D_global_.reset( ParMult(&D_d, &edge_trueedge) );
 
     if (W_local_)
     {
@@ -258,13 +258,13 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // Compute face to permuted edge relation table
     mfem::Array<HYPRE_Int>& face_start =
         const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
-    const mfem::HypreParMatrix& edge_d_td(graph_topology_.edge_d_td_);
+    const mfem::HypreParMatrix& edge_trueedge(graph_topology_.edge_trueedge_);
 
     mfem::SparseMatrix& face_edge(const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_));
-    mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_d_td.GetGlobalNumRows(),
-                                     face_start, const_cast<int*>(edge_d_td.RowPart()), &face_edge);
+    mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_trueedge.GetGlobalNumRows(),
+                                     face_start, const_cast<int*>(edge_trueedge.RowPart()), &face_edge);
 
-    ParMatrix face_trueedge(ParMult(&face_edge_d, &edge_d_td));
+    ParMatrix face_trueedge(ParMult(&face_edge_d, &edge_trueedge));
     face_permedge_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
 
     // Column map for submatrix extraction
