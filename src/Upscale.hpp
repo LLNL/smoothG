@@ -177,7 +177,7 @@ public:
 
 protected:
     Upscale(MPI_Comm comm, int size, bool hybridization = false)
-        : Operator(size), comm_(comm), setup_time_(0.0), hybridization_(hybridization)
+        : Operator(size), comm_(comm), setup_time_(0.0), hybridization_(hybridization), remove_one_dof_(true)
     {
         MPI_Comm_rank(comm_, &myid_);
     }
@@ -207,6 +207,8 @@ protected:
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
     mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+
+    bool remove_one_dof_; // whether the 1st dof of 2nd block should be eliminated
 
 private:
     void SetOperator(const mfem::Operator& op) {};

@@ -68,18 +68,17 @@ public:
        @param block_true_offsets describes parallel partitioning (@todo can this be inferred from the matrices?)
        @param use_W use the W block
     */
-    MinresBlockSolver(
-        MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
-        const mfem::Array<int>& block_true_offsets, bool use_W = false);
+    MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
+        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true, bool use_W = false);
 
     MinresBlockSolver(
         MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-        const mfem::Array<int>& block_true_offsets);
+        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true);
 
     /**
        @brief Constructor from a single MixedMatrix
     */
-    MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL);
+    MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof = true);
 
     ~MinresBlockSolver();
 
@@ -107,6 +106,7 @@ protected:
     MPI_Comm comm_;
     int myid_;
 
+    bool remove_one_dof_;
     bool use_W_;
 
 private:
@@ -135,7 +135,7 @@ private:
 class MinresBlockSolverFalse : public MinresBlockSolver
 {
 public:
-    MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL);
+    MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof = true);
     ~MinresBlockSolverFalse();
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;

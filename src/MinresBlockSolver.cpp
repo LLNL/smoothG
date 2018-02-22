@@ -27,14 +27,14 @@ namespace smoothg
 {
 
 /// implementation largely lifted from ex5p.cpp
-MinresBlockSolver::MinresBlockSolver(
-    MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
+MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
     const mfem::Array<int>& block_true_offsets,
-    bool use_W)
+    bool remove_one_dof, bool use_W)
     :
     MixedLaplacianSolver(block_true_offsets),
     minres_(comm),
     comm_(comm),
+    remove_one_dof_(remove_one_dof),
     use_W_(use_W),
     operator_(block_true_offsets),
     prec_(block_true_offsets)
@@ -82,7 +82,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 
         hypre_ParCSRMatrixSetColStartsOwner(*schur_block_, 0);
     }
-    else
+    else if (remove_one_dof_)
     {
         mfem::SparseMatrix W(D->Height());
         W_.Swap(W);
@@ -118,18 +118,18 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     minres_.iterative_mode = false;
 }
 
-MinresBlockSolver::MinresBlockSolver(
-    MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-    const mfem::Array<int>& block_true_offsets)
-    : MinresBlockSolver(comm, M, D, nullptr, block_true_offsets)
+MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
+    const mfem::Array<int>& block_true_offsets, bool remove_one_dof)
+    : MinresBlockSolver(comm, M, D, nullptr, block_true_offsets, remove_one_dof)
 {
 }
 
-MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
+MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     minres_(comm),
     comm_(comm),
+    remove_one_dof_(remove_one_dof),
     use_W_(mgL.CheckW()),
     operator_(mgL.get_blockTrueOffsets()),
     prec_(mgL.get_blockTrueOffsets()),
@@ -174,7 +174,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
     }
     else
     {
-        if (myid_ == 0)
+        if (remove_one_dof_ && myid_ == 0)
         {
             D_.EliminateRow(0);
         }
@@ -207,7 +207,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 
     *rhs_ = rhs;
 
-    if (!use_W_ && myid_ == 0)
+    if (!use_W_ && remove_one_dof_ && myid_ == 0)
     {
         rhs_->GetBlock(1)(0) = 0.0;
     }
@@ -239,10 +239,9 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 /**
    MinresBlockSolver acts on "true" dofs, this one does not.
 */
-MinresBlockSolverFalse::MinresBlockSolverFalse(
-    MPI_Comm comm, const MixedMatrix& mgL)
+MinresBlockSolverFalse::MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof)
     :
-    MinresBlockSolver(comm, mgL),
+    MinresBlockSolver(comm, mgL, remove_one_dof),
     mixed_matrix_(mgL),
     true_rhs_(mgL.get_blockTrueOffsets()),
     true_sol_(mgL.get_blockTrueOffsets())
@@ -265,7 +264,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     edgedof_d_td.MultTranspose(rhs.GetBlock(0), true_rhs_.GetBlock(0));
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
 
-    if (!use_W_ && myid_ == 0)
+    if (!use_W_ && remove_one_dof_ && myid_ == 0)
     {
         true_rhs_.GetBlock(1)(0) = 0.0;
     }

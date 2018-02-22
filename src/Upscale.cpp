@@ -40,7 +40,10 @@ void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
 
     coarsener_->interpolate(sol_coarse_->GetBlock(1), y);
 
-    Orthogonalize(y);
+    if (remove_one_dof_)
+    {
+        Orthogonalize(y);
+    }
 }
 
 void Upscale::Solve(const mfem::Vector& x, mfem::Vector& y) const
@@ -65,13 +68,16 @@ void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
     assert(coarse_solver_);
 
     coarsener_->coarsen(x, *rhs_coarse_);
-    rhs_coarse_->GetBlock(1) *= -1.0;
+//    rhs_coarse_->GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
 
     coarsener_->interpolate(*sol_coarse_, y);
 
-    Orthogonalize(y);
+    if (remove_one_dof_)
+    {
+        Orthogonalize(y);
+    }
 }
 
 mfem::BlockVector Upscale::Solve(const mfem::BlockVector& x) const
@@ -103,7 +109,7 @@ void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) cons
     assert(coarse_solver_);
 
     coarse_solver_->Solve(x, y);
-    y *= -1.0;
+//    y *= -1.0;
 }
 
 mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
@@ -121,7 +127,10 @@ void Upscale::SolveFine(const mfem::Vector& x, mfem::Vector& y) const
     fine_solver_->Solve(x, y);
     y *= -1.0;
 
-    Orthogonalize(y);
+    if (remove_one_dof_)
+    {
+        Orthogonalize(y);
+    }
 }
 
 mfem::Vector Upscale::SolveFine(const mfem::Vector& x) const
@@ -138,9 +147,12 @@ void Upscale::SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const
     assert(fine_solver_);
 
     fine_solver_->Solve(x, y);
-    y *= -1.0;
+//    y *= -1.0;
 
-    Orthogonalize(y);
+    if (remove_one_dof_)
+    {
+        Orthogonalize(y);
+    }
 }
 
 mfem::BlockVector Upscale::SolveFine(const mfem::BlockVector& x) const
