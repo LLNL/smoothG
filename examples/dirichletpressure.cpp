@@ -35,11 +35,6 @@
 
 using namespace smoothg;
 
-enum
-{
-    TOPOLOGY = 0, SEQUENCE, SOLVER, NSTAGES
-};
-
 void MetisPart(mfem::Array<int>& partitioning,
                mfem::ParFiniteElementSpace& sigmafespace,
                mfem::ParFiniteElementSpace& ufespace,
@@ -112,9 +107,6 @@ int main(int argc, char* argv[])
     {
         args.PrintOptions(std::cout);
     }
-
-    constexpr auto nLevels = 2;
-    UpscalingStatistics stats(nLevels);
 
     mfem::Array<int> coarseningFactor(nDimensions);
     coarseningFactor[0] = 10;
@@ -288,9 +280,8 @@ int main(int argc, char* argv[])
             MPI_Barrier(comm);
         };
 
-        Visualize(sol_fine.GetBlock(1));
-
         Visualize(sol_upscaled.GetBlock(1));
+        Visualize(sol_fine.GetBlock(1));
     }
 
     return EXIT_SUCCESS;
