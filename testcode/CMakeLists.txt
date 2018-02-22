@@ -73,7 +73,6 @@ add_valgrind_test(vwattsstrogatz wattsstrogatz)
 
 add_test(mltopo mltopo --no-visualization)
 add_test(parmltopo mpirun -np 2 ./mltopo --no-visualization)
-add_valgrind_test(vmltopo mltopo)
 
 add_test(NAME style
   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp
@@ -81,3 +80,6 @@ add_test(NAME style
 set_tests_properties(style
   PROPERTIES FAIL_REGULAR_EXPRESSION
   "Formatted")
+
+# this test takes too long so we are deprecating it, but you should run it once in a while
+# add_valgrind_test(vmltopo mltopo)
