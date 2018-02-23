@@ -362,80 +362,12 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     pAggExt_vertex_.reset( ParMult(pAgg_edge.get(), pedge_vertex.get()) );
 
     // Construct extended aggregate to (interior) edge relation tables
-    {
-        SetConstantValue(*pAggExt_vertex_, 1.);
-        unique_ptr<mfem::HypreParMatrix>pAggExt_edge_tmp(
-            ParMult(pAggExt_vertex_.get(), pvertex_edge.get()) );
+    SetConstantValue(*pAggExt_vertex_, 1.);
+    pAggExt_edge_.reset(ParMult(pAggExt_vertex_.get(), pvertex_edge.get()));
 
-        // Remove the edges on the boundary of extended aggregates (diag part)
-        HYPRE_Int* offd_map_tmp;
-        mfem::SparseMatrix diag, diag_tmp, offd_tmp;
-        pAggExt_edge_tmp->GetDiag(diag_tmp);
-        AggregateEdge2AggregateEdgeInt(diag_tmp, diag);
-
-        // Remove the edges on the boundary of extended aggregates (offd part)
-        pAggExt_edge_tmp->GetOffd(offd_tmp, offd_map_tmp);
-        int* offd_tmp_i = offd_tmp.GetI();
-        int* offd_tmp_j = offd_tmp.GetJ();
-        double* offd_tmp_data = offd_tmp.GetData();
-
-        int* offd_i = new int[offd_tmp.Height() + 1];
-        int offd_nnz(0), offd_ncol(0);
-        mfem::Array<int> offd_marker(offd_tmp.Width());
-        offd_marker = 0;
-        for (int i = 0; i < offd_tmp.Height(); i++)
-        {
-            offd_i[i] = offd_nnz;
-            for (int j = offd_tmp_i[i]; j < offd_tmp_i[i + 1]; j++)
-                if (offd_tmp_data[j] == 2)
-                {
-                    offd_marker[offd_tmp_j[j]]++;
-                    offd_nnz++;
-                }
-        }
-        offd_i[offd_tmp.Height()] = offd_nnz;
-
-        // After removing the edges on the boundary of extended aggregates, the
-        // number of columns of the offd matrix, as well as the offd_col_map
-        // need to be adjusted accordingly
-        for (int i = 0; i < offd_marker.Size(); i++)
-            if (offd_marker[i])
-                offd_ncol++;
-
-        HYPRE_Int* offd_map = new HYPRE_Int[offd_ncol];
-        offd_ncol = 0;
-        for (int i = 0; i < offd_marker.Size(); i++)
-            if (offd_marker[i])
-            {
-                offd_marker[i] = offd_ncol;
-                offd_map[offd_ncol++] = offd_map_tmp[i];
-            }
-
-        int* offd_j = new int[offd_nnz];
-        offd_nnz = 0;
-        for (int i = 0; i < offd_tmp.Height(); i++)
-            for (int j = offd_tmp_i[i]; j < offd_tmp_i[i + 1]; j++)
-                if (offd_tmp_data[j] == 2)
-                    offd_j[offd_nnz++] = offd_marker[offd_tmp_j[j]];
-
-        double* offd_data = new double[offd_nnz];
-        std::fill_n(offd_data, offd_nnz, 1.);
-
-        int* diag_i = diag.GetI();
-        int* diag_j = diag.GetJ();
-        double* diag_data = diag.GetData();
-
-        pAggExt_edge_ = make_unique<mfem::HypreParMatrix>(
-                            comm, aggregate_start_.Last(), edge_trueedge_.GetGlobalNumCols(),
-                            aggregate_start_, const_cast<int*>(edge_trueedge_.ColPart()), diag_i, diag_j,
-                            diag_data, offd_i, offd_j, offd_data, offd_ncol, offd_map);
-
-        pAggExt_edge_->CopyRowStarts();
-        pAggExt_edge_->CopyColStarts();
-
-        // set diag not to own i, j, data arrays (pAggExt_edge owns them)
-        diag.LoseData();
-    }
+    // Note that boundary edges on an extended aggregate have value 1, while
+    // interior edges have value 2, and the goal is to keep only interior edges
+    pAggExt_edge_->Threshold(1.5);
 }
 
 GraphTopology::GraphTopology(const mfem::SparseMatrix& face_edge,
