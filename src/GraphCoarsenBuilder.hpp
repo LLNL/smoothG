@@ -229,6 +229,9 @@ private:
     mfem::SparseMatrix& Pedges_;
     const mfem::SparseMatrix& face_cdof_;
 
+    int total_num_traces_;
+    int ncoarse_vertexdofs_;
+
     /// weights on aggregates
     mfem::Vector agg_weights_;
 

@@ -15,6 +15,7 @@
 
 #include "GraphCoarsenBuilder.hpp"
 #include "GraphTopology.hpp"
+#include "MatrixUtilities.hpp"
 
 namespace smoothg
 {
@@ -68,7 +69,9 @@ CoefficientMBuilder::CoefficientMBuilder(
     :
     topology_(topology),
     Pedges_(Pedges),
-    face_cdof_(face_cdof)
+    face_cdof_(face_cdof),
+    total_num_traces_(total_num_traces),
+    ncoarse_vertexdofs_(ncoarse_vertexdofs)
 {
 }
 
@@ -255,7 +258,6 @@ void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weights)
     agg_weights_ = agg_weights;
 }
 
-/// coarse dofs, ie, *column* numbers of Pedges
 /// this method may be unnecessary?
 void CoefficientMBuilder::GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs)
 {
@@ -348,10 +350,58 @@ void CoefficientMBuilder::BuildComponents()
 
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
 {
+    // what we're doing:
+    //   1. assemble from components, identity weights, compare to original
+    //   2. change interface so we can actually change weights
+    //   3. what to do in parallel....
 
+    // build the components...
+    BuildComponents();
 
-    // return std::move(CoarseM_);
-    return std::unique_ptr<mfem::SparseMatrix>(nullptr);
+    // temporarily just use hard-coded weights = 1
+    const int num_aggs = topology_.Agg_face_.Height();
+    const int num_faces = topology_.Agg_face_.Width();
+    mfem::Vector agg_weights(num_aggs);
+    agg_weights = 1.0;
+    SetCoefficient(agg_weights);
+
+    // assemble from components...
+    auto CoarseM = make_unique<mfem::SparseMatrix>(
+        total_num_traces_ + ncoarse_vertexdofs_ - num_aggs,
+        total_num_traces_ + ncoarse_vertexdofs_ - num_aggs);
+
+    // these data structures for face_Agg etc do not exist, there may be a better way to do this
+    auto face_Agg = smoothg::Transpose(topology_.Agg_face_);
+    mfem::Array<int> neighbor_aggs;
+    mfem::Array<int> local_coarse_dofs;
+    for (int face=0; face<num_faces; ++face)
+    {
+        double face_weight;
+        GetTableRow(face_Agg, face, neighbor_aggs);
+        MFEM_ASSERT(neighbor_aggs.Size() <= 2, "Face has three or more aggregates!");
+        if (neighbor_aggs.Size() == 1)
+        {
+            face_weight = agg_weights_[neighbor_aggs[0]];
+        }
+        else
+        {
+            const double recip = 2.0 / (1.0 / agg_weights_[neighbor_aggs[0]] +
+                                        1.0 / agg_weights_[neighbor_aggs[1]]);
+            face_weight = 1.0 / recip;
+        }
+        comp_F_F_[face] *= face_weight;
+        GetCoarseFaceDofs(face, local_coarse_dofs);
+        CoarseM->AddSubMatrix(local_coarse_dofs, local_coarse_dofs, comp_F_F_[face]);
+        comp_F_F_[face] *= 1.0 / face_weight;
+    }
+
+    for (int agg=0; agg<num_aggs; ++agg)
+    {
+
+    }
+
+    CoarseM->Finalize(0);
+    return std::move(CoarseM);
 }
 
 Agg_cdof_edge_Builder::Agg_cdof_edge_Builder(std::vector<mfem::DenseMatrix>& edge_traces,
