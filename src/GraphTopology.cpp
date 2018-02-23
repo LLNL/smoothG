@@ -98,6 +98,71 @@ GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening
     Init(vertex_edge, partitioning, edge_boundaryattr, edge_trueedge_edge);
 }
 
+GraphTopology::GraphTopology(const mfem::SparseMatrix& face_edge,
+                             const mfem::SparseMatrix& Agg_vertex,
+                             const mfem::SparseMatrix& Agg_edge,
+                             const mfem::HypreParMatrix& pAggExt_vertex,
+                             const mfem::HypreParMatrix& pAggExt_edge,
+                             const mfem::SparseMatrix& Agg_face,
+                             const mfem::HypreParMatrix& edge_trueedge,
+                             const mfem::HypreParMatrix& face_trueface,
+                             const mfem::HypreParMatrix& face_trueface_face)
+    : edge_trueedge_(edge_trueedge), Agg_edge_(Agg_edge), Agg_vertex_(Agg_vertex), Agg_face_(Agg_face),
+      face_edge_(face_edge)
+{
+    pAggExt_vertex_ = make_unique<mfem::HypreParMatrix>();
+    pAggExt_vertex_->MakeRef(pAggExt_vertex);
+    pAggExt_edge_ = make_unique<mfem::HypreParMatrix>();
+    pAggExt_edge_->MakeRef(pAggExt_edge);
+    face_trueface_ = make_unique<mfem::HypreParMatrix>();
+    face_trueface_->MakeRef(face_trueface);
+    face_trueface_face_ = make_unique<mfem::HypreParMatrix>();
+    face_trueface_face_->MakeRef(face_trueface_face);
+
+    int start_size = 3;
+    if (!HYPRE_AssumedPartitionCheck())
+    {
+        MPI_Comm_size(pAggExt_vertex_->GetComm(), &start_size);
+        start_size++;
+    }
+
+    vertex_start_.SetSize(start_size);
+    edge_start_.SetSize(start_size);
+    face_start_.SetSize(start_size);
+    for (int i = 0; i < start_size; i++)
+    {
+        vertex_start_[i] = pAggExt_vertex_->ColPart()[i];
+        edge_start_[i] = pAggExt_edge_->ColPart()[i];
+        face_start_[i] = face_trueface_face_->ColPart()[i];
+    }
+
+    mfem::SparseMatrix tmp = smoothg::Transpose(Agg_face_);
+    face_Agg_.Swap(tmp);
+}
+
+GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
+    : edge_trueedge_(graph_topology.edge_trueedge_)
+{
+    face_trueface_ = std::move(graph_topology.face_trueface_);
+    face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
+
+    Agg_edge_.Swap(graph_topology.Agg_edge_);
+    Agg_vertex_.Swap(graph_topology.Agg_vertex_);
+    face_Agg_.Swap(graph_topology.face_Agg_);
+    Agg_face_.Swap(graph_topology.Agg_face_);
+    face_edge_.Swap(graph_topology.face_edge_);
+
+    pAggExt_vertex_ = std::move(graph_topology.pAggExt_vertex_);
+    pAggExt_edge_ = std::move(graph_topology.pAggExt_edge_);
+
+    face_bdratt_.Swap(graph_topology.face_bdratt_);
+
+    Swap(vertex_start_, graph_topology.GetVertexStart());
+    Swap(edge_start_, graph_topology.GetEdgeStart());
+    Swap(aggregate_start_, graph_topology.GetAggregateStart());
+    Swap(face_start_, graph_topology.GetFaceStart());
+}
+
 void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
                          const mfem::Array<int>& partition,
                          const mfem::SparseMatrix* edge_boundaryattr,
@@ -130,12 +195,10 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     GenerateOffsets(comm, 3, nloc, start);
 
     // Construct the relation table aggregate_vertex from partition
-
     mfem::SparseMatrix tmp = PartitionToMatrix(partition, nAggs);
     Agg_vertex_.Swap(tmp);
 
-    mfem::SparseMatrix aggregate_edge(smoothg::Mult(Agg_vertex_,
-                                                    vertex_edge));
+    mfem::SparseMatrix aggregate_edge(smoothg::Mult(Agg_vertex_, vertex_edge));
 
     // Need to sort the edge indices to prevent index problem in face_edge
     aggregate_edge.SortColumnIndices();
@@ -260,8 +323,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
                 edge = agg_edge_j[k];
                 if (edge_shareattr_i[edge + 1] > edge_shareattr_i[edge])
                 {
-                    edge_shareattr_loc =
-                        edge_shareattr_j[edge_shareattr_i[edge]];
+                    edge_shareattr_loc = edge_shareattr_j[edge_shareattr_i[edge]];
                     if (edge_shareattr_map[edge_shareattr_loc] == sharedattr)
                         face_edge_nnz++;
                 }
@@ -368,71 +430,6 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     // Note that boundary edges on an extended aggregate have value 1, while
     // interior edges have value 2, and the goal is to keep only interior edges
     pAggExt_edge_->Threshold(1.5);
-}
-
-GraphTopology::GraphTopology(const mfem::SparseMatrix& face_edge,
-                             const mfem::SparseMatrix& Agg_vertex,
-                             const mfem::SparseMatrix& Agg_edge,
-                             const mfem::HypreParMatrix& pAggExt_vertex,
-                             const mfem::HypreParMatrix& pAggExt_edge,
-                             const mfem::SparseMatrix& Agg_face,
-                             const mfem::HypreParMatrix& edge_trueedge,
-                             const mfem::HypreParMatrix& face_trueface,
-                             const mfem::HypreParMatrix& face_trueface_face)
-    : edge_trueedge_(edge_trueedge), Agg_edge_(Agg_edge), Agg_vertex_(Agg_vertex), Agg_face_(Agg_face),
-      face_edge_(face_edge)
-{
-    pAggExt_vertex_ = make_unique<mfem::HypreParMatrix>();
-    pAggExt_vertex_->MakeRef(pAggExt_vertex);
-    pAggExt_edge_ = make_unique<mfem::HypreParMatrix>();
-    pAggExt_edge_->MakeRef(pAggExt_edge);
-    face_trueface_ = make_unique<mfem::HypreParMatrix>();
-    face_trueface_->MakeRef(face_trueface);
-    face_trueface_face_ = make_unique<mfem::HypreParMatrix>();
-    face_trueface_face_->MakeRef(face_trueface_face);
-
-    int start_size = 3;
-    if (!HYPRE_AssumedPartitionCheck())
-    {
-        MPI_Comm_size(pAggExt_vertex_->GetComm(), &start_size);
-        start_size++;
-    }
-
-    vertex_start_.SetSize(start_size);
-    edge_start_.SetSize(start_size);
-    face_start_.SetSize(start_size);
-    for (int i = 0; i < start_size; i++)
-    {
-        vertex_start_[i] = pAggExt_vertex_->ColPart()[i];
-        edge_start_[i] = pAggExt_edge_->ColPart()[i];
-        face_start_[i] = face_trueface_face_->ColPart()[i];
-    }
-
-    mfem::SparseMatrix tmp = smoothg::Transpose(Agg_face_);
-    face_Agg_.Swap(tmp);
-}
-
-GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
-    : edge_trueedge_(graph_topology.edge_trueedge_)
-{
-    face_trueface_ = std::move(graph_topology.face_trueface_);
-    face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
-
-    Agg_edge_.Swap(graph_topology.Agg_edge_);
-    Agg_vertex_.Swap(graph_topology.Agg_vertex_);
-    face_Agg_.Swap(graph_topology.face_Agg_);
-    Agg_face_.Swap(graph_topology.Agg_face_);
-    face_edge_.Swap(graph_topology.face_edge_);
-
-    pAggExt_vertex_ = std::move(graph_topology.pAggExt_vertex_);
-    pAggExt_edge_ = std::move(graph_topology.pAggExt_edge_);
-
-    face_bdratt_.Swap(graph_topology.face_bdratt_);
-
-    Swap(vertex_start_, graph_topology.GetVertexStart());
-    Swap(edge_start_, graph_topology.GetEdgeStart());
-    Swap(aggregate_start_, graph_topology.GetAggregateStart());
-    Swap(face_start_, graph_topology.GetFaceStart());
 }
 
 std::vector<GraphTopology> MultilevelGraphTopology(
