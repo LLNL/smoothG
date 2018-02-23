@@ -84,6 +84,12 @@ mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B
     return C;
 }
 
+mfem::SparseMatrix AAt(const mfem::SparseMatrix& A)
+{
+    mfem::SparseMatrix At = smoothg::Transpose(A);
+    return smoothg::Mult(A, At);
+}
+
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
 {
     // TODO(gelever1): Perform this more better

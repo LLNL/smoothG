@@ -45,8 +45,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     mfem::StopWatch chrono;
     chrono.Start();
 
-    mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge_global);
-    mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge_global, edge_vertex);
+    mfem::SparseMatrix vertex_vertex = smoothg::AAt(vertex_edge_global);
 
     int num_parts = (vertex_edge_global.Height() / (double)(coarse_factor)) + 0.5;
     num_parts = std::max(1, num_parts);

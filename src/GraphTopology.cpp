@@ -86,8 +86,7 @@ GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening
     const auto edge_boundaryattr = (finer_graph_topology.face_bdratt_.Height()) ?
                                    &(finer_graph_topology.face_bdratt_) : nullptr;
 
-    auto edge_vertex = smoothg::Transpose(vertex_edge);
-    auto vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
+    auto vertex_vertex = smoothg::AAt(vertex_edge);
 
     const int nvertices = vertex_vertex.Height();
     int num_partitions = std::max(1, nvertices / coarsening_factor);

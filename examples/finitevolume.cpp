@@ -283,8 +283,7 @@ void MetisPart(mfem::Array<int>& partitioning,
     DivOp.Finalize();
 
     const mfem::SparseMatrix& DivMat = DivOp.SpMat();
-    const mfem::SparseMatrix DivMatT = smoothg::Transpose(DivMat);
-    const mfem::SparseMatrix vertex_vertex = smoothg::Mult(DivMat, DivMatT);
+    const mfem::SparseMatrix vertex_vertex = smoothg::AAt(DivMat);
 
     int metis_coarsening_factor = 1;
     for (const auto factor : coarsening_factor)

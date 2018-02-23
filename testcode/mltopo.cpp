@@ -130,9 +130,7 @@ void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmes
         int* partitioning = vertex_Agg.GetJ();
 
         // Make better coloring (better with serial run)
-        const auto& Agg_face = graph_topos[i].Agg_face_;
-        auto face_Agg = smoothg::Transpose(Agg_face);
-        auto Agg_Agg = smoothg::Mult(Agg_face, face_Agg);
+        mfem::SparseMatrix Agg_Agg = smoothg::AAt(graph_topos[i].Agg_face_);
         mfem::Array<int> colors;
         GetElementColoring(colors, Agg_Agg);
         const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());

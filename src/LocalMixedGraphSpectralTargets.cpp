@@ -159,8 +159,8 @@ LocalMixedGraphSpectralTargets::BuildEdgeEigenSystem(
     // Compute energy matrix M + D^T D if energy_dual_ is true
     if (energy_dual_)
     {
-        mfem::SparseMatrix DT( smoothg::Transpose(D) );
-        mfem::SparseMatrix edge_product( smoothg::Mult(DT, D) );
+        mfem::SparseMatrix DT = smoothg::Transpose(D);
+        mfem::SparseMatrix edge_product = smoothg::Mult(DT, D);
         smoothg::Add(edge_product, M_diag_inv, true);
         EigSys.push_back(edge_product);
     }

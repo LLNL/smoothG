@@ -70,6 +70,11 @@ mfem::SparseMatrix Transpose(const mfem::SparseMatrix& A);
 mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B);
 
 /**
+    @brief Compute the product A * A^T
+*/
+mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
+
+/**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense.
 */
