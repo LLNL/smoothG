@@ -26,7 +26,6 @@
 #include "partition.hpp"
 
 #include "Upscale.hpp"
-#include "Utilities.hpp"
 
 namespace smoothg
 {
@@ -37,14 +36,6 @@ namespace smoothg
 
 class GraphUpscale : public Upscale
 {
-    using Vector = linalgcpp::Vector<double>;
-    using VectorView = linalgcpp::VectorView<double>;
-    using BlockVector = linalgcpp::BlockVector<double>;
-    using SparseMatrix = linalgcpp::SparseMatrix<double>;
-    using DenseMatrix = linalgcpp::DenseMatrix;
-    using BlockMatrix = linalgcpp::BlockMatrix<double>;
-    using ParMatrix = parlinalgcpp::ParMatrix;
-
 public:
     /**
        @brief Constructor

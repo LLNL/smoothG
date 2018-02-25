@@ -56,7 +56,9 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 
     int num_parts = std::max(1.0, (global_vertices_ / (double)(coarse_factor)) + 0.5);
 
-    auto partitioning_global = Partition(vertex_vertex, num_parts);
+    bool contig = true;
+    double ubal = 2.0;
+    auto partitioning_global = Partition(vertex_vertex, num_parts, contig, ubal);
 
     Init(vertex_edge_global, partitioning_global, weight_global);
 }
@@ -179,6 +181,7 @@ void GraphUpscale::MakeFineLevel(const std::vector<double>& global_weight)
     M_global_ = parlinalgcpp::RAP(M_d, edge_true_edge_);
     D_global_ = D_d.Mult(edge_true_edge_);
     W_global_ = ParMatrix(comm_, vertex_starts, W_local_);
+    true_offsets_ = {0, M_global_.Rows(), M_global_.Rows() + D_global_.Rows()};
 }
 
 void GraphUpscale::MakeTopology()
@@ -195,9 +198,9 @@ void GraphUpscale::MakeTopology()
 
     auto edge_ext_agg = agg_edge_ext.Transpose<double>();
 
-    size_t num_vertices = vertex_edge_local_.Rows();
-    size_t num_edges = vertex_edge_local_.Cols();
-    size_t num_aggs = agg_edge_local_.Rows();
+    int num_vertices = vertex_edge_local_.Rows();
+    int num_edges = vertex_edge_local_.Cols();
+    int num_aggs = agg_edge_local_.Rows();
 
     const auto& vertex_starts = D_global_.GetRowStarts();
     const auto& edge_starts = edge_true_edge_.GetRowStarts();
@@ -259,35 +262,54 @@ void GraphUpscale::MakeCoarseSpace()
     ParMatrix face_edge_true_edge = face_edge_.Mult(edge_true_edge_);
     ParMatrix face_perm_edge = face_edge_true_edge.Mult(permute_e_T);
 
-    size_t marker_size = std::max(permute_v.Rows(), permute_e.Rows());
+    int marker_size = std::max(permute_v.Rows(), permute_e.Rows());
     std::vector<int> col_marker(marker_size, -1);
     std::vector<int> vertex_dof_marker(permute_v.Rows(), -1);
+    std::vector<int> row_map;
 
     int num_aggs = agg_ext_edge_.Rows();
     std::vector<DenseMatrix> vertex_targets(num_aggs);
     std::vector<DenseMatrix> agg_ext_sigma(num_aggs);
 
+    linalgcpp::EigenSolver eigen;
+    linalgcpp::EigenPair eigen_pair;
+
     for (int agg = 0; agg < num_aggs; ++agg)
     {
-        std::vector<int> edge_dofs = GetExtDofs(agg_ext_edge_, agg);
-        std::vector<int> vertex_dofs = GetExtDofs(agg_ext_vertex_, agg);
+        const auto edge_dofs_ext = GetExtDofs(agg_ext_edge_, agg);
+        const auto vertex_dofs_ext = GetExtDofs(agg_ext_vertex_, agg);
+        const auto vertex_dofs_local = agg_vertex_local_.GetIndices(agg);
 
-        if (edge_dofs.size() == 0)
+        if (edge_dofs_ext.size() == 0)
         {
-            vertex_targets[agg] = DenseMatrix(1, 1);
-            vertex_targets[agg] = 1.0;
+            vertex_targets[agg] = DenseMatrix(1, 1, {1.0});
             continue;
         }
 
-        SparseMatrix M_local = M_ext.GetSubMatrix(edge_dofs, edge_dofs, col_marker);
-        SparseMatrix D_local = D_ext.GetSubMatrix(vertex_dofs, edge_dofs, col_marker);
+        SparseMatrix M_local = M_ext.GetSubMatrix(edge_dofs_ext, edge_dofs_ext, col_marker);
+        SparseMatrix D_local = D_ext.GetSubMatrix(vertex_dofs_ext, edge_dofs_ext, col_marker);
         SparseMatrix D_local_T = D_local.Transpose();
 
-        D_local_T.InverseScaleRows(M_local.GetData());
+        D_local_T.InverseScaleRows(M_local);
 
         SparseMatrix DMinvDT = D_local.Mult(D_local_T);
-        DenseMatrix evects = DMinvDT.ToDense();
-        auto evals = evects.EigenSolve();
+
+        eigen.Solve(DMinvDT, spect_tol_, max_evects_, eigen_pair);
+
+        auto& evals = eigen_pair.first;
+        auto& evects = eigen_pair.second;
+
+        agg_ext_sigma[agg] = D_local_T.MultCT(evects);
+
+        DenseMatrix evects_restricted = RestrictLocal(evects, vertex_dof_marker,
+                                                      vertex_dofs_ext, vertex_dofs_local);
+
+        vertex_targets[agg] = smoothg::Orthogonalize(evects_restricted);
+
+        if (myid_ == 0)
+        {
+            vertex_targets[agg].Print("Vertex targets");
+        }
     }
 }
 

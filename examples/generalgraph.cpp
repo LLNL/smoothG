@@ -48,16 +48,27 @@ int main(int argc, char* argv[])
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
+    bool metis_agglomeration = false;
     // program options from command line
-    int num_partitions = 12;
-    std::string graphFileName = "../../graphdata/vertex_edge_sample.txt";
+    //int num_partitions = 12;
+    //std::string graphFileName = "../../graphdata/vertex_edge_sample.txt";
+    //std::string FiedlerFileName = "../../graphdata/fiedler_sample.txt";
+    //std::string partition_filename = "../../graphdata/partition_sample.txt";
+
+    int num_partitions = 25;
+    std::string graphFileName = "ve.txt";
     std::string FiedlerFileName = "../../graphdata/fiedler_sample.txt";
-    std::string partition_filename = "../../graphdata/partition_sample.txt";
+    std::string partition_filename = "part.part";
+
+    //int num_partitions = 2;
+    //std::string graphFileName = "../../graphdata/vertex_edge_tiny.txt";
+    //std::string FiedlerFileName = "../../graphdata/fiedler_tiny.txt";
+    //std::string partition_filename = "../../graphdata/partition_tiny.txt";
     std::string weight_filename = "";
     std::string w_block_filename = "";
-    bool metis_agglomeration = true;
-    int max_evects = 4;
-    double spect_tol = 1.e-3;
+    int max_evects = 2;
+    //double spect_tol = 1.e-3;
+    double spect_tol = 1.0;
     bool hybridization = false;
     int isolate = -1;
 

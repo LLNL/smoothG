@@ -23,6 +23,7 @@
 
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
+#include "Utilities.hpp"
 
 namespace smoothg
 {
@@ -32,10 +33,6 @@ namespace smoothg
 */
 class Upscale : public linalgcpp::Operator
 {
-    using Vector = linalgcpp::Vector<double>;
-    using VectorView = linalgcpp::VectorView<double>;
-    using BlockVector = linalgcpp::BlockVector<double>;
-
 public:
     /// Wrapper for applying the upscaling, in linalgcpp terminology
     virtual void Mult(const VectorView& x, VectorView& y) const override {}
@@ -175,15 +172,9 @@ public:
     void ShowErrors(const BlockVector& upscaled_sol,
                     const BlockVector& fine_sol) const {}
 
-    size_t Rows() const override { return size_; }
-    size_t Cols() const override { return size_; }
-
-private:
-    size_t size_;
-
 protected:
     Upscale(MPI_Comm comm, int size)
-        : size_(size), comm_(comm), setup_time_(0.0)
+        : Operator(size), comm_(comm), setup_time_(0.0)
     {
         MPI_Comm_size(comm_, &num_procs_);
         MPI_Comm_rank(comm_, &myid_);
