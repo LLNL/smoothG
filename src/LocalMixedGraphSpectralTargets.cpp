@@ -90,6 +90,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     colMapper(0)
 {
     // Assemble the parallel global M and D
+    // TODO: D and M starts should in terms of dofs
     graph_topology.GetVertexStart().Copy(D_local_rowstart);
     graph_topology.GetEdgeStart().Copy(M_local_rowstart);
 
@@ -113,6 +114,35 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
                         comm_, D_local_rowstart.Last(),
                         D_local_rowstart, W_local_ptr);
     }
+}
+
+void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
+{
+    mfem::HypreParMatrix edge_trueedge;
+    edge_trueedge.MakeRef(graph_topology_.edge_trueedge_);
+
+    // Construct extended aggregate to vertex dofs relation tables
+    mfem::SparseMatrix vertex_edge(graph_topology_.vertex_edge_);
+    mfem::HypreParMatrix vertex_edge_bd(comm_, D_local_rowstart.Last(), M_local_rowstart.Last(),
+                                        D_local_rowstart, M_local_rowstart, &vertex_edge);
+    unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_bd, &edge_trueedge) );
+    unique_ptr<mfem::HypreParMatrix> pedge_vertex( pvertex_edge->Transpose() );
+    unique_ptr<mfem::HypreParMatrix> pvertex_vertex( ParMult(pvertex_edge.get(), pedge_vertex.get()) );
+
+    graph_topology_.GetAggregateStart().Copy(Agg_start_);
+
+    mfem::SparseMatrix Agg_vertex(graph_topology_.Agg_vertex_);
+    mfem::HypreParMatrix Agg_vertex_bd(comm_, Agg_start_.Last(), D_local_rowstart.Last(),
+                                       Agg_start_, D_local_rowstart, &Agg_vertex);
+    pExtAgg_vdof_.reset( ParMult(&Agg_vertex_bd, pvertex_vertex.get()) );
+
+    // Construct extended aggregate to (interior) edge relation tables
+    SetConstantValue(*pExtAgg_vdof_, 1.);
+    pExtAgg_edof_.reset(ParMult(pExtAgg_vdof_.get(), pvertex_edge.get()));
+
+    // Note that boundary edges on an extended aggregate have value 1, while
+    // interior edges have value 2, and the goal is to keep only interior edges
+    pExtAgg_edof_->Threshold(1.5);
 }
 
 std::vector<mfem::SparseMatrix>
@@ -188,21 +218,23 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     AggExt_sigmaT.resize(nAggs);
     local_vertex_targets.resize(nAggs);
 
+    BuildExtendedAggregates();
+
     // Construct permutation matrices to obtain M, D on extended aggregates
-    const mfem::HypreParMatrix& pAggExt_vertex(*graph_topology_.pAggExt_vertex_);
-    const mfem::HypreParMatrix& pAggExt_edge(*graph_topology_.pAggExt_edge_);
+//    const mfem::HypreParMatrix& pAggExt_vertex(*graph_topology_.pAggExt_vertex_);
+//    const mfem::HypreParMatrix& pAggExt_edge(*graph_topology_.pAggExt_edge_);
     mfem::Array<HYPRE_Int>& vertex_start = const_cast<mfem::Array<HYPRE_Int>&>
                                            (graph_topology_.GetVertexStart());
-    HYPRE_Int* edge_start = const_cast<HYPRE_Int*>(pAggExt_edge.ColPart());
+    HYPRE_Int* edge_start = const_cast<HYPRE_Int*>(pExtAgg_edof_->ColPart());
 
     mfem::SparseMatrix AggExt_vertex_diag, AggExt_edge_diag;
-    pAggExt_vertex.GetDiag(AggExt_vertex_diag);
-    pAggExt_edge.GetDiag(AggExt_edge_diag);
+    pExtAgg_vdof_->GetDiag(AggExt_vertex_diag);
+    pExtAgg_edof_->GetDiag(AggExt_edge_diag);
 
     mfem::SparseMatrix AggExt_vertex_offd, AggExt_edge_offd;
     HYPRE_Int* vertex_shared_map, *edge_shared_map;
-    pAggExt_vertex.GetOffd(AggExt_vertex_offd, vertex_shared_map);
-    pAggExt_edge.GetOffd(AggExt_edge_offd, edge_shared_map);
+    pExtAgg_vdof_->GetOffd(AggExt_vertex_offd, vertex_shared_map);
+    pExtAgg_edof_->GetOffd(AggExt_edge_offd, edge_shared_map);
 
     int nvertices_diag = AggExt_vertex_diag.Width();
     int nvertices_offd = AggExt_vertex_offd.Width();
@@ -222,12 +254,12 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     mfem::SparseMatrix perm_e_offd = SparseIdentity(nedges_ext, nedges_offd, nedges_diag);
 
     mfem::HypreParMatrix permute_v(comm_, vertex_ext_start.Last(),
-                                   pAggExt_vertex.GetGlobalNumCols(),
+                                   pExtAgg_vdof_->GetGlobalNumCols(),
                                    vertex_ext_start, vertex_start, &perm_v_diag,
                                    &perm_v_offd, vertex_shared_map);
 
     mfem::HypreParMatrix permute_e(comm_, edge_ext_start.Last(),
-                                   pAggExt_edge.GetGlobalNumCols(),
+                                   pExtAgg_edof_->GetGlobalNumCols(),
                                    edge_ext_start, edge_start, &perm_e_diag,
                                    &perm_e_offd, edge_shared_map);
 
@@ -256,8 +288,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     }
 
     // Compute face to permuted edge relation table
-    mfem::Array<HYPRE_Int>& face_start =
-        const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
+    auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
     const mfem::HypreParMatrix& edge_trueedge(graph_topology_.edge_trueedge_);
 
     mfem::SparseMatrix& face_edge(const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_));
@@ -444,7 +475,6 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const mfem::SparseMatrix& face_edge(graph_topology_.face_edge_);
     const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
     const mfem::SparseMatrix& Agg_edge(graph_topology_.Agg_edge_);
-    const mfem::HypreParMatrix& pAggExt_edge(*graph_topology_.pAggExt_edge_);
 
     const int nfaces = face_Agg.Height(); // Number of coarse faces
     local_edge_trace_targets.resize(nfaces);
@@ -454,10 +484,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
     mfem::SparseMatrix AggExt_edge_diag, AggExt_edge_offd, face_permedge_diag;
     face_permedge_->GetDiag(face_permedge_diag);
-    pAggExt_edge.GetDiag(AggExt_edge_diag);
+    pExtAgg_edof_->GetDiag(AggExt_edge_diag);
     int nedges_diag = AggExt_edge_diag.Width();
     HYPRE_Int* junk_map;
-    pAggExt_edge.GetOffd(AggExt_edge_offd, junk_map);
+    pExtAgg_edof_->GetOffd(AggExt_edge_offd, junk_map);
 
     mfem::SparseMatrix face_IsShared;
     graph_topology_.face_trueface_face_->GetOffd(face_IsShared, junk_map);

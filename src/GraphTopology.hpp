@@ -78,11 +78,10 @@ public:
 
        @todo the arguments to this constructor should be carefully documented
     */
-    GraphTopology(const mfem::SparseMatrix& face_edge,
+    GraphTopology(const mfem::SparseMatrix& vertex_edge,
+                  const mfem::SparseMatrix& face_edge,
                   const mfem::SparseMatrix& Agg_vertex,
                   const mfem::SparseMatrix& Agg_edge,
-                  const mfem::HypreParMatrix& pAggExt_vertex,
-                  const mfem::HypreParMatrix& pAggExt_edge,
                   const mfem::SparseMatrix& Agg_face,
                   const mfem::HypreParMatrix& edge_trueedge,
                   const mfem::HypreParMatrix& face_trueface,
@@ -112,6 +111,9 @@ public:
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
     ///@}
 
+    // vertex to edge table
+    const mfem::SparseMatrix& vertex_edge_;
+
     ///@name entity to true_entity tables for edge and face
     ///@{
     const mfem::HypreParMatrix& edge_trueedge_;
@@ -132,20 +134,15 @@ public:
     mfem::SparseMatrix face_edge_;
     ///@}
 
-    ///@name extended aggregate relation tables, using "true dofs"
-    ///@{
-    std::unique_ptr<mfem::HypreParMatrix> pAggExt_vertex_;
-    std::unique_ptr<mfem::HypreParMatrix> pAggExt_edge_;
-    ///@}
-
     /// "face" to boundary attribute table
     mfem::SparseMatrix face_bdratt_;
 
 private:
-    void Init(mfem::SparseMatrix& vertex_edge,
-              const mfem::Array<int>& partition,
+    void Init(const mfem::Array<int>& partition,
               const mfem::SparseMatrix* edge_boundaryattr,
               const mfem::HypreParMatrix* edge_trueedge_edge_ptr);
+
+    void BuildExtendedAggregates();
 
     mfem::Array<HYPRE_Int> vertex_start_;
     mfem::Array<HYPRE_Int> edge_start_;

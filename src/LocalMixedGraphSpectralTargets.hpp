@@ -117,6 +117,8 @@ private:
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
+    void BuildExtendedAggregates();
+
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
         const mfem::SparseMatrix& Lloc,
         const mfem::SparseMatrix& Dloc,
@@ -125,8 +127,7 @@ private:
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
-    void CheckMinimalEigenvalue(
-        double eval_min, int aggregate_id, std::string entity);
+    void CheckMinimalEigenvalue(double eval_min, int aggregate_id, std::string entity);
 
     MPI_Comm comm_;
 
@@ -147,12 +148,19 @@ private:
     const GraphTopology& graph_topology_;
     const double zero_eigenvalue_threshold_;
 
+    /// Extended aggregate to vertex dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> pExtAgg_vdof_;
+
+    /// Extended aggregate to edge dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> pExtAgg_edof_;
+
     /// face to permuted edge relation table
     std::unique_ptr<mfem::HypreParMatrix> face_permedge_;
 
     mfem::Array<HYPRE_Int> M_local_rowstart;
     mfem::Array<HYPRE_Int> D_local_rowstart;
     mfem::Array<HYPRE_Int> edge_ext_start;
+    mfem::Array<int> Agg_start_;
 
     mfem::Array<int> colMapper;
 };
