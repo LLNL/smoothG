@@ -196,15 +196,12 @@ void GraphUpscale::MakeTopology()
 
     agg_edge_local_ = RestrictInterior(agg_edge_ext);
 
-    auto edge_ext_agg = agg_edge_ext.Transpose<double>();
-
-    int num_vertices = vertex_edge_local_.Rows();
-    int num_edges = vertex_edge_local_.Cols();
-    int num_aggs = agg_edge_local_.Rows();
+    SparseMatrix edge_ext_agg = agg_edge_ext.Transpose();
 
     const auto& vertex_starts = D_global_.GetRowStarts();
     const auto& edge_starts = edge_true_edge_.GetRowStarts();
 
+    int num_aggs = agg_edge_local_.Rows();
     auto agg_starts = parlinalgcpp::GenerateOffsets(comm_, num_aggs);
 
     ParMatrix edge_agg_d(comm_, edge_starts, agg_starts, edge_ext_agg);
@@ -214,9 +211,10 @@ void GraphUpscale::MakeTopology()
     ParMatrix agg_agg = agg_edge_d.Mult(edge_agg_ext);
 
     SparseMatrix face_agg_int = MakeFaceAggInt(agg_agg);
+    agg_edge_ext = 1.0;
     SparseMatrix face_edge_ext = face_agg_int.Mult(agg_edge_ext);
 
-    face_edge_local_ = MakeFaceEdge(agg_agg, edge_edge_,
+    face_edge_local_ = MakeFaceEdge(agg_agg, edge_agg_ext,
                                     agg_edge_ext, face_edge_ext);
 
     face_agg_local_ = ExtendFaceAgg(agg_agg, face_agg_int);
@@ -255,12 +253,13 @@ void GraphUpscale::MakeCoarseSpace()
     ParMatrix D_ext_global = permute_v.Mult(D_global_.Mult(permute_e_T));
     ParMatrix W_ext_global = permute_v.Mult(W_global_.Mult(permute_v_T));
 
+    ParMatrix face_edge_true_edge = face_edge_.Mult(edge_true_edge_);
+    ParMatrix face_perm_edge = face_edge_true_edge.Mult(permute_e_T);
+
     const auto& M_ext = M_ext_global.GetDiag();
     const auto& D_ext = D_ext_global.GetDiag();
     const auto& W_ext = W_ext_global.GetDiag();
-
-    ParMatrix face_edge_true_edge = face_edge_.Mult(edge_true_edge_);
-    ParMatrix face_perm_edge = face_edge_true_edge.Mult(permute_e_T);
+    const auto& face_edge = face_perm_edge.GetDiag();
 
     int marker_size = std::max(permute_v.Rows(), permute_e.Rows());
     std::vector<int> col_marker(marker_size, -1);
@@ -268,6 +267,8 @@ void GraphUpscale::MakeCoarseSpace()
     std::vector<int> row_map;
 
     int num_aggs = agg_ext_edge_.Rows();
+    int num_faces = face_edge_local_.Rows();
+
     std::vector<DenseMatrix> vertex_targets(num_aggs);
     std::vector<DenseMatrix> agg_ext_sigma(num_aggs);
 
@@ -299,18 +300,93 @@ void GraphUpscale::MakeCoarseSpace()
         auto& evals = eigen_pair.first;
         auto& evects = eigen_pair.second;
 
-        agg_ext_sigma[agg] = D_local_T.MultCT(evects);
+        DenseMatrix evects_ortho = evects.GetCol(1, evects.Cols());
+        agg_ext_sigma[agg] = D_local_T.Mult(evects_ortho);
 
         DenseMatrix evects_restricted = RestrictLocal(evects, vertex_dof_marker,
                                                       vertex_dofs_ext, vertex_dofs_local);
 
         vertex_targets[agg] = smoothg::Orthogonalize(evects_restricted);
-
-        if (myid_ == 0)
-        {
-            vertex_targets[agg].Print("Vertex targets");
-        }
     }
+
+    DenseMatrix face_sigma;
+
+    for (int face = 0; face < num_faces; ++face)
+    {
+        auto face_dofs = face_edge.GetIndices(face);
+        auto neighbors = face_agg_local_.GetIndices(face);
+
+        int total_vects = 0;
+
+        for (auto agg : neighbors)
+        {
+            total_vects += agg_ext_sigma[agg].Cols();
+        }
+
+        face_sigma.Resize(face_dofs.size(), total_vects);
+        int col_count = 0;
+
+        for (auto agg : neighbors)
+        {
+            const auto edge_dofs_ext = GetExtDofs(agg_ext_edge_, agg);
+
+            DenseMatrix face_restrict = RestrictLocal(agg_ext_sigma[agg], col_marker,
+                                                      edge_dofs_ext, face_dofs);
+
+            face_sigma.SetCol(col_count, face_restrict);
+            col_count += face_restrict.Cols();
+        }
+
+        // TODO(gelever1): SendReduce(face_sigma);
+
+        assert(col_count == total_vects);
+    }
+        // TODO(gelever1): Collect(face_sigma);
+
+    for (int face = 0; face < num_faces; ++face)
+    {
+        std::vector<int> vertex_ext_dofs;
+        std::vector<int> edge_ext_dofs = face_edge_local_.GetIndices(face);
+        std::vector<int> neighbors = face_agg_local_.GetIndices(face);
+
+        for (auto agg : neighbors)
+        {
+            auto agg_edges = agg_edge_local_.GetIndices(agg);
+            edge_ext_dofs.insert(std::end(edge_ext_dofs), std::begin(agg_edges),
+                                          std::end(agg_edges));
+
+            auto agg_vertices = agg_vertex_local_.GetIndices(agg);
+            vertex_ext_dofs.insert(std::end(vertex_ext_dofs), std::begin(agg_vertices),
+                                          std::end(agg_vertices));
+        }
+
+        auto D_face = D_local_.GetSubMatrix(vertex_ext_dofs, edge_ext_dofs, col_marker);
+
+        // TODO(gelever1): SendReduce(face, D_face);
+    }
+
+    // TODO(gelever1): Collect shared D
+
+    for (int face = 0; face < num_faces; ++face)
+    {
+        std::vector<int> edge_ext_dofs = face_edge_local_.GetIndices(face);
+        std::vector<int> neighbors = face_agg_local_.GetIndices(face);
+
+        for (auto agg : neighbors)
+        {
+            auto agg_edges = agg_edge_local_.GetIndices(agg);
+            edge_ext_dofs.insert(std::end(edge_ext_dofs), std::begin(agg_edges),
+                                 std::end(agg_edges));
+        }
+
+        auto M_face = M_local_.GetSubMatrix(edge_ext_dofs, edge_ext_dofs, col_marker);
+        auto M_diag = M_face.GetDiag();
+
+        // TODO(gelever1): SendReduce(face, M_diag);
+    }
+
+    // TODO(gelever1): Collect shared M
+
 }
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const

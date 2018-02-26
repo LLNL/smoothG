@@ -251,12 +251,11 @@ SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg)
     const auto& agg_agg_offd = agg_agg.GetOffd();
 
     int num_aggs = agg_agg_diag.Rows();
-    int num_faces_int = agg_agg_diag.nnz() - agg_agg_diag.Rows();
+    int num_faces = agg_agg_diag.nnz() - agg_agg_diag.Rows();
 
-    assert(num_faces_int % 2 == 0);
-    num_faces_int /= 2;
+    assert(num_faces % 2 == 0);
+    num_faces /= 2;
 
-    int num_faces = num_faces_int + agg_agg_offd.nnz();
     std::vector<int> indptr(num_faces + 1);
     std::vector<int> indices(num_faces * 2);
     std::vector<double> data(num_faces * 2, 1);
@@ -284,14 +283,14 @@ SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg)
         }
     }
 
-    assert(count == num_faces_int);
+    assert(count == num_faces);
 
     return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
             num_faces, num_aggs);
 }
 
 SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
-        const ParMatrix& edge_edge,
+        const ParMatrix& edge_ext_agg,
         const SparseMatrix& agg_edge_ext,
         const SparseMatrix& face_edge_ext)
 {
@@ -334,9 +333,9 @@ SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
     const auto& agg_offd_indices = agg_agg_offd.GetIndices();
     const auto& agg_colmap = agg_agg.GetColMap();
 
-    const auto& edge_offd_indptr = edge_edge.GetOffd().GetIndptr();
-    const auto& edge_offd_indices = edge_edge.GetOffd().GetIndices();
-    const auto& edge_colmap = edge_edge.GetColMap();
+    const auto& edge_offd_indptr = edge_ext_agg.GetOffd().GetIndptr();
+    const auto& edge_offd_indices = edge_ext_agg.GetOffd().GetIndices();
+    const auto& edge_colmap = edge_ext_agg.GetColMap();
 
     for (int i = 0; i < num_aggs; ++i)
     {
@@ -344,7 +343,7 @@ SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
         {
             int shared = agg_colmap[agg_offd_indices[j]];
 
-            for (int k = agg_edge_indptr[i]; k < agg_edge_indptr[i + 1]; k++)
+            for (int k = agg_edge_indptr[i]; k < agg_edge_indptr[i + 1]; ++k)
             {
                 int edge = agg_edge_indices[k];
 
