@@ -223,6 +223,8 @@ private:
     /// @todo remove this?
     void GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs);
 
+    void GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs);
+
     mfem::DenseMatrix RTP(const mfem::DenseMatrix& R, const mfem::DenseMatrix& P);
 
     const GraphTopology& topology_;
@@ -231,6 +233,7 @@ private:
 
     int total_num_traces_;
     int ncoarse_vertexdofs_;
+    mfem::Array<int> coarse_agg_dof_offsets_;
 
     /// weights on aggregates
     mfem::Vector agg_weights_;

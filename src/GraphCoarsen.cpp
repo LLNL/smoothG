@@ -288,6 +288,7 @@ void GraphCoarsen::BuildPEdges(
     int* Pedges_j = new int[Pedges_i[nedges]];
     double* Pedges_data = new double[Pedges_i[nedges]];
 
+    // coarse vertex dofs are also known as bubble dofs
     int ncoarse_vertexdofs = 0;
     for (unsigned int i = 0; i < nAggs; i++)
         ncoarse_vertexdofs += vertex_target[i].Width();
