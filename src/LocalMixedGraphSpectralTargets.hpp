@@ -157,9 +157,9 @@ private:
     /// face to permuted edge relation table
     std::unique_ptr<mfem::HypreParMatrix> face_permedge_;
 
-    mfem::Array<HYPRE_Int> M_local_rowstart;
-    mfem::Array<HYPRE_Int> D_local_rowstart;
-    mfem::Array<HYPRE_Int> edge_ext_start;
+    mfem::Array<HYPRE_Int> edgedof_starts;
+    mfem::Array<HYPRE_Int> vertdof_starts;
+    mfem::Array<HYPRE_Int> edgedof_ext_starts;
     mfem::Array<int> Agg_start_;
 
     mfem::Array<int> colMapper;

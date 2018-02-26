@@ -91,28 +91,27 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 {
     // Assemble the parallel global M and D
     // TODO: D and M starts should in terms of dofs
-    graph_topology.GetVertexStart().Copy(D_local_rowstart);
-    graph_topology.GetEdgeStart().Copy(M_local_rowstart);
+    graph_topology.GetVertexStart().Copy(vertdof_starts);
+    graph_topology.GetEdgeStart().Copy(edgedof_starts);
 
     auto M_local_ptr = const_cast<mfem::SparseMatrix*>(&M_local_);
     auto D_local_ptr = const_cast<mfem::SparseMatrix*>(&D_local_);
 
-    mfem::HypreParMatrix M_d(comm_, M_local_rowstart.Last(),
-                             M_local_rowstart, M_local_ptr);
+    mfem::HypreParMatrix M_d(comm_, edgedof_starts.Last(), edgedof_starts, M_local_ptr);
 
     const mfem::HypreParMatrix& edge_trueedge(graph_topology.edge_trueedge_);
     M_global_.reset(smoothg::RAP(M_d, edge_trueedge));
 
-    mfem::HypreParMatrix D_d(comm_, D_local_rowstart.Last(), M_local_rowstart.Last(),
-                             D_local_rowstart, M_local_rowstart, D_local_ptr);
+    mfem::HypreParMatrix D_d(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
+                             vertdof_starts, edgedof_starts, D_local_ptr);
     D_global_.reset( ParMult(&D_d, &edge_trueedge) );
 
     if (W_local_)
     {
         auto W_local_ptr = const_cast<mfem::SparseMatrix*>(W_local_);
         W_global_ = make_unique<mfem::HypreParMatrix>(
-                        comm_, D_local_rowstart.Last(),
-                        D_local_rowstart, W_local_ptr);
+                        comm_, vertdof_starts.Last(),
+                        vertdof_starts, W_local_ptr);
     }
 }
 
@@ -123,8 +122,8 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 
     // Construct extended aggregate to vertex dofs relation tables
     mfem::SparseMatrix vertex_edge(graph_topology_.vertex_edge_);
-    mfem::HypreParMatrix vertex_edge_bd(comm_, D_local_rowstart.Last(), M_local_rowstart.Last(),
-                                        D_local_rowstart, M_local_rowstart, &vertex_edge);
+    mfem::HypreParMatrix vertex_edge_bd(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
+                                        vertdof_starts, edgedof_starts, &vertex_edge);
     unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_bd, &edge_trueedge) );
     unique_ptr<mfem::HypreParMatrix> pedge_vertex( pvertex_edge->Transpose() );
     unique_ptr<mfem::HypreParMatrix> pvertex_vertex( ParMult(pvertex_edge.get(), pedge_vertex.get()) );
@@ -132,8 +131,8 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
     graph_topology_.GetAggregateStart().Copy(Agg_start_);
 
     mfem::SparseMatrix Agg_vertex(graph_topology_.Agg_vertex_);
-    mfem::HypreParMatrix Agg_vertex_bd(comm_, Agg_start_.Last(), D_local_rowstart.Last(),
-                                       Agg_start_, D_local_rowstart, &Agg_vertex);
+    mfem::HypreParMatrix Agg_vertex_bd(comm_, Agg_start_.Last(), vertdof_starts.Last(),
+                                       Agg_start_, vertdof_starts, &Agg_vertex);
     pExtAgg_vdof_.reset( ParMult(&Agg_vertex_bd, pvertex_vertex.get()) );
 
     // Construct extended aggregate to (interior) edge relation tables
@@ -221,8 +220,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     BuildExtendedAggregates();
 
     // Construct permutation matrices to obtain M, D on extended aggregates
-//    const mfem::HypreParMatrix& pAggExt_vertex(*graph_topology_.pAggExt_vertex_);
-//    const mfem::HypreParMatrix& pAggExt_edge(*graph_topology_.pAggExt_edge_);
     mfem::Array<HYPRE_Int>& vertex_start = const_cast<mfem::Array<HYPRE_Int>&>
                                            (graph_topology_.GetVertexStart());
     HYPRE_Int* edge_start = const_cast<HYPRE_Int*>(pExtAgg_edof_->ColPart());
@@ -243,8 +240,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     int nedges_offd = AggExt_edge_offd.Width();
     int nedges_ext = nedges_diag + nedges_offd;
 
-    mfem::Array<HYPRE_Int> vertex_ext_start;
-    mfem::Array<HYPRE_Int>* start[2] = {&vertex_ext_start, &edge_ext_start};
+    mfem::Array<HYPRE_Int> vertdof_ext_starts;
+    mfem::Array<HYPRE_Int>* start[2] = {&vertdof_ext_starts, &edgedof_ext_starts};
     HYPRE_Int nloc[2] = {nvertices_ext, nedges_ext};
     GenerateOffsets(comm_, 2, nloc, start);
 
@@ -253,14 +250,14 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     mfem::SparseMatrix perm_e_diag = SparseIdentity(nedges_ext, nedges_diag);
     mfem::SparseMatrix perm_e_offd = SparseIdentity(nedges_ext, nedges_offd, nedges_diag);
 
-    mfem::HypreParMatrix permute_v(comm_, vertex_ext_start.Last(),
+    mfem::HypreParMatrix permute_v(comm_, vertdof_ext_starts.Last(),
                                    pExtAgg_vdof_->GetGlobalNumCols(),
-                                   vertex_ext_start, vertex_start, &perm_v_diag,
+                                   vertdof_ext_starts, vertex_start, &perm_v_diag,
                                    &perm_v_offd, vertex_shared_map);
 
-    mfem::HypreParMatrix permute_e(comm_, edge_ext_start.Last(),
+    mfem::HypreParMatrix permute_e(comm_, edgedof_ext_starts.Last(),
                                    pExtAgg_edof_->GetGlobalNumCols(),
-                                   edge_ext_start, edge_start, &perm_e_diag,
+                                   edgedof_ext_starts, edge_start, &perm_e_diag,
                                    &perm_e_offd, edge_shared_map);
 
     using ParMatrix = unique_ptr<mfem::HypreParMatrix>;
