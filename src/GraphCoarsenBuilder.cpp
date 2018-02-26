@@ -273,8 +273,9 @@ void CoefficientMBuilder::GetCoarseFaceDofs(int face, mfem::Array<int>& local_co
 
 void CoefficientMBuilder::GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs)
 {
-    local_coarse_dofs.SetSize(coarse_agg_dof_offsets_[agg+1] - coarse_agg_dof_offsets_[agg]);
-    for (int i=coarse_agg_dof_offsets_[agg]; i<coarse_agg_dof_offsets_[agg+1]; ++i)
+    int agg_size = coarse_agg_dof_offsets_[agg+1] - coarse_agg_dof_offsets_[agg];
+    local_coarse_dofs.SetSize(agg_size);
+    for (int i=0; i<agg_size; ++i)
     {
         local_coarse_dofs[i] = coarse_agg_dof_offsets_[agg] + i;
     }
@@ -345,22 +346,33 @@ void CoefficientMBuilder::BuildComponents()
     comp_E_E_.resize(num_aggs);
     for (int agg=0; agg<num_aggs; ++agg)
     {
-        GetTableRow(topology_.Agg_edge_, agg, local_fine_dofs);
         GetCoarseAggDofs(agg, local_coarse_dofs);
-        mfem::DenseMatrix P_E(local_fine_dofs.Size(), local_coarse_dofs.Size());
-        Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);
-        comp_E_E_[agg] = RTP(P_E, P_E);
-        GetTableRow(topology_.Agg_face_, agg, local_faces);
-        for (int af=0; af<local_faces.Size(); ++af)
+        if (local_coarse_dofs.Size() == 0)
         {
-            int face = local_faces[af];
-            GetCoarseFaceDofs(face, local_coarse_dofs);
-            mfem::DenseMatrix P_EF(local_fine_dofs.Size(), local_coarse_dofs.Size());
-            Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
-            // int index = -1; // ??? todo, how to index these guys
-            // comp_EF_E[index] = RTP(P_EF, P_E);
-            comp_EF_E_.push_back(RTP(P_EF, P_E));
-            // also store transpose, or just have it implicitly?
+            mfem::DenseMatrix empty(0,0);
+            comp_E_E_[agg] = empty;
+            for (int af=0; af<local_faces.Size(); ++af)
+            {
+                comp_EF_E_.push_back(empty);
+            }
+        }
+        else
+        {
+            GetTableRow(topology_.Agg_edge_, agg, local_fine_dofs);
+            mfem::DenseMatrix P_E(local_fine_dofs.Size(), local_coarse_dofs.Size());
+            Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);
+            comp_E_E_[agg] = RTP(P_E, P_E);
+            GetTableRow(topology_.Agg_face_, agg, local_faces);
+            for (int af=0; af<local_faces.Size(); ++af)
+            {
+                int face = local_faces[af];
+                GetCoarseFaceDofs(face, local_coarse_dofs);
+                mfem::DenseMatrix P_EF(local_fine_dofs.Size(), local_coarse_dofs.Size());
+                Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
+                // comp_EF_E[index] = RTP(P_EF, P_E);
+                comp_EF_E_.push_back(RTP(P_EF, P_E));
+                // also store transpose, or just have it implicitly?
+            }
         }
     }
 }
