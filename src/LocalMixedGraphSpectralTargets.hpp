@@ -119,6 +119,10 @@ private:
 
     void BuildExtendedAggregates();
 
+    // TODO: better naming - this is not really a permutation because it is not one to one
+    // the returned matrix makes a copy of extended part (offd) and add it to local
+    std::unique_ptr<mfem::HypreParMatrix> DofPermutation(mfem::HypreParMatrix& ExtAgg_dof);
+
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
         const mfem::SparseMatrix& Lloc,
         const mfem::SparseMatrix& Dloc,
