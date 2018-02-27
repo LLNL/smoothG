@@ -450,7 +450,6 @@ void LocalEigenSolver::Compute(
     eigprob('S', n, max_num_evects, &adapter_A_B_shift,
             &A_B_shift_adapter::MultOP, &adapter_B, &A_adapter::MultOP,
             shift_, "LM", ncv, tolerance_, max_iterations_);
-
     auto data_ptr = EigenPairsSetSizeAndData(n, max_num_evects, evals, evects);
     int num_converged = eigprob.EigenValVectors(data_ptr[0], data_ptr[1]);
     CheckNotConverged(max_num_evects, num_converged);
@@ -505,6 +504,20 @@ double LocalEigenSolver::Compute(
         Compute(dense_A_, dense_B_, evals_, evects);
     }
     return evals_(0);
+}
+
+double LocalEigenSolver::Compute(
+    std::vector<mfem::SparseMatrix>& mat, mfem::DenseMatrix& evects)
+{
+    assert(mat.size() == 1 || mat.size() == 2);
+    if (mat.size() == 1)
+    {
+        return Compute(mat[0], evects);
+    }
+    else
+    {
+        return Compute(mat[0], mat[1], evects);
+    }
 }
 
 } // namespace smoothg

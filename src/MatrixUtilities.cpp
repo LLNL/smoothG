@@ -198,27 +198,26 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
     }
 }
 
-
-void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDense(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C)
 {
-    C.SetSize(A.Height(), B.Width());
     MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
+    C.SetSize(A.Height(), B.Width());
 
     mfem::Vector column_in, column_out;
     for (int j = 0; j < B.Width(); ++j)
     {
-        B.GetColumnReference(j, column_in);
+        const_cast<mfem::DenseMatrix&>(B).GetColumnReference(j, column_in);
         C.GetColumnReference(j, column_out);
         A.Mult(column_in, column_out);
     }
 }
 
-void MultSparseDenseTranspose(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                               mfem::DenseMatrix& C)
 {
-    MFEM_ASSERT(C.Width() == A.Height() && C.Height() == B.Width() &&
-                A.Width() == B.Height(), "incompatible dimensions");
+    MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
+    C.SetSize(B.Width(), A.Height());
 
     const double* A_data = A.GetData();
     const int* A_i = A.GetI();
@@ -661,9 +660,9 @@ void ExtractSubMatrix(
 }
 
 void ExtractColumns(
-    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
-    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
-    const int row_offset)
+    const mfem::DenseMatrix& A, const mfem::Array<int>& col_to_ref,
+    const mfem::Array<int>& subcol_to_ref, mfem::Array<int>& ref_workspace,
+    mfem::DenseMatrix& A_sub, int row_offset)
 {
     const int A_width = A.Width();
     const int A_height = A.Height();
@@ -671,14 +670,21 @@ void ExtractColumns(
 
     assert((A_height + row_offset) <= A_sub_height);
 
+    for (int j = 0; j < col_to_ref.Size(); ++j)
+        ref_workspace[col_to_ref[j]] = j;
+
     for (int j = 0; j < subcol_to_ref.Size(); ++j)
     {
-        int A_col = ref_to_col[subcol_to_ref[j]];
+        int A_col = ref_workspace[subcol_to_ref[j]];
         assert(A_col >= 0);
         assert(A_col < A_width);
         std::copy_n(A.Data() + A_col * A_height, A_height,
                     A_sub.Data() + j * A_sub_height + row_offset);
     }
+
+    // reset reference workspace so that it can be reused
+    for (int j = 0; j < col_to_ref.Size(); ++j)
+        ref_workspace[col_to_ref[j]] = -1;
 }
 
 void Full(const mfem::SparseMatrix& Asparse, mfem::DenseMatrix& Adense)

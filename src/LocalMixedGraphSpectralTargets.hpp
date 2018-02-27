@@ -125,7 +125,7 @@ private:
     // the returned matrix makes a copy of extended part (offd) and add it to local
     std::unique_ptr<mfem::HypreParMatrix> DofPermutation(DofType dof_type);
 
-    int GetExtAggDofs(DofType dof_type, int iAgg, mfem::Array<int>& dofs);
+    void GetExtAggDofs(DofType dof_type, int iAgg, mfem::Array<int>& dofs);
 
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
         const mfem::SparseMatrix& Lloc,

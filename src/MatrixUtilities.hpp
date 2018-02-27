@@ -78,14 +78,14 @@ mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense.
 */
-void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDense(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C);
 
 /**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense, but C is kept transposed.
 */
-void MultSparseDenseTranspose(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                               mfem::DenseMatrix& C);
 
 /**
@@ -195,15 +195,16 @@ void ExtractSubMatrix(
    @brief Extract columns from a dense matrix (A) to another dense matrix (A_sub)
 
    @param A the matrix to extract from
-   @param ref_to_col mapping from reference index to column index of A
+   @param col_to_ref mapping from column index of A to reference index
    @param subcol_to_ref mapping from column index of A_sub to reference index
+   @param ref_workspace array of "-1" of size at least dimension of reference space
    @param A_sub the returned matrix where the extracted columns are collected
    @param row_offset which row of A_sub to start putting the extracted columns
 */
 void ExtractColumns(
-    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
-    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
-    const int row_offset = 0);
+    const mfem::DenseMatrix& A, const mfem::Array<int>& col_to_ref,
+    const mfem::Array<int>& subcol_to_ref, mfem::Array<int>& ref_workspace,
+    mfem::DenseMatrix& A_sub, int row_offset = 0);
 
 /**
    @brief Fill a DenseMatrix with the entries of a SparseMatrix
