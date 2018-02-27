@@ -28,9 +28,6 @@
 #include <mpi.h>
 
 #include "mfem.hpp"
-#include "../examples/spe10.hpp"
-
-#include "../src/picojson.h"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
@@ -42,7 +39,7 @@ int main(int argc, char* argv[])
     int myid;
 
     // 1. Initialize MPI
-    MPI_Init(&argc, &argv);
+    mpi_session session(argc, argv);
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_rank(comm, &myid);
 
@@ -73,7 +70,7 @@ int main(int argc, char* argv[])
     const int coarsening_factor = nDimensions == 2 ? 8 : 32;
 
     // Setting up a mesh (2D or 3D SPE10 model)
-    unique_ptr<mfem::ParMesh> pmesh;
+    std::unique_ptr<mfem::ParMesh> pmesh;
     if (nDimensions == 3)
     {
         mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
@@ -104,8 +101,6 @@ int main(int argc, char* argv[])
     {
         ShowAggregates(graph_topos, pmesh.get());
     }
-
-    MPI_Finalize();
 
     return EXIT_SUCCESS;
 }
