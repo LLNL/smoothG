@@ -87,9 +87,12 @@ public:
     /**
        @brief Return targets as result of eigenvalue computations.
 
-       @param local_edge_trace_targets traces of the vertex targets
-       @param local_vertex_targets vectors corresponding to smallest eigenvalues
-                                   on the vertex space.
+       @param local_edge_trace_targets (OUT) an array of DenseMatrix of size number
+              of coarse faces, each DenseMatrix contains edge trace targets on
+              the corresponding coarse face as column vectors
+       @param local_vertex_targets (OUT) an array of DenseMatrix of size number
+              of aggregate, each DenseMatrix contains coarse vertex basis in
+              the corresponding aggregate as column vectors
     */
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
                  std::vector<mfem::DenseMatrix>& local_vertex_targets);
@@ -97,26 +100,32 @@ private:
     enum DofType { vdof, edof }; // vertex-based and edge-based dofs
 
     /**
-       @brief Solve an eigenvalue problem on each agglomerate, put the result in
-       local_vertex_targets.
+       @brief Compute spectral vectex targets for each aggregate
 
-       Put the normal trace of these into AggExt_sigma
+       Solve an eigenvalue problem on each extended aggregate, restrict eigenvectors
+       to original aggregate and use SVD to remove linear dependence, put resulting
+       vectors in local_vertex_targets as column vectors.
 
-       @param local_vertex targets is a std::vector of size nAEs when it comes in.
-           When it comes out, each entry is a DenseMatrix with one column for each
-           eigenvector selected.
+       Put edge traces into ExtAgg_sigmaT as row vectors
+       Trace generation depends on dual_target_, scaled_dual_, and energy_dual_
+
+       @param ExtAgg_sigmaT (OUT)
+       @param local_vertex targets (OUT)
     */
-    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
+    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
                               std::vector<mfem::DenseMatrix>& local_vertex_targets);
 
     /**
-       @brief Given normal traces of eigenvectors in AggExt_sigma, put those as well as
-       some kind of PV vector into local_edge_trace_targets.
+       @brief Compute edge trace targets for each coarse face
 
-       @param AggExt_sigma (IN)
+       Given edge traces in aggregates (from ExtAgg_sigmaT), restrict them to coarse
+       face, put those restricted vectors as well as some kind of PV vector into
+       local_edge_trace_targets after SVD.
+
+       @param ExtAgg_sigmaT (IN)
        @param local_edge_trace_targets (OUT)
     */
-    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
+    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
     void BuildExtendedAggregates();
