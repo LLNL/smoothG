@@ -14,17 +14,15 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file finitevolume.cpp
-   @brief This is an example for upscaling a graph Laplacian coming from a finite
-   volume discretization of a simple reservior model in parallel.
+   @file mltopo.cpp
+   @brief This is an example showing how to generate a hierarchy of graphs by
+   recursive coarsening.
 
    A simple way to run the example:
 
-   mpirun -n 4 ./finitevolume
+   ./mltopo
 */
 
-#include <fstream>
-#include <sstream>
 #include <mpi.h>
 
 #include "mfem.hpp"
