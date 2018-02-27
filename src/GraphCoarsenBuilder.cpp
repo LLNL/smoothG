@@ -293,7 +293,8 @@ mfem::DenseMatrix CoefficientMBuilder::RTP(const mfem::DenseMatrix& R,
 
 void CoefficientMBuilder::BuildComponents()
 {
-    // indexing!
+    // instead of indexing/maps, we will just go through everything in the same
+    // order when we assemble.
 
     // F_F block
     const int num_faces = topology_.Agg_face_.Width();
@@ -328,7 +329,7 @@ void CoefficientMBuilder::BuildComponents()
             GetCoarseFaceDofs(face, local_coarse_dofs);
             mfem::DenseMatrix P_EF(local_fine_dofs.Size(), local_coarse_dofs.Size());
             Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
-            for (int fprime=f+1; fprime<local_faces.Size(); ++fprime)
+            for (int fprime=f; fprime<local_faces.Size(); ++fprime)
             {
                 int faceprime = local_faces[fprime];
                 GetTableRow(topology_.face_edge_, faceprime, local_fine_dofs_prime);
@@ -377,6 +378,8 @@ void CoefficientMBuilder::BuildComponents()
     }
 }
 
+/// this shares a lot of code with BuildComponents, but I'm not sure it makes
+/// sense to combine them in any way.
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
 {
     // what we're doing:
@@ -384,7 +387,9 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
     //   2. change interface so we can actually change weights
     //   3. what to do in parallel....
 
+    // ---
     // build the components...
+    // ---
     BuildComponents();
 
     // temporarily just use hard-coded weights = 1
@@ -394,15 +399,17 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
     agg_weights = 1.0;
     SetCoefficient(agg_weights);
 
+    // ---
     // assemble from components...
+    // ---
     auto CoarseM = make_unique<mfem::SparseMatrix>(
         total_num_traces_ + ncoarse_vertexdofs_ - num_aggs,
         total_num_traces_ + ncoarse_vertexdofs_ - num_aggs);
 
-    // this explicit transpose is not my favorite
+    // F_F block, the P_F^T M_F P_F pieces (this explicit transpose is not my favorite)
     auto face_Agg = smoothg::Transpose(topology_.Agg_face_);
     mfem::Array<int> neighbor_aggs;
-    mfem::Array<int> local_coarse_dofs;
+    mfem::Array<int> coarse_face_dofs;
     for (int face=0; face<num_faces; ++face)
     {
         double face_weight;
@@ -418,15 +425,61 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
                                         1.0 / agg_weights_[neighbor_aggs[1]]);
             face_weight = 1.0 / recip;
         }
-        comp_F_F_[face] *= face_weight;
-        GetCoarseFaceDofs(face, local_coarse_dofs);
-        CoarseM->AddSubMatrix(local_coarse_dofs, local_coarse_dofs, comp_F_F_[face]);
-        comp_F_F_[face] *= 1.0 / face_weight;
+        GetCoarseFaceDofs(face, coarse_face_dofs);
+        AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_face_dofs,
+                           comp_F_F_[face], face_weight);
     }
 
+    // the EF_EF block
+    // for (pairs of *faces* that share an *aggregate*)
+    mfem::Array<int> local_faces;
+    mfem::Array<int> coarse_face_dofs_prime;
+    int counter = 0;
     for (int agg=0; agg<num_aggs; ++agg)
     {
-        // todo: every other part of the coarse mass matrix
+        double agg_weight = agg_weights_[agg];
+        GetTableRow(topology_.Agg_face_, agg, local_faces);
+        for (int f=0; f<local_faces.Size(); ++f)
+        {
+            int face = local_faces[f];
+            GetCoarseFaceDofs(face, coarse_face_dofs);
+            for (int fprime=f; fprime<local_faces.Size(); ++fprime)
+            {
+                int faceprime = local_faces[fprime];
+                GetCoarseFaceDofs(faceprime, coarse_face_dofs_prime);
+                // comp_EF_EF_.push_back(RTP(P_EF, P_EFprime));
+                // TODO: am I adding the below matrix twice if f=fprime?
+                // (I think PSV actually wants it added twice, once for A, once for A')
+                AddScaledSubMatrix(*CoarseM, coarse_face_dofs,
+                                   coarse_face_dofs_prime, comp_EF_EF_[counter++],
+                                   agg_weight);
+            }
+        }
+    }
+
+    // EF_E block and E_E block
+    counter = 0;
+    mfem::Array<int> coarse_agg_dofs;
+    for (int agg=0; agg<num_aggs; ++agg)
+    {
+        double agg_weight = agg_weights_[agg];
+        GetCoarseAggDofs(agg, coarse_agg_dofs);
+        // Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);
+        AddScaledSubMatrix(*CoarseM, coarse_agg_dofs, coarse_agg_dofs,
+                           comp_E_E_[agg], agg_weight);
+        GetTableRow(topology_.Agg_face_, agg, local_faces);
+        for (int af=0; af<local_faces.Size(); ++af)
+        {
+            int face = local_faces[af];
+            GetCoarseFaceDofs(face, coarse_face_dofs);
+            // Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
+            AddScaledSubMatrix(*CoarseM, coarse_agg_dofs, coarse_face_dofs,
+                               comp_EF_E_[counter], agg_weight);
+            mfem::DenseMatrix E_EF(comp_EF_E_[counter], 't');
+            AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_agg_dofs,
+                               E_EF, agg_weight);
+            counter++;
+        }
     }
 
     CoarseM->Finalize(0);
