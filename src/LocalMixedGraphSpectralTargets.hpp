@@ -153,10 +153,10 @@ private:
     const double zero_eigenvalue_threshold_;
 
     /// Extended aggregate to vertex dof relation table
-    std::unique_ptr<mfem::HypreParMatrix> pExtAgg_vdof_;
+    std::unique_ptr<mfem::HypreParMatrix> ExtAgg_vdof_;
 
     /// Extended aggregate to edge dof relation table
-    std::unique_ptr<mfem::HypreParMatrix> pExtAgg_edof_;
+    std::unique_ptr<mfem::HypreParMatrix> ExtAgg_edof_;
 
     /// face to permuted edge relation table
     std::unique_ptr<mfem::HypreParMatrix> face_permedge_;
@@ -166,7 +166,7 @@ private:
     mfem::Array<HYPRE_Int> edgedof_ext_starts;
     mfem::Array<int> Agg_start_;
 
-    mfem::Array<int> colMapper;
+    mfem::Array<int> colMapper_;
 };
 
 } // namespace smoothg
