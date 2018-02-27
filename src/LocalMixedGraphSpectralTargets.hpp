@@ -121,7 +121,12 @@ private:
 
     // TODO: better naming - this is not really a permutation because it is not one to one
     // the returned matrix makes a copy of extended part (offd) and add it to local
-    std::unique_ptr<mfem::HypreParMatrix> DofPermutation(mfem::HypreParMatrix& ExtAgg_dof);
+    std::unique_ptr<mfem::HypreParMatrix> DofPermutation(mfem::HypreParMatrix& ExtAgg_dof,
+                                                         mfem::SparseMatrix &ExtAgg_dof_diag,
+                                                         mfem::SparseMatrix &ExtAgg_dof_offd);
+
+    int GetExtAggDofs(mfem::SparseMatrix& ExtAgg_dof_diag, mfem::SparseMatrix& ExtAgg_dof_offd,
+                      int iAgg, mfem::Array<int>& dofs);
 
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
         const mfem::SparseMatrix& Lloc,
@@ -154,12 +159,16 @@ private:
 
     /// Extended aggregate to vertex dof relation table
     std::unique_ptr<mfem::HypreParMatrix> ExtAgg_vdof_;
+    mfem::SparseMatrix ExtAgg_vdof_diag_;
+    mfem::SparseMatrix ExtAgg_vdof_offd_;
 
     /// Extended aggregate to edge dof relation table
     std::unique_ptr<mfem::HypreParMatrix> ExtAgg_edof_;
+    mfem::SparseMatrix ExtAgg_edof_diag_;
+    mfem::SparseMatrix ExtAgg_edof_offd_;
 
-    /// face to permuted edge relation table
-    std::unique_ptr<mfem::HypreParMatrix> face_permedge_;
+    /// face to permuted edge dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> face_perm_edof_;
 
     mfem::Array<HYPRE_Int> edgedof_starts;
     mfem::Array<HYPRE_Int> vertdof_starts;

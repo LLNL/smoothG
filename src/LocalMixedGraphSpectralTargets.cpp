@@ -145,9 +145,10 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 }
 
 std::unique_ptr<mfem::HypreParMatrix>
-LocalMixedGraphSpectralTargets::DofPermutation(mfem::HypreParMatrix& ExtAgg_dof)
+LocalMixedGraphSpectralTargets::DofPermutation(mfem::HypreParMatrix& ExtAgg_dof,
+                                               mfem::SparseMatrix& ExtAgg_dof_diag,
+                                               mfem::SparseMatrix& ExtAgg_dof_offd)
 {
-    mfem::SparseMatrix ExtAgg_dof_diag, ExtAgg_dof_offd;
     HYPRE_Int* dof_offd_map;
     ExtAgg_dof.GetDiag(ExtAgg_dof_diag);
     ExtAgg_dof.GetOffd(ExtAgg_dof_offd, dof_offd_map);
@@ -175,13 +176,10 @@ LocalMixedGraphSpectralTargets::DofPermutation(mfem::HypreParMatrix& ExtAgg_dof)
     return dof_permute;
 }
 
-int GetExtAggDofs(mfem::HypreParMatrix& ExtAgg_dof, int iAgg, mfem::Array<int>& dofs)
+int LocalMixedGraphSpectralTargets::GetExtAggDofs(
+        mfem::SparseMatrix& ExtAgg_dof_diag, mfem::SparseMatrix& ExtAgg_dof_offd,
+        int iAgg, mfem::Array<int>& dofs)
 {
-    mfem::SparseMatrix ExtAgg_dof_diag, ExtAgg_dof_offd;
-    HYPRE_Int* colmap;
-    ExtAgg_dof.GetDiag(ExtAgg_dof_diag);
-    ExtAgg_dof.GetOffd(ExtAgg_dof_offd, colmap);
-
     int num_ext_dofs_diag = ExtAgg_dof_diag.Width();
 
     mfem::Array<int> dofs_diag, dofs_offd;
@@ -275,8 +273,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // Construct permutation matrices to obtain M, D on extended aggregates
     using ParMatrix = unique_ptr<mfem::HypreParMatrix>;
 
-    ParMatrix permute_e = DofPermutation(*ExtAgg_edof_);
-    ParMatrix permute_v = DofPermutation(*ExtAgg_vdof_);
+    ParMatrix permute_e = DofPermutation(*ExtAgg_edof_, ExtAgg_edof_diag_, ExtAgg_edof_offd_);
+    ParMatrix permute_v = DofPermutation(*ExtAgg_vdof_, ExtAgg_vdof_diag_, ExtAgg_vdof_offd_);
 
     ParMatrix permute_eT( permute_e->Transpose() );
 
@@ -309,7 +307,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
                                      face_start, const_cast<int*>(edge_trueedge.RowPart()), &face_edge);
 
     ParMatrix face_trueedge(ParMult(&face_edge_d, &edge_trueedge));
-    face_permedge_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
+    face_perm_edof_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
 
     // Column map for submatrix extraction
     col_mapper_.SetSize(std::max(permute_e->Height(), permute_v->Height()));
@@ -335,8 +333,9 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
     {
         // Extract local dofs for extended aggregates that is shared
-        GetExtAggDofs(*ExtAgg_edof_, iAgg, ext_loc_edofs);
-        int num_ext_loc_vdofs_diag = GetExtAggDofs(*ExtAgg_vdof_, iAgg, ext_loc_vdofs);
+        GetExtAggDofs(ExtAgg_edof_diag_, ExtAgg_edof_offd_, iAgg, ext_loc_edofs);
+        int num_ext_loc_vdofs_diag = GetExtAggDofs(ExtAgg_vdof_diag_, ExtAgg_vdof_offd_,
+                                                   iAgg, ext_loc_vdofs);
         assert(num_ext_loc_vdofs_diag > 0);
 
         // Single vertex aggregate
@@ -460,8 +459,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     mfem::Array<int> ext_loc_edofs, iface_edofs;
     mfem::DenseMatrix collected_sigma;
 
-    mfem::SparseMatrix face_permedge_diag;
-    face_permedge_->GetDiag(face_permedge_diag);
+    mfem::SparseMatrix face_perm_edof_diag;
+    face_perm_edof_->GetDiag(face_perm_edof_diag);
 
     mfem::SparseMatrix face_IsShared;
     HYPRE_Int* junk_map;
@@ -473,8 +472,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     sec_trace.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
     {
-        // extract the dofs i.d. for the face
-        GetTableRow(face_permedge_diag, iface, iface_edofs);
+        // extract the (permuted) dofs i.d. for the face
+        GetTableRow(face_perm_edof_diag, iface, iface_edofs);
 
         int num_iface_edofs = iface_edofs.Size();
         assert(1 <= num_iface_edofs);
@@ -500,7 +499,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             for (int i = 0; i < num_neighbor_aggs; ++i)
             {
                 const int iAgg = neighbor_aggs[i];
-                GetExtAggDofs(*ExtAgg_edof_, iAgg, ext_loc_edofs);
+                GetExtAggDofs(ExtAgg_edof_diag_, ExtAgg_edof_offd_, iAgg, ext_loc_edofs);
 
                 for (int j = 0; j < ext_loc_edofs.Size(); ++j)
                     col_mapper_[ext_loc_edofs[j]] = j;
