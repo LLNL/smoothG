@@ -20,13 +20,6 @@
 
 #include "GraphUpscale.hpp"
 
-using Vector = linalgcpp::Vector<double>;
-using VectorView = linalgcpp::VectorView<double>;
-using BlockVector = linalgcpp::BlockVector<double>;
-using SparseMatrix = linalgcpp::SparseMatrix<double>;
-using BlockMatrix = linalgcpp::BlockMatrix<double>;
-using ParMatrix = parlinalgcpp::ParMatrix;
-
 namespace smoothg
 {
 
@@ -51,8 +44,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
-    auto edge_vertex = vertex_edge_global.Transpose();
-    auto vertex_vertex = vertex_edge_global.Mult(edge_vertex);
+    SparseMatrix edge_vertex = vertex_edge_global.Transpose();
+    SparseMatrix vertex_vertex = vertex_edge_global.Mult(edge_vertex);
 
     int num_parts = std::max(1.0, (global_vertices_ / (double)(coarse_factor)) + 0.5);
 
@@ -127,7 +120,7 @@ void GraphUpscale::MakeFineLevel(const std::vector<double>& global_weight)
     ParMatrix edge_true_edge_T = edge_true_edge_.Transpose();
     edge_edge_ = edge_true_edge_.Mult(edge_true_edge_T);
 
-    const auto& offd = edge_edge_.GetOffd();
+    const SparseMatrix& offd = edge_edge_.GetOffd();
 
     assert(offd.Rows() == local_weight.size());
 
@@ -139,14 +132,14 @@ void GraphUpscale::MakeFineLevel(const std::vector<double>& global_weight)
         }
     }
 
-    auto DT = vertex_edge_local_.Transpose();
+    SparseMatrix DT = vertex_edge_local_.Transpose();
     const auto& indptr(DT.GetIndptr());
     auto& data(DT.GetData());
 
     int num_vertices = DT.Cols();
     int num_edges = DT.Rows();
 
-    const auto& edge_diag = edge_true_edge_.GetDiag();
+    const SparseMatrix& edge_diag = edge_true_edge_.GetDiag();
 
     for (int i = 0; i < num_edges; i++)
     {
@@ -256,10 +249,10 @@ void GraphUpscale::MakeCoarseSpace()
     ParMatrix face_edge_true_edge = face_edge_.Mult(edge_true_edge_);
     ParMatrix face_perm_edge = face_edge_true_edge.Mult(permute_e_T);
 
-    const auto& M_ext = M_ext_global.GetDiag();
-    const auto& D_ext = D_ext_global.GetDiag();
-    const auto& W_ext = W_ext_global.GetDiag();
-    const auto& face_edge = face_perm_edge.GetDiag();
+    const SparseMatrix& M_ext = M_ext_global.GetDiag();
+    const SparseMatrix& D_ext = D_ext_global.GetDiag();
+    const SparseMatrix& W_ext = W_ext_global.GetDiag();
+    const SparseMatrix& face_edge = face_perm_edge.GetDiag();
 
     int marker_size = std::max(permute_v.Rows(), permute_e.Rows());
     std::vector<int> col_marker(marker_size, -1);

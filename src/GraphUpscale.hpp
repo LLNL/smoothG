@@ -25,6 +25,7 @@
 #include "parlinalgcpp.hpp"
 #include "partition.hpp"
 
+#include "Utilities.hpp"
 #include "Upscale.hpp"
 
 namespace smoothg
