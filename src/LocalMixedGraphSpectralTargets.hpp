@@ -94,6 +94,8 @@ public:
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
                  std::vector<mfem::DenseMatrix>& local_vertex_targets);
 private:
+    enum DofType { vdof, edof }; // vertex-based and edge-based dofs
+
     /**
        @brief Solve an eigenvalue problem on each agglomerate, put the result in
        local_vertex_targets.
@@ -121,12 +123,9 @@ private:
 
     // TODO: better naming - this is not really a permutation because it is not one to one
     // the returned matrix makes a copy of extended part (offd) and add it to local
-    std::unique_ptr<mfem::HypreParMatrix> DofPermutation(mfem::HypreParMatrix& ExtAgg_dof,
-                                                         mfem::SparseMatrix &ExtAgg_dof_diag,
-                                                         mfem::SparseMatrix &ExtAgg_dof_offd);
+    std::unique_ptr<mfem::HypreParMatrix> DofPermutation(DofType dof_type);
 
-    int GetExtAggDofs(mfem::SparseMatrix& ExtAgg_dof_diag, mfem::SparseMatrix& ExtAgg_dof_offd,
-                      int iAgg, mfem::Array<int>& dofs);
+    int GetExtAggDofs(DofType dof_type, int iAgg, mfem::Array<int>& dofs);
 
     std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
         const mfem::SparseMatrix& Lloc,
