@@ -124,11 +124,13 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
 HybridSolver::~HybridSolver()
 {
+#if SMOOTHG_USE_SAAMGE
     if (use_spectralAMGe_)
     {
         saamge::ml_free_data(sa_ml_data_);
         saamge::agg_free_partitioning(sa_apr_);
     }
+#endif
 }
 
 template<typename T>
