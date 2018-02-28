@@ -24,10 +24,6 @@
 #include "MatrixUtilities.hpp"
 #include "MetisGraphPartitioner.hpp"
 
-#if SMOOTHG_USE_SAAMGE
-#include "saamge.hpp"
-#endif
-
 using std::unique_ptr;
 
 namespace smoothg
@@ -124,6 +120,15 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Init(face_edgedof, mgLc.get_CM_el(), mgL.get_edge_d_td(),
          face_bdrattr, ess_edge_dofs);
+}
+
+HybridSolver::~HybridSolver()
+{
+    if (use_spectralAMGe_)
+    {
+        saamge::ml_free_data(sa_ml_data_);
+        saamge::agg_free_partitioning(sa_apr_);
+    }
 }
 
 template<typename T>
@@ -816,48 +821,48 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 #if SMOOTHG_USE_SAAMGE
     saamge::proc_init(comm_);
 
-    mfem::Table elem_dof = MatrixToTable(Agg_multiplier_);
+    mfem::Table* elem_dof = MatrixToTable(Agg_multiplier_);
     mfem::SparseMatrix multiplier_Agg = smoothg::Transpose(Agg_multiplier_);
     mfem::SparseMatrix Agg_Agg = smoothg::Mult(Agg_multiplier_, multiplier_Agg);
     auto elem_adjacency_matrix = MetisGraphPartitioner::getAdjacency(Agg_Agg);
-    mfem::Table elem_elem = MatrixToTable(elem_adjacency_matrix);
+    mfem::Table* elem_elem = MatrixToTable(elem_adjacency_matrix);
 
     // Mark dofs that are shared by more than one processor
     saamge::SharedEntityCommunication<mfem::Vector> sec(comm_, *multiplier_d_td_);
-    std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof.Width(), 0);
+    std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof->Width(), 0);
     for (unsigned int i = 0; i < bdr_dofs.size(); i++)
     {
         if (sec.NumNeighbors(i) > 1)
             SA_SET_FLAGS(bdr_dofs[i], AGG_ON_PROC_IFACE_FLAG);
     }
 
-    int num_elems = elem_elem.Size();
-    std::vector<int> nparts_arr(saamge_param_->num_levels - 1);
-    nparts_arr[0] = (num_elems / saamge_param_->first_coarsen_factor) + 1;
+    int num_elems = elem_elem->Size();
+    sa_nparts_.resize(saamge_param_->num_levels - 1);
+    sa_nparts_[0] = (num_elems / saamge_param_->first_coarsen_factor) + 1;
 
     bool first_do_aggregates = (saamge_param_->num_levels <= 2 && saamge_param_->do_aggregates);
-    auto apr = saamge::agg_create_partitioning_fine(
-                   *pHybridSystem_, num_elems, &elem_dof, &elem_elem, nullptr, bdr_dofs.data(),
-                   &(nparts_arr[0]), multiplier_d_td_.get(), first_do_aggregates);
+    sa_apr_ = saamge::agg_create_partitioning_fine(
+                  *pHybridSystem_, num_elems, elem_dof, elem_elem, nullptr, bdr_dofs.data(),
+                  sa_nparts_.data(), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
     // of nparts_arr[0] in some cases, so I define the rest of the array here
     for (int i = 1; i < saamge_param_->num_levels - 1; i++)
-        nparts_arr[i] = nparts_arr[i - 1] / saamge_param_->coarsen_factor + 1;
+        sa_nparts_[i] = sa_nparts_[i - 1] / saamge_param_->coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (unsigned int i = 0; i < Hybrid_el_.size(); i++)
         elmats[i] = &(Hybrid_el_[i]);
-    auto emp = new saamge::ElementMatrixDenseArray(*apr, elmats);
+    auto emp = new saamge::ElementMatrixDenseArray(*sa_apr_, elmats);
 
     int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        saamge_param_->num_levels - 1, nparts_arr.data(), saamge_param_->first_nu_pro,
+        saamge_param_->num_levels - 1, sa_nparts_.data(), saamge_param_->first_nu_pro,
         saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
         saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
         saamge_param_->use_arpack, saamge_param_->do_aggregates);
-    auto ml_data = saamge::ml_produce_data(*pHybridSystem_, apr, emp, mlp);
-    auto level = levels_list_get_level(ml_data->levels_list, 0);
+    sa_ml_data_ = saamge::ml_produce_data(*pHybridSystem_, sa_apr_, emp, mlp);
+    auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
 
     prec_ = make_unique<saamge::VCycleSolver>(level->tg_data, false);
     prec_->SetOperator(*pHybridSystem_);

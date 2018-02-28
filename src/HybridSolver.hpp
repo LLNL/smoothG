@@ -39,6 +39,10 @@
 #include "Mixed_GL_Coarsener.hpp"
 #include "MixedMatrix.hpp"
 
+#if SMOOTHG_USE_SAAMGE
+#include "saamge.hpp"
+#endif
+
 namespace smoothg
 {
 
@@ -153,7 +157,7 @@ public:
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);
 
-    virtual ~HybridSolver() {}
+    virtual ~HybridSolver();
 
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs,
@@ -271,8 +275,13 @@ private:
     mfem::Vector diagonal_scaling_;
 
     const SAAMGeParam* saamge_param_;
+#if SMOOTHG_USE_SAAMGE
+    std::vector<int> sa_nparts_;
+    saamge::agg_partitioning_relations_t* sa_apr_;
+    saamge::ml_data_t* sa_ml_data_;
+#endif
 };
 
 } // namespace smoothg
 
-#endif /* HYBRIDIZATION_HPP_ */
+#endif /* __HYBRIDIZATION_HPP */
