@@ -221,9 +221,9 @@ public:
 
 private:
     /// @todo remove this?
-    void GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs);
+    void GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs) const;
 
-    void GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs);
+    void GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs) const;
 
     mfem::DenseMatrix RTP(const mfem::DenseMatrix& R, const mfem::DenseMatrix& P);
 

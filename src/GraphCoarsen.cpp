@@ -366,7 +366,11 @@ void GraphCoarsen::BuildPEdges(
         // ---
         int nlocal_traces = 0;
         for (int j = 0; j < faces.Size(); j++)
+        {
             nlocal_traces += face_cdof.RowSize(faces[j]);
+            std::cout << "    face " << j << " contributes " << face_cdof.RowSize(faces[j]) << std::endl;
+        }
+        std::cout << "  agg " << i << " has " << nlocal_traces << " local traces." << std::endl;
         traces_extensions.SetSize(nlocal_fine_dofs, nlocal_traces);
         F_potentials.SetSize(nlocal_verts, nlocal_traces);
         local_facecdofs.SetSize(nlocal_traces);
@@ -470,10 +474,12 @@ void GraphCoarsen::BuildPEdges(
             }
         }
         bubble_counter += num_bubbles_i;
+        std::cout << "  agg " << i << " has " << num_bubbles_i << " bubbles." << std::endl;
     }
 
     CoarseD_->Finalize();
 
+    std::cout << "total num traces = " << total_num_traces << ", bubble_counter = " << bubble_counter << std::endl;
     Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
@@ -523,6 +529,12 @@ void GraphCoarsen::BuildPEdges(
     Pedges.Swap(newPedges);
 
     CoarseM_ = mbuilder.GetCoarseM();
+    if (coarse_m_type == CoarseMType::CoarseCoefficient ||
+        coarse_m_type == CoarseMType::Assemble)
+    {
+        std::ofstream out("CoarseM.mat");
+        CoarseM_->Print(out, 1);
+    }
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
