@@ -112,7 +112,7 @@ class SPE10Problem
 {
 public:
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
-                 int slice, bool metis_partition,
+                 int slice, bool metis_partition, double proc_part_ubal,
                  const mfem::Array<int>& coarsening_factor);
     ~SPE10Problem();
     mfem::ParMesh* GetParMesh()
@@ -144,7 +144,7 @@ private:
 };
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
-                           int spe10_scale, int slice,  bool metis_partition,
+                           int spe10_scale, int slice,  bool metis_partition, double proc_part_ubal,
                            const mfem::Array<int>& coarsening_factor)
 {
     int num_procs, myid;
@@ -209,7 +209,9 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
         auto elem_elem = TableToSparse(mesh->ElementToElementTable());
 
         mfem::Array<int> partition;
-        Partition(elem_elem, partition, num_procs);
+        MetisGraphPartitioner partitioner;
+        partitioner.setUnbalanceTol(proc_part_ubal);
+        partitioner.doPartition(elem_elem, num_procs, partition);
 
         pmesh_  = new mfem::ParMesh(comm, *mesh, partition);
 

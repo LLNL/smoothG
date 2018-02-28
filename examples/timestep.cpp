@@ -82,6 +82,9 @@ int main(int argc, char* argv[])
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of geometric).");
+    double proc_part_ubal = 2.0;
+    args.AddOption(&proc_part_ubal, "-pub", "--part-unbalance",
+                   "Processor partition unbalance factor.");
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
@@ -165,7 +168,7 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, coarseningFactor);
+                              metis_agglomeration, proc_part_ubal, coarseningFactor);
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
     for (int i = 0; i < num_refine; ++i)
