@@ -311,52 +311,18 @@ GraphTopology::GraphTopology(
     assert(face_d_td_d_);
     SetConstantValue(*face_d_td_d_, 1.0);
 
-    hypre_ParCSRMatrix* face_shared = *face_d_td_d_;
-    HYPRE_Int* face_shared_i = face_shared->offd->i;
-    HYPRE_Int* face_shared_j = face_shared->offd->j;
-    HYPRE_Int* face_shared_map = face_shared->col_map_offd;
-    HYPRE_Int maxface = face_shared->last_row_index;
-
-    // Create a selection matrix to pick one of the processors sharing a true
-    // face to own the true face (we pick the processor with a smaller index)
-    int* select_i = new int[nfaces + 1];
-    int ntruefaces = 0;
-    for (int i = 0; i < nfaces; i++)
-    {
-        select_i[i] = ntruefaces;
-        if (face_shared_i[i + 1] == face_shared_i[i])
-            ntruefaces++;
-        else if (face_shared_map[face_shared_j[face_shared_i[i]]] > maxface)
-            ntruefaces++;
-    }
-    select_i[nfaces] = ntruefaces;
-    int* select_j = new int[ntruefaces];
-    double* select_data = new double[ntruefaces];
-    std::iota(select_j, select_j + ntruefaces, 0);
-    std::fill_n(select_data, ntruefaces, 1.);
-    mfem::SparseMatrix select(select_i, select_j, select_data,
-                              nfaces, ntruefaces);
-
-    // Construct a (block diagonal) global select matrix from local
-    GenerateOffsets(comm_, ntruefaces, trueface_start_);
-    mfem::HypreParMatrix select_d(comm_, face_shared->global_num_rows,
-                                  trueface_start_.Last(), face_shared->row_starts,
-                                  trueface_start_, &select);
-
     // Construct face "dof to true dof" table
-    face_d_td_.reset( ParMult(face_d_td_d_.get(), &select_d) );
+    face_d_td_ = BuildEntityToTrueEntity(*face_d_td_d_);
 
     // Construct extended aggregate to vertex relation tables
     mfem::HypreParMatrix vertex_edge_d(comm_, vertex_start_.Last(), edge_start_.Last(),
                                        vertex_start_, edge_start_, &vertex_edge);
-    unique_ptr<mfem::HypreParMatrix> pvertex_edge(
-        ParMult(&vertex_edge_d, &edge_d_td_) );
+    unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_d, &edge_d_td_) );
     unique_ptr<mfem::HypreParMatrix> pedge_vertex( pvertex_edge->Transpose() );
 
     mfem::HypreParMatrix Agg_edge_d(comm_, aggregate_start_.Last(), edge_start_.Last(),
                                     aggregate_start_, edge_start_, &aggregate_edge);
-    unique_ptr<mfem::HypreParMatrix> pAgg_edge(
-        ParMult(&Agg_edge_d, &edge_d_td_) );
+    unique_ptr<mfem::HypreParMatrix> pAgg_edge( ParMult(&Agg_edge_d, &edge_d_td_) );
     pAggExt_vertex_.reset( ParMult(pAgg_edge.get(), pedge_vertex.get()) );
 
     // Construct extended aggregate to (interior) edge relation tables

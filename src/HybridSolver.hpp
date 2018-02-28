@@ -252,7 +252,6 @@ private:
     bool ess_multiplier_bc_;
     mfem::Array<int> ess_multiplier_dofs_;
     mfem::Array<HYPRE_Int> multiplier_start_;
-    mfem::Array<HYPRE_Int> truemultiplier_start_;
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
 

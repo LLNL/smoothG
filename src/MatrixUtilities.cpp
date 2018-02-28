@@ -1016,4 +1016,50 @@ double InnerProduct(const mfem::Vector& u, const mfem::Vector& v)
     return out;
 }
 
+std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
+    const mfem::HypreParMatrix& entity_trueentity_entity)
+{
+    hypre_ParCSRMatrix* entity_shared = entity_trueentity_entity;
+    HYPRE_Int* entity_shared_i = entity_shared->offd->i;
+    HYPRE_Int* entity_shared_j = entity_shared->offd->j;
+    HYPRE_Int* entity_shared_map = entity_shared->col_map_offd;
+    HYPRE_Int max_entity = entity_shared->last_row_index;
+
+    // Diagonal part
+    int nentities = entity_trueentity_entity.Width();
+    int* select_i = new int[nentities + 1];
+    int ntrueentities = 0;
+    for (int i = 0; i < nentities; i++)
+    {
+        select_i[i] = ntrueentities;
+        int j_offset = entity_shared_i[i];
+        if (entity_shared_i[i + 1] == j_offset)
+            ntrueentities++;
+        else if (entity_shared_map[entity_shared_j[j_offset]] > max_entity)
+            ntrueentities++;
+    }
+    select_i[nentities] = ntrueentities;
+    int* select_j = new int[ntrueentities];
+    double* select_data = new double[ntrueentities];
+    std::iota(select_j, select_j + ntrueentities, 0);
+    std::fill_n(select_data, ntrueentities, 1.);
+    mfem::SparseMatrix select_diag(select_i, select_j, select_data,
+                                   nentities, ntrueentities);
+
+    // Construct a "block diagonal" global select matrix from local
+    auto comm = entity_trueentity_entity.GetComm();
+    mfem::Array<int> trueentity_starts;
+    GenerateOffsets(comm, ntrueentities, trueentity_starts);
+
+    mfem::HypreParMatrix select(
+        comm, entity_shared->global_num_rows, trueentity_starts.Last(),
+        entity_shared->row_starts, trueentity_starts, &select_diag);
+
+    auto out = mfem::ParMult(&entity_trueentity_entity, &select);
+    out->CopyRowStarts();
+    out->CopyColStarts();
+
+    return unique_ptr<mfem::HypreParMatrix>(out);
+}
+
 } // namespace smoothg

@@ -550,7 +550,6 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
     const mfem::SparseMatrix& face_cdof, const mfem::SparseMatrix& Pedges)
 {
     int ncdofs = Pedges.Width();
-    int ntraces = face_cdof.Width();
     int nfaces = face_cdof.Height();
 
     // count edge coarse true dofs (if the dof is a bubble or on a true face)
@@ -559,16 +558,9 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
     mfem::HypreParMatrix& face_d_td_d =
         const_cast<mfem::HypreParMatrix&>(*graph_topology_.face_d_td_d_);
     face_d_td.GetDiag(face_d_td_diag);
-    int ntruecdofs = 0;
-    for (int i = 0; i < nfaces; i++)
-        if (face_d_td_diag.RowSize(i))
-            ntruecdofs += face_cdof.RowSize(i);
-    ntruecdofs += (ncdofs - ntraces);
 
     MPI_Comm comm = face_d_td.GetComm();
-    mfem::Array<HYPRE_Int>* start[2] = {&edge_cd_start_, &edge_ctd_start_};
-    HYPRE_Int nloc[2] = {ncdofs, ntruecdofs};
-    GenerateOffsets(comm, 2, nloc, start);
+    GenerateOffsets(comm, ncdofs, edge_cd_start_);
 
     mfem::Array<HYPRE_Int>& face_start =
         const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
@@ -617,6 +609,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
     int* face_cdof_j = face_cdof.GetJ();
     mfem::Array<int> face_cdofs;
     for (int i = 0; i < nfaces; i++)
+    {
         if (face_d_td_d_offd.RowSize(i))
         {
             face_ncdofs = face_cdof_i[i + 1] - face_cdof_i[i];
@@ -626,6 +619,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
             for (int j = 0; j < face_ncdofs; j++)
                 d_td_d_offd_j[d_td_d_offd_nnz++] = face_cdofs[j];
         }
+    }
     assert(d_td_d_offd_i[ncdofs] == d_td_d_offd_nnz);
     mfem::SparseMatrix d_td_d_offd(d_td_d_offd_i, d_td_d_offd_j,
                                    d_td_d_diag_data.GetData(), ncdofs, d_td_d_offd_nnz,
@@ -635,43 +629,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
         comm, edge_cd_start_.Last(), edge_cd_start_.Last(), edge_cd_start_,
         edge_cd_start_, &d_td_d_diag, &d_td_d_offd, d_td_d_map);
 
-    // Create a selection matrix to set dofs on true faces to be true dofs
-    int* select_i = new int[ncdofs + 1];
-    select_i[0] = 0;
-    int cdof_counter = 0;
-    for (int i = 0; i < nfaces; i++)
-    {
-        face_ncdofs = face_cdof_i[i + 1] - face_cdof_i[i];
-        if (face_d_td_diag.RowSize(i))
-            for (int j = 0; j < face_ncdofs; j++)
-            {
-                select_i[cdof_counter + 1] = select_i[cdof_counter] + 1;
-                cdof_counter++;
-            }
-        else
-            for (int j = 0; j < face_ncdofs; j++)
-            {
-                select_i[cdof_counter + 1] = select_i[cdof_counter];
-                cdof_counter++;
-            }
-    }
-    int cdof_counter2 = cdof_counter;
-    for (int i = cdof_counter2; i < ncdofs; i++)
-    {
-        select_i[cdof_counter + 1] = select_i[cdof_counter] + 1;
-        cdof_counter++;
-    }
-    assert(cdof_counter == ncdofs);
-    int* select_j = new int[ntruecdofs];
-    std::iota(select_j, select_j + ntruecdofs, 0);
-    mfem::SparseMatrix select(select_i, select_j, d_td_d_diag_data.GetData(), ncdofs,
-                              ntruecdofs, true, false, false);
-    mfem::HypreParMatrix select_d(comm, edge_cd_start_.Last(),
-                                  edge_ctd_start_.Last(), edge_cd_start_,
-                                  edge_ctd_start_, &select);
-    mfem::HypreParMatrix* d_td = ParMult(&d_td_d, &select_d);
-
-    return unique_ptr<mfem::HypreParMatrix>(d_td);
+    return BuildEntityToTrueEntity(d_td_d);
 }
 
 } // namespace smoothg

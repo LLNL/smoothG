@@ -485,7 +485,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
         // restrict local sigmas in AggExt_sigma to the coarse face.
         // shared faces or interior faces
-        if (face_IsShared.RowSize(iface) || num_neighbor_aggs == 2)
+        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
         {
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -520,7 +520,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             face_sigma_tmp = mfem::DenseMatrix(face_sigma_tmp, 't');
             assert(!face_sigma_tmp.CheckFinite());
         }
-        else // global boundary face
+        else // global boundary face or only 1 dof on face
         {
             // TODO: build more meaningful basis on boundary faces
             face_sigma_tmp.SetSize(num_iface_edge_dof, 1);
@@ -545,7 +545,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
         // shared faces or interior faces
-        if (face_IsShared.RowSize(iface) || num_neighbor_aggs == 2)
+        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
         {
             dof_counter = num_iface_edge_dof;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -581,9 +581,9 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                                              face_nbh_dofs, colMapper);
             sec_D.ReduceSend(iface, Dloc);
         }
-        else // global boundary face
+        else // global boundary face or only 1 dof on face
         {
-            mfem::SparseMatrix empty_matrix;
+            mfem::SparseMatrix empty_matrix = SparseIdentity(0);
             sec_D.ReduceSend(iface, empty_matrix);
         }
     }
@@ -603,7 +603,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
         // shared faces or interior faces
-        if (face_IsShared.RowSize(iface) || num_neighbor_aggs == 2)
+        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
         {
             dof_counter = num_iface_edge_dof;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -626,7 +626,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 Mloc[i] = M_diag_data[face_nbh_dofs[i]];
             sec_M.ReduceSend(iface, Mloc);
         }
-        else // global boundary face
+        else // global boundary face or only 1 dof on face
         {
             mfem::Vector empty_vector;
             sec_M.ReduceSend(iface, empty_vector);
@@ -672,7 +672,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             mfem::Vector PV_sigma_on_face;
             const int num_neighbor_aggs = face_Agg.RowSize(iface);
 
-            if (face_IsShared.RowSize(iface))
+            if (face_IsShared.RowSize(iface) && num_iface_edge_dof > 1)
             {
                 // This face is shared between two processors
                 // Gather local matrices from both processors and assemble them
@@ -748,7 +748,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(),
                                                 num_iface_edge_dof);
             }
-            else if (num_neighbor_aggs == 2)
+            else if (num_neighbor_aggs == 2 && num_iface_edge_dof > 1)
             {
                 // This face is not shared between processors, but shared by
                 // two aggregates
@@ -777,8 +777,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             }
             else
             {
-                // This face is not shared between processors, nor shared
-                // between aggregates (so it is on the global boundary)
+                // global boundary face or only 1 dof on face
                 PV_sigma_on_face.SetSize(num_iface_edge_dof);
                 PV_sigma_on_face = 1.;
             }

@@ -232,45 +232,8 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
         unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(
             smoothg::RAP(*edgedof_d_td_d, *edgedof_multiplier_d) );
 
-        // Create a selection matrix to set dofs on true faces to be true dofs
-        hypre_ParCSRMatrix* multiplier_shared = *multiplier_d_td_d;
-        HYPRE_Int* multiplier_shared_i = multiplier_shared->offd->i;
-        HYPRE_Int* multiplier_shared_j = multiplier_shared->offd->j;
-        HYPRE_Int* multiplier_shared_map = multiplier_shared->col_map_offd;
-        HYPRE_Int maxmultiplier = multiplier_shared->last_row_index;
-
-        // Create a selection matrix to pick one of the processors sharing a true
-        // face to own the true face (we pick the processor with a smaller index)
-        int* select_i = new int[num_multiplier_dofs_ + 1];
-        int ntruemultipliers = 0;
-        for (int i = 0; i < num_multiplier_dofs_; i++)
-        {
-            select_i[i] = ntruemultipliers;
-            if (multiplier_shared_i[i + 1] == multiplier_shared_i[i])
-                ntruemultipliers++;
-            else if (multiplier_shared_map[ multiplier_shared_j[
-                                                multiplier_shared_i[i] ] ] > maxmultiplier)
-                ntruemultipliers++;
-        }
-        select_i[num_multiplier_dofs_] = ntruemultipliers;
-        int* select_j = new int[ntruemultipliers];
-        double* select_data = new double[ntruemultipliers];
-        std::iota(select_j, select_j + ntruemultipliers, 0);
-        std::fill_n(select_data, ntruemultipliers, 1.);
-        mfem::SparseMatrix select(select_i, select_j, select_data,
-                                  num_multiplier_dofs_, ntruemultipliers);
-
-        // Construct a (block diagonal) global select matrix from local
-        GenerateOffsets(comm_, ntruemultipliers, truemultiplier_start_);
-
-        mfem::HypreParMatrix select_d(
-            comm_, multiplier_start_.Last(), truemultiplier_start_.Last(),
-            multiplier_start_, truemultiplier_start_, &select);
-
-        // Construct face "dof to true dof" table
-        multiplier_d_td_.reset( ParMult(multiplier_d_td_d.get(), &select_d) );
-        multiplier_d_td_->CopyRowStarts();
-        multiplier_d_td_->CopyColStarts();
+        // Construct multiplier "dof to true dof" table
+        multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
     }
 
     // Assemble the hybridized system

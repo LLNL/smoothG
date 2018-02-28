@@ -133,7 +133,6 @@ private:
     mfem::Array<HYPRE_Int> edge_start_;
     mfem::Array<HYPRE_Int> aggregate_start_;
     mfem::Array<HYPRE_Int> face_start_;
-    mfem::Array<HYPRE_Int> trueface_start_;
 }; // class GraphTopology
 
 } // namespace smoothg

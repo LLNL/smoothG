@@ -376,6 +376,17 @@ double InnerProduct(const mfem::Vector& weight, const mfem::Vector& u,
 */
 double InnerProduct(const mfem::Vector& u, const mfem::Vector& v);
 
+/**
+   @brief Construct entity to true entity table from entity_trueentity_entity
+
+   Pick one of the processors sharing a true entity to own the true entity
+   (pick the processor with a smaller id)
+
+   @param entity_trueentity_entity = entity_trueentity * trueentity_entity
+*/
+std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
+    const mfem::HypreParMatrix& entity_trueentity_entity);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */
