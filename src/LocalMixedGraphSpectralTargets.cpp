@@ -119,8 +119,10 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
     mfem::HypreParMatrix edge_trueedge;
     edge_trueedge.MakeRef(graph_topology_.edge_trueedge_);
 
-    // Construct extended aggregate to vertex dofs relation tables
+    // hypre may modify the matrix, so make a deep copy
     mfem::SparseMatrix vertex_edge(graph_topology_.vertex_edge_);
+
+    // Construct extended aggregate to vertex dofs relation tables
     mfem::HypreParMatrix vertex_edge_bd(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
                                         vertdof_starts, edgedof_starts, &vertex_edge);
     unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_bd, &edge_trueedge) );

@@ -14,23 +14,18 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file finitevolume.cpp
-   @brief This is an example for upscaling a graph Laplacian coming from a finite
-   volume discretization of a simple reservior model in parallel.
+   @file mltopo.cpp
+   @brief This is an example showing how to generate a hierarchy of graphs by
+   recursive coarsening.
 
    A simple way to run the example:
 
-   mpirun -n 4 ./finitevolume
+   ./mltopo
 */
 
-#include <fstream>
-#include <sstream>
 #include <mpi.h>
 
 #include "mfem.hpp"
-#include "../examples/spe10.hpp"
-
-#include "../src/picojson.h"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
@@ -42,7 +37,7 @@ int main(int argc, char* argv[])
     int myid;
 
     // 1. Initialize MPI
-    MPI_Init(&argc, &argv);
+    mpi_session session(argc, argv);
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_rank(comm, &myid);
 
@@ -73,7 +68,7 @@ int main(int argc, char* argv[])
     const int coarsening_factor = nDimensions == 2 ? 8 : 32;
 
     // Setting up a mesh (2D or 3D SPE10 model)
-    unique_ptr<mfem::ParMesh> pmesh;
+    std::unique_ptr<mfem::ParMesh> pmesh;
     if (nDimensions == 3)
     {
         mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
@@ -104,8 +99,6 @@ int main(int argc, char* argv[])
     {
         ShowAggregates(graph_topos, pmesh.get());
     }
-
-    MPI_Finalize();
 
     return EXIT_SUCCESS;
 }

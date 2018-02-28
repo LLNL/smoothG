@@ -85,13 +85,8 @@ GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening
     const auto edge_boundaryattr = (finer_graph_topology.face_bdratt_.Height()) ?
                                    &(finer_graph_topology.face_bdratt_) : nullptr;
 
-    auto vertex_vertex = smoothg::AAt(vertex_edge_);
-
-    const int nvertices = vertex_vertex.Height();
-    int num_partitions = std::max(1, nvertices / coarsening_factor);
-
     mfem::Array<int> partitioning;
-    Partition(vertex_vertex, partitioning, num_partitions);
+    PartitionAAT(vertex_edge_, partitioning, coarsening_factor);
 
     const auto edge_trueedge_edge = finer_graph_topology.face_trueface_face_.get();
     Init(partitioning, edge_boundaryattr, edge_trueedge_edge);
@@ -416,13 +411,7 @@ std::vector<GraphTopology> MultilevelGraphTopology(
 
     // Construct finest level graph topology
     mfem::Array<int> partitioning;
-    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
-    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
-
-    const int nvertices = vert_vert.Height();
-    int num_partitions = std::max(1, nvertices / coarsening_factor);
-
-    Partition(vert_vert, partitioning, num_partitions);
+    PartitionAAT(vertex_edge, partitioning, coarsening_factor);
     graph_topologies.emplace_back(vertex_edge, edge_d_td, partitioning, edge_boundaryattr);
 
     // Construct coarser levels graph topology by recursion

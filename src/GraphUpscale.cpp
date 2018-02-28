@@ -45,15 +45,10 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     mfem::StopWatch chrono;
     chrono.Start();
 
-    mfem::SparseMatrix vertex_vertex = smoothg::AAt(vertex_edge_global);
-
-    int num_parts = (vertex_edge_global.Height() / (double)(coarse_factor)) + 0.5;
-    num_parts = std::max(1, num_parts);
-
     // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
     // obtain the same global partition from metis?
     mfem::Array<int> global_partitioning;
-    Partition(vertex_vertex, global_partitioning, num_parts);
+    PartitionAAT(vertex_edge_global, global_partitioning, coarse_factor);
 
     Init(vertex_edge_global, global_partitioning, weight, spect_tol,
          max_evects, dual_target, scaled_dual, energy_dual);
