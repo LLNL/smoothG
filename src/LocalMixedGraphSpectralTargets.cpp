@@ -790,8 +790,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 }
 
 void LocalMixedGraphSpectralTargets::Compute(
-        std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-        std::vector<mfem::DenseMatrix>& local_vertex_targets)
+    std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+    std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
     // ExtAgg_sigma^T is used to store edge traces as row vectors.
     // This storage format is more efficient for extracting dofs
