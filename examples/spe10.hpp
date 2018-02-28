@@ -24,6 +24,9 @@
 
 using std::unique_ptr;
 
+namespace smoothg
+{
+
 /**
    @brief A forcing function that is supposed to very roughly represent some wells
    that are resolved on the *coarse* level.
@@ -203,7 +206,14 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     if (metis_partition)
     {
-        pmesh_  = new mfem::ParMesh(comm, *mesh);
+        auto elem_elem = TableToSparse(mesh->ElementToElementTable());
+
+        mfem::Array<int> partition;
+        Partition(elem_elem, partition, num_procs);
+
+        pmesh_  = new mfem::ParMesh(comm, *mesh, partition);
+
+        assert(partition.Max() + 1 == num_procs);
     }
     else
     {
@@ -252,4 +262,6 @@ SPE10Problem::~SPE10Problem()
     delete kinv_;
     delete pmesh_;
 }
+
+} // namespace smoothg
 

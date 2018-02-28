@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
     double initial_val = 1.0;
     args.AddOption(&initial_val, "-iv", "--initial-value",
                    "Initial pressure difference.");
-    int vis_step = 100;
+    int vis_step = 0;
     args.AddOption(&vis_step, "-vs", "--vis_step",
                    "Step size for visualization.");
     int k = 1;
