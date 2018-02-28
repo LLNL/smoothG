@@ -18,7 +18,7 @@
 # generate lib file
 #####
 
-add_library(smoothg Upscale.cpp GraphUpscale.cpp Utilities.cpp)
+add_library(smoothg Upscale.cpp GraphUpscale.cpp Utilities.cpp SharedEntityComm.cpp)
 
 #add_library(smoothg LocalMixedGraphSpectralTargets.cpp GraphCoarsen.cpp
 #  utilities.cpp MinresBlockSolver.cpp sharedentitycommunication.cpp

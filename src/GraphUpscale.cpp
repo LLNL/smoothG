@@ -84,6 +84,7 @@ void GraphUpscale::DistributeGraph(const SparseMatrix& vertex_edge, const std::v
     edge_map_ = proc_edge.GetIndices(myid_);
 
     vertex_edge_local_ = vertex_edge.GetSubMatrix(vertex_map_, edge_map_);
+    vertex_edge_local_ = 1.0;
 
     int nvertices_local = proc_vert.RowSize(myid_);
     part_local_.resize(nvertices_local);
@@ -181,9 +182,6 @@ void GraphUpscale::MakeTopology()
 {
     agg_vertex_local_ = MakeAggVertex(part_local_);
 
-    agg_vertex_local_ = 1;
-    vertex_edge_local_ = 1;
-
     SparseMatrix agg_edge_ext = agg_vertex_local_.Mult(vertex_edge_local_);
     agg_edge_ext.SortIndices();
 
@@ -203,8 +201,8 @@ void GraphUpscale::MakeTopology()
     ParMatrix edge_agg_ext = edge_edge_.Mult(edge_agg_d);
     ParMatrix agg_agg = agg_edge_d.Mult(edge_agg_ext);
 
-    SparseMatrix face_agg_int = MakeFaceAggInt(agg_agg);
     agg_edge_ext = 1.0;
+    SparseMatrix face_agg_int = MakeFaceAggInt(agg_agg);
     SparseMatrix face_edge_ext = face_agg_int.Mult(agg_edge_ext);
 
     face_edge_local_ = MakeFaceEdge(agg_agg, edge_agg_ext,
@@ -220,7 +218,7 @@ void GraphUpscale::MakeTopology()
     face_face_ = parlinalgcpp::RAP(edge_edge_, edge_face);
     face_face_ = 1;
 
-    face_true_edge_ = MakeFaceTrueEdge(face_face_);
+    face_true_face_ = MakeEntityTrueEntity(face_face_);
 
     ParMatrix vertex_edge_d(comm_, vertex_starts, edge_starts, vertex_edge_local_);
     ParMatrix vertex_edge = vertex_edge_d.Mult(edge_true_edge_);
@@ -372,7 +370,7 @@ void GraphUpscale::MakeCoarseSpace()
                                  std::end(agg_edges));
         }
 
-        auto M_face = M_local_.GetSubMatrix(edge_ext_dofs, edge_ext_dofs, col_marker);
+        SparseMatrix M_face = M_local_.GetSubMatrix(edge_ext_dofs, edge_ext_dofs, col_marker);
         auto M_diag = M_face.GetDiag();
 
         // TODO(gelever1): SendReduce(face, M_diag);

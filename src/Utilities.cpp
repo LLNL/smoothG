@@ -399,48 +399,50 @@ SparseMatrix ExtendFaceAgg(const ParMatrix& agg_agg,
             num_faces, num_aggs);
 }
 
-ParMatrix MakeFaceTrueEdge(const ParMatrix& face_face)
+ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
 {
-    const auto& offd = face_face.GetOffd();
+    const auto& offd = entity_entity.GetOffd();
 
     const auto& offd_indptr = offd.GetIndptr();
     const auto& offd_indices = offd.GetIndices();
-    const auto& offd_colmap = face_face.GetColMap();
+    const auto& offd_colmap = entity_entity.GetColMap();
 
-    HYPRE_Int last_row = face_face.GetColStarts()[1];
+    HYPRE_Int last_row = entity_entity.GetColStarts()[1];
 
-    int num_faces = face_face.Rows();
-    std::vector<int> select_indptr(num_faces + 1);
+    int num_entities = entity_entity.Rows();
+    std::vector<int> select_indptr(num_entities + 1);
 
-    int num_true_faces = 0;
+    int num_true_entities = 0;
 
-    for (int i = 0; i < num_faces; ++i)
+    for (int i = 0; i < num_entities; ++i)
     {
-        select_indptr[i] = num_true_faces;
+        select_indptr[i] = num_true_entities;
 
         int row_size = offd.RowSize(i);
 
         if (row_size == 0 || offd_colmap[offd_indices[offd_indptr[i]]] > last_row )
         {
             assert(row_size == 0 || row_size == 1);
-            num_true_faces++;
+            num_true_entities++;
         }
     }
 
-    select_indptr[num_faces] = num_true_faces;
+    select_indptr[num_entities] = num_true_entities;
 
-    std::vector<double> select_data(num_true_faces, 1.0);
-    std::vector<int> select_indices(num_true_faces);
+    std::vector<int> select_indices(num_true_entities);
     std::iota(std::begin(select_indices), std::end(select_indices), 0);
 
+    std::vector<double> select_data(num_true_entities, 1.0);
+
     SparseMatrix select(std::move(select_indptr), std::move(select_indices), std::move(select_data),
-            num_faces, num_true_faces);
+            num_entities, num_true_entities);
 
-    MPI_Comm comm = face_face.GetComm();
-    auto face_true_starts = parlinalgcpp::GenerateOffsets(comm, num_true_faces);
-    parlinalgcpp::ParMatrix select_d(comm, face_face.GetRowStarts(), face_true_starts, select);
+    MPI_Comm comm = entity_entity.GetComm();
+    auto true_starts = parlinalgcpp::GenerateOffsets(comm, num_true_entities);
 
-    return face_face.Mult(select_d);
+    ParMatrix select_d(comm, entity_entity.GetRowStarts(), true_starts, select);
+
+    return entity_entity.Mult(select_d);
 }
 
 ParMatrix MakeExtPermutation(MPI_Comm comm, const ParMatrix& parmat)

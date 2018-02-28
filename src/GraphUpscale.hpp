@@ -142,7 +142,7 @@ private:
     SparseMatrix face_agg_local_;
 
     ParMatrix face_face_;
-    ParMatrix face_true_edge_;
+    ParMatrix face_true_face_;
     ParMatrix face_edge_;
     ParMatrix agg_ext_vertex_;
     ParMatrix agg_ext_edge_;
