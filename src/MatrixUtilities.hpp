@@ -49,7 +49,7 @@ mfem::SparseMatrix TableToMatrix(const mfem::Table& table);
 /**
     @brief Creates a table from a sparse matrix's graph
 */
-mfem::Table* MatrixToTable(const mfem::SparseMatrix& mat);
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat);
 
 // Rap by hand that seems to be faster than the mfem rap but uses more memory
 // Use mfem::RAP if memory is more important than cycles

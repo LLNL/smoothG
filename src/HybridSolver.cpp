@@ -823,11 +823,15 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 #if SMOOTHG_USE_SAAMGE
     saamge::proc_init(comm_);
 
-    mfem::Table* elem_dof = MatrixToTable(Agg_multiplier_);
+    mfem::Table elem_dof_tmp = MatrixToTable(Agg_multiplier_);
+    mfem::Table* elem_dof = new mfem::Table;
+    elem_dof->Swap(elem_dof_tmp);
     mfem::SparseMatrix multiplier_Agg = smoothg::Transpose(Agg_multiplier_);
     mfem::SparseMatrix Agg_Agg = smoothg::Mult(Agg_multiplier_, multiplier_Agg);
     auto elem_adjacency_matrix = MetisGraphPartitioner::getAdjacency(Agg_Agg);
-    mfem::Table* elem_elem = MatrixToTable(elem_adjacency_matrix);
+    mfem::Table elem_elem_tmp = MatrixToTable(elem_adjacency_matrix);
+    mfem::Table* elem_elem = new mfem::Table;
+    elem_elem->Swap(elem_elem_tmp);
 
     // Mark dofs that are shared by more than one processor
     saamge::SharedEntityCommunication<mfem::Vector> sec(comm_, *multiplier_d_td_);
@@ -848,7 +852,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
                   sa_nparts_.data(), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
-    // of nparts_arr[0] in some cases, so I define the rest of the array here
+    // of sa_nparts_[0] in some cases, so I define the rest of the array here
     for (int i = 1; i < saamge_param_->num_levels - 1; i++)
         sa_nparts_[i] = sa_nparts_[i - 1] / saamge_param_->coarsen_factor + 1;
 

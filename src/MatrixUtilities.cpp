@@ -126,7 +126,7 @@ mfem::SparseMatrix TableToMatrix(const mfem::Table& table)
     return mfem::SparseMatrix(i, j, data, height, width);
 }
 
-mfem::Table* MatrixToTable(const mfem::SparseMatrix& mat)
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat)
 {
     const int nrows = mat.Height();
     const int nnz = mat.NumNonZeroElems();
@@ -137,8 +137,8 @@ mfem::Table* MatrixToTable(const mfem::SparseMatrix& mat)
     std::copy_n(mat.GetI(), nrows + 1, i);
     std::copy_n(mat.GetJ(), nnz, j);
 
-    mfem::Table* table = new mfem::Table;
-    table->SetIJ(i, j, nrows);
+    mfem::Table table;
+    table.SetIJ(i, j, nrows);
     return table;
 }
 
