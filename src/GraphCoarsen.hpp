@@ -55,6 +55,8 @@ namespace smoothg
 class GraphCoarsen
 {
 public:
+    enum class CoarseMType { Assemble = 0, CoarseElement, CoarseCoefficient };
+
     /**
        @brief Constructor based on the fine graph and a vertex partitioning.
 
@@ -117,7 +119,7 @@ public:
         mfem::SparseMatrix& Pedges,
         mfem::SparseMatrix& face_dof,
         std::vector<mfem::DenseMatrix>& CM_el,
-        bool build_coarse_relation = false);
+        CoarseMType coarse_m_type = CoarseMType::Assemble);
 
     /**
        @brief Get the aggregate to coarse vertex dofs relation table
@@ -177,7 +179,7 @@ private:
     /// @brief take vertex-based target functions and assemble them in matrix
     void BuildPVertices(std::vector<mfem::DenseMatrix>& vertex_targets,
                         mfem::SparseMatrix& Pvertices,
-                        bool build_coarse_relation);
+                        CoarseMType coarse_m_type);
 
     /**
        Method called from BuildPEdges
@@ -259,7 +261,7 @@ private:
         mfem::SparseMatrix& face_cdof,
         mfem::SparseMatrix& Pedges,
         std::vector<mfem::DenseMatrix>& CM_el,
-        bool build_coarse_relation);
+        CoarseMType coarse_m_type);
 
     void BuildW(const mfem::SparseMatrix& Pvertices);
 

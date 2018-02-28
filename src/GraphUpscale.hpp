@@ -50,6 +50,7 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
+       @param coefficient use coarse coefficient rescaling construction
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
@@ -57,6 +58,7 @@ public:
                  double spect_tol = 0.001, int max_evects = 4,
                  bool dual_target = false, bool scaled_dual = false,
                  bool energy_dual = false, bool hybridization = false,
+                 bool coarse_coefficient = false,
                  const mfem::Vector& weight = mfem::Vector());
     /**
        @brief Constructor
@@ -75,6 +77,7 @@ public:
        @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
               (guarantees approximation property in edge energy norm)
        @param hybridization use hybridization as solver
+       @param coefficient use coarse coefficient rescaling construction
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
@@ -82,6 +85,7 @@ public:
                  double spect_tol = 0.001, int max_evects = 4,
                  bool dual_target = false, bool scaled_dual = false,
                  bool energy_dual = false, bool hybridization = false,
+                 bool coarse_coefficient = false,
                  const mfem::Vector& weight = mfem::Vector());
 
     /// Read permuted vertex vector
@@ -110,7 +114,8 @@ private:
               const mfem::Array<int>& global_partitioning,
               const mfem::Vector& weight,
               double spect_tol, int max_evects,
-              bool dual_target, bool scaled_dual, bool energy_dual);
+              bool dual_target, bool scaled_dual, bool energy_dual,
+              bool coarse_coefficient);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;

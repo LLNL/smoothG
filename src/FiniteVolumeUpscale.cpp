@@ -52,7 +52,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
+                     max_evects, dual_target, scaled_dual, energy_dual, hybridization, false);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -122,7 +122,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
+                     max_evects, dual_target, scaled_dual, energy_dual, hybridization, false);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
