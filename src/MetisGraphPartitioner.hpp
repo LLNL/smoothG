@@ -125,6 +125,9 @@ private:
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning, int num_parts);
 
+void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
+                  mfem::Array<int>& partitioning, int coarsening_factor);
+
 } // namespace smoothg
 
 #endif

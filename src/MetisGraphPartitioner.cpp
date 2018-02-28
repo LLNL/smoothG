@@ -322,4 +322,16 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
     partitioner.doPartition(w_table, num_parts, partitioning);
 }
 
+void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
+                  mfem::Array<int>& partitioning, int coarsening_factor)
+{
+    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
+    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
+
+    const int nvertices = vert_vert.Height();
+    int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
+    num_partitions = std::max(1, num_partitions);
+    Partition(vert_vert, partitioning, num_partitions);
+}
+
 } // namespace smoothg
