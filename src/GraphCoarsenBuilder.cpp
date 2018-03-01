@@ -408,14 +408,13 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
                        total_num_traces_ + ncoarse_vertexdofs_ - num_aggs,
                        total_num_traces_ + ncoarse_vertexdofs_ - num_aggs);
 
-    // F_F block, the P_F^T M_F P_F pieces (this explicit transpose is not my favorite)
-    auto face_Agg = smoothg::Transpose(topology_.Agg_face_);
+    // F_F block, the P_F^T M_F P_F pieces
     mfem::Array<int> neighbor_aggs;
     mfem::Array<int> coarse_face_dofs;
     for (int face = 0; face < num_faces; ++face)
     {
         double face_weight;
-        GetTableRow(face_Agg, face, neighbor_aggs);
+        GetTableRow(topology_.face_Agg_, face, neighbor_aggs);
         MFEM_ASSERT(neighbor_aggs.Size() <= 2, "Face has three or more aggregates!");
         if (neighbor_aggs.Size() == 1)
         {
