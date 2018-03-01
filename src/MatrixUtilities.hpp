@@ -151,7 +151,7 @@ mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect);
 */
 void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
                         const mfem::Array<int>& cols, const mfem::DenseMatrix& subm,
-                        double scaling = 1.0, int skip_zeros=1);
+                        double scaling = 1.0, int skip_zeros = 1);
 
 /**
    @brief Add two parallel matrices C = A + B

@@ -391,41 +391,41 @@ void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
                         const mfem::Array<int>& cols, const mfem::DenseMatrix& subm,
                         double scaling, int skip_zeros)
 {
-   int i, j, gi, gj, s, t;
-   double a;
-   const int height = mat.Height();
-   const int width = mat.Width();
+    int i, j, gi, gj, s, t;
+    double a;
+    const int height = mat.Height();
+    const int width = mat.Width();
 
-   for (i = 0; i < rows.Size(); i++)
-   {
-      if ((gi=rows[i]) < 0) { gi = -1-gi, s = -1; }
-      else { s = 1; }
-      MFEM_ASSERT(gi < height,
-                  "Trying to insert a row " << gi << " outside the matrix height "
-                  << height);
-      mat.SetColPtr(gi);
-      for (j = 0; j < cols.Size(); j++)
-      {
-         if ((gj=cols[j]) < 0) { gj = -1-gj, t = -s; }
-         else { t = s; }
-         MFEM_ASSERT(gj < width,
-                     "Trying to insert a column " << gj << " outside the matrix width "
-                     << width);
-         a = scaling * subm(i, j);
-         if (skip_zeros && a == 0.0)
-         {
-            // if the element is zero do not assemble it unless this breaks
-            // the symmetric structure
-            if (&rows != &cols || subm(j, i) == 0.0)
+    for (i = 0; i < rows.Size(); i++)
+    {
+        if ((gi = rows[i]) < 0) { gi = -1 - gi, s = -1; }
+        else { s = 1; }
+        MFEM_ASSERT(gi < height,
+                    "Trying to insert a row " << gi << " outside the matrix height "
+                    << height);
+        mat.SetColPtr(gi);
+        for (j = 0; j < cols.Size(); j++)
+        {
+            if ((gj = cols[j]) < 0) { gj = -1 - gj, t = -s; }
+            else { t = s; }
+            MFEM_ASSERT(gj < width,
+                        "Trying to insert a column " << gj << " outside the matrix width "
+                        << width);
+            a = scaling * subm(i, j);
+            if (skip_zeros && a == 0.0)
             {
-               continue;
+                // if the element is zero do not assemble it unless this breaks
+                // the symmetric structure
+                if (&rows != &cols || subm(j, i) == 0.0)
+                {
+                    continue;
+                }
             }
-         }
-         if (t < 0) { a = -a; }
-         mat._Add_(gj, a);
-      }
-      mat.ClearColPtr();
-   }
+            if (t < 0) { a = -a; }
+            mat._Add_(gj, a);
+        }
+        mat.ClearColPtr();
+    }
 }
 
 // Modified from MFEM
