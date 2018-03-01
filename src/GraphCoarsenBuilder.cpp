@@ -450,13 +450,9 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
             int face = local_faces[f];
             GetCoarseFaceDofs(face, coarse_face_dofs);
             for (int fprime=f; fprime<local_faces.Size(); ++fprime)
-            // for (int fprime=0; fprime<local_faces.Size(); ++fprime)
             {
                 int faceprime = local_faces[fprime];
                 GetCoarseFaceDofs(faceprime, coarse_face_dofs_prime);
-                // comp_EF_EF_.push_back(RTP(P_EF, P_EFprime));
-                // TODO: am I adding the below matrix twice if f=fprime?
-                // (I think PSV actually wants it added twice, once for A, once for A')
                 AddScaledSubMatrix(*CoarseM, coarse_face_dofs,
                                    coarse_face_dofs_prime, comp_EF_EF_[counter],
                                    agg_weight);

@@ -216,6 +216,16 @@ def make_tests():
           "finest-u-error": 0.38079825403520218,
           "operator-complexity": 1.016509834901651}]
 
+    tests["samplegraph1-coeff"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-coefficient"],
+         {"finest-div-error": 0.37918423747873353,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.016509834901651}]
+
     tests["graph-metis"] = \
         [["./generalgraph",
           "--spect-tol", "1.0",
@@ -240,6 +250,16 @@ def make_tests():
         [["./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
+         {"finest-div-error": 0.12043046187567592,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.2578874211257887}]
+
+    tests["samplegraph4-coeff"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4",
+          "--coarse-coefficient"],
          {"finest-div-error": 0.12043046187567592,
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
