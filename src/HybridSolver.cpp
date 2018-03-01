@@ -622,7 +622,7 @@ void HybridSolver::AssembleHybridSystem(
     }
 }
 
-/// @todo nonzero BC
+/// @todo nonzero BC, solve on true dof
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
     RHSTransform(Rhs, Hrhs_);
