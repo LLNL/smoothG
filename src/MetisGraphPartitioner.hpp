@@ -84,6 +84,7 @@ public:
                      mfem::Array<int>& partitioning,
                      bool use_edge_weight = false);
 
+    // TODO: move this function to MatrixUtilities?
     static mfem::SparseMatrix getAdjacency(const mfem::SparseMatrix& wtable);
 
     /**
