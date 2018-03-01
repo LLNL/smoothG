@@ -472,12 +472,10 @@ void GraphCoarsen::BuildPEdges(
             }
         }
         bubble_counter += num_bubbles_i;
-        std::cout << "  agg " << i << " has " << num_bubbles_i << " bubbles." << std::endl;
     }
 
     CoarseD_->Finalize();
 
-    std::cout << "total num traces = " << total_num_traces << ", bubble_counter = " << bubble_counter << std::endl;
     Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
@@ -527,16 +525,6 @@ void GraphCoarsen::BuildPEdges(
     Pedges.Swap(newPedges);
 
     CoarseM_ = mbuilder.GetCoarseM();
-    if (coarse_m_type == CoarseMType::CoarseCoefficient ||
-        coarse_m_type == CoarseMType::Assemble)
-    {
-        std::ofstream out("CoarseM.mat");
-        CoarseM_->Print(out, 1);
-    }
-    {
-        std::ofstream out("Pedges.mat");
-        Pedges.Print(out, 1);
-    }
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)

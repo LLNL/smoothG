@@ -392,9 +392,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
     // ---
     // build the components...
     // ---
-    std::cout << "BuildComponents() begins\n---" << std::endl;
     BuildComponents();
-    std::cout << "---\nBuildComponents() ends" << std::endl;
 
     // temporarily just use hard-coded weights = 1
     const int num_aggs = topology_.Agg_face_.Height();
@@ -410,7 +408,6 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
         total_num_traces_ + ncoarse_vertexdofs_ - num_aggs,
         total_num_traces_ + ncoarse_vertexdofs_ - num_aggs);
 
-    std::cout << "F_F block begins" << std::endl;
     // F_F block, the P_F^T M_F P_F pieces (this explicit transpose is not my favorite)
     auto face_Agg = smoothg::Transpose(topology_.Agg_face_);
     mfem::Array<int> neighbor_aggs;
@@ -435,7 +432,6 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
                            comp_F_F_[face], face_weight);
     }
 
-    std::cout << "EF_EF block begins" << std::endl;
     // the EF_EF block
     // for (pairs of *faces* that share an *aggregate*)
     mfem::Array<int> local_faces;
@@ -468,7 +464,6 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
         }
     }
 
-    std::cout << "other block begins" << std::endl;
     // EF_E block and E_E block
     counter = 0;
     mfem::Array<int> coarse_agg_dofs;
@@ -493,7 +488,6 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM()
             counter++;
         }
     }
-    std::cout << "other block ends" << std::endl;
 
     CoarseM->Finalize(0);
     return std::move(CoarseM);
