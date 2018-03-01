@@ -30,7 +30,6 @@
 
 #include "mfem.hpp"
 #include "GraphTopology.hpp"
-#include "MixedMatrix.hpp"
 
 namespace smoothg
 {
@@ -82,12 +81,6 @@ public:
         const mfem::SparseMatrix& D_local,
         const mfem::SparseMatrix* W_local,
         const GraphTopology& graph_topology);
-
-    LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects,
-        bool dual_target, bool scaled_dual, bool energy_dual,
-        const MixedMatrix& mixed_laplacian,
-        const DofHandler& dof_handler);
 
     ~LocalMixedGraphSpectralTargets() {}
 
