@@ -368,9 +368,7 @@ void GraphCoarsen::BuildPEdges(
         for (int j = 0; j < faces.Size(); j++)
         {
             nlocal_traces += face_cdof.RowSize(faces[j]);
-            std::cout << "    face " << j << " contributes " << face_cdof.RowSize(faces[j]) << std::endl;
         }
-        std::cout << "  agg " << i << " has " << nlocal_traces << " local traces." << std::endl;
         traces_extensions.SetSize(nlocal_fine_dofs, nlocal_traces);
         F_potentials.SetSize(nlocal_verts, nlocal_traces);
         local_facecdofs.SetSize(nlocal_traces);
@@ -534,6 +532,10 @@ void GraphCoarsen::BuildPEdges(
     {
         std::ofstream out("CoarseM.mat");
         CoarseM_->Print(out, 1);
+    }
+    {
+        std::ofstream out("Pedges.mat");
+        Pedges.Print(out, 1);
     }
 }
 
