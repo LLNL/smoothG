@@ -149,12 +149,9 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 std::unique_ptr<mfem::HypreParMatrix>
 LocalMixedGraphSpectralTargets::DofPermutation(DofType dof_type)
 {
-    mfem::HypreParMatrix& ExtAgg_dof = (dof_type == DofType::vdof) ?
-                                       *ExtAgg_vdof_ : *ExtAgg_edof_;
-    mfem::SparseMatrix& ExtAgg_dof_diag = (dof_type == DofType::vdof) ?
-                                          ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
-    mfem::SparseMatrix& ExtAgg_dof_offd = (dof_type == DofType::vdof) ?
-                                          ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
+    auto& ExtAgg_dof = (dof_type == vdof) ? *ExtAgg_vdof_ : *ExtAgg_edof_;
+    auto& ExtAgg_dof_diag = (dof_type == vdof) ? ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
+    auto& ExtAgg_dof_offd = (dof_type == vdof) ? ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
 
     HYPRE_Int* dof_offd_map;
     ExtAgg_dof.GetDiag(ExtAgg_dof_diag);
@@ -186,10 +183,8 @@ LocalMixedGraphSpectralTargets::DofPermutation(DofType dof_type)
 void LocalMixedGraphSpectralTargets::GetExtAggDofs(
     DofType dof_type, int iAgg, mfem::Array<int>& dofs)
 {
-    mfem::SparseMatrix& ExtAgg_dof_diag = (dof_type == DofType::vdof) ?
-                                          ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
-    mfem::SparseMatrix& ExtAgg_dof_offd = (dof_type == DofType::vdof) ?
-                                          ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
+    auto& ExtAgg_dof_diag = (dof_type == vdof) ? ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
+    auto& ExtAgg_dof_offd = (dof_type == vdof) ? ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
 
     int num_ext_dofs_diag = ExtAgg_dof_diag.Width();
 
