@@ -626,6 +626,18 @@ void GetTableRow(
     J.MakeRef(mat.GetJ() + begin, size);
 }
 
+/// instead of a reference, get a copy
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
+{
+    const int begin = mat.GetI()[rownum];
+    const int end = mat.GetI()[rownum + 1];
+    const int size = end - begin;
+    mfem::Array<int> temp;
+    temp.MakeRef(mat.GetJ() + begin, size);
+    temp.Copy(J);
+}
+
 void FiniteVolumeMassIntegrator::AssembleElementMatrix(
     const mfem::FiniteElement& el,
     mfem::ElementTransformation& Trans,
