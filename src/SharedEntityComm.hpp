@@ -35,6 +35,7 @@ class SharedEntityComm
 
     private:
         const ParMatrix& entity_true_entity_;
+        parlinalgcpp::ParCommPkg comm_pkg_;
 
         MPI_Comm comm_;
         MPI_Comm myid_;
@@ -62,22 +63,22 @@ SharedEntityComm<T>::SharedEntityComm(const ParMatrix& entity_true_entity)
 {
     MPI_Comm_rank(comm_, &myid_);
 
-    auto comm_pkg = entity_true_entity_.MakeCommPkg();
+    comm_pkg_ = entity_true_entity_.MakeCommPkg();
 
-    auto& send_starts = comm_pkg.send_map_starts_;
-    auto& recv_starts = comm_pkg.recv_vec_starts_;
+    auto& send_starts = comm_pkg_.send_map_starts_;
+    auto& recv_starts = comm_pkg_.recv_vec_starts_;
 
     std::vector<std::pair<int, int> > true_entity_proc;
 
-    int num_sends = comm_pkg.num_sends_;
+    int num_sends = comm_pkg_.num_sends_;
 
     for (int send = 0; send < num_sends; ++send)
     {
-        int proc = comm_pkg.send_procs_[send];
+        int proc = comm_pkg_.send_procs_[send];
 
         for (int j = send_starts[send]; j < send_starts[send + 1]; ++j)
         {
-            int true_entity = comm_pkg.send_map_elmts_[j];
+            int true_entity = comm_pkg_.send_map_elmts_[j];
 
             true_entity_proc.push_back(std::make_pair(true_entity, proc));
         }
@@ -121,9 +122,9 @@ SharedEntityComm<T>::SharedEntityComm(const ParMatrix& entity_true_entity)
 
             int shared_entity = ete_offd_indices[ete_offd_indptr[entity]];
 
-            for (int recv = 0; recv < comm_pkg.num_recvs_; ++recv)
+            for (int recv = 0; recv < comm_pkg_.num_recvs_; ++recv)
             {
-                int proc = comm_pkg.recv_procs_[recv];
+                int proc = comm_pkg_.recv_procs_[recv];
 
                 for (int k = recv_starts[recv]; k < recv_starts[recv + 1]; ++k)
                 {
