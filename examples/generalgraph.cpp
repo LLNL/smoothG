@@ -113,6 +113,10 @@ int main(int argc, char* argv[])
     bool energy_dual = false;
     args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
                    "--no-energy-dual", "Use energy matrix in trace generation.");
+    bool rand_weights = false;
+    args.AddOption(&rand_weights, "-rw", "--random-weight", "-no-rw",
+                   "--no-random-weight", "Randomize edge weights.");
+
     args.Parse();
     if (!args.Good())
     {
@@ -170,9 +174,35 @@ int main(int argc, char* argv[])
         std::ifstream weight_file(weight_filename);
         weight.Load(weight_file, nedges_global);
     }
+    else if (rand_weights)
+    {
+        weight.Randomize();
+        weight -= 0.1;
+
+        for (int i = 0; i < weight.Size(); ++i)
+        {
+            weight[i] = weight[i] < 0 ? -0.5 : 1.0;
+        }
+    }
     else
     {
         weight = 1.0;
+    }
+
+
+    int count = 0;
+
+    for (int i = 0; i < weight.Size(); ++i)
+    {
+        if (weight[i] < 0)
+        {
+            count++;
+        }
+    }
+
+    if (myid == 0)
+    {
+        printf("%d / %d negative weights\n", count, weight.Size());
     }
     /// [Load the edge weights]
 

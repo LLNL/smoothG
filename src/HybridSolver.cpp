@@ -289,25 +289,20 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
         std::cout << "  Timing: Preconditioner for hybridized system"
                   " constructed in " << chrono.RealTime() << "s. \n";
 
-    cg_ = make_unique<mfem::CGSolver>(comm_);
-    cg_->SetPrintLevel(print_level_);
-    cg_->SetMaxIter(max_num_iter_);
-    cg_->SetRelTol(rtol_);
-    cg_->SetAbsTol(atol_);
-    cg_->SetOperator(*pHybridSystem_);
-    cg_->iterative_mode = false;
+    //solver_ = make_unique<mfem::MINRESSolver>(comm_);
+    solver_ = make_unique<mfem::GMRESSolver>(comm_);
+    solver_->SetPrintLevel(print_level_);
+    solver_->SetMaxIter(max_num_iter_);
+    solver_->SetRelTol(rtol_);
+    solver_->SetAbsTol(atol_);
+    solver_->SetOperator(*pHybridSystem_);
+    solver_->iterative_mode = false;
 
-    // HypreBoomerAMG is broken if local size is zero
-    int local_size = pHybridSystem_->Height();
-    int min_size;
-    MPI_Allreduce(&local_size, &min_size, 1, MPI_INT, MPI_MIN, comm_);
-
-    const bool use_prec = min_size > 0;
+    const bool use_prec = true;
     if (use_prec)
     {
-        prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
-        prec_->SetPrintLevel(0);
-        cg_->SetPreconditioner(*prec_);
+        prec_ = make_unique<mfem::HypreDiagScale>(*pHybridSystem_);
+        solver_->SetPreconditioner(*prec_);
     }
 
     trueHrhs_.SetSize(multiplier_d_td_->GetNumCols());
@@ -630,7 +625,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     chrono.Clear();
     chrono.Start();
 
-    cg_->Mult(trueHrhs_, trueMu_);
+    solver_->Mult(trueHrhs_, trueMu_);
 
     chrono.Stop();
     timing_ += chrono.RealTime();
@@ -641,20 +636,20 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
                   << timing_ << "s. \n";
     }
 
-    num_iterations_ += cg_->GetNumIterations();
+    num_iterations_ += solver_->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
     {
-        if (cg_->GetConverged())
+        if (solver_->GetConverged())
             std::cout << "  CG converged in "
                       << num_iterations_
                       << " with a final residual norm "
-                      << cg_->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         else
             std::cout << "  CG did not converge in "
                       << num_iterations_
                       << ". Final residual norm is "
-                      << cg_->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
     }
 
     // distribute true dofs to dofs and recover solution of the original system
@@ -766,28 +761,28 @@ void HybridSolver::SetPrintLevel(int print_level)
 {
     MixedLaplacianSolver::SetPrintLevel(print_level);
 
-    cg_->SetPrintLevel(print_level_);
+    solver_->SetPrintLevel(print_level_);
 }
 
 void HybridSolver::SetMaxIter(int max_num_iter)
 {
     MixedLaplacianSolver::SetMaxIter(max_num_iter);
 
-    cg_->SetMaxIter(max_num_iter_);
+    solver_->SetMaxIter(max_num_iter_);
 }
 
 void HybridSolver::SetRelTol(double rtol)
 {
     MixedLaplacianSolver::SetMaxIter(rtol);
 
-    cg_->SetRelTol(rtol_);
+    solver_->SetRelTol(rtol_);
 }
 
 void HybridSolver::SetAbsTol(double atol)
 {
     MixedLaplacianSolver::SetAbsTol(atol);
 
-    cg_->SetAbsTol(atol_);
+    solver_->SetAbsTol(atol_);
 }
 
 } // namespace smoothg

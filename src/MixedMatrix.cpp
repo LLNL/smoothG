@@ -131,7 +131,8 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
     for (int i = 0; i < nedges; i++)
     {
         assert(M_fine_data[i] != 0.0);
-        M_fine_data[i] = 1.0 / std::fabs(M_fine_data[i]);
+        //M_fine_data[i] = 1.0 / std::fabs(M_fine_data[i]);
+        M_fine_data[i] = 1.0 / M_fine_data[i];
     }
 
     M_ = make_unique<mfem::SparseMatrix>(M_fine_i, M_fine_j, M_fine_data,

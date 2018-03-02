@@ -1020,8 +1020,8 @@ std::vector<double> ComputeErrors(MPI_Comm comm, const mfem::SparseMatrix& M,
 
     for (int i = 0; i < num_edges; ++i)
     {
-        M_scaled_up_sol[i] *= std::sqrt(M_data[i]);
-        M_scaled_fine_sol[i] *= std::sqrt(M_data[i]);
+        M_scaled_up_sol[i] *= std::sqrt(std::fabs(M_data[i]));
+        M_scaled_fine_sol[i] *= std::sqrt(std::fabs(M_data[i]));
     }
 
     std::vector<double> info(3);

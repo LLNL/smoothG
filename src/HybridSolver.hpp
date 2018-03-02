@@ -198,8 +198,8 @@ private:
     std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
     std::unique_ptr<mfem::SparseMatrix> HybridSystemElim_;
     std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_;
-    std::unique_ptr<mfem::HypreBoomerAMG> prec_;
-    std::unique_ptr<mfem::CGSolver> cg_;
+    std::unique_ptr<mfem::HypreSolver> prec_;
+    std::unique_ptr<mfem::IterativeSolver> solver_;
 
 
     std::vector<mfem::DenseMatrix> Hybrid_el_;
