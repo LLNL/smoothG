@@ -152,26 +152,14 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    // 2. Read the mesh from the given mesh file. We can handle triangular,
-    //    quadrilateral, tetrahedral, hexahedral, surface and volume meshes with
-    //    the same code.
     Mesh *mesh = new Mesh(mesh_file, 1, 1);
     int dim = mesh->Dimension();
 
-    // 3. Refine the mesh to increase the resolution. In this example we do
-    //    'ref_levels' of uniform refinement. We choose 'ref_levels' to be the
-    //    largest number that gives a final mesh with no more than 50,000
-    //    elements.
+    for (int l = 0; l < ref_levels; l++)
     {
-        for (int l = 0; l < ref_levels; l++)
-        {
-            mesh->UniformRefinement();
-        }
+        mesh->UniformRefinement();
     }
 
-    // 4. Define a finite element space on the mesh. Here we use continuous
-    //    Lagrange finite elements of the specified order. If order < 1, we
-    //    instead use an isoparametric/isogeometric space.
     FiniteElementCollection *fec;
     if (order > 0)
     {
@@ -187,10 +175,6 @@ int main(int argc, char* argv[])
     }
     FiniteElementSpace *fespace = new FiniteElementSpace(mesh, fec);
 
-    // 5. Determine the list of true (i.e. conforming) essential boundary dofs.
-    //    In this example, the boundary conditions are defined by marking all
-    //    the boundary attributes from the mesh as essential (Dirichlet) and
-    //    converting them to a list of true dofs.
     Array<int> ess_tdof_list;
     if (mesh->bdr_attributes.Size())
     {
@@ -199,30 +183,17 @@ int main(int argc, char* argv[])
         fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
     }
 
-    // 6. Set up the linear form b(.) which corresponds to the right-hand side of
-    //    the FEM linear system, which in this case is (1,phi_i) where phi_i are
-    //    the basis functions in the finite element fespace.
     LinearForm *b = new LinearForm(fespace);
     ConstantCoefficient one(1.0);
     b->AddDomainIntegrator(new DomainLFIntegrator(one));
     b->Assemble();
 
-    // 7. Define the solution vector x as a finite element grid function
-    //    corresponding to fespace. Initialize x with initial guess of zero,
-    //    which satisfies the boundary conditions.
     GridFunction x(fespace);
     x = 0.0;
 
-    // 8. Set up the bilinear form a(.,.) on the finite element space
-    //    corresponding to the Laplacian operator -Delta, by adding the Diffusion
-    //    domain integrator.
     BilinearForm *a = new BilinearForm(fespace);
     a->AddDomainIntegrator(new DiffusionIntegrator(one));
 
-    // 9. Assemble the bilinear form and the corresponding linear system,
-    //    applying any necessary transformations such as: eliminating boundary
-    //    conditions, applying conforming constraints for non-conforming AMR,
-    //    static condensation, etc.
     if (static_cond) { a->EnableStaticCondensation(); }
     a->Assemble();
 
@@ -233,7 +204,7 @@ int main(int argc, char* argv[])
     /// [Load graph from file or generate one]
     mfem::Vector weight;
     mfem::SparseMatrix vertex_edge_global;
-    
+
     Split(A, vertex_edge_global, weight);
     /// [Load graph from file or generate one]
 
