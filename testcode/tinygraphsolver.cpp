@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol(blockOffsets);
 
     // setup solvers
-    std::map<const MixedLaplacianSolver*, std::string> solver_to_name;
+    std::map<MixedLaplacianSolver*, std::string> solver_to_name;
 
     MinresBlockSolver minres(comm, mixed_graph_laplacian);
     solver_to_name[&minres] = "Minres + block preconditioner";
@@ -203,7 +203,7 @@ int main(int argc, char* argv[])
 
         // solve
         sol = 0.0;
-        const_cast<MixedLaplacianSolver*>(solver)->SetPrintLevel(1);
+        solver->SetPrintLevel(1);
         solver->Solve(rhs, sol);
 
         int iter = solver->GetNumIterations();
