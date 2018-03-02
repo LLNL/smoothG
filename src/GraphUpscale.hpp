@@ -50,6 +50,8 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
+       @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+              coarse hybridized system if saamge_param is not nullptr
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
@@ -57,7 +59,8 @@ public:
                  double spect_tol = 0.001, int max_evects = 4,
                  bool dual_target = false, bool scaled_dual = false,
                  bool energy_dual = false, bool hybridization = false,
-                 const mfem::Vector& weight = mfem::Vector());
+                 const mfem::Vector& weight = mfem::Vector(),
+                 const SAAMGeParam* saamge_param = nullptr);
     /**
        @brief Constructor
 
@@ -75,6 +78,8 @@ public:
        @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
               (guarantees approximation property in edge energy norm)
        @param hybridization use hybridization as solver
+       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
+              coarse hybridized system if saamge_param is not nullptr
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
@@ -82,7 +87,8 @@ public:
                  double spect_tol = 0.001, int max_evects = 4,
                  bool dual_target = false, bool scaled_dual = false,
                  bool energy_dual = false, bool hybridization = false,
-                 const mfem::Vector& weight = mfem::Vector());
+                 const mfem::Vector& weight = mfem::Vector(),
+                 const SAAMGeParam* saamge_param = nullptr);
 
     /// Read permuted vertex vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
@@ -110,7 +116,8 @@ private:
               const mfem::Array<int>& global_partitioning,
               const mfem::Vector& weight,
               double spect_tol, int max_evects,
-              bool dual_target, bool scaled_dual, bool energy_dual);
+              bool dual_target, bool scaled_dual, bool energy_dual,
+              const SAAMGeParam* saamge_param);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
