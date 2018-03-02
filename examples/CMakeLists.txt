@@ -31,6 +31,9 @@ target_link_libraries(graphupscale smoothg ${TPL_LIBRARIES})
 add_executable(poweriter poweriter.cpp)
 target_link_libraries(poweriter smoothg ${TPL_LIBRARIES})
 
+add_executable(ex1 ex1.cpp)
+target_link_libraries(ex1 smoothg ${TPL_LIBRARIES})
+
 # add tests
 configure_file(
   "${PROJECT_SOURCE_DIR}/examples/stest.py"

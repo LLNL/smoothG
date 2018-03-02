@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
     // program options from command line
     mfem::OptionsParser args(argc, argv);
     int coarse_factor = 12;
-    args.AddOption(&coarse_factor, "-np", "--num-part",
+    args.AddOption(&coarse_factor, "-cf", "--coarse-factor",
                    "Coarsening factor");
     const char* graphFileName = "../../graphdata/vertex_edge_sample.txt";
     args.AddOption(&graphFileName, "-g", "--graph",
@@ -116,6 +116,12 @@ int main(int argc, char* argv[])
     bool energy_dual = false;
     args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
                    "--no-energy-dual", "Use energy matrix in trace generation.");
+    bool verbose = false;
+    args.AddOption(&verbose, "-v", "--verbose", "-no-v",
+                   "--no-verbose", "Verbose solver output.");
+    int max_iter = 10000;
+    args.AddOption(&max_iter, "-mi", "--max-iter",
+                   "Max number of solver iterations.");
 
 
     // MFEM Options
@@ -211,8 +217,10 @@ int main(int argc, char* argv[])
     /// [Partitioning]
     mfem::Array<int> global_partitioning;
     int num_parts = std::max(1, vertex_edge_global.Height() / coarse_factor);
+
     assert(num_parts >= num_procs);
-    printf("Num Parts: %d\n", num_parts);
+    if (myid == 0)
+        printf("Num Parts: %d\n", num_parts);
 
     MetisPart(vertex_edge_global, global_partitioning, num_parts, isolate);
     /// [Partitioning]
@@ -243,12 +251,19 @@ int main(int argc, char* argv[])
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
-        upscale.SetMaxIter(100000);
+        upscale.SetMaxIter(max_iter);
+
+        if (verbose)
+        {
+            upscale.SetPrintLevel(1);
+        }
         /// [Upscale]
 
         /// [Right Hand Side]
-        mfem::Vector rhs_u_fine = B;
+        mfem::Vector rhs_u_fine(A.Height());
         rhs_u_fine.Randomize();
+        rhs_u_fine -= 0.5;
+        rhs_u_fine *= 10.0;
         upscale.Orthogonalize(rhs_u_fine);
 
         mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
@@ -264,9 +279,12 @@ int main(int argc, char* argv[])
         upscale.ShowFineSolveInfo();
         /// [Solve]
 
-        for (int i = 0; i < 10; ++i)
+        if (verbose && myid == 0)
         {
-            printf("%d: %.8f %.8f\n", i, upscaled_sol.GetBlock(1)[i], fine_sol.GetBlock(1)[i]);
+            for (int i = 0; i < 10; ++i)
+            {
+                printf("%d: %.8f %.8f\n", i, upscaled_sol.GetBlock(1)[i], fine_sol.GetBlock(1)[i]);
+            }
         }
 
         /// [Check Error]
@@ -278,6 +296,7 @@ int main(int argc, char* argv[])
             upscale.WriteVertexVector(rhs_u_fine, FiedlerFileName);
         }
 
+        /*
         assert(num_procs == 1);
 
         mfem::Vector one(A.Height());
@@ -285,6 +304,7 @@ int main(int argc, char* argv[])
         one = 1.0;
         A.Mult(one, Azero);
         printf("A 1 = : %.4e B* 1: %.4e\n", Azero.Norml2(), (rhs_u_fine * one));
+        */
     }
 
     MPI_Finalize();
