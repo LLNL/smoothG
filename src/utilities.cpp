@@ -1072,6 +1072,14 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
     return rayleigh;
 }
 
+void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
+{
+    for (int i = 0; i < vec.Size(); i++)
+    {
+        vec[i] *= scaling[i];
+    }
+}
+
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el)
 {
     const int el0 = 0;

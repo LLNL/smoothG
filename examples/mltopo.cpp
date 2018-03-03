@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
     // Construct vertex_edge, edge_trueedge, edge_boundaryattr tables from mesh
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
                               : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToSparse(vertex_edge_table);
+    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
     mfem::RT_FECollection sigmafec(0, nDimensions);
     mfem::ParFiniteElementSpace sigmafespace(pmesh.get(), &sigmafec);

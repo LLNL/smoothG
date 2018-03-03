@@ -22,6 +22,7 @@
 #include "HybridSolver.hpp"
 #include "utilities.hpp"
 #include "MatrixUtilities.hpp"
+#include "MetisGraphPartitioner.hpp"
 
 using std::unique_ptr;
 
@@ -64,14 +65,17 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
-                           bool spectralAMGe)
+                           const int rescale_iter,
+                           const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    spectralAMGe_(spectralAMGe),
-    use_w_(mgL.CheckW())
+    use_spectralAMGe_((saamge_param != nullptr)),
+    use_w_(mgL.CheckW()),
+    rescale_iter_(rescale_iter),
+    saamge_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
 
@@ -96,14 +100,17 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const Mixed_GL_Coarsener& mgLc,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
-                           bool spectralAMGe)
+                           const int rescale_iter,
+                           const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    spectralAMGe_(spectralAMGe),
-    use_w_(mgL.CheckW())
+    use_spectralAMGe_((saamge_param != nullptr)),
+    use_w_(mgL.CheckW()),
+    rescale_iter_(rescale_iter),
+    saamge_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
     const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
@@ -113,6 +120,17 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Init(face_edgedof, mgLc.get_CM_el(), mgL.get_edge_d_td(),
          face_bdrattr, ess_edge_dofs);
+}
+
+HybridSolver::~HybridSolver()
+{
+#if SMOOTHG_USE_SAAMGE
+    if (use_spectralAMGe_)
+    {
+        saamge::ml_free_data(sa_ml_data_);
+        saamge::agg_free_partitioning(sa_apr_);
+    }
+#endif
 }
 
 template<typename T>
@@ -139,7 +157,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     AinvDMinvCT_.resize(nAggs_);
     Ainv_f_.resize(nAggs_);
     Ainv_.resize(nAggs_);
-    if (spectralAMGe_)
+    if (use_spectralAMGe_)
         Hybrid_el_.resize(nAggs_);
 
     mfem::SparseMatrix edgedof_bdrattr;
@@ -273,10 +291,14 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
                               comm_, multiplier_start_.Last(), multiplier_start_,
                               HybridSystemElim_.get());
 
-    // This is just doing RAP, but for some reason for large systems this two-
-    // step RAP is much faster than a direct RAP, so the two-step way is used
-    pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
-
+    if (rescale_iter_ == 0 || use_spectralAMGe_)
+    {
+        pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
+    }
+    else
+    {
+        ComputeScaledHybridSystem(*HybridSystem_d);
+    }
     nnz_ = pHybridSystem_->NNZ();
 
     if (myid_ == 0 && print_level_ > 0)
@@ -305,8 +327,15 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     const bool use_prec = min_size > 0;
     if (use_prec)
     {
-        prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
-        prec_->SetPrintLevel(0);
+        if (use_spectralAMGe_)
+        {
+            BuildSpectralAMGePreconditioner();
+        }
+        else
+        {
+            prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
+            ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(0);
+        }
         cg_->SetPreconditioner(*prec_);
     }
 
@@ -450,7 +479,7 @@ void HybridSolver::AssembleHybridSystem(
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
-        if (spectralAMGe_)
+        if (use_spectralAMGe_)
             Hybrid_el_[iAgg] = tmpHybrid_el;
     }
 }
@@ -588,12 +617,12 @@ void HybridSolver::AssembleHybridSystem(
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
-        if (spectralAMGe_)
+        if (use_spectralAMGe_)
             Hybrid_el_[iAgg] = tmpHybrid_el;
     }
 }
 
-/// @todo nonzero BC
+/// @todo nonzero BC, solve on true dof
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
     RHSTransform(Rhs, Hrhs_);
@@ -624,6 +653,9 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 
     // assemble true right hand side
     multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
+
+    if (diagonal_scaling_.Size() > 0)
+        RescaleVector(diagonal_scaling_, trueHrhs_);
 
     // solve the parallel global hybridized system
     mfem::StopWatch chrono;
@@ -660,6 +692,9 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     // distribute true dofs to dofs and recover solution of the original system
     chrono.Clear();
     chrono.Start();
+
+    if (diagonal_scaling_.Size() > 0)
+        RescaleVector(diagonal_scaling_, trueMu_);
 
     multiplier_d_td_->Mult(trueMu_, Mu_);
     RecoverOriginalSolution(Mu_, Sol);
@@ -760,6 +795,88 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
         for (int i = 0; i < nlocal_edgedof; ++i)
             RecoveredSol(local_edgedof[i]) = -sigma_loc(i);
     }
+}
+
+void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d)
+{
+    unique_ptr<mfem::HypreParMatrix> tmpH(smoothg::RAP(H_d, *multiplier_d_td_));
+    mfem::HypreSmoother prec_scale(*tmpH);
+
+    mfem::Vector zeros(tmpH->Height());
+    zeros = 1e-8;
+    diagonal_scaling_.SetSize(tmpH->Height());
+    diagonal_scaling_ = 1.0;
+
+    mfem::CGSolver cg_scale(comm_);
+    cg_scale.SetMaxIter(rescale_iter_);
+    cg_scale.SetPreconditioner(prec_scale);
+    cg_scale.SetOperator(*tmpH);
+    cg_scale.Mult(zeros, diagonal_scaling_);
+
+    auto Scale = VectorToMatrix(diagonal_scaling_);
+    mfem::HypreParMatrix pScale(comm_, tmpH->N(), tmpH->ColPart(), &Scale);
+    pHybridSystem_.reset(smoothg::RAP(*tmpH, pScale));
+}
+
+void HybridSolver::BuildSpectralAMGePreconditioner()
+{
+#if SMOOTHG_USE_SAAMGE
+    saamge::proc_init(comm_);
+
+    mfem::Table elem_dof_tmp = MatrixToTable(Agg_multiplier_);
+    mfem::Table* elem_dof = new mfem::Table;
+    elem_dof->Swap(elem_dof_tmp);
+    mfem::SparseMatrix multiplier_Agg = smoothg::Transpose(Agg_multiplier_);
+    mfem::SparseMatrix Agg_Agg = smoothg::Mult(Agg_multiplier_, multiplier_Agg);
+    auto elem_adjacency_matrix = MetisGraphPartitioner::getAdjacency(Agg_Agg);
+    mfem::Table elem_elem_tmp = MatrixToTable(elem_adjacency_matrix);
+    mfem::Table* elem_elem = new mfem::Table;
+    elem_elem->Swap(elem_elem_tmp);
+
+    // Mark dofs that are shared by more than one processor
+    saamge::SharedEntityCommunication<mfem::Vector> sec(comm_, *multiplier_d_td_);
+    std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof->Width(), 0);
+    for (unsigned int i = 0; i < bdr_dofs.size(); i++)
+    {
+        if (sec.NumNeighbors(i) > 1)
+            SA_SET_FLAGS(bdr_dofs[i], AGG_ON_PROC_IFACE_FLAG);
+    }
+
+    int num_elems = elem_elem->Size();
+    sa_nparts_.resize(saamge_param_->num_levels - 1);
+    sa_nparts_[0] = (num_elems / saamge_param_->first_coarsen_factor) + 1;
+
+    bool first_do_aggregates = (saamge_param_->num_levels <= 2 && saamge_param_->do_aggregates);
+    sa_apr_ = saamge::agg_create_partitioning_fine(
+                  *pHybridSystem_, num_elems, elem_dof, elem_elem, nullptr, bdr_dofs.data(),
+                  sa_nparts_.data(), multiplier_d_td_.get(), first_do_aggregates);
+
+    // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
+    // of sa_nparts_[0] in some cases, so I define the rest of the array here
+    for (int i = 1; i < saamge_param_->num_levels - 1; i++)
+        sa_nparts_[i] = sa_nparts_[i - 1] / saamge_param_->coarsen_factor + 1;
+
+    mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
+    for (unsigned int i = 0; i < Hybrid_el_.size(); i++)
+        elmats[i] = &(Hybrid_el_[i]);
+    auto emp = new saamge::ElementMatrixDenseArray(*sa_apr_, elmats);
+
+    int polynomial_coarse = -1; // we do not have geometric information
+    saamge::MultilevelParameters mlp(
+        saamge_param_->num_levels - 1, sa_nparts_.data(), saamge_param_->first_nu_pro,
+        saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
+        saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
+        saamge_param_->use_arpack, saamge_param_->do_aggregates);
+    sa_ml_data_ = saamge::ml_produce_data(*pHybridSystem_, sa_apr_, emp, mlp);
+    auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
+
+    prec_ = make_unique<saamge::VCycleSolver>(level->tg_data, false);
+    prec_->SetOperator(*pHybridSystem_);
+#else
+    if (myid_ == 0)
+        std::cout << "SAAMGE needs to be enabled! \n";
+    std::abort();
+#endif
 }
 
 void HybridSolver::SetPrintLevel(int print_level)

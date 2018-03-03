@@ -206,17 +206,9 @@ int main(int argc, char* argv[])
     rhs_u_fine = 0.0;
 
     // Construct vertex_edge table in mfem::SparseMatrix format
-    mfem::SparseMatrix vertex_edge;
-    if (nDimensions == 2)
-    {
-        mfem::SparseMatrix tmp = TableToSparse(pmesh->ElementToEdgeTable());
-        vertex_edge.Swap(tmp);
-    }
-    else
-    {
-        mfem::SparseMatrix tmp = TableToSparse(pmesh->ElementToFaceTable());
-        vertex_edge.Swap(tmp);
-    }
+    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
+                              : pmesh->ElementToFaceTable();
+    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration
     mfem::Array<int> partitioning;

@@ -136,33 +136,52 @@ int main(int argc, char* argv[])
         }
     }
 
-    // Compare hybridization vs Minres solvers
+    // Compare Minres vs hybridization solvers
     {
         const bool use_hybridization = true;
-
-        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                             spect_tol, max_evects, dual_target,
-                                             scaled_dual, energy_dual, use_hybridization);
 
         const auto minres_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
                                                  spect_tol, max_evects, dual_target,
                                                  scaled_dual, energy_dual, !use_hybridization);
+
+        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
+                                             spect_tol, max_evects, dual_target,
+                                             scaled_dual, energy_dual, use_hybridization);
 
         const auto rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 
         const auto minres_sol = minres_upscale.Solve(rhs_u_fine);
         const auto hb_sol = hb_upscale.Solve(rhs_u_fine);
 
-        const auto error = CompareError(comm, minres_sol, hb_sol);
+        const auto error = CompareError(comm, hb_sol, minres_sol);
 
         if (myid == 0)
         {
             std::cout.precision(3);
             std::cout << "---------------------\n";
-            std::cout << "HB vs Minres Error: " <<  error << "\n";
+            std::cout << "HB (BoomerAMG) vs Minres Error: " <<  error << "\n";
             std::cout.precision(3);
         }
 
+#if SMOOTHG_USE_SAAMGE
+        SAAMGeParam saamge_param;
+        const auto hbsa_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
+                                               spect_tol, max_evects, dual_target,
+                                               scaled_dual, energy_dual, use_hybridization,
+                                               mfem::Vector(), &saamge_param);
+
+        const auto hbsa_sol = hbsa_upscale.Solve(rhs_u_fine);
+        const auto error_sa_mr = CompareError(comm, hbsa_sol, minres_sol);
+        const auto error_sa_ba = CompareError(comm, hbsa_sol, hb_sol);
+        if (myid == 0)
+        {
+            std::cout.precision(3);
+            std::cout << "---------------------\n";
+            std::cout << "HB (SAAMGe) vs Minres Error: " <<  error_sa_mr << "\n";
+            std::cout << "HB (SAAMGe) vs HB (BoomerAMG): " <<  error_sa_ba << "\n";
+            std::cout.precision(3);
+        }
+#endif
     }
 
     MPI_Finalize();
