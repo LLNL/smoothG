@@ -412,6 +412,8 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
+std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
+
 } // namespace smoothg
 
 #endif /* __UTILITIES_HPP */

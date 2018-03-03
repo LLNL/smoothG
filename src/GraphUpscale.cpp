@@ -66,20 +66,20 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     mfem::StopWatch chrono;
     chrono.Start();
 
-    pgraph_ = make_unique<smoothg::ParGraph>(comm_, vertex_edge_global, global_partitioning);
+    graph_ = make_unique<smoothg::Graph>(comm_, vertex_edge_global, global_partitioning);
 
-    const mfem::Array<int>& partitioning = pgraph_->GetLocalPartition();
+    const mfem::Array<int>& partitioning = graph_->GetLocalPartition();
 
-    mfem::SparseMatrix& vertex_edge = pgraph_->GetLocalVertexToEdge();
+    mfem::SparseMatrix& vertex_edge = graph_->GetLocalVertexToEdge();
     Operator::height = vertex_edge.Height();
     Operator::width = vertex_edge.Height();
 
-    edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
+    edge_e_te_ = &graph_->GetEdgeToTrueEdge();
 
     if (global_weight.Size() == vertex_edge_global.Width())
     {
         mfem::Vector local_weight(vertex_edge.Width());
-        global_weight.GetSubVector(pgraph_->GetEdgeLocalToGlobalMap(), local_weight);
+        global_weight.GetSubVector(graph_->GetEdgeLocalToGlobalMap(), local_weight);
 
         mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
     }
@@ -133,14 +133,14 @@ void GraphUpscale::MakeFineSolver() const
 
 mfem::Vector GraphUpscale::ReadVertexVector(const std::string& filename) const
 {
-    assert(pgraph_);
-    return ReadVector(filename, global_vertices_, pgraph_->GetVertexLocalToGlobalMap());
+    assert(graph_);
+    return ReadVector(filename, global_vertices_, graph_->GetVertexLocalToGlobalMap());
 }
 
 mfem::Vector GraphUpscale::ReadEdgeVector(const std::string& filename) const
 {
-    assert(pgraph_);
-    return ReadVector(filename, global_edges_, pgraph_->GetEdgeLocalToGlobalMap());
+    assert(graph_);
+    return ReadVector(filename, global_edges_, graph_->GetEdgeLocalToGlobalMap());
 }
 
 mfem::Vector GraphUpscale::ReadVector(const std::string& filename, int global_size,
@@ -162,9 +162,9 @@ mfem::Vector GraphUpscale::ReadVector(const std::string& filename, int global_si
 
 mfem::BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filename) const
 {
-    assert(pgraph_);
+    assert(graph_);
     mfem::Vector vertex_vect = ReadVector(filename, global_vertices_,
-                                          pgraph_->GetVertexLocalToGlobalMap());
+                                          graph_->GetVertexLocalToGlobalMap());
 
     mfem::BlockVector vect = GetFineBlockVector();
     vect.GetBlock(0) = 0.0;
@@ -175,8 +175,8 @@ mfem::BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filenam
 
 mfem::BlockVector GraphUpscale::ReadEdgeBlockVector(const std::string& filename) const
 {
-    assert(pgraph_);
-    mfem::Vector edge_vect = ReadVector(filename, global_edges_, pgraph_->GetEdgeLocalToGlobalMap());
+    assert(graph_);
+    mfem::Vector edge_vect = ReadVector(filename, global_edges_, graph_->GetEdgeLocalToGlobalMap());
 
     mfem::BlockVector vect = GetFineBlockVector();
     vect.GetBlock(0) = edge_vect;
@@ -187,14 +187,14 @@ mfem::BlockVector GraphUpscale::ReadEdgeBlockVector(const std::string& filename)
 
 void GraphUpscale::WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const
 {
-    assert(pgraph_);
-    WriteVector(vect, filename, global_vertices_, pgraph_->GetVertexLocalToGlobalMap());
+    assert(graph_);
+    WriteVector(vect, filename, global_vertices_, graph_->GetVertexLocalToGlobalMap());
 }
 
 void GraphUpscale::WriteEdgeVector(const mfem::Vector& vect, const std::string& filename) const
 {
-    assert(pgraph_);
-    WriteVector(vect, filename, global_edges_, pgraph_->GetEdgeLocalToGlobalMap());
+    assert(graph_);
+    WriteVector(vect, filename, global_edges_, graph_->GetEdgeLocalToGlobalMap());
 }
 
 void GraphUpscale::WriteVector(const mfem::Vector& vect, const std::string& filename,

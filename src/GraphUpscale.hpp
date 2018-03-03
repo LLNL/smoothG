@@ -28,6 +28,7 @@
 #include "MixedMatrix.hpp"
 #include "Upscale.hpp"
 #include "mfem.hpp"
+#include "Graph.hpp"
 
 namespace smoothg
 {
@@ -118,7 +119,7 @@ private:
     void WriteVector(const mfem::Vector& vect, const std::string& filename, int global_size,
                      const mfem::Array<int>& local_to_global) const;
 
-    std::unique_ptr<smoothg::ParGraph> pgraph_;
+    std::unique_ptr<smoothg::Graph> graph_;
 
     const int global_edges_;
     const int global_vertices_;
