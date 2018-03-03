@@ -15,11 +15,11 @@
 
 /** @file
 
-    @brief Contains DofHandler class.
+    @brief Contains GraphSpace class.
  */
 
-#ifndef __DOFHANDLER_HPP__
-#define __DOFHANDLER_HPP__
+#ifndef __GRAPHSPACE_HPP__
+#define __GRAPHSPACE_HPP__
 
 #include "mfem.hpp"
 #include "GraphTopology.hpp"
@@ -30,7 +30,7 @@ namespace smoothg
 /**
    @brief Contains information about degrees of freedom to vertex/edge
 */
-class DofHandler
+class GraphSpace
 {
 public:
     /**
@@ -38,9 +38,7 @@ public:
 
        @param graph_topology
     */
-    DofHandler(const GraphTopology& graph_topology);
-
-
+    GraphSpace(const GraphTopology& graph_topology);
 
 private:
     const GraphTopology& graph_topology_;
@@ -48,13 +46,8 @@ private:
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix vertex_edof_;
     mfem::SparseMatrix edge_edof_;
-
-    mfem::SparseMatrix Agg_vdof_;
-    mfem::SparseMatrix Agg_edof_;
-    mfem::SparseMatrix face_edof_;
-
-}; // class DofHandler
+}; // class GraphSpace
 
 } // namespace smoothg
 
-#endif /* __DOFHANDLER_HPP__ */
+#endif /* __GRAPHSPACE_HPP__ */

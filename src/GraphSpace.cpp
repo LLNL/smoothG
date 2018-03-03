@@ -15,19 +15,19 @@
 
 /** @file
 
-    @brief Implements DofHandler object.
+    @brief Implements GraphSpace object.
 */
 
-#include "DofHandler.hpp"
+#include "GraphSpace.hpp"
 
 using std::unique_ptr;
 
 namespace smoothg
 {
 
-DofHandler::DofHandler(const GraphTopology& graph_topology)
+GraphSpace::GraphSpace(const GraphTopology& graph_topology)
     : graph_topology_(graph_topology)
-{ 
+{
 }
 
 
