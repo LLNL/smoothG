@@ -34,3 +34,4 @@
 #include "GraphUpscale.hpp"
 #include "FiniteVolumeUpscale.hpp"
 #include "Graph.hpp"
+#include "GraphSpace.hpp"
