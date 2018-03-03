@@ -140,8 +140,8 @@ private:
        @param partition_global for each vertex, indicates which processor it
               goes to. Can be obtained from MetisGraphPartitioner.
     */
-    void Distribute(const mfem::SparseMatrix &vertex_edge_global,
-                    const mfem::Array<int> &partition_global);
+    void Distribute(const mfem::SparseMatrix& vertex_edge_global,
+                    const mfem::Array<int>& partition_global);
 
     /**
        @brief Construct a NewEntity_OldTrueEntity relation table
@@ -156,16 +156,16 @@ private:
               distributed true entities
     */
     std::unique_ptr<mfem::HypreParMatrix> NewEntityToOldTrueEntity(
-            const mfem::HypreParMatrix& local_distributed);
+        const mfem::HypreParMatrix& local_distributed);
 
     std::unique_ptr<mfem::HypreParMatrix> DistributedPartitionToParMatrix(
-            const mfem::Array<int>& partition_distributed);
+        const mfem::Array<int>& partition_distributed);
 
     std::unique_ptr<mfem::HypreParMatrix> RedistributeVertices(
-            const mfem::HypreParMatrix& vertex_Agg_tmp);
+        const mfem::HypreParMatrix& vertex_Agg_tmp);
 
     void UpdateEdgeLocalToGlobalMap(
-            const mfem::HypreParMatrix& newedge_oldtrueedge);
+        const mfem::HypreParMatrix& newedge_oldtrueedge);
 
     void RedistributeEdges(const mfem::HypreParMatrix& vertex_permutation);
 
