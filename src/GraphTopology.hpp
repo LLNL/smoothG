@@ -56,7 +56,7 @@ public:
        @param partition partition vector for vertices
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
-    GraphTopology(mfem::SparseMatrix& vertex_edge,
+    GraphTopology(const mfem::SparseMatrix& vertex_edge,
                   const mfem::HypreParMatrix& edge_trueedge,
                   const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
@@ -70,7 +70,7 @@ public:
        @param partition partition vector for vertices
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
-    GraphTopology(Graph& graph,
+    GraphTopology(const Graph& graph,
                   const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
 
@@ -83,7 +83,7 @@ public:
        @param finer_graph_topology finer level graph topology
        @param coarsening_factor intended number of vertices in an aggregate
     */
-    GraphTopology(GraphTopology& finer_graph_topology, int coarsening_factor);
+    GraphTopology(const GraphTopology& finer_graph_topology, int coarsening_factor);
 
     /**
        @brief Partial graph-based constructor for graph topology.

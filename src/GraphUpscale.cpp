@@ -72,7 +72,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     const mfem::Array<int>& partitioning = graph_->GetLocalPartition();
 
-    mfem::SparseMatrix& vertex_edge = graph_->GetLocalVertexToEdge();
+    const mfem::SparseMatrix& vertex_edge = graph_->GetLocalVertexToEdge();
     Operator::height = vertex_edge.Height();
     Operator::width = vertex_edge.Height();
 

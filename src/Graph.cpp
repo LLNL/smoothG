@@ -34,8 +34,7 @@ namespace smoothg
 Graph::Graph(MPI_Comm comm,
              const mfem::SparseMatrix& vertex_edge_global,
              const mfem::Array<int>& partition_global)
-    :
-    comm_(comm)
+    : comm_(comm)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
@@ -47,8 +46,7 @@ Graph::Graph(MPI_Comm comm,
              const mfem::SparseMatrix& vertex_edge_global,
              const int coarsening_factor,
              const bool do_parmetis_partition)
-    :
-    comm_(comm)
+    : comm_(comm)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
@@ -71,7 +69,7 @@ Graph::Graph(MPI_Comm comm,
         Redistribute(partition_distributed);
 #else
         std::cout << "ParMetis needs to enabled!\n";
-        assert(do_parmetis_partition == false);
+        std::abort();
 #endif
     }
     else

@@ -85,11 +85,6 @@ public:
 
     ///@name Getters for tables that describe parallel graph
     ///@{
-    mfem::SparseMatrix& GetLocalVertexToEdge()
-    {
-        return vertex_edge_local_;
-    }
-
     const mfem::SparseMatrix& GetLocalVertexToEdge() const
     {
         return vertex_edge_local_;
