@@ -48,11 +48,10 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mixed_laplacians_.emplace_back(ve_copy, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, global_partitioning,
-                                                     &edge_boundary_att_);
+    GraphTopology graph_topology(ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
+                     mixed_laplacians_[0], graph_topology, spect_tol,
                      max_evects, dual_target, scaled_dual, energy_dual, hybridization);
     coarsener_->construct_coarse_subspace();
 
@@ -120,11 +119,10 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mixed_laplacians_.emplace_back(ve_copy, weight, w_block, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(
-                              ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
+    GraphTopology graph_topology(ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
+                     mixed_laplacians_[0], graph_topology, spect_tol,
                      max_evects, dual_target, scaled_dual, energy_dual, hybridization);
     coarsener_->construct_coarse_subspace();
 

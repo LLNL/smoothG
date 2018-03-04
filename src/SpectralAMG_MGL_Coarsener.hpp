@@ -56,7 +56,7 @@ public:
               HybridSolver
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                              std::unique_ptr<GraphTopology> gt,
+                              const GraphTopology& gt,
                               double spectral_tol,
                               unsigned int max_evecs_per_agg,
                               bool dual_target,

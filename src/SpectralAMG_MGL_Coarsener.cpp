@@ -31,14 +31,14 @@ namespace smoothg
 {
 
 SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                                                     std::unique_ptr<GraphTopology> gt,
+                                                     const GraphTopology& gt,
                                                      double spectral_tol,
                                                      unsigned int max_evecs_per_agg,
                                                      bool dual_target,
                                                      bool scaled_dual,
                                                      bool energy_dual,
                                                      bool is_hybridization_used)
-    : Mixed_GL_Coarsener(mgL, std::move(gt)),
+    : Mixed_GL_Coarsener(mgL, gt),
       is_hybridization_used_(is_hybridization_used),
       spectral_tol_(spectral_tol),
       max_evecs_per_agg_(max_evecs_per_agg),
@@ -57,7 +57,7 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
 
     LMGST localtargets(spectral_tol_, max_evecs_per_agg_, dual_target_,
                        scaled_dual_, energy_dual_, mgL_.getWeight(),
-                       mgL_.getD(), mgL_.getW(), *graph_topology_);
+                       mgL_.getD(), mgL_.getW(), graph_topology_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     graph_coarsen_->BuildInterpolation(local_edge_traces,
