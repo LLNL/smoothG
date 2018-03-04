@@ -38,7 +38,24 @@ class Graph
 {
 public:
     /**
-       @brief Distribute a graph to the communicator.
+       @brief Distribute a weighted graph to the communicator.
+
+       Generally we read a global graph on one processor, and then distribute
+       it. This constructor handles that process.
+
+       @param comm the communicator over which to distribute the graph
+       @param vertex_edge_global describes the entire global graph, unsigned
+       @param vertex_edge_global edge weight of global graph
+       @param partition_global for each vertex, indicates which processor it
+              goes to. Can be obtained from MetisGraphPartitioner.
+    */
+    Graph(MPI_Comm comm,
+          const mfem::SparseMatrix& vertex_edge_global,
+          const mfem::Vector& edge_weight_global,
+          const mfem::Array<int>& partition_global);
+
+    /**
+       @brief Distribute an unweighted graph to the communicator.
 
        Generally we read a global graph on one processor, and then distribute
        it. This constructor handles that process.
@@ -69,6 +86,12 @@ public:
     */
     Graph(MPI_Comm comm,
           const mfem::SparseMatrix& vertex_edge_global,
+          const mfem::Vector& edge_weight_global,
+          const int coarsening_factor,
+          const bool do_parmetis_partition = false);
+
+    Graph(MPI_Comm comm,
+          const mfem::SparseMatrix& vertex_edge_global,
           const int coarsening_factor,
           const bool do_parmetis_partition = false);
 
@@ -88,6 +111,11 @@ public:
     const mfem::SparseMatrix& GetLocalVertexToEdge() const
     {
         return vertex_edge_local_;
+    }
+
+    const mfem::SparseMatrix& GetLocalEdgeWeight() const
+    {
+        return edge_weight_local_;
     }
 
     const mfem::HypreParMatrix& GetVertexToTrueEdge() const
@@ -123,6 +151,14 @@ public:
     MPI_Comm GetComm() const { return comm_; }
     ///@}
 private:
+    void Distribute(const mfem::SparseMatrix& vertex_edge_global,
+                    const mfem::Vector& edge_weight_global,
+                    const mfem::Array<int>& partition_global);
+
+    void Distribute(const mfem::SparseMatrix& vertex_edge_global,
+                    const mfem::Vector& edge_weight_global,
+                    int coarsening_factor, bool do_parmetis_partition);
+
     /**
        @brief distribute a global serial graph into parallel local subgraphs.
 
@@ -135,8 +171,10 @@ private:
        @param partition_global for each vertex, indicates which processor it
               goes to. Can be obtained from MetisGraphPartitioner.
     */
-    void Distribute(const mfem::SparseMatrix& vertex_edge_global,
-                    const mfem::Array<int>& partition_global);
+    void DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
+                              const mfem::Array<int>& partition_global);
+
+    void DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
 
     /**
        @brief Construct a NewEntity_OldTrueEntity relation table
@@ -177,6 +215,7 @@ private:
     int num_procs_;
 
     mfem::SparseMatrix vertex_edge_local_;
+    mfem::Vector edge_weight_local_;
     std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
 

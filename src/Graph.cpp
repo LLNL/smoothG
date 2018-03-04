@@ -33,13 +33,41 @@ namespace smoothg
 
 Graph::Graph(MPI_Comm comm,
              const mfem::SparseMatrix& vertex_edge_global,
+             const mfem::Vector& edge_weight_global,
              const mfem::Array<int>& partition_global)
     : comm_(comm)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
 
-    Distribute(vertex_edge_global, partition_global);
+    Distribute(vertex_edge_global, edge_weight_global, partition_global);
+}
+
+Graph::Graph(MPI_Comm comm,
+             const mfem::SparseMatrix& vertex_edge_global,
+             const mfem::Array<int>& partition_global)
+    : comm_(comm)
+{
+    MPI_Comm_size(comm_, &num_procs_);
+    MPI_Comm_rank(comm_, &myid_);
+
+    mfem::Vector edge_weight_global(vertex_edge_global.Width());
+    edge_weight_global = 1.0;
+
+    Distribute(vertex_edge_global, edge_weight_global, partition_global);
+}
+
+Graph::Graph(MPI_Comm comm,
+             const mfem::SparseMatrix& vertex_edge_global,
+             const mfem::Vector& edge_weight_global,
+             const int coarsening_factor,
+             const bool do_parmetis_partition)
+    : comm_(comm)
+{
+    MPI_Comm_size(comm_, &num_procs_);
+    MPI_Comm_rank(comm_, &myid_);
+
+    Distribute(vertex_edge_global, edge_weight_global, coarsening_factor, do_parmetis_partition);
 }
 
 Graph::Graph(MPI_Comm comm,
@@ -51,6 +79,16 @@ Graph::Graph(MPI_Comm comm,
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
 
+    mfem::Vector edge_weight_global(vertex_edge_global.Width());
+    edge_weight_global = 1.0;
+
+    Distribute(vertex_edge_global, edge_weight_global, coarsening_factor, do_parmetis_partition);
+}
+
+void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
+                       const mfem::Vector& edge_weight_global,
+                       int coarsening_factor, bool do_parmetis_partition)
+{
     int num_vertices_global = vertex_edge_global.Height();
     int num_parts_global = (num_vertices_global / (double)(coarsening_factor)) + 0.5;
     num_parts_global = std::max(1, num_parts_global);
@@ -60,7 +98,7 @@ Graph::Graph(MPI_Comm comm,
     {
 #if SMOOTHG_USE_PARMETIS
         PartitionByIndex(num_vertices_global, num_procs_, partition_global);
-        Distribute(vertex_edge_global, partition_global);
+        Distribute(vertex_edge_global, edge_weight_global, partition_global);
 
         mfem::Array<int> partition_distributed;
         smoothg::ParMetisGraphPartitioner parallel_partitioner;
@@ -82,12 +120,20 @@ Graph::Graph(MPI_Comm comm,
         smoothg::MetisGraphPartitioner partitioner;
         partitioner.setUnbalanceTol(2);
         partitioner.doPartition(vert_vert, num_parts_global, partition_global);
-        Distribute(vertex_edge_global, partition_global);
+        Distribute(vertex_edge_global, edge_weight_global, partition_global);
     }
 }
 
 void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
+                       const mfem::Vector& edge_weight_global,
                        const mfem::Array<int>& partition_global)
+{
+    DistributeVertexEdge(vertex_edge_global, partition_global);
+    DistributeEdgeWeight(edge_weight_global);
+}
+
+void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
+                                 const mfem::Array<int>& partition_global)
 {
     MFEM_VERIFY(HYPRE_AssumedPartitionCheck(),
                 "this method can not be used without assumed partition");
@@ -237,6 +283,12 @@ void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
     GenerateOffsets(comm_, vertex_edge_local_.Height(), vertex_starts_);
     vertex_trueedge_.reset(
         edge_e_te_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
+}
+
+void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
+{
+    edge_weight_local_.SetSize(vertex_edge_local_.Width());
+    edge_weight_global.GetSubVector(edge_local2global_, edge_weight_local_);
 }
 
 unique_ptr<mfem::HypreParMatrix> Graph::NewEntityToOldTrueEntity(
