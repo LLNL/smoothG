@@ -78,6 +78,16 @@ GraphTopology::GraphTopology(
     Init(partition, edge_boundaryattr, nullptr);
 }
 
+GraphTopology::GraphTopology(
+    Graph& graph,
+    const mfem::Array<int>& partition,
+    const mfem::SparseMatrix* edge_boundaryattr)
+    : vertex_edge_(graph.GetLocalVertexToEdge()),
+      edge_trueedge_(graph.GetEdgeToTrueEdge())
+{
+    Init(partition, edge_boundaryattr, nullptr);
+}
+
 GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening_factor)
     : vertex_edge_(finer_graph_topology.Agg_face_),
       edge_trueedge_(*(finer_graph_topology.face_trueface_))

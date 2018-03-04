@@ -90,7 +90,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         mixed_laplacians_.emplace_back(vertex_edge, *edge_e_te_);
     }
 
-    auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
+    auto graph_topology = make_unique<GraphTopology>(*graph_, partitioning);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),

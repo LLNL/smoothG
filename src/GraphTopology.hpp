@@ -25,6 +25,7 @@
 #include <assert.h>
 
 #include "mfem.hpp"
+#include "Graph.hpp"
 
 namespace smoothg
 {
@@ -57,6 +58,19 @@ public:
     */
     GraphTopology(mfem::SparseMatrix& vertex_edge,
                   const mfem::HypreParMatrix& edge_trueedge,
+                  const mfem::Array<int>& partition,
+                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
+
+    /**
+       @brief Build agglomerated topology relation tables of a given graph
+
+       All of this data is local to a single processor
+
+       @param graph graph oject containing vertex edge relation
+       @param partition partition vector for vertices
+       @param edge_boundaryattr boundary attributes for edges with boundary conditions
+    */
+    GraphTopology(Graph& graph,
                   const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
 
