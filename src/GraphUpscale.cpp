@@ -61,10 +61,7 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
               const std::vector<double>& weight)
 {
     graph_ = Graph(comm_, vertex_edge, global_partitioning);
-
-    mixed_mat_fine_ = MixedMatrix(graph_, weight);
-    par_mixed_mat_fine_ = ParMixedMatrix(comm_, graph_, mixed_mat_fine_);
-
+    mixed_mat_fine_ = MixedMatrix(comm_, graph_, weight);
     gt_ = GraphTopology(comm_, graph_);
 
     MakeCoarseSpace();
@@ -76,9 +73,9 @@ void GraphUpscale::MakeCoarseSpace()
     const SparseMatrix& D_local = mixed_mat_fine_.D_local_;
     const SparseMatrix& W_local = mixed_mat_fine_.W_local_;
 
-    const ParMatrix& M_global = par_mixed_mat_fine_.M_global_;
-    const ParMatrix& D_global = par_mixed_mat_fine_.D_global_;
-    const ParMatrix& W_global = par_mixed_mat_fine_.W_global_;
+    const ParMatrix& M_global = mixed_mat_fine_.M_global_;
+    const ParMatrix& D_global = mixed_mat_fine_.D_global_;
+    const ParMatrix& W_global = mixed_mat_fine_.W_global_;
 
     ParMatrix permute_v = MakeExtPermutation(comm_, gt_.agg_ext_vertex_);
     ParMatrix permute_e = MakeExtPermutation(comm_, gt_.agg_ext_edge_);

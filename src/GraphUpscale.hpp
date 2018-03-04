@@ -27,7 +27,6 @@
 
 #include "Graph.hpp"
 #include "MixedMatrix.hpp"
-#include "ParMixedMatrix.hpp"
 #include "GraphTopology.hpp"
 #include "SharedEntityComm.hpp"
 #include "Utilities.hpp"
@@ -123,7 +122,6 @@ private:
     Graph graph_;
 
     MixedMatrix mixed_mat_fine_;
-    ParMixedMatrix par_mixed_mat_fine_;
 
     GraphTopology gt_;
 };

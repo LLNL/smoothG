@@ -35,7 +35,7 @@ namespace smoothg
 struct MixedMatrix
 {
     MixedMatrix() = default;
-    MixedMatrix(const Graph& graph, const std::vector<double>& global_weight);
+    MixedMatrix(MPI_Comm comm, const Graph& graph, const std::vector<double>& global_weight);
 
     ~MixedMatrix() noexcept = default;
 
@@ -48,7 +48,13 @@ struct MixedMatrix
     SparseMatrix M_local_;
     SparseMatrix D_local_;
     SparseMatrix W_local_;
+
+    ParMatrix M_global_;
+    ParMatrix D_global_;
+    ParMatrix W_global_;
+
     std::vector<int> offsets_;
+    std::vector<int> true_offsets_;
 };
 
 } // namespace smoothg

@@ -23,19 +23,36 @@
 namespace smoothg
 {
 
-MixedMatrix::MixedMatrix(const Graph& graph, const std::vector<double>& global_weight)
+MixedMatrix::MixedMatrix(MPI_Comm comm, const Graph& graph, const std::vector<double>& global_weight)
 {
     M_local_ = MakeLocalM(graph.edge_true_edge_, graph.edge_edge_, graph.edge_map_, global_weight);
     D_local_ = MakeLocalD(graph.edge_true_edge_, graph.vertex_edge_local_);
     W_local_ = SparseMatrix(std::vector<double>(D_local_.Rows(), 0.0));
+
+    auto starts = parlinalgcpp::GenerateOffsets(comm, {D_local_.Rows(), D_local_.Cols()});
+    std::vector<HYPRE_Int>& vertex_starts = starts[0];
+    std::vector<HYPRE_Int>& edge_starts = starts[1];
+
+    ParMatrix M_d(comm, edge_starts, M_local_);
+    ParMatrix D_d(comm, vertex_starts, edge_starts, D_local_);
+
+    M_global_ = parlinalgcpp::RAP(M_d, graph.edge_true_edge_);
+    D_global_ = D_d.Mult(graph.edge_true_edge_);
+    W_global_ = ParMatrix(comm, vertex_starts, W_local_);
+
     offsets_ = {0, M_local_.Rows(), M_local_.Rows() + D_local_.Rows()};
+    true_offsets_ = {0, M_global_.Rows(), M_global_.Rows() + D_global_.Rows()};
 }
 
 MixedMatrix::MixedMatrix(const MixedMatrix& other) noexcept
     : M_local_(other.M_local_),
       D_local_(other.D_local_),
       W_local_(other.W_local_),
-      offsets_(other.offsets_)
+      M_global_(other.M_global_),
+      D_global_(other.D_global_),
+      W_global_(other.W_global_),
+      offsets_(other.offsets_),
+      true_offsets_(other.true_offsets_)
 {
 
 }
@@ -58,7 +75,12 @@ void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
     swap(lhs.D_local_, rhs.D_local_);
     swap(lhs.W_local_, rhs.W_local_);
 
+    swap(lhs.M_global_, rhs.M_global_);
+    swap(lhs.D_global_, rhs.D_global_);
+    swap(lhs.W_global_, rhs.W_global_);
+
     std::swap(lhs.offsets_, rhs.offsets_);
+    std::swap(lhs.true_offsets_, rhs.true_offsets_);
 }
 
 
