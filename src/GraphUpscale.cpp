@@ -106,11 +106,8 @@ void GraphUpscale::DistributeGraph(const SparseMatrix& vertex_edge, const std::v
 
 void GraphUpscale::MakeFineLevel(const std::vector<double>& global_weight)
 {
-    SparseMatrix M = MakeLocalM(edge_true_edge_, edge_edge_, edge_map_, global_weight);
-    SparseMatrix DT = MakeLocalDT(edge_true_edge_, vertex_edge_local_);
-
-    M_local_ = SparseMatrix(std::move(M));
-    D_local_ = SparseMatrix(DT.Transpose());
+    M_local_ = MakeLocalM(edge_true_edge_, edge_edge_, edge_map_, global_weight);
+    D_local_ = MakeLocalD(edge_true_edge_, vertex_edge_local_);
     W_local_ = SparseMatrix(std::vector<double>(D_local_.Rows(), 0.0));
     offsets_ = {0, M_local_.Rows(), M_local_.Rows() + D_local_.Rows()};
 
@@ -247,9 +244,7 @@ void GraphUpscale::MakeCoarseSpace()
         vertex_targets[agg] = smoothg::Orthogonalize(evects_restricted);
     }
 
-    SharedEntityComm<DenseMatrix> shared_sigma(face_true_face_);
-
-    DenseMatrix face_sigma;
+    SharedEntityComm<DenseMatrix> sec_sigma(face_true_face_);
 
     for (int face = 0; face < num_faces; ++face)
     {
@@ -264,7 +259,7 @@ void GraphUpscale::MakeCoarseSpace()
             total_vects += agg_ext_sigma[agg].Cols();
         }
 
-        face_sigma.Resize(face_dofs.size(), total_vects);
+        DenseMatrix face_sigma(face_dofs.size(), total_vects);
 
         for (auto agg : neighbors)
         {
@@ -277,11 +272,14 @@ void GraphUpscale::MakeCoarseSpace()
             col_count += face_restrict.Cols();
         }
 
-        // TODO(gelever1): SendReduce(face_sigma);
-
         assert(col_count == total_vects);
+
+        sec_sigma.ReduceSend(face, std::move(face_sigma));
     }
-        // TODO(gelever1): Collect(face_sigma);
+
+    auto shared_sigma = sec_sigma.Collect();
+
+    SharedEntityComm<SparseMatrix> sec_D(face_true_face_);
 
     for (int face = 0; face < num_faces; ++face)
     {
@@ -302,10 +300,12 @@ void GraphUpscale::MakeCoarseSpace()
 
         SparseMatrix D_face = D_local_.GetSubMatrix(vertex_ext_dofs, edge_ext_dofs, dof_marker);
 
-        // TODO(gelever1): SendReduce(face, D_face);
+        sec_D.ReduceSend(face, std::move(D_face));
     }
 
-    // TODO(gelever1): Collect shared D
+    auto shared_D = sec_D.Collect();
+
+    SharedEntityComm<Vector> sec_M(face_true_face_);
 
     for (int face = 0; face < num_faces; ++face)
     {
@@ -320,13 +320,15 @@ void GraphUpscale::MakeCoarseSpace()
         }
 
         SparseMatrix M_face = M_local_.GetSubMatrix(edge_ext_dofs, edge_ext_dofs, dof_marker);
-        std::vector<double> M_diag = M_face.GetDiag();
+        std::vector<double> M_diag_data = M_face.GetDiag();
+        Vector M_diag(std::move(M_diag_data));
 
-        // TODO(gelever1): SendReduce(face, M_diag);
+        sec_M.ReduceSend(face, std::move(M_diag));
     }
 
-    // TODO(gelever1): Collect shared M
+    auto shared_M = sec_M.Collect();
 
+    printf("%d: %d %d %d\n", myid_, shared_sigma.size(), shared_D.size(), shared_M.size());
 }
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const

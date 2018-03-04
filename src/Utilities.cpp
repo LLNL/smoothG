@@ -61,7 +61,7 @@ SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
     return SparseMatrix(std::move(local_weight));
 }
 
-SparseMatrix MakeLocalDT(const ParMatrix& edge_true_edge,
+SparseMatrix MakeLocalD(const ParMatrix& edge_true_edge,
                           const SparseMatrix& vertex_edge)
 {
     SparseMatrix edge_vertex = vertex_edge.Transpose();
@@ -93,7 +93,9 @@ SparseMatrix MakeLocalDT(const ParMatrix& edge_true_edge,
         }
     }
 
-    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data), num_edges, num_vertices);
+    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data), num_edges, num_vertices);
+
+    return DT.Transpose();
 }
 
 ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
