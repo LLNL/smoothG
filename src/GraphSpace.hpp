@@ -38,14 +38,16 @@ public:
 
        @param graph_topology
     */
-    GraphSpace(const GraphTopology& graph_topology);
+    GraphSpace(const Graph& graph);
 
 private:
-    const GraphTopology& graph_topology_;
+    const Graph& graph_;
 
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix vertex_edof_;
     mfem::SparseMatrix edge_edof_;
+
+    std::shared_ptr<mfem::HypreParMatrix> edof_etruedof_;
 }; // class GraphSpace
 
 } // namespace smoothg

@@ -19,14 +19,17 @@
 */
 
 #include "GraphSpace.hpp"
+#include "MatrixUtilities.hpp"
 
 using std::unique_ptr;
 
 namespace smoothg
 {
 
-GraphSpace::GraphSpace(const GraphTopology& graph_topology)
-    : graph_topology_(graph_topology)
+GraphSpace::GraphSpace(const Graph& graph)
+    : graph_(graph), vertex_vdof_(SparseIdentity(graph.GetNumberOfVertices())),
+      vertex_edof_(graph.GetLocalVertexToEdge()),
+      edge_edof_(SparseIdentity(graph.GetNumberOfEdges()))
 {
 }
 

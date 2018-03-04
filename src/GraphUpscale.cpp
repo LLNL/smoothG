@@ -68,28 +68,22 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     mfem::StopWatch chrono;
     chrono.Start();
 
-    graph_ = make_unique<smoothg::Graph>(comm_, vertex_edge_global, global_partitioning);
-
-    const mfem::Array<int>& partitioning = graph_->GetLocalPartition();
-
-    const mfem::SparseMatrix& vertex_edge = graph_->GetLocalVertexToEdge();
-    Operator::height = vertex_edge.Height();
-    Operator::width = vertex_edge.Height();
-
-    edge_e_te_ = &graph_->GetEdgeToTrueEdge();
-
-    if (global_weight.Size() == vertex_edge_global.Width())
+    if (global_weight.Size() == 0)
     {
-        mfem::Vector local_weight(vertex_edge.Width());
-        global_weight.GetSubVector(graph_->GetEdgeLocalToGlobalMap(), local_weight);
-
-        mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
+        graph_ = make_unique<smoothg::Graph>(comm_, vertex_edge_global, global_partitioning);
     }
     else
     {
-        mixed_laplacians_.emplace_back(vertex_edge, *edge_e_te_);
+        graph_ = make_unique<smoothg::Graph>(comm_, vertex_edge_global,
+                                             global_weight, global_partitioning);
     }
 
+    Operator::height = graph_->GetLocalVertexToEdge().Height();
+    Operator::width = Operator::height;
+
+    mixed_laplacians_.emplace_back(*graph_);
+
+    const mfem::Array<int>& partitioning = graph_->GetLocalPartition();
     auto graph_topology = make_unique<GraphTopology>(*graph_, partitioning);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(

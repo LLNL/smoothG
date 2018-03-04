@@ -24,6 +24,7 @@
 #include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
+#include "GraphSpace.hpp"
 
 namespace smoothg
 {
@@ -63,6 +64,9 @@ public:
                 const mfem::Vector& weight,
                 const mfem::Vector& w_block,
                 const mfem::HypreParMatrix& edge_d_td,
+                DistributeWeight dist_weight = DistributeWeight::True);
+
+    MixedMatrix(const Graph& graph,
                 DistributeWeight dist_weight = DistributeWeight::True);
 
     /// build with weights all equal to 1
@@ -304,6 +308,8 @@ private:
     mutable std::unique_ptr<mfem::Array<HYPRE_Int>> Drow_start_;
     mutable std::unique_ptr<mfem::Array<int>> blockOffsets_;
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
+
+    std::unique_ptr<GraphSpace> graph_space_;
 
 }; // class MixedMatrix
 

@@ -89,6 +89,13 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 {
 }
 
+MixedMatrix::MixedMatrix(const Graph& graph, DistributeWeight dist_weight)
+    : MixedMatrix(graph.GetLocalVertexToEdge(), graph.GetLocalEdgeWeight(),
+                  graph.GetEdgeToTrueEdge(), dist_weight)
+{
+    graph_space_ = make_unique<GraphSpace>(graph);
+}
+
 MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
                          const mfem::HypreParMatrix& edge_d_td)
     : MixedMatrix(vertex_edge, mfem::Vector(vertex_edge.Width()) = 1.0, edge_d_td,
@@ -96,6 +103,7 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 {
 
 }
+
 MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,
@@ -115,8 +123,6 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
                        const mfem::Vector& weight,
                        const mfem::SparseMatrix& w_block)
 {
-
-
     const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
     const int nvertices = vertex_edge.Height();
     const int nedges = vertex_edge.Width();

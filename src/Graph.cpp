@@ -265,9 +265,9 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
     GenerateOffsets(comm_, 2, size, starts);
 
     edge_trueedge_ = make_unique<mfem::HypreParMatrix>(
-                     comm_, edge_starts.Last(), ntedges_global, edge_starts, tedge_starts,
-                     e_te_diag_i, e_te_diag_j, e_te_diag_data,
-                     e_te_offd_i, e_te_offd_j, e_te_offd_data, offd_counter, e_te_col_map);
+                         comm_, edge_starts.Last(), ntedges_global, edge_starts, tedge_starts,
+                         e_te_diag_i, e_te_diag_j, e_te_diag_data,
+                         e_te_offd_i, e_te_offd_j, e_te_offd_data, offd_counter, e_te_col_map);
     edge_trueedge_->CopyRowStarts();
     edge_trueedge_->CopyColStarts();
 

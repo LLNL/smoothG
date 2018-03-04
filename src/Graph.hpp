@@ -148,6 +148,16 @@ public:
         return vertex_starts_;
     }
 
+    const int GetNumberOfVertices() const
+    {
+        return vertex_edge_local_.Height();
+    }
+
+    const int GetNumberOfEdges() const
+    {
+        return vertex_edge_local_.Width();
+    }
+
     MPI_Comm GetComm() const { return comm_; }
     ///@}
 private:
