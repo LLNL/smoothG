@@ -113,7 +113,7 @@ public:
         return vertex_edge_local_;
     }
 
-    const mfem::SparseMatrix& GetLocalEdgeWeight() const
+    const mfem::Vector& GetLocalEdgeWeight() const
     {
         return edge_weight_local_;
     }
@@ -130,7 +130,7 @@ public:
 
     const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
     {
-        return *edge_e_te_;
+        return *edge_trueedge_;
     }
 
     const mfem::Array<int>& GetVertexLocalToGlobalMap() const
@@ -216,7 +216,7 @@ private:
 
     mfem::SparseMatrix vertex_edge_local_;
     mfem::Vector edge_weight_local_;
-    std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
+    std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
 
     mfem::Array<int> partition_local_;

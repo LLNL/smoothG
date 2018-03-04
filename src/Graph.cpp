@@ -264,12 +264,12 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
     HYPRE_Int size[2] = {nedges_local, ntedges_local};
     GenerateOffsets(comm_, 2, size, starts);
 
-    edge_e_te_ = make_unique<mfem::HypreParMatrix>(
+    edge_trueedge_ = make_unique<mfem::HypreParMatrix>(
                      comm_, edge_starts.Last(), ntedges_global, edge_starts, tedge_starts,
                      e_te_diag_i, e_te_diag_j, e_te_diag_data,
                      e_te_offd_i, e_te_offd_j, e_te_offd_data, offd_counter, e_te_col_map);
-    edge_e_te_->CopyRowStarts();
-    edge_e_te_->CopyColStarts();
+    edge_trueedge_->CopyRowStarts();
+    edge_trueedge_->CopyColStarts();
 
     // Extract local submatrix of the global vertex to edge relation table
     mfem::Array<int> map(ntedges_global);
@@ -282,7 +282,7 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
     // Compute vertex_trueedge
     GenerateOffsets(comm_, vertex_edge_local_.Height(), vertex_starts_);
     vertex_trueedge_.reset(
-        edge_e_te_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
+        edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
 }
 
 void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
@@ -494,15 +494,15 @@ Graph::RedistributeVertices(const mfem::HypreParMatrix& vertex_Agg_tmp)
 void Graph::UpdateEdgeLocalToGlobalMap(
     const mfem::HypreParMatrix& newedge_oldtrueedge)
 {
-    mfem::SparseMatrix edge_e_te_diag;
-    edge_e_te_->GetDiag(edge_e_te_diag);
+    mfem::SparseMatrix e_te_diag;
+    edge_trueedge_->GetDiag(e_te_diag);
     mfem::Vector edge_local2global(edge_local2global_.Size());
     for (int i = 0; i < edge_local2global.Size(); i++)
         edge_local2global[i] = edge_local2global_[i];
 
-    mfem::Vector edge_truelocal2global(edge_e_te_diag.Width());
+    mfem::Vector edge_truelocal2global(e_te_diag.Width());
     edge_truelocal2global = 0.0;
-    edge_e_te_diag.MultTranspose(edge_local2global, edge_truelocal2global);
+    e_te_diag.MultTranspose(edge_local2global, edge_truelocal2global);
 
     mfem::Vector edge_local2global_new(newedge_oldtrueedge.Height());
     newedge_oldtrueedge.Mult(edge_truelocal2global, edge_local2global_new);
@@ -539,14 +539,14 @@ void Graph::RedistributeEdges(const mfem::HypreParMatrix& vertex_permutation)
     vertex_edge_local_ = newvertex_newedge;
 
     // Construct new "edge to true edge" table
-    unique_ptr<mfem::HypreParMatrix> newedge_e_te_e(
+    unique_ptr<mfem::HypreParMatrix> new_e_te_e(
         ParMult(newedge_oldtrueedge.get(), oldtrueedge_newedge.get()));
 
-    int ntrueedges_old = edge_e_te_->GetGlobalNumCols();
-    edge_e_te_ = BuildEntityToTrueEntity(*newedge_e_te_e);
+    int ntrueedges_old = edge_trueedge_->GetGlobalNumCols();
+    edge_trueedge_ = BuildEntityToTrueEntity(*new_e_te_e);
 
     // Global number of true edge should be the same after redistribution
-    assert(edge_e_te_->GetGlobalNumCols() == ntrueedges_old);
+    assert(edge_trueedge_->GetGlobalNumCols() == ntrueedges_old);
 }
 
 void Graph::LocalDepthFirstSearch(const mfem::SparseMatrix& vert_vert,
