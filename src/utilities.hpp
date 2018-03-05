@@ -407,6 +407,16 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
 // Rescale vec by scaling: vec = diag(scaling) * vec
 void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 
+/**
+   @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
+
+   This function is copied from mfem::Mesh::GetElementColoring.
+
+   @param colors at return containing colors of all elements
+   @param el_el element connectivity matrix (assuming nonzero diagonal)
+*/
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
 } // namespace smoothg
 
 #endif /* __UTILITIES_HPP */

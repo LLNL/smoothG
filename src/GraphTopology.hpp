@@ -46,7 +46,7 @@ public: // static functions
         mfem::SparseMatrix& aggregate_edge_int);
 public:
     /**
-       @brief Build agglomerated topology relation tables.
+       @brief Build agglomerated topology relation tables of a given graph
 
        All of this data is local to a single processor
 
@@ -59,6 +59,17 @@ public:
                   const mfem::HypreParMatrix& edge_d_td,
                   const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
+
+    /**
+       @brief Build agglomerated topology relation tables of the coarse level
+       graph in a given GraphTopology object
+
+       All of this data is local to a single processor
+
+       @param finer_graph_topology finer level graph topology
+       @param coarsening_factor intended number of vertices in an aggregate
+    */
+    GraphTopology(GraphTopology& finer_graph_topology, int coarsening_factor);
 
     /**
        @brief Partial graph-based constructor for graph topology.
@@ -77,6 +88,11 @@ public:
                   const mfem::HypreParMatrix& face_d_td,
                   const mfem::HypreParMatrix& face_d_td_d);
 
+    /**
+       @brief Move constructor
+    */
+    GraphTopology(GraphTopology&& graph_topology) noexcept;
+
     ~GraphTopology() {}
 
     /// Return number of faces in aggregated graph
@@ -88,9 +104,11 @@ public:
     ///@{
     mfem::Array<HYPRE_Int>& GetVertexStart() { return vertex_start_; }
     mfem::Array<HYPRE_Int>& GetEdgeStart() { return edge_start_; }
+    mfem::Array<HYPRE_Int>& GetAggregateStart() { return aggregate_start_; }
     mfem::Array<HYPRE_Int>& GetFaceStart() { return face_start_; }
     const mfem::Array<HYPRE_Int>& GetVertexStart() const { return vertex_start_; }
     const mfem::Array<HYPRE_Int>& GetEdgeStart() const { return edge_start_; }
+    const mfem::Array<HYPRE_Int>& GetAggregateStart() const { return aggregate_start_; }
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
     ///@}
 
@@ -102,7 +120,6 @@ public:
 
     ///@name dof_truedof_dof tables, which connect dofs across processors that share a true dof
     ///@{
-    std::unique_ptr<mfem::HypreParMatrix> edge_d_td_d_;
     std::unique_ptr<mfem::HypreParMatrix> face_d_td_d_;
     ///@}
 
@@ -125,15 +142,20 @@ public:
     mfem::SparseMatrix face_bdratt_;
 
 private:
-    MPI_Comm comm_;
-    int num_procs_;
-    int myid_;
+    void Init(mfem::SparseMatrix& vertex_edge,
+              const mfem::Array<int>& partition,
+              const mfem::SparseMatrix* edge_boundaryattr,
+              const mfem::HypreParMatrix* edge_d_td_d);
 
     mfem::Array<HYPRE_Int> vertex_start_;
     mfem::Array<HYPRE_Int> edge_start_;
     mfem::Array<HYPRE_Int> aggregate_start_;
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology
+
+std::vector<GraphTopology> MultilevelGraphTopology(
+    mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_d_td,
+    const mfem::SparseMatrix* edge_boundaryattr, int num_levels, int coarsening_factor);
 
 } // namespace smoothg
 
