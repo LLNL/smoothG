@@ -404,6 +404,9 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::
 double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
 
+// Rescale vec by scaling: vec = diag(scaling) * vec
+void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
+
 /**
    @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
 
