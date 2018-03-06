@@ -64,6 +64,9 @@ public:
                               bool energy_dual,
                               bool is_hybridization_used);
 
+    SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL, const GraphTopology& gt,
+                              const SpectralCoarsenParam& param);
+
 private:
     /**
        @brief Coarsen the graph, constructing projectors, coarse operators, etc.
@@ -71,13 +74,8 @@ private:
     void do_construct_coarse_subspace();
 
 private:
-    bool is_hybridization_used_;
-    double spectral_tol_;
-    unsigned int max_evecs_per_agg_;
-    bool dual_target_;
-    bool scaled_dual_;
-    bool energy_dual_;
-
+    // TODO: make it a const reference if the first constructor is not kept
+    SpectralCoarsenParam coarsen_param_;
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

@@ -522,6 +522,7 @@ void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
 {
     if (W_proc_)
     {
+        // TODO: CoarseW_ should be identity, RAP can be used in debug mode to check
         unique_ptr<mfem::SparseMatrix> W_tmp(mfem::RAP(Pvertices, *W_proc_, Pvertices));
         mfem::SparseMatrix W_thresh(*W_tmp);
 

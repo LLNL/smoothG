@@ -82,6 +82,11 @@ public:
         const mfem::SparseMatrix* W_local,
         const GraphTopology& graph_topology);
 
+    LocalMixedGraphSpectralTargets(
+        const MixedMatrix& mixed_graph_laplacian,
+        const GraphTopology& graph_topology,
+        const SpectralCoarsenParam& coarsen_param);
+
     ~LocalMixedGraphSpectralTargets() {}
 
     /**

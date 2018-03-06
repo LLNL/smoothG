@@ -175,72 +175,6 @@ int MarkDofsOnBoundary(
     const mfem::Array<int>& bndrAttributesMarker, mfem::Array<int>& dofMarker);
 
 /**
-    @brief Manage topological information for the coarsening
-
-    Extract the local submatrix of the global vertex to edge relation table
-    Each vertex belongs to one and only one processor, while some edges are
-    shared by two processors, indicated by the edge to true edge
-    HypreParMatrix edge_e_te
-*/
-class ParGraph
-{
-public:
-    /**
-       @brief Distribute a graph to the communicator.
-
-       Generally we read a global graph on one processor, and then distribute
-       it. This constructor handles that process.
-
-       @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
-    */
-    ParGraph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Array<int>& partition_global);
-
-    ///@name Getters for tables that describe parallel graph
-    ///@{
-    mfem::SparseMatrix& GetLocalVertexToEdge()
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::SparseMatrix& GetLocalVertexToEdge() const
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::Array<int>& GetLocalPartition() const
-    {
-        return partition_local_;
-    }
-
-    const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
-    {
-        return *edge_e_te_;
-    }
-
-    const mfem::Array<int>& GetVertexLocalToGlobalMap() const
-    {
-        return vert_local2global_;
-    }
-
-    const mfem::Array<int>& GetEdgeLocalToGlobalMap() const
-    {
-        return edge_local2global_;
-    }
-    ///@}
-private:
-    mfem::SparseMatrix vertex_edge_local_;
-    mfem::Array<int> partition_local_;
-    std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
-    mfem::Array<int> vert_local2global_;
-    mfem::Array<int> edge_local2global_;
-};
-
-/**
    @brief Treat a SparseMatrix as a (boolean) table, and return the column
    indices of a given row in the Array J
 
@@ -418,6 +352,45 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
+
+/**
+   @brief Parameters for SAAMGe
+*/
+struct SAAMGeParam
+{
+    int num_levels = 2;
+
+    /// Parameters for all levels
+    int nu_relax = 2;
+    bool use_arpack = false;
+    bool correct_nulspace = false;
+    bool do_aggregates = true;
+
+    /// Parameters for the first coarsening
+    int first_coarsen_factor = 64;
+    int first_nu_pro = 1;
+    double first_theta = 1e-3;
+
+    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
+    int coarsen_factor = 8;
+    int nu_pro = 1;
+    double theta = 1e-3;
+};
+
+/**
+   @brief Parameters for spectral coarsener
+*/
+struct SpectralCoarsenParam
+{
+    int max_evects = 4;
+    double spec_tol = 0.001;
+    bool dual_target = false;
+    bool scaled_dual = false;
+    bool energy_dual = false;
+    bool hybridization = false;
+
+    SAAMGeParam* sa_param = nullptr;
+};
 
 } // namespace smoothg
 

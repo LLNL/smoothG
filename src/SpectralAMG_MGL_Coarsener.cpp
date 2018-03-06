@@ -38,36 +38,37 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                                                      bool scaled_dual,
                                                      bool energy_dual,
                                                      bool is_hybridization_used)
-    : Mixed_GL_Coarsener(mgL, gt),
-      is_hybridization_used_(is_hybridization_used),
-      spectral_tol_(spectral_tol),
-      max_evecs_per_agg_(max_evecs_per_agg),
-      dual_target_(dual_target),
-      scaled_dual_(scaled_dual),
-      energy_dual_(energy_dual)
+    : Mixed_GL_Coarsener(mgL, gt)
+{
+    coarsen_param_.hybridization = is_hybridization_used;
+    coarsen_param_.spec_tol = spectral_tol;
+    coarsen_param_.max_evects = max_evecs_per_agg;
+    coarsen_param_.dual_target = dual_target;
+    coarsen_param_.scaled_dual = scaled_dual;
+    coarsen_param_.energy_dual = energy_dual;
+}
+
+SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(
+        const MixedMatrix& mgL, const GraphTopology& gt, const SpectralCoarsenParam& param)
+    : Mixed_GL_Coarsener(mgL, gt), coarsen_param_(param)
 {
 }
 
 void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
 {
-    using LMGST = LocalMixedGraphSpectralTargets;
-
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LMGST localtargets(spectral_tol_, max_evecs_per_agg_, dual_target_,
-                       scaled_dual_, energy_dual_, mgL_.getWeight(),
-                       mgL_.getD(), mgL_.getW(), graph_topology_);
+    LocalMixedGraphSpectralTargets localtargets(mgL_, graph_topology_, coarsen_param_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
-                                       CM_el_, is_hybridization_used_);
+                                       CM_el_, coarsen_param_.hybridization);
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
     CoarseM_ = graph_coarsen_->GetCoarseM();
-
     CoarseW_ = graph_coarsen_->GetCoarseW();
 }
 
