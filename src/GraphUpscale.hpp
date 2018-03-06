@@ -51,6 +51,8 @@ public:
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
        @param coefficient use coarse coefficient rescaling construction
+       @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+              coarse hybridized system if saamge_param is not nullptr
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
@@ -59,7 +61,8 @@ public:
                  bool dual_target = false, bool scaled_dual = false,
                  bool energy_dual = false, bool hybridization = false,
                  bool coarse_coefficient = false,
-                 const mfem::Vector& weight = mfem::Vector());
+                 const mfem::Vector& weight = mfem::Vector(),
+                 const SAAMGeParam* saamge_param = nullptr);
     /**
        @brief Constructor
 
@@ -78,6 +81,8 @@ public:
               (guarantees approximation property in edge energy norm)
        @param hybridization use hybridization as solver
        @param coefficient use coarse coefficient rescaling construction
+       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
+              coarse hybridized system if saamge_param is not nullptr
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
@@ -86,7 +91,8 @@ public:
                  bool dual_target = false, bool scaled_dual = false,
                  bool energy_dual = false, bool hybridization = false,
                  bool coarse_coefficient = false,
-                 const mfem::Vector& weight = mfem::Vector());
+                 const mfem::Vector& weight = mfem::Vector(),
+                 const SAAMGeParam* saamge_param = nullptr);
 
     /// Read permuted vertex vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
@@ -115,7 +121,8 @@ private:
               const mfem::Vector& weight,
               double spect_tol, int max_evects,
               bool dual_target, bool scaled_dual, bool energy_dual,
-              bool coarse_coefficient);
+              bool coarse_coefficient,
+              const SAAMGeParam* saamge_param);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;

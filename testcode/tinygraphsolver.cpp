@@ -119,6 +119,10 @@ int main(int argc, char* argv[])
     rhs_p_fine.SetSize(nvertices);
     rhs_p_fine = 1.0;
 
+    // make rhs average zero so the problem is well defined when W block is zero
+    if (!w_block && myid == 0)
+        rhs_p_fine(0) = -5.0;
+
     // setup mixed problem
     auto edge_d_td_diag = SparseIdentity(nedges);
     mfem::Array<HYPRE_Int> edge_start(2);
@@ -133,22 +137,21 @@ int main(int argc, char* argv[])
     mfem::Array<int>& blockOffsets(mixed_graph_laplacian.get_blockoffsets());
     mfem::BlockVector rhs = *mixed_graph_laplacian.subvecs_to_blockvector(rhs_u_fine, rhs_p_fine);
     mfem::BlockVector sol(blockOffsets);
-    sol = 0.0;
 
-    // solve
-    MinresBlockSolver mgp(comm, mixed_graph_laplacian);
-    mgp.SetPrintLevel(1);
-    mgp.Mult(rhs, sol);
+    // setup solvers
+    std::map<MixedLaplacianSolver*, std::string> solver_to_name;
 
-    int iter = mgp.GetNumIterations();
-    int nnz = mgp.GetNNZ();
-    std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
-    std::cout << "Minres converged in " << iter << " iterations." << std::endl;
+    MinresBlockSolver minres(comm, mixed_graph_laplacian);
+    solver_to_name[&minres] = "Minres + block preconditioner";
 
-    if (!w_block)
-    {
-        orthogonalize_from_constant(sol.GetBlock(1));
-    }
+    HybridSolver hb_bamg(comm, mixed_graph_laplacian);
+    solver_to_name[&hb_bamg] = "Hybridization + BoomerAMG";
+
+#if SMOOTHG_USE_SAAMGE
+    SAAMGeParam sa_param;
+    HybridSolver hb_saamge(comm, mixed_graph_laplacian, nullptr, nullptr, 0, &sa_param);
+    solver_to_name[&hb_saamge] = "Hybridization + SA-AMGe";
+#endif
 
     // truesol was found "independently" with python: testcode/tinygraph.py
     mfem::Vector truesol(nvertices);
@@ -189,15 +192,45 @@ int main(int argc, char* argv[])
         truesol[5] = -2.83333333333333e+00;
     }
 
-    std::cout.precision(16);
-    sol.GetBlock(1).Print(std::cout, 1);
+    bool some_solver_fails = false;
+    for (auto& solver_pair : solver_to_name)
+    {
+        auto& solver = solver_pair.first;
+        auto& name = solver_pair.second;
 
-    truesol -= sol.GetBlock(1);
-    double norm = truesol.Norml2();
-    std::cout << "Error norm: " << norm << std::endl;
+        std::cout << "\nSolving mixed graph Laplacian problem with "
+                  << name << " ..." << std::endl;
 
-    if (norm < equality_tolerance)
-        return 0;
-    else
+        // solve
+        sol = 0.0;
+        solver->SetPrintLevel(1);
+        solver->Solve(rhs, sol);
+
+        int iter = solver->GetNumIterations();
+        int nnz = solver->GetNNZ();
+        std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
+        std::cout << name << " converged in " << iter << " iterations." << std::endl;
+
+        if (!w_block)
+        {
+            orthogonalize_from_constant(sol.GetBlock(1));
+        }
+
+        std::cout.precision(16);
+        sol.GetBlock(1).Print(std::cout, 1);
+
+        sol.GetBlock(1) -= truesol;
+        double norm = sol.GetBlock(1).Norml2();
+        std::cout << "Error norm: " << norm << std::endl;
+
+        if (norm > equality_tolerance)
+        {
+            some_solver_fails = true;
+        }
+    }
+
+    if (some_solver_fails)
         return 1;
+    else
+        return 0;
 }
