@@ -120,11 +120,10 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
         const SpectralCoarsenParam& coarsen_param)
     :
     LocalMixedGraphSpectralTargets(
-        coarsen_param.spec_tol, coarsen_param.max_evects, coarsen_param.dual_target,
-        coarsen_param.scaled_dual, coarsen_param.energy_dual, mgL.getWeight(),
-        mgL.getD(), mgL.getW(), graph_topology)
+        coarsen_param.spectral_tol, coarsen_param.max_evects,
+        coarsen_param.dual_target, coarsen_param.scaled_dual, coarsen_param.energy_dual,
+        mgL.getWeight(), mgL.getD(), mgL.getW(), graph_topology)
 {
-
 }
 
 void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()

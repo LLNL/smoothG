@@ -101,7 +101,6 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
     : MixedMatrix(vertex_edge, mfem::Vector(vertex_edge.Width()) = 1.0, edge_d_td,
                   DistributeWeight::True)
 {
-
 }
 
 MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,

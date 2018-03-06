@@ -383,7 +383,7 @@ struct SAAMGeParam
 struct SpectralCoarsenParam
 {
     int max_evects = 4;
-    double spec_tol = 0.001;
+    double spectral_tol = 0.001;
     bool dual_target = false;
     bool scaled_dual = false;
     bool energy_dual = false;

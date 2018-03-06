@@ -41,7 +41,7 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
     : Mixed_GL_Coarsener(mgL, gt)
 {
     coarsen_param_.hybridization = is_hybridization_used;
-    coarsen_param_.spec_tol = spectral_tol;
+    coarsen_param_.spectral_tol = spectral_tol;
     coarsen_param_.max_evects = max_evecs_per_agg;
     coarsen_param_.dual_target = dual_target;
     coarsen_param_.scaled_dual = scaled_dual;
