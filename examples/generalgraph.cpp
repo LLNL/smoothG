@@ -47,6 +47,8 @@ int main(int argc, char* argv[])
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
+    SpectralCoarsenerParameters coarsen_param;
+
     // program options from command line
     mfem::OptionsParser args(argc, argv);
     int num_partitions = 12;
@@ -71,14 +73,11 @@ int main(int argc, char* argv[])
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of loading partition).");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
+    args.AddOption(&(coarsen_param.max_evects), "-m", "--max-evects",
                    "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
+    args.AddOption(&(coarsen_param.spectral_tol), "-t", "--spect-tol",
                    "Spectral tolerance for eigenvalue problems.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+    args.AddOption(&(coarsen_param.use_hybridization), "-hb", "--hybridization", "-no-hb",
                    "--no-hybridization", "Enable hybridization.");
     bool generate_graph = false;
     args.AddOption(&generate_graph, "-gg", "--generate-graph", "-no-gg",
@@ -104,14 +103,11 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+    args.AddOption(&(coarsen_param.dual_target), "-dt", "--dual-target", "-no-dt",
                    "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+    args.AddOption(&(coarsen_param.scaled_dual), "-sd", "--scaled-dual", "-no-sd",
                    "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+    args.AddOption(&(coarsen_param.energy_dual), "-ed", "--energy-dual", "-no-ed",
                    "--no-energy-dual", "Use energy matrix in trace generation.");
     args.Parse();
     if (!args.Good())
@@ -132,20 +128,20 @@ int main(int argc, char* argv[])
 
 
     /// [Load graph from file or generate one]
-    mfem::SparseMatrix vertex_edge_global;
+    mfem::SparseMatrix global_vertex_edge;
     if (generate_graph)
     {
         mfem::SparseMatrix tmp = GenerateGraph(comm, gen_vertices, mean_degree, beta, seed);
-        vertex_edge_global.Swap(tmp);
+        global_vertex_edge.Swap(tmp);
     }
     else
     {
         mfem::SparseMatrix tmp = ReadVertexEdge(graphFileName);
-        vertex_edge_global.Swap(tmp);
+        global_vertex_edge.Swap(tmp);
     }
 
-    const int nedges_global = vertex_edge_global.Width();
-    const int nvertices_global = vertex_edge_global.Height();
+    const int nedges_global = global_vertex_edge.Width();
+    const int nvertices_global = global_vertex_edge.Height();
 
     /// [Load graph from file or generate one]
 
@@ -153,7 +149,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> global_partitioning;
     if (metis_agglomeration || generate_graph)
     {
-        MetisPart(vertex_edge_global, global_partitioning, num_partitions, isolate);
+        MetisPart(global_vertex_edge, global_partitioning, num_partitions, isolate);
     }
     else
     {
@@ -164,24 +160,23 @@ int main(int argc, char* argv[])
     /// [Partitioning]
 
     /// [Load the edge weights]
-    mfem::Vector weight(nedges_global);
+    mfem::Vector edge_weight(nedges_global);
     if (std::strlen(weight_filename))
     {
         std::ifstream weight_file(weight_filename);
-        weight.Load(weight_file, nedges_global);
+        edge_weight.Load(weight_file, nedges_global);
     }
     else
     {
-        weight = 1.0;
+        edge_weight = 1.0;
     }
     /// [Load the edge weights]
 
     // Set up GraphUpscale
     {
         /// [Upscale]
-        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, weight);
+        GraphUpscale upscale(comm, global_vertex_edge, global_partitioning,
+                             coarsen_param, edge_weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

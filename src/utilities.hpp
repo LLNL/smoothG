@@ -356,22 +356,22 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 /**
    @brief Parameters for SAAMGe
 */
-struct SAAMGeParam
+struct SAAMGeParameters
 {
     int num_levels = 2;
 
-    /// Parameters for all levels
+    // Parameters for all levels
     int nu_relax = 2;
     bool use_arpack = false;
     bool correct_nulspace = false;
     bool do_aggregates = true;
 
-    /// Parameters for the first coarsening
+    // Parameters for the first coarsening
     int first_coarsen_factor = 64;
     int first_nu_pro = 1;
     double first_theta = 1e-3;
 
-    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
+    // Parameters for all later coarsenings (irrelevant if num_levels = 2)
     int coarsen_factor = 8;
     int nu_pro = 1;
     double theta = 1e-3;
@@ -380,16 +380,17 @@ struct SAAMGeParam
 /**
    @brief Parameters for spectral coarsener
 */
-struct SpectralCoarsenParam
+struct SpectralCoarsenerParameters
 {
+    int coarsening_factor = 100;
     int max_evects = 4;
     double spectral_tol = 0.001;
     bool dual_target = false;
     bool scaled_dual = false;
     bool energy_dual = false;
-    bool hybridization = false;
+    bool use_hybridization = false;
 
-    SAAMGeParam* sa_param = nullptr;
+    const SAAMGeParameters* sa_param = nullptr;
 };
 
 } // namespace smoothg

@@ -85,7 +85,7 @@ public:
     LocalMixedGraphSpectralTargets(
         const MixedMatrix& mixed_graph_laplacian,
         const GraphTopology& graph_topology,
-        const SpectralCoarsenParam& coarsen_param);
+        const SpectralCoarsenerParameters& coarsen_param);
 
     ~LocalMixedGraphSpectralTargets() {}
 

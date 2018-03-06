@@ -45,28 +45,16 @@ int main(int argc, char* argv[])
     constexpr auto ve_filename = "../../graphdata/vertex_edge_sample.txt";
     constexpr auto rhs_filename = "../../graphdata/fiedler_sample.txt";
 
-    constexpr auto coarse_factor = 100;
-    constexpr auto num_partitions = 10;
-    constexpr auto max_evects = 4;
-    constexpr auto spect_tol = 1.e-3;
-    constexpr auto dual_target = false;
-    constexpr auto scaled_dual = false;
-    constexpr auto energy_dual = false;
-    constexpr auto hybridization = false;
+    SpectralCoarsenerParameters coarsen_param;
 
     const auto vertex_edge = ReadVertexEdge(ve_filename);
 
     // vertex_edge and partition
     {
-        const auto edge_vertex = smoothg::Transpose(vertex_edge);
-        const auto vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
-
         mfem::Array<int> global_partitioning(vertex_edge.Height());
-        Partition(vertex_vertex, global_partitioning, num_partitions);
+        PartitionAAT(vertex_edge, global_partitioning, coarsen_param.coarsening_factor);
 
-        const auto upscale = GraphUpscale(comm, vertex_edge, global_partitioning,
-                                          spect_tol, max_evects, dual_target,
-                                          scaled_dual, energy_dual, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, global_partitioning, coarsen_param);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(rhs_u_fine);
@@ -76,9 +64,7 @@ int main(int argc, char* argv[])
 
     // vertex_edge and coarse factor
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                          spect_tol, max_evects, dual_target,
-                                          scaled_dual, energy_dual, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, coarsen_param);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(rhs_u_fine);
@@ -88,9 +74,7 @@ int main(int argc, char* argv[])
 
     // Using coarse space
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                          spect_tol, max_evects, dual_target,
-                                          scaled_dual, energy_dual, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, coarsen_param);
 
         // Start at Fine Level
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
@@ -114,9 +98,7 @@ int main(int argc, char* argv[])
 
     // Comparing Error; essentially generalgraph.cpp
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                          spect_tol, max_evects, dual_target,
-                                          scaled_dual, energy_dual, hybridization);
+        const auto upscale = GraphUpscale(comm, vertex_edge, coarsen_param);
 
         mfem::BlockVector fine_rhs = upscale.ReadVertexBlockVector(rhs_filename);
 
@@ -138,15 +120,11 @@ int main(int argc, char* argv[])
 
     // Compare Minres vs hybridization solvers
     {
-        const bool use_hybridization = true;
+        const auto minres_upscale = GraphUpscale(comm, vertex_edge, coarsen_param);
 
-        const auto minres_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                                 spect_tol, max_evects, dual_target,
-                                                 scaled_dual, energy_dual, !use_hybridization);
+        coarsen_param.use_hybridization = true;
 
-        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                             spect_tol, max_evects, dual_target,
-                                             scaled_dual, energy_dual, use_hybridization);
+        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarsen_param);
 
         const auto rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 
@@ -164,11 +142,9 @@ int main(int argc, char* argv[])
         }
 
 #if SMOOTHG_USE_SAAMGE
-        SAAMGeParam saamge_param;
-        const auto hbsa_upscale = GraphUpscale(comm, vertex_edge, coarse_factor,
-                                               spect_tol, max_evects, dual_target,
-                                               scaled_dual, energy_dual, use_hybridization,
-                                               mfem::Vector(), &saamge_param);
+        SAAMGeParameters saamge_param;
+        coarsen_param.sa_param = &saamge_param;
+        const auto hbsa_upscale = GraphUpscale(comm, vertex_edge, coarsen_param);
 
         const auto hbsa_sol = hbsa_upscale.Solve(rhs_u_fine);
         const auto error_sa_mr = CompareError(comm, hbsa_sol, minres_sol);
@@ -176,7 +152,6 @@ int main(int argc, char* argv[])
         if (myid == 0)
         {
             std::cout.precision(3);
-            std::cout << "---------------------\n";
             std::cout << "HB (SAAMGe) vs Minres Error: " <<  error_sa_mr << "\n";
             std::cout << "HB (SAAMGe) vs HB (BoomerAMG): " <<  error_sa_ba << "\n";
             std::cout.precision(3);

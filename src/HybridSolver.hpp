@@ -111,7 +111,7 @@ public:
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
-                 const SAAMGeParam* saamge_param = nullptr);
+                 const SAAMGeParameters* saamge_param = nullptr);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
@@ -133,7 +133,7 @@ public:
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
-                 const SAAMGeParam* saamge_param = nullptr);
+                 const SAAMGeParameters* saamge_param = nullptr);
 
     virtual ~HybridSolver();
 
@@ -246,13 +246,13 @@ private:
     int num_edge_dofs_;
     int num_multiplier_dofs_;
 
-    bool use_spectralAMGe_;
+    bool use_SAAMGe_;
     bool use_w_;
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
 
-    const SAAMGeParam* saamge_param_;
+    const SAAMGeParameters* sa_param_;
 #if SMOOTHG_USE_SAAMGE
     std::vector<int> sa_nparts_;
     saamge::agg_partitioning_relations_t* sa_apr_;

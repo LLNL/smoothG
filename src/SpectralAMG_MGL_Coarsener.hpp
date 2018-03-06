@@ -65,7 +65,7 @@ public:
                               bool is_hybridization_used);
 
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL, const GraphTopology& gt,
-                              const SpectralCoarsenParam& param);
+                              const SpectralCoarsenerParameters& param);
 
 private:
     /**
@@ -75,7 +75,7 @@ private:
 
 private:
     // TODO: make it a const reference if the first constructor is not kept
-    SpectralCoarsenParam coarsen_param_;
+    SpectralCoarsenerParameters coarsen_param_;
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

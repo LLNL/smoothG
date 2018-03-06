@@ -115,9 +115,9 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 }
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-        const MixedMatrix& mgL,
-        const GraphTopology& graph_topology,
-        const SpectralCoarsenParam& coarsen_param)
+    const MixedMatrix& mgL,
+    const GraphTopology& graph_topology,
+    const SpectralCoarsenerParameters& coarsen_param)
     :
     LocalMixedGraphSpectralTargets(
         coarsen_param.spectral_tol, coarsen_param.max_evects,

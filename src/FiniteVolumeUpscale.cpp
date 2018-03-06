@@ -34,7 +34,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          double spect_tol, int max_evects,
                                          bool dual_target, bool scaled_dual,
                                          bool energy_dual, bool hybridization,
-                                         const SAAMGeParam* saamge_param)
+                                         const SAAMGeParameters* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)
@@ -105,7 +105,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          double spect_tol, int max_evects,
                                          bool dual_target, bool scaled_dual,
                                          bool energy_dual, bool hybridization,
-                                         const SAAMGeParam* saamge_param)
+                                         const SAAMGeParameters* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att)

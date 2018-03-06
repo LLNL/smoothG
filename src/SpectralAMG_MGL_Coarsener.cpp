@@ -40,7 +40,7 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                                                      bool is_hybridization_used)
     : Mixed_GL_Coarsener(mgL, gt)
 {
-    coarsen_param_.hybridization = is_hybridization_used;
+    coarsen_param_.use_hybridization = is_hybridization_used;
     coarsen_param_.spectral_tol = spectral_tol;
     coarsen_param_.max_evects = max_evecs_per_agg;
     coarsen_param_.dual_target = dual_target;
@@ -48,8 +48,9 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
     coarsen_param_.energy_dual = energy_dual;
 }
 
-SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(
-        const MixedMatrix& mgL, const GraphTopology& gt, const SpectralCoarsenParam& param)
+SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
+                                                     const GraphTopology& gt,
+                                                     const SpectralCoarsenerParameters& param)
     : Mixed_GL_Coarsener(mgL, gt), coarsen_param_(param)
 {
 }
@@ -65,7 +66,7 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
-                                       CM_el_, coarsen_param_.hybridization);
+                                       CM_el_, coarsen_param_.use_hybridization);
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
     CoarseM_ = graph_coarsen_->GetCoarseM();

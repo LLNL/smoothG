@@ -64,7 +64,7 @@ public:
                         double spect_tol = 0.001, int max_evects = 4,
                         bool dual_target = false, bool scaled_dual = false,
                         bool energy_dual = false, bool hybridization = false,
-                        const SAAMGeParam* saamge_param = nullptr);
+                        const SAAMGeParameters* saamge_param = nullptr);
 
     /**
        @brief Constructor with W block specified
@@ -93,7 +93,7 @@ public:
                         double spect_tol = 0.001, int max_evects = 4,
                         bool dual_target = false, bool scaled_dual = false,
                         bool energy_dual = false, bool hybridization = false,
-                        const SAAMGeParam* saamge_param = nullptr);
+                        const SAAMGeParameters* saamge_param = nullptr);
 
     void MakeFineSolver(const mfem::Array<int>& marker) const;
 

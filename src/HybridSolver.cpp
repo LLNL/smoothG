@@ -66,16 +66,16 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
+                           const SAAMGeParameters* saamge_param)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    use_spectralAMGe_((saamge_param != nullptr)),
+    use_SAAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
-    saamge_param_(saamge_param)
+    sa_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
 
@@ -101,16 +101,16 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
+                           const SAAMGeParameters* saamge_param)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
     D_(mgL.getD()),
     W_(mgL.getW()),
-    use_spectralAMGe_((saamge_param != nullptr)),
+    use_SAAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
-    saamge_param_(saamge_param)
+    sa_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
     const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
@@ -125,7 +125,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 HybridSolver::~HybridSolver()
 {
 #if SMOOTHG_USE_SAAMGE
-    if (use_spectralAMGe_)
+    if (use_SAAMGe_)
     {
         saamge::ml_free_data(sa_ml_data_);
         saamge::agg_free_partitioning(sa_apr_);
@@ -157,7 +157,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     AinvDMinvCT_.resize(nAggs_);
     Ainv_f_.resize(nAggs_);
     Ainv_.resize(nAggs_);
-    if (use_spectralAMGe_)
+    if (use_SAAMGe_)
         Hybrid_el_.resize(nAggs_);
 
     mfem::SparseMatrix edgedof_bdrattr;
@@ -291,7 +291,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
                               comm_, multiplier_start_.Last(), multiplier_start_,
                               HybridSystemElim_.get());
 
-    if (rescale_iter_ == 0 || use_spectralAMGe_)
+    if (rescale_iter_ == 0 || use_SAAMGe_)
     {
         pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
     }
@@ -327,7 +327,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     const bool use_prec = min_size > 0;
     if (use_prec)
     {
-        if (use_spectralAMGe_)
+        if (use_SAAMGe_)
         {
             BuildSpectralAMGePreconditioner();
         }
@@ -479,7 +479,7 @@ void HybridSolver::AssembleHybridSystem(
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
-        if (use_spectralAMGe_)
+        if (use_SAAMGe_)
             Hybrid_el_[iAgg] = tmpHybrid_el;
     }
 }
@@ -617,7 +617,7 @@ void HybridSolver::AssembleHybridSystem(
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
-        if (use_spectralAMGe_)
+        if (use_SAAMGe_)
             Hybrid_el_[iAgg] = tmpHybrid_el;
     }
 }
@@ -843,18 +843,18 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     }
 
     int num_elems = elem_elem->Size();
-    sa_nparts_.resize(saamge_param_->num_levels - 1);
-    sa_nparts_[0] = (num_elems / saamge_param_->first_coarsen_factor) + 1;
+    sa_nparts_.resize(sa_param_->num_levels - 1);
+    sa_nparts_[0] = (num_elems / sa_param_->first_coarsen_factor) + 1;
 
-    bool first_do_aggregates = (saamge_param_->num_levels <= 2 && saamge_param_->do_aggregates);
+    bool first_do_aggregates = (sa_param_->num_levels <= 2 && sa_param_->do_aggregates);
     sa_apr_ = saamge::agg_create_partitioning_fine(
                   *pHybridSystem_, num_elems, elem_dof, elem_elem, nullptr, bdr_dofs.data(),
                   sa_nparts_.data(), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
     // of sa_nparts_[0] in some cases, so I define the rest of the array here
-    for (int i = 1; i < saamge_param_->num_levels - 1; i++)
-        sa_nparts_[i] = sa_nparts_[i - 1] / saamge_param_->coarsen_factor + 1;
+    for (int i = 1; i < sa_param_->num_levels - 1; i++)
+        sa_nparts_[i] = sa_nparts_[i - 1] / sa_param_->coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (unsigned int i = 0; i < Hybrid_el_.size(); i++)
@@ -863,10 +863,9 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        saamge_param_->num_levels - 1, sa_nparts_.data(), saamge_param_->first_nu_pro,
-        saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
-        saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
-        saamge_param_->use_arpack, saamge_param_->do_aggregates);
+        sa_nparts_.size(), sa_nparts_.data(), sa_param_->first_nu_pro, sa_param_->nu_pro,
+        sa_param_->nu_relax, sa_param_->first_theta, sa_param_->theta, polynomial_coarse,
+        sa_param_->correct_nulspace, sa_param_->use_arpack, sa_param_->do_aggregates);
     sa_ml_data_ = saamge::ml_produce_data(*pHybridSystem_, sa_apr_, emp, mlp);
     auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
 
