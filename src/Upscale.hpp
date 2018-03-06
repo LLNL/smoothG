@@ -176,8 +176,8 @@ public:
                     const mfem::BlockVector& fine_sol) const;
 
 protected:
-    Upscale(MPI_Comm comm, int size, bool hybridization = false)
-        : Operator(size), comm_(comm), setup_time_(0.0), hybridization_(hybridization)
+    Upscale(MPI_Comm comm, int size, bool use_hybridization = false)
+        : Operator(size), comm_(comm), setup_time_(0.0), use_hybridization_(use_hybridization)
     {
         MPI_Comm_rank(comm_, &myid_);
     }
@@ -200,7 +200,7 @@ protected:
 
     double setup_time_;
 
-    const bool hybridization_;
+    const bool use_hybridization_;
 
     std::unique_ptr<mfem::BlockVector> rhs_coarse_;
     std::unique_ptr<mfem::BlockVector> sol_coarse_;

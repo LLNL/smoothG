@@ -169,7 +169,7 @@ void FiniteVolumeUpscale::MakeFineSolver(const mfem::Array<int>& marker) const
 {
     if (!fine_solver_)
     {
-        if (hybridization_) // Hybridization solver
+        if (use_hybridization_) // Hybridization solver
         {
             fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
                                                      &edge_boundary_att_, &marker);

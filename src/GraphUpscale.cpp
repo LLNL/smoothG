@@ -87,7 +87,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
-    if (hybridization_)
+    if (use_hybridization_)
     {
         coarse_solver_ = make_unique<HybridSolver>(
                              comm_, GetCoarseMatrix(), *coarsener_, nullptr, nullptr, 0, coarsen_param.sa_param);
@@ -110,7 +110,7 @@ void GraphUpscale::MakeFineSolver() const
 {
     if (!fine_solver_)
     {
-        if (hybridization_)
+        if (use_hybridization_)
         {
             fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
         }
