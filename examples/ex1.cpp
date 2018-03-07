@@ -35,10 +35,8 @@ using std::make_shared;
 using namespace smoothg;
 using namespace mfem;
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
-               int isolate);
-mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
-
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
+unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
 void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::Vector& weight);
 
 int main(int argc, char* argv[])
@@ -50,82 +48,17 @@ int main(int argc, char* argv[])
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
+    mfem::StopWatch chrono;
+
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    int coarse_factor = 100;
-    args.AddOption(&coarse_factor, "-cf", "--coarse-factor",
-                   "Coarsening factor");
-    const char* graphFileName = "../../graphdata/vertex_edge_sample.txt";
-    args.AddOption(&graphFileName, "-g", "--graph",
-                   "File to load for graph connection data.");
-    const char* FiedlerFileName = "../../graphdata/fiedler_sample.txt";
-    args.AddOption(&FiedlerFileName, "-f", "--fiedler",
-                   "File to load for the Fiedler vector.");
-    const char* partition_filename = "../../graphdata/partition_sample.txt";
-    args.AddOption(&partition_filename, "-p", "--partition",
-                   "Partition file to load (instead of using metis).");
-    const char* weight_filename = "";
-    args.AddOption(&weight_filename, "-w", "--weight",
-                   "File to load for graph edge weights.");
-    const char* w_block_filename = "";
-    args.AddOption(&w_block_filename, "-wb", "--w_block",
-                   "File to load for w block.");
-    bool metis_agglomeration = false;
-    args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
-                   "-nm", "--no-metis-agglomeration",
-                   "Use Metis as the partitioner (instead of loading partition).");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
-    bool hybridization = true;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
-    bool generate_graph = false;
-    args.AddOption(&generate_graph, "-gg", "--generate-graph", "-no-gg",
-                   "--no-generate-graph", "Generate a graph at runtime.");
-    bool generate_fiedler = false;
-    args.AddOption(&generate_fiedler, "-gf", "--generate-fiedler", "-no-gf",
-                   "--no-generate-fiedler", "Generate a fiedler vector at runtime.");
-    bool save_fiedler = false;
-    args.AddOption(&save_fiedler, "-sf", "--save-fiedler", "-no-sf",
-                   "--no-save-fiedler", "Save a generate a fiedler vector at runtime.");
-    int gen_vertices = 1000;
-    args.AddOption(&gen_vertices, "-nv", "--num-vert",
-                   "Number of vertices of the graph to be generated.");
-    int mean_degree = 40;
-    args.AddOption(&mean_degree, "-md", "--mean-degree",
-                   "Average vertex degree of the graph to be generated.");
-    double beta = 0.15;
-    args.AddOption(&beta, "-b", "--beta",
-                   "Probability of rewiring in the Watts-Strogatz model.");
-    int seed = 0;
-    args.AddOption(&seed, "-s", "--seed",
-                   "Seed (unsigned integer) for the random number generator.");
-    int isolate = -1;
-    args.AddOption(&isolate, "--isolate", "--isolate",
-                   "Isolate a single vertex (for debugging so far).");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
-    bool verbose = false;
-    args.AddOption(&verbose, "-v", "--verbose", "-no-v",
-                   "--no-verbose", "Verbose solver output.");
-    int max_iter = 10000;
-    args.AddOption(&max_iter, "-mi", "--max-iter",
-                   "Max number of solver iterations.");
+    int agg_size = 12;
+    args.AddOption(&agg_size, "-as", "--agg-size",
+                   "Number of vertices in an aggregated in hybridization.");
 
 
     // MFEM Options
-    const char* mesh_file = "../data/star.mesh";
+    const char* mesh_file = "star.mesh";
     args.AddOption(&mesh_file, "-mesh", "--mesh",
                    "Mesh file to use.");
     int order = 1;
@@ -213,95 +146,162 @@ int main(int argc, char* argv[])
 
     Split(A, vertex_edge_global, weight);
 
-    if (myid == 0)
+    //if (myid == 0)
     {
         printf("Mesh: %ld VE: %d %d A: %d\n", mesh->GetGlobalNE(), vertex_edge_global.Height(), vertex_edge_global.Width(),
                 A.NumNonZeroElems());
     }
-    /// [Load graph from file or generate one]
 
-    /// [Partitioning]
+    /// [Set up parallel graph and Laplacian]
     mfem::Array<int> global_partitioning;
-    MetisPart(vertex_edge_global, global_partitioning, num_procs, isolate);
-    /// [Partitioning]
+    MetisPart(vertex_edge_global, global_partitioning, num_procs);
+    smoothg::ParGraph pgraph(comm, vertex_edge_global, global_partitioning);
+    auto& vertex_edge = pgraph.GetLocalVertexToEdge();
+    const auto& edge_trueedge = pgraph.GetEdgeToTrueEdge();
+    mfem::Vector local_weight(vertex_edge.Width());
+    weight.GetSubVector(pgraph.GetEdgeLocalToGlobalMap(), local_weight);
 
-    int count = 0;
+    MixedMatrix mixed_laplacian(vertex_edge, local_weight, edge_trueedge);
+    unique_ptr<mfem::HypreParMatrix> gL = GraphLaplacian(mixed_laplacian);
+    /// [Set up parallel graph and Laplacian]
 
-    for (int i = 0; i < weight.Size(); ++i)
+    /// [Right Hand Side]
+    mfem::Vector rhs_u_fine(vertex_edge.Width());
+    B.GetSubVector(pgraph.GetVertexLocalToGlobalMap(), rhs_u_fine);
+    mfem::BlockVector fine_rhs(mixed_laplacian.get_blockoffsets());
+    fine_rhs.GetBlock(0) = 0.0;
+    fine_rhs.GetBlock(1) = rhs_u_fine;
+    fine_rhs *= -1.0;
+    /// [Right Hand Side]
+
+    /// [Solve primal problem by CG + BoomerAMG]
+    mfem::Vector primal_sol(rhs_u_fine);
     {
-        if (weight[i] < 0)
+        if (myid == 0)
         {
-            count++;
+            std::cout << "\nSolving primal problem by CG + BoomerAMG ...\n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+        mfem::CGSolver cg(comm);
+        cg.SetPrintLevel(0);
+        cg.SetMaxIter(5000);
+        cg.SetRelTol(1e-9);
+        cg.SetAbsTol(1e-12);
+        cg.SetOperator(*gL);
+
+        mfem::Array<int> ess_dof(1);
+        ess_dof = 0;
+        gL->EliminateRowsCols(ess_dof);
+        rhs_u_fine(0) = 0.0;
+
+        mfem::HypreBoomerAMG prec(*gL);
+        prec.SetPrintLevel(0);
+        cg.SetPreconditioner(prec);
+        if (myid == 0)
+        {
+            std::cout << "System size: " << gL->N() <<"\n";
+            std::cout << "System NNZ: " << gL->NNZ() <<"\n";
+            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+
+        primal_sol = 0.0;
+        cg.Mult(rhs_u_fine, primal_sol);
+        par_orthogonalize_from_constant(primal_sol, vertex_edge_global.Height());
+        if (myid == 0)
+        {
+            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "Number of iterations: " << cg.GetNumIterations() <<"\n";
         }
     }
+    /// [Solve primal problem by CG + BoomerAMG]
 
+    /// [Solve mixed problem by generalized hybridization]
+    mfem::BlockVector mixed_sol(fine_rhs);
+    {
+        if (myid == 0)
+        {
+            std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+        HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
+        if (myid == 0)
+        {
+            std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
+            std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
+            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+        mixed_sol = 0.0;
+        hb_solver.Solve(fine_rhs, mixed_sol);
+        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
+        if (myid == 0)
+        {
+            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
+        }
+    }
+    /// [Solve mixed problem by generalized hybridization]
+
+    /// [Check solution difference]
+    primal_sol -= mixed_sol.GetBlock(1);
+    double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
     if (myid == 0)
     {
-        printf("%d / %d negative weights\n", count, weight.Size());
+        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) <<" \n";
     }
-
-    /// [Load the edge weights]
-
-    // Set up GraphUpscale
-    {
-        /// [Upscale]
-        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, weight);
-
-        //upscale.PrintInfo();
-        //upscale.ShowSetupTime();
-        //upscale.SetMaxIter(max_iter);
-
-        if (verbose)
-        {
-            upscale.SetPrintLevel(1);
-        }
-        /// [Upscale]
-
-        /// [Right Hand Side]
-        //mfem::Vector rhs_u_fine(A.Height());
-        //rhs_u_fine = B;
-        //rhs_u_fine.Randomize();
-        //rhs_u_fine -= 0.5;
-        //rhs_u_fine *= 100000.0;
-        //upscale.Orthogonalize(rhs_u_fine);
-
-
-        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
-        fine_rhs.GetBlock(0) = 0.0;
-        fine_rhs.GetBlock(1) = upscale.GetLocalVector(B);
-        //fine_rhs.GetBlock(1) = rhs_u_fine;
-        //int seed = 1;
-        //fine_rhs.GetBlock(1).Randomize(seed);
-        //upscale.Orthogonalize(fine_rhs);
-        /// [Right Hand Side]
-
-        /// [Solve]
-        //mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        //upscale.ShowCoarseSolveInfo();
-
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        upscale.ShowFineSolveInfo();
-        /// [Solve]
-
-        /// [Check Error]
-        //upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
-
-        /*
-        assert(num_procs == 1);
-
-        mfem::Vector one(A.Height());
-        mfem::Vector Azero(A.Height());
-        one = 1.0;
-        A.Mult(one, Azero);
-        printf("A 1 = : %.4e B* 1: %.4e\n", Azero.Norml2(), (rhs_u_fine * one));
-        */
-    }
+    /// [Check solution difference]
 
     MPI_Finalize();
     return 0;
+}
+
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts)
+{
+    smoothg::MetisGraphPartitioner partitioner;
+    partitioner.setUnbalanceTol(2);
+    mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
+    mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
+
+    partitioner.doPartition(vertex_vertex, num_parts, part);
+}
+
+unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian)
+{
+    auto& pM = mixed_laplacian.get_pM();
+    auto& pD = mixed_laplacian.get_pD();
+    auto* pW = mixed_laplacian.get_pW();
+
+    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
+
+    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
+    pM.GetDiag(M_inv);
+    MinvDT->InvScaleRows(M_inv);
+
+    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
+
+    const bool use_w = mixed_laplacian.CheckW();
+
+    if (use_w)
+    {
+        (*pW) *= -1.0;
+        // TODO(gelever1): define ParSub lol
+        A.reset(ParAdd(*A, *pW));
+        (*pW) *= -1.0;
+    }
+
+    A->CopyRowStarts();
+    A->CopyColStarts();
+
+    return A;
 }
 
 void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::Vector& weight)
@@ -342,21 +342,4 @@ void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::V
 
     SparseMatrix ve = smoothg::Transpose(ev);
     vertex_edge.Swap(ve);
-}
-
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
-               int isolate)
-{
-    smoothg::MetisGraphPartitioner partitioner;
-    partitioner.setUnbalanceTol(1.0);
-    mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
-    mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
-
-    mfem::Array<int> post_isolate_vertices;
-    if (isolate >= 0)
-        post_isolate_vertices.Append(isolate);
-
-    partitioner.SetPostIsolateVertices(post_isolate_vertices);
-
-    partitioner.doPartition(vertex_vertex, num_parts, part);
 }

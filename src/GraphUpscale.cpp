@@ -126,7 +126,9 @@ void GraphUpscale::MakeFineSolver() const
     {
         if (hybridization_)
         {
-            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
+            int agg_size = 20;
+            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(), agg_size);
+            //fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
         }
         else
         {
