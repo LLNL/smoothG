@@ -252,7 +252,8 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
                         const mfem::Array<int>* ess_edge_dofs)
 {
     // Determine if we are solving fine level graph Laplacian problem
-    bool fine_level = (typeid(T) == typeid(mfem::Vector)) ? true : false;
+    //bool fine_level = (typeid(T) == typeid(mfem::Vector)) ? true : false;
+    bool fine_level = std::is_same<T, mfem::Vector>::value;
 
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -381,6 +382,9 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
 
     AssembleHybridSystem(M_el, j_multiplier_edgedof);
     HybridSystem_->Finalize();
+    
+    mfem::SparseMatrix tmp_thresh(Threshold(*HybridSystem_));
+    HybridSystem_->Swap(tmp_thresh);
 
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
@@ -704,6 +708,9 @@ void HybridSolver::AssembleHybridSystem(
         tmpHybrid_el.SetSize(nlocal_multiplier, nlocal_multiplier);
 
         Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
+
+        // Assumes one vertex per aggregate!
+        assert(nlocal_vertexdof == 1);
 
         if (Dloc.Height() > 0 && Dloc.Width() > 0)
         {
