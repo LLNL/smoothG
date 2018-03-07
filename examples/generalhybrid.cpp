@@ -36,7 +36,7 @@ using namespace smoothg;
 
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
-mfem::Vector ComputeFiedlerVector(mfem::HypreParMatrix &A, bool use_w);
+mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
 {
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
     /// [Set up parallel graph and Laplacian]
 
     /// [Right Hand Side]
-    mfem::Vector rhs_u_fine = ComputeFiedlerVector(*gL, mixed_laplacian.CheckW());
+    mfem::Vector rhs_u_fine = ComputeFiedlerVector(mixed_laplacian);
     mfem::BlockVector fine_rhs(mixed_laplacian.get_blockoffsets());
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = rhs_u_fine;
@@ -143,6 +143,7 @@ int main(int argc, char* argv[])
     /// [Right Hand Side]
 
     /// [Solve primal problem by CG + BoomerAMG]
+    mfem::Vector primal_sol(rhs_u_fine);
     {
         if (myid == 0)
         {
@@ -158,6 +159,11 @@ int main(int argc, char* argv[])
         cg.SetAbsTol(1e-12);
         cg.SetOperator(*gL);
 
+        mfem::Array<int> ess_dof(1);
+        ess_dof = 0;
+        gL->EliminateRowsCols(ess_dof);
+        rhs_u_fine(0) = 0.0;
+
         mfem::HypreBoomerAMG prec(*gL);
         prec.SetPrintLevel(0);
         cg.SetPreconditioner(prec);
@@ -170,9 +176,10 @@ int main(int argc, char* argv[])
 
         chrono.Clear();
         chrono.Start();
-        mfem::Vector fine_sol(rhs_u_fine);
-        fine_sol = 0.0;
-        cg.Mult(rhs_u_fine, fine_sol);
+
+        primal_sol = 0.0;
+        cg.Mult(rhs_u_fine, primal_sol);
+        par_orthogonalize_from_constant(primal_sol, vertex_edge_global.Height());
         if (myid == 0)
         {
             std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
@@ -182,6 +189,7 @@ int main(int argc, char* argv[])
     /// [Solve primal problem by CG + BoomerAMG]
 
     /// [Solve mixed problem by generalized hybridization]
+    mfem::BlockVector mixed_sol(fine_rhs);
     {
         if (myid == 0)
         {
@@ -200,9 +208,9 @@ int main(int argc, char* argv[])
 
         chrono.Clear();
         chrono.Start();
-        mfem::BlockVector fine_sol(fine_rhs);
-        fine_sol = 0.0;
-        hb_solver.Solve(fine_rhs, fine_sol);
+        mixed_sol = 0.0;
+        hb_solver.Solve(fine_rhs, mixed_sol);
+        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
         if (myid == 0)
         {
             std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
@@ -210,6 +218,13 @@ int main(int argc, char* argv[])
         }
     }
     /// [Solve mixed problem by generalized hybridization]
+
+    primal_sol -= mixed_sol.GetBlock(1);
+    if (myid == 0)
+    {
+        double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
+        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) <<" \n";
+    }
 
     MPI_Finalize();
     return 0;
@@ -248,6 +263,35 @@ unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplaci
         A.reset(ParAdd(*A, *pW));
         (*pW) *= -1.0;
     }
+
+    A->CopyRowStarts();
+    A->CopyColStarts();
+
+    return A;
+}
+
+mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
+{
+    auto& pM = mixed_laplacian.get_pM();
+    auto& pD = mixed_laplacian.get_pD();
+    auto* pW = mixed_laplacian.get_pW();
+    const bool use_w = mixed_laplacian.CheckW();
+
+    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
+
+    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
+    pM.GetDiag(M_inv);
+    MinvDT->InvScaleRows(M_inv);
+
+    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
+
+    if (use_w)
+    {
+        (*pW) *= -1.0;
+        // TODO(gelever1): define ParSub lol
+        A.reset(ParAdd(*A, *pW));
+        (*pW) *= -1.0;
+    }
     else
     {
         // Adding identity to A so that it is non-singular
@@ -256,23 +300,16 @@ unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplaci
         for (int i = 0; i < diag.Width(); i++)
             diag(i, i) += 1.0;
     }
-    A->CopyRowStarts();
-    A->CopyColStarts();
 
-    return A;
-}
-
-mfem::Vector ComputeFiedlerVector(mfem::HypreParMatrix& A, bool use_w)
-{
-    mfem::HypreBoomerAMG prec(A);
+    mfem::HypreBoomerAMG prec(*A);
     prec.SetPrintLevel(0);
 
-    mfem::HypreLOBPCG lobpcg(A.GetComm());
+    mfem::HypreLOBPCG lobpcg(A->GetComm());
     lobpcg.SetMaxIter(5000);
     lobpcg.SetTol(1e-8);
     lobpcg.SetPrintLevel(0);
     lobpcg.SetNumModes(2);
-    lobpcg.SetOperator(A);
+    lobpcg.SetOperator(*A);
     lobpcg.SetPreconditioner(prec);
     lobpcg.Solve();
 
