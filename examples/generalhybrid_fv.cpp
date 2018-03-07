@@ -188,9 +188,9 @@ int main(int argc, char* argv[])
         cg.SetPreconditioner(prec);
         if (myid == 0)
         {
-            std::cout << "System size: " << gL->N() <<"\n";
-            std::cout << "System NNZ: " << gL->NNZ() <<"\n";
-            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "System size: " << gL->N() << "\n";
+            std::cout << "System NNZ: " << gL->NNZ() << "\n";
+            std::cout << "Setup time: " << chrono.RealTime() << "s. \n";
         }
 
         chrono.Clear();
@@ -201,8 +201,8 @@ int main(int argc, char* argv[])
         par_orthogonalize_from_constant(primal_sol, gL->N());
         if (myid == 0)
         {
-            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
-            std::cout << "Number of iterations: " << cg.GetNumIterations() <<"\n";
+            std::cout << "Solve time: " << chrono.RealTime() << "s. \n";
+            std::cout << "Number of iterations: " << cg.GetNumIterations() << "\n";
         }
     }
     /// [Solve primal problem by CG + BoomerAMG]
@@ -226,9 +226,9 @@ int main(int argc, char* argv[])
         HybridSolver hb_solver(comm, mixed_laplacian, partitioning, &edge_boundary_att, &marker);
         if (myid == 0)
         {
-            std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
-            std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
-            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "System size: " << hb_solver.GetHybridSystemSize() << "\n";
+            std::cout << "System NNZ: " << hb_solver.GetNNZ() << "\n";
+            std::cout << "Setup time: " << chrono.RealTime() << "s. \n";
         }
 
         chrono.Clear();
@@ -238,8 +238,8 @@ int main(int argc, char* argv[])
         par_orthogonalize_from_constant(mixed_sol.GetBlock(1), gL->N());
         if (myid == 0)
         {
-            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
-            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
+            std::cout << "Solve time: " << chrono.RealTime() << "s. \n";
+            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() << "\n\n";
         }
     }
     /// [Solve mixed problem by generalized hybridization]
@@ -249,7 +249,7 @@ int main(int argc, char* argv[])
     double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
     if (myid == 0)
     {
-        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) <<" \n";
+        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) << " \n";
     }
     /// [Check solution difference]
 
@@ -267,7 +267,8 @@ void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, in
     partitioner.doPartition(vertex_vertex, num_parts, part);
 }
 
-unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian, const mfem::SparseMatrix* bdr)
+unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian,
+                                                const mfem::SparseMatrix* bdr)
 {
     auto& pM = mixed_laplacian.get_pM();
     auto& pD = mixed_laplacian.get_pD();

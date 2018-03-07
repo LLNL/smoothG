@@ -263,7 +263,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
         assert(edgedof_face.Height() <= num_edge_dofs_);
         for (int i = edgedof_face.Height(); i < num_edge_dofs_; i++)
         {
-                i_edgedof_multiplier[i + 1] = i_edgedof_multiplier[i];
+            i_edgedof_multiplier[i + 1] = i_edgedof_multiplier[i];
         }
 
         num_multiplier_dofs_ = face_edgedof.NumNonZeroElems();
