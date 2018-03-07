@@ -172,7 +172,7 @@ public:
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
-                 const GraphTopology& topo,
+                 const mfem::Array<int>& partitioning,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,

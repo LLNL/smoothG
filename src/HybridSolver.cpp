@@ -141,7 +141,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
-                           const GraphTopology& topo,
+                           const mfem::Array<int>& partitioning,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
@@ -157,15 +157,19 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     saamge_param_(saamge_param)
 {
     MPI_Comm_rank(comm, &myid_);
-    const mfem::SparseMatrix& face_edgedof(topo.face_edge_);
 
-    Agg_vertexdof_.MakeRef(topo.Agg_vertex_);
+    mfem::SparseMatrix face_edgedof;
+    {
+        mfem::SparseMatrix vertex_edge(D_);
+        vertex_edge = 1.0;
 
-    mfem::SparseMatrix vertex_edge(mgL.getD());
-    vertex_edge = 1.0;
+        GraphTopology topo(vertex_edge, mgL.get_edge_d_td(), partitioning, face_bdrattr);
+        Agg_vertexdof_.Swap(topo.Agg_vertex_);
+        face_edgedof.Swap(topo.face_edge_);
 
-    auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
-    Agg_edgedof_.Swap(Agg_edgedof_tmp);
+        auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
+        Agg_edgedof_.Swap(Agg_edgedof_tmp);
+    }
 
     std::vector<mfem::Vector> M_el;
     BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
