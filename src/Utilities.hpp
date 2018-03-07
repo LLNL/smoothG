@@ -62,7 +62,7 @@ SparseMatrix ExtendFaceAgg(const ParMatrix& agg_agg,
                            const SparseMatrix& face_agg_int);
 
 ParMatrix MakeEntityTrueEntity(const ParMatrix& face_face);
-ParMatrix MakeExtPermutation(MPI_Comm comm, const ParMatrix& parmat);
+ParMatrix MakeExtPermutation(const ParMatrix& parmat);
 
 SparseMatrix SparseIdentity(int size);
 SparseMatrix SparseIdentity(int rows, int cols, int row_offset = 0, int col_offset = 0);

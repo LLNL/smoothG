@@ -28,6 +28,7 @@
 #include "Graph.hpp"
 #include "MixedMatrix.hpp"
 #include "GraphTopology.hpp"
+#include "GraphCoarsen.hpp"
 #include "SharedEntityComm.hpp"
 #include "Utilities.hpp"
 #include "Upscale.hpp"
@@ -101,13 +102,6 @@ private:
               const std::vector<int>& partitioning_global,
               const std::vector<double>& weight_global);
 
-    //void DistributeGraph(const SparseMatrix& vertex_edge,
-              //const std::vector<int>& global_partitioning);
-    //void MakeFineLevel(const std::vector<double>& global_weight);
-    //void MakeD(const std::vector<double>& global_weight);
-    //void MakeTopology();
-    void MakeCoarseSpace();
-
     Vector ReadVector(const std::string& filename, const std::vector<int>& local_to_global) const;
 
     void WriteVector(const VectorView& vect, const std::string& filename, int global_size,
@@ -124,6 +118,7 @@ private:
     MixedMatrix mixed_mat_fine_;
 
     GraphTopology gt_;
+    GraphCoarsen coarsener_;
 };
 
 } // namespace smoothg

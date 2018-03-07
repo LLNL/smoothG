@@ -23,11 +23,26 @@
 namespace smoothg
 {
 
-MixedMatrix::MixedMatrix(MPI_Comm comm, const Graph& graph, const std::vector<double>& global_weight)
+MixedMatrix::MixedMatrix(const Graph& graph, const std::vector<double>& global_weight)
 {
     M_local_ = MakeLocalM(graph.edge_true_edge_, graph.edge_edge_, graph.edge_map_, global_weight);
     D_local_ = MakeLocalD(graph.edge_true_edge_, graph.vertex_edge_local_);
     W_local_ = SparseMatrix(std::vector<double>(D_local_.Rows(), 0.0));
+
+    Init(graph.edge_true_edge_);
+}
+
+MixedMatrix::MixedMatrix(SparseMatrix M_local, SparseMatrix D_local,
+                         SparseMatrix W_local, ParMatrix edge_true_edge)
+    : M_local_(std::move(M_local)), D_local_(std::move(D_local)),
+      W_local_(std::move(W_local))
+{
+    Init(edge_true_edge);
+}
+
+void MixedMatrix::Init(const ParMatrix& edge_true_edge)
+{
+    MPI_Comm comm = edge_true_edge.GetComm();
 
     auto starts = parlinalgcpp::GenerateOffsets(comm, {D_local_.Rows(), D_local_.Cols()});
     std::vector<HYPRE_Int>& vertex_starts = starts[0];
@@ -36,8 +51,8 @@ MixedMatrix::MixedMatrix(MPI_Comm comm, const Graph& graph, const std::vector<do
     ParMatrix M_d(comm, edge_starts, M_local_);
     ParMatrix D_d(comm, vertex_starts, edge_starts, D_local_);
 
-    M_global_ = parlinalgcpp::RAP(M_d, graph.edge_true_edge_);
-    D_global_ = D_d.Mult(graph.edge_true_edge_);
+    M_global_ = parlinalgcpp::RAP(M_d, edge_true_edge);
+    D_global_ = D_d.Mult(edge_true_edge);
     W_global_ = ParMatrix(comm, vertex_starts, W_local_);
 
     offsets_ = {0, M_local_.Rows(), M_local_.Rows() + D_local_.Rows()};

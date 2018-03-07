@@ -32,29 +32,35 @@ namespace smoothg
           On false dofs.
 */
 
-struct MixedMatrix
+class MixedMatrix
 {
-    MixedMatrix() = default;
-    MixedMatrix(MPI_Comm comm, const Graph& graph, const std::vector<double>& global_weight);
+    public:
+        MixedMatrix() = default;
+        MixedMatrix(const Graph& graph, const std::vector<double>& global_weight);
+        MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local, ParMatrix edge_true_edge);
 
-    ~MixedMatrix() noexcept = default;
+        ~MixedMatrix() noexcept = default;
 
-    MixedMatrix(const MixedMatrix& other) noexcept;
-    MixedMatrix(MixedMatrix&& other) noexcept;
-    MixedMatrix& operator=(MixedMatrix other) noexcept;
+        MixedMatrix(const MixedMatrix& other) noexcept;
+        MixedMatrix(MixedMatrix&& other) noexcept;
+        MixedMatrix& operator=(MixedMatrix other) noexcept;
 
-    friend void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept;
+        friend void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept;
 
-    SparseMatrix M_local_;
-    SparseMatrix D_local_;
-    SparseMatrix W_local_;
+        SparseMatrix M_local_;
+        SparseMatrix D_local_;
+        SparseMatrix W_local_;
 
-    ParMatrix M_global_;
-    ParMatrix D_global_;
-    ParMatrix W_global_;
+        ParMatrix M_global_;
+        ParMatrix D_global_;
+        ParMatrix W_global_;
 
-    std::vector<int> offsets_;
-    std::vector<int> true_offsets_;
+        std::vector<int> offsets_;
+        std::vector<int> true_offsets_;
+
+    private:
+        void Init(const ParMatrix& edge_true_edge);
+
 };
 
 } // namespace smoothg

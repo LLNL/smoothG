@@ -518,8 +518,10 @@ ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
     return entity_entity.Mult(select_d);
 }
 
-ParMatrix MakeExtPermutation(MPI_Comm comm, const ParMatrix& parmat)
+ParMatrix MakeExtPermutation(const ParMatrix& parmat)
 {
+    MPI_Comm comm = parmat.GetComm();
+
     const auto& diag = parmat.GetDiag();
     const auto& offd = parmat.GetOffd();
     const auto& colmap = parmat.GetColMap();
