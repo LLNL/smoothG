@@ -219,12 +219,14 @@ int main(int argc, char* argv[])
     }
     /// [Solve mixed problem by generalized hybridization]
 
+    /// [Check solution difference]
     primal_sol -= mixed_sol.GetBlock(1);
+    double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
     if (myid == 0)
     {
-        double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
         std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) <<" \n";
     }
+    /// [Check solution difference]
 
     MPI_Finalize();
     return 0;
