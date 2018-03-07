@@ -57,13 +57,13 @@ public:
 
     mfem::Vector& GetFineCoefficient(int sample)
     {
-        fine_ = (double) sample;
+        fine_ = 100.0 * (1.0 + sample);
         return fine_;
     }
 
     mfem::Vector& GetCoarseCoefficient(int sample)
     {
-        coarse_ = (double) sample;
+        coarse_ = 100.0 * (1.0 + sample);
         return coarse_;
     }
 
@@ -211,12 +211,14 @@ int main(int argc, char* argv[])
     mfem::RT_FECollection sigmafec(0, nDimensions);
     mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
 
-    mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight);
+    {
+        mfem::ParBilinearForm a(&sigmafespace);
+        a.AddDomainIntegrator(
+            new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
+        a.Assemble();
+        a.Finalize();
+        a.SpMat().GetDiag(weight);
+    }
 
     for (int i = 0; i < weight.Size(); ++i)
     {
@@ -260,7 +262,6 @@ int main(int argc, char* argv[])
     mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
     marker = 0;
     sigmafespace.GetEssentialVDofs(ess_attr, marker);
-    fvupscale.MakeFineSolver(marker);
 
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
@@ -276,13 +277,16 @@ int main(int argc, char* argv[])
     const int num_samples = 2;
     for (int sample = 0; sample < num_samples; ++sample)
     {
-        auto fine_coefficient = sampler.GetCoarseCoefficient(sample);
-        fvupscale.RescaleCoarseCoefficient(fine_coefficient);
+        std::cout << "---\nSample " << sample << "\n---" << std::endl;
+
+        auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
+        fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
 
-        auto coarse_coefficient = sampler.GetFineCoefficient(sample);
-        fvupscale.RescaleFineCoefficient(coarse_coefficient);
+        auto fine_coefficient = sampler.GetFineCoefficient(sample);
+        fvupscale.RescaleFineCoefficient(fine_coefficient);
+        fvupscale.MakeFineSolver(marker);
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
 
