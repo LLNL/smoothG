@@ -124,8 +124,8 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     if (hybridization_)
     {
         coarse_solver_ = make_unique<HybridSolver>(
-                     comm_, GetCoarseMatrix(), *coarsener_, *hybrid_builder_ptr,
-                     nullptr, nullptr, 0, saamge_param);
+                             comm_, GetCoarseMatrix(), *coarsener_, *hybrid_builder_ptr,
+                             nullptr, nullptr, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
