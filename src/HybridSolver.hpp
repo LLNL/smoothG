@@ -118,6 +118,7 @@ public:
 
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the fine level
+       @param number of "elements" forming an aggregate in hybridization
        @param face_bdrattr Boundary edge to boundary attribute table
        @param ess_edge_dofs An array indicating essential edge dofs
        @param rescale_iter number of iterations to compute diagonal scaling
@@ -128,6 +129,7 @@ public:
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
+                 const int agg_size = 1,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
@@ -171,28 +173,6 @@ public:
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const GraphTopology& topo,
-                 const mfem::SparseMatrix* face_bdrattr = nullptr,
-                 const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 const int rescale_iter = 0,
-                 const SAAMGeParam* saamge_param = nullptr);
-
-    /**
-       @brief Constructor for fine-level hybridiziation solver using aggregates.
-       The aggregate is constructed based on agg_size
-
-       @param comm MPI communicator
-       @param mgL Mixed matrices for the graph Laplacian in the fine level
-       @param face_bdrattr Boundary edge to boundary attribute table
-       @param ess_edge_dofs An array indicating essential edge dofs
-       @param rescale_iter number of iterations to compute diagonal scaling
-              vector for hybridized system. No rescaling if set to 0.
-       @param saamge_param SAAMGe parameters. Use SAAMGe as preconditioner for
-              hybridized system if saamge_param is not nullptr, otherwise
-              BoomerAMG is used instead.
-    */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgL,
-                 const int agg_size,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
@@ -289,10 +269,11 @@ private:
 
     std::vector<mfem::DenseMatrix> Hybrid_el_;
 
-    std::vector<mfem::DenseMatrix> MinvDT_;
-    std::vector<mfem::DenseMatrix> MinvCT_;
+    std::vector<std::unique_ptr<mfem::Operator>> MinvDT_;
+    std::vector<std::unique_ptr<mfem::Operator>> MinvCT_;
     std::vector<mfem::DenseMatrix> AinvDMinvCT_;
-    std::vector<mfem::DenseMatrix> Ainv_;
+    std::vector<std::unique_ptr<mfem::Operator> > Ainv_;
+    std::vector<std::unique_ptr<mfem::Operator> > A_;
 
     mutable std::vector<mfem::Vector> Ainv_f_;
 

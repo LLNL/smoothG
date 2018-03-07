@@ -63,6 +63,7 @@ void HybridSolver::BuildFineLevelLocalMassMatrix(
 
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
+                           const int agg_size,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
@@ -79,20 +80,41 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 {
     MPI_Comm_rank(comm, &myid_);
 
-    const int nvertices = D_.Height();
+    mfem::SparseMatrix face_edgedof;
+    if (agg_size == 1)
+    {
+        // TODO(gelever1): use operator= when mfem version is updated
+        mfem::SparseMatrix tmp_vdof = SparseIdentity(D_.Height());
+        Agg_vertexdof_.Swap(tmp_vdof);
+        mfem::SparseMatrix tmp_edof = SparseIdentity(D_.Width());
+        face_edgedof.Swap(tmp_edof);
+        Agg_edgedof_.MakeRef(D_);
+    }
+    else
+    {
+        mfem::SparseMatrix vertex_edge(D_);
+        vertex_edge = 1.0;
 
-    // TODO(gelever1): use operator= when mfem version is updated
-    mfem::SparseMatrix tmp = SparseIdentity(nvertices);
-    Agg_vertexdof_.Swap(tmp);
+        mfem::Array<int> partitioning;
+        PartitionAAT(vertex_edge, partitioning, agg_size);
 
-    Agg_edgedof_.MakeRef(D_);
-    const mfem::SparseMatrix edge_edgedof;
+        GraphTopology topo(vertex_edge, mgL.get_edge_d_td(), partitioning, face_bdrattr);
+        Agg_vertexdof_.Swap(topo.Agg_vertex_);
+        face_edgedof.Swap(topo.face_edge_);
+
+        auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
+        Agg_edgedof_.Swap(Agg_edgedof_tmp);
+
+        if (face_bdrattr)
+        {
+            face_bdrattr = &(topo.face_bdratt_);
+        }
+    }
 
     std::vector<mfem::Vector> M_el;
-    BuildFineLevelLocalMassMatrix(D_, mgL.getWeight(), M_el);
+    BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
 
-    Init(edge_edgedof, M_el, mgL.get_edge_d_td(),
-         face_bdrattr, ess_edge_dofs);
+    Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
@@ -150,80 +172,8 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
     Agg_edgedof_.Swap(Agg_edgedof_tmp);
 
-    std::vector<mfem::Vector> M_el_tmp;
-    BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el_tmp);
-
-    std::vector<mfem::DenseMatrix> M_el(M_el_tmp.size());
-    for (unsigned int i = 0; i < M_el.size(); i++)
-    {
-        mfem::Vector& M_el_tmp_i(M_el_tmp[i]);
-        mfem::DenseMatrix& M_el_i(M_el[i]);
-
-        M_el_i.SetSize(M_el_tmp_i.Size());
-        M_el_i = 0.0;
-        for (int j = 0; j < M_el_tmp_i.Size(); j++)
-        {
-            M_el_i(j, j) = M_el_tmp_i(j);
-        }
-    }
-
-    if (face_bdrattr)
-    {
-        face_bdrattr = &(topo.face_bdratt_);
-    }
-
-    Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
-}
-
-HybridSolver::HybridSolver(MPI_Comm comm,
-                           const MixedMatrix& mgL,
-                           const int agg_size,
-                           const mfem::SparseMatrix* face_bdrattr,
-                           const mfem::Array<int>* ess_edge_dofs,
-                           const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
-    :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
-    comm_(comm),
-    D_(mgL.getD()),
-    W_(mgL.getW()),
-    use_spectralAMGe_((saamge_param != nullptr)),
-    use_w_(mgL.CheckW()),
-    rescale_iter_(rescale_iter),
-    saamge_param_(saamge_param)
-{
-    MPI_Comm_rank(comm, &myid_);
-
-    mfem::SparseMatrix vertex_edge(mgL.getD());
-    vertex_edge = 1.0;
-
-    mfem::Array<int> partitioning;
-    PartitionAAT(vertex_edge, partitioning, agg_size);
-
-    GraphTopology topo(vertex_edge, mgL.get_edge_d_td(), partitioning, face_bdrattr);
-
-    const mfem::SparseMatrix& face_edgedof(topo.face_edge_);
-    Agg_vertexdof_.Swap(topo.Agg_vertex_);
-
-    auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
-    Agg_edgedof_.Swap(Agg_edgedof_tmp);
-
-    std::vector<mfem::Vector> M_el_tmp;
-    BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el_tmp);
-
-    std::vector<mfem::DenseMatrix> M_el(M_el_tmp.size());
-    for (unsigned int i = 0; i < M_el.size(); i++)
-    {
-        mfem::Vector& M_el_tmp_i(M_el_tmp[i]);
-        mfem::DenseMatrix& M_el_i(M_el[i]);
-
-        M_el_i.SetSize(M_el_tmp_i.Size());
-        M_el_i = 0.0;
-        for (int j = 0; j < M_el_tmp_i.Size(); j++)
-        {
-            M_el_i(j, j) = M_el_tmp_i(j);
-        }
-    }
+    std::vector<mfem::Vector> M_el;
+    BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
 
     if (face_bdrattr)
     {
@@ -271,6 +221,8 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     if (use_spectralAMGe_)
         Hybrid_el_.resize(nAggs_);
 
+    mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
+
     mfem::SparseMatrix edgedof_bdrattr;
     if (face_bdrattr)
     {
@@ -280,7 +232,6 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
         }
         else
         {
-            mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
             mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, *face_bdrattr);
             edgedof_bdrattr.Swap(tmp);
         }
@@ -296,35 +247,11 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     mfem::Array<int> j_multiplier_edgedof;
 
     // construct multiplier dof to true dof table
-    if (fine_level)
-    {
-        num_multiplier_dofs_ = num_edge_dofs_;
-        j_multiplier_edgedof.SetSize(num_edge_dofs_);
-        std::iota(j_multiplier_edgedof.GetData(), j_multiplier_edgedof.GetData() + num_edge_dofs_, 0);
-        Agg_multiplier_.MakeRef(Agg_edgedof_);
-
-        GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
-
-        multiplier_d_td_ = make_unique<mfem::HypreParMatrix>();
-        multiplier_d_td_->MakeRef(edgedof_d_td_);
-    }
-    else
     {
         unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
         unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
 
-//        num_multiplier_dofs_ = face_edgedof.Width();
-
         int* i_edgedof_multiplier = new int[num_edge_dofs_ + 1];
-//        std::iota(i_edgedof_multiplier, i_edgedof_multiplier + num_multiplier_dofs_ + 1, 0);
-//        std::fill_n(i_edgedof_multiplier + num_multiplier_dofs_ + 1,
-//                    num_edge_dofs_ - num_multiplier_dofs_,
-//                    i_edgedof_multiplier[num_multiplier_dofs_]);
-
-        // more general case
-        num_multiplier_dofs_ = face_edgedof.NumNonZeroElems();
-
-        mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
         i_edgedof_multiplier[0] = 0;
         for (int i = 0; i < edgedof_face.Height(); i++)
         {
@@ -345,6 +272,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
                 i_edgedof_multiplier[i + 1] = i_edgedof_multiplier[i];
         }
 
+        num_multiplier_dofs_ = face_edgedof.NumNonZeroElems();
         int* j_edgedof_multiplier = new int[num_multiplier_dofs_];
         std::iota(j_edgedof_multiplier, j_edgedof_multiplier + num_multiplier_dofs_, 0);
         double* data_edgedof_multiplier = new double[num_multiplier_dofs_];
@@ -552,23 +480,23 @@ void HybridSolver::AssembleHybridSystem(
 
         Mloc_solver.SetOperator(M_el[iAgg]);
 
-        mfem::DenseMatrix& MinvCT_i(MinvCT_[iAgg]);
-        mfem::DenseMatrix& MinvDT_i(MinvDT_[iAgg]);
+        mfem::DenseMatrix* MinvCT_i = new mfem::DenseMatrix;
+        mfem::DenseMatrix* MinvDT_i = new mfem::DenseMatrix;
+        mfem::DenseMatrix* Ainv_i = new mfem::DenseMatrix;
         mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
-        mfem::DenseMatrix& Ainv_i(Ainv_[iAgg]);
 
-        MinvCT_i.SetSize(nlocal_edgedof, nlocal_multiplier);
-        MinvDT_i.SetSize(nlocal_edgedof, nlocal_vertexdof);
+        MinvCT_i->SetSize(nlocal_edgedof, nlocal_multiplier);
+        MinvDT_i->SetSize(nlocal_edgedof, nlocal_vertexdof);
         AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
 
-        Mloc_solver.Mult(DlocT, MinvDT_i);
-        Mloc_solver.Mult(ClocT, MinvCT_i);
+        Mloc_solver.Mult(DlocT, *MinvDT_i);
+        Mloc_solver.Mult(ClocT, *MinvCT_i);
 
         // Compute CMinvCT = Cloc * MinvCT
-        MultSparseDense(Cloc, MinvCT_i, tmpHybrid_el);
+        MultSparseDense(Cloc, *MinvCT_i, tmpHybrid_el);
 
         // Compute Aloc = DMinvDT = Dloc * MinvDT
-        MultSparseDense(Dloc, MinvDT_i, Aloc);
+        MultSparseDense(Dloc, *MinvDT_i, Aloc);
 
         if (W_)
         {
@@ -581,14 +509,14 @@ void HybridSolver::AssembleHybridSystem(
         }
 
         // Compute DMinvCT Dloc * MinvCT
-        MultSparseDense(Dloc, MinvCT_i, DMinvCT);
+        MultSparseDense(Dloc, *MinvCT_i, DMinvCT);
 
         // Compute the LU factorization of Aloc and Ainv_ * DMinvCT
         mfem::DenseMatrixInverse Ainv(Aloc);
-        Ainv.GetInverseMatrix(Ainv_i);
+        Ainv.GetInverseMatrix(*Ainv_i);
 
         //Ainv_i.Mult(DMinvCT, AinvDMinvCT_i);
-        mfem::Mult(Ainv_i, DMinvCT, AinvDMinvCT_i);
+        mfem::Mult(*Ainv_i, DMinvCT, AinvDMinvCT_i);
 
         // Compute CMinvDTAinvDMinvCT = CMinvDT * AinvDMinvCT_
         CMinvDT.Transpose(DMinvCT);
@@ -610,6 +538,10 @@ void HybridSolver::AssembleHybridSystem(
         HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier,
                                     tmpHybrid_el);
 
+        MinvCT_[iAgg].reset(MinvCT_i);
+        MinvDT_[iAgg].reset(MinvDT_i);
+        Ainv_[iAgg].reset(Ainv_i);
+
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
         if (use_spectralAMGe_)
@@ -621,16 +553,16 @@ void HybridSolver::AssembleHybridSystem(
     const std::vector<mfem::Vector>& M_el,
     const mfem::Array<int>& j_multiplier_edgedof)
 {
+    A_.resize(M_el.size());
+
     const int map_size = std::max(num_edge_dofs_, Agg_vertexdof_.Width());
     mfem::Array<int> edgedof_global_to_local_map(map_size);
     edgedof_global_to_local_map = -1;
     mfem::Array<bool> edge_marker(num_edge_dofs_);
     edge_marker = true;
 
-    mfem::DenseMatrix Dloc, Aloc;
     mfem::DenseMatrix tmpHybrid_el;
-
-    mfem::Vector column_in, CMinvCT, CMinvDT;
+    mfem::Vector CMinvCT;
 
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
@@ -640,7 +572,6 @@ void HybridSolver::AssembleHybridSystem(
         GetTableRow(Agg_edgedof_, iAgg, local_edgedof);
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
 
-        const int nlocal_vertexdof = local_vertexdof.Size();
         const int nlocal_edgedof = local_edgedof.Size();
         const int nlocal_multiplier = local_multiplier.Size();
 
@@ -650,18 +581,8 @@ void HybridSolver::AssembleHybridSystem(
             edgedof_global_to_local_map[local_edgedof[i]] = i;
 
         // Extract MinvDT as a dense submatrix of D^T
-        ExtractSubMatrix(D_, local_vertexdof, local_edgedof,
-                         edgedof_global_to_local_map, Dloc);
-
-        mfem::DenseMatrix& MinvCT_i(MinvCT_[iAgg]);
-        mfem::DenseMatrix& MinvDT_i(MinvDT_[iAgg]);
-        mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
-        mfem::DenseMatrix& Ainv_i(Ainv_[iAgg]);
-
-        MinvDT_i.Transpose(Dloc);
-        MinvCT_i.SetSize(nlocal_edgedof, nlocal_multiplier);
-        AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
-        Ainv_i.SetSize(nlocal_vertexdof, nlocal_vertexdof);
+        auto Dloc = ExtractRowAndColumns(D_, local_vertexdof, local_edgedof,
+                                         edgedof_global_to_local_map, false);
 
         // Construct the constraint matrix C which enforces the continuity of
         // the broken edge space
@@ -684,69 +605,80 @@ void HybridSolver::AssembleHybridSystem(
                 edge_marker[edgedof_global_id])
             {
                 edge_marker[edgedof_global_id] = false;
-                MinvCT_i.Elem(edgedof_local_id, i) = 1. / M_diag(edgedof_local_id);
                 Cloc_data[i] = 1.;
             }
             else
             {
-                MinvCT_i.Elem(edgedof_local_id, i) = -1. / M_diag(edgedof_local_id);
                 Cloc_data[i] = -1.;
             }
         }
 
-        mfem::SparseMatrix Cloc(Cloc_i, Cloc_j, Cloc_data,
-                                nlocal_multiplier, nlocal_edgedof);
-
         for (int i = 0; i < nlocal_edgedof; ++i)
             edgedof_global_to_local_map[local_edgedof[i]] = -1;
 
-        MinvDT_i.InvLeftScaling(M_diag);
+        mfem::SparseMatrix Cloc(Cloc_i, Cloc_j, Cloc_data,
+                                nlocal_multiplier, nlocal_edgedof);
 
-        tmpHybrid_el.SetSize(nlocal_multiplier, nlocal_multiplier);
+        mfem::SparseMatrix* MinvCT_i = mfem::Transpose(Cloc);
+        InvScaleRows(M_diag, *MinvCT_i);
 
-        Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
+        mfem::SparseMatrix* MinvDT_i = mfem::Transpose(Dloc);
+        InvScaleRows(M_diag, *MinvDT_i);
 
+        mfem::SparseMatrix* Aloc;
         if (Dloc.Height() > 0 && Dloc.Width() > 0)
         {
-            mfem::Mult(Dloc, MinvDT_i, Aloc);
+            Aloc = mfem::Mult(Dloc, *MinvDT_i);
         }
         else
         {
-            Aloc = 0.0;
+            Aloc = new mfem::SparseMatrix(0);
         }
-
-        // Compute CMinvDT  = Cloc * MinvDT
-        CMinvDT.SetSize(nlocal_multiplier);
-        column_in.SetDataAndSize(MinvDT_i.Data(), nlocal_multiplier);
-        Cloc.Mult(column_in, CMinvDT);
 
         if (W_)
         {
             auto Wloc = ExtractRowAndColumns(*W_, local_vertexdof, local_vertexdof,
                                              edgedof_global_to_local_map);
-            mfem::DenseMatrix tmpW;
-            Full(Wloc, tmpW);
-
-            Aloc -= tmpW;
+            Aloc->Add(-1.0, Wloc);
         }
 
-        // Compute the LU factorization of Aloc and Ainv_ * DMinvCT
-        const double A00_inv = 1. / Aloc(0, 0);
-        Ainv_i.Elem(0, 0) = A00_inv;
+        // Compute the LU factorization of Aloc
+        mfem::UMFPackSolver* Ainv_i = new mfem::UMFPackSolver(*Aloc);
 
-        for (int j = 0; j < nlocal_multiplier; ++j)
-            AinvDMinvCT_i.Elem(0, j) = CMinvDT(j) * A00_inv;
+        // Compute DMinvCT = Dloc * MinvCT
+        mfem::SparseMatrix DMinvCT = smoothg::Mult(Dloc, *MinvCT_i);
 
-        // Compute -CMinvDTAinvDMinvCT = -CMinvDT * Ainv_ * DMinvCT
-        Mult_a_VVt(-A00_inv, CMinvDT, tmpHybrid_el);
+        // AinvDMinvCT_i = Ainv_i * DMinvCT;
+        mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
+        AinvDMinvCT_i = smoothg::Mult(*Ainv_i, DMinvCT);
+
+        // Compute CMinvDTAinvDMinvCT = -CMinvDT * AinvDMinvCT_
+        tmpHybrid_el.SetSize(nlocal_multiplier, nlocal_multiplier);
+
+        mfem::SparseMatrix CMinvDT = smoothg::Transpose(DMinvCT);
+        CMinvDT *= -1.0;
+        if (CMinvDT.Height() > 0 && CMinvDT.Width() > 0)
+        {
+            MultSparseDense(CMinvDT, AinvDMinvCT_i, tmpHybrid_el);
+        }
+        else
+        {
+            tmpHybrid_el = 0.0;
+        }
 
         // Hybrid_el_ = CMinvCT - CMinvDTAinvDMinvCT
         for (int j = 0; j < nlocal_multiplier; ++j)
-            tmpHybrid_el.Elem(j, j) += CMinvCT(j);
+        {
+            tmpHybrid_el(j, j) += CMinvCT(j);
+        }
 
         // Add contribution of the element matrix to the golbal system
-        HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier,
-                                    tmpHybrid_el);
+        HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier, tmpHybrid_el);
+
+        MinvCT_[iAgg].reset(MinvCT_i);
+        MinvDT_[iAgg].reset(MinvDT_i);
+        Ainv_[iAgg].reset(Ainv_i);
+        A_[iAgg].reset(Aloc);
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
@@ -873,7 +805,7 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
 
         // Save the element rhs [M B^T;B 0]^-1[f;g] for solution recovery
         Ainv_f_[iAgg].SetSize(nlocal_vertexdof);
-        Ainv_[iAgg].Mult(f_loc, Ainv_f_[iAgg]);
+        Ainv_[iAgg]->Mult(f_loc, Ainv_f_[iAgg]);
     }
 }
 
@@ -888,7 +820,7 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
 
     mfem::Vector& RecoveredSol_block2(RecoveredSol.GetBlock(1));
 
-    mfem::Vector mu_loc, sigma_loc;
+    mfem::Vector mu_loc, sigma_loc, tmp_loc;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         // Extracting the size and global numbering of local dof
@@ -917,8 +849,10 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
 
             // Compute -sigma = Minv(DT u + DT mu)
             sigma_loc.SetSize(nlocal_edgedof);
-            MinvDT_[iAgg].Mult(u_loc, sigma_loc);
-            MinvCT_[iAgg].AddMult(mu_loc, sigma_loc);
+            MinvDT_[iAgg]->Mult(u_loc, sigma_loc);
+            tmp_loc.SetSize(nlocal_edgedof);
+            MinvCT_[iAgg]->Mult(mu_loc, sigma_loc);
+            sigma_loc += tmp_loc;
         }
 
         // Save local solution to the global solution vector
