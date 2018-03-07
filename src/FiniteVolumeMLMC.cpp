@@ -92,10 +92,9 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
-    // GetFineMatrix().setWeight
+    GetFineMatrix().SetMFromWeightVector(coeff);
 }
 
-/// the .back() assumes this is two-level, that is TLMC not MLMC
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     mbuilder_->SetCoefficient(coeff);
