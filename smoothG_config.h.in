@@ -18,4 +18,6 @@
 
 #define SMOOTHG_USE_ARPACK @smoothG_USE_ARPACK@
 
+#define SMOOTHG_USE_SAAMGE @smoothG_USE_SAAMGE@
+
 #endif

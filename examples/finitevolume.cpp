@@ -173,17 +173,9 @@ int main(int argc, char* argv[])
     rhs_u_fine = q;
 
     // Construct vertex_edge table in mfem::SparseMatrix format
-    mfem::SparseMatrix vertex_edge;
-    if (nDimensions == 2)
-    {
-        mfem::SparseMatrix tmp = TableToSparse(pmesh->ElementToEdgeTable());
-        vertex_edge.Swap(tmp);
-    }
-    else
-    {
-        mfem::SparseMatrix tmp = TableToSparse(pmesh->ElementToFaceTable());
-        vertex_edge.Swap(tmp);
-    }
+    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
+                              : pmesh->ElementToFaceTable();
+    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration
     mfem::Array<int> partitioning;
@@ -282,18 +274,11 @@ void MetisPart(mfem::Array<int>& partitioning,
     DivOp.Assemble();
     DivOp.Finalize();
 
-    const mfem::SparseMatrix& DivMat = DivOp.SpMat();
-    const mfem::SparseMatrix DivMatT = smoothg::Transpose(DivMat);
-    const mfem::SparseMatrix vertex_vertex = smoothg::Mult(DivMat, DivMatT);
-
     int metis_coarsening_factor = 1;
     for (const auto factor : coarsening_factor)
         metis_coarsening_factor *= factor;
 
-    const int nvertices = vertex_vertex.Height();
-    int num_partitions = std::max(1, nvertices / metis_coarsening_factor);
-
-    Partition(vertex_vertex, partitioning, num_partitions);
+    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
 }
 
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,

@@ -81,7 +81,11 @@ public:
      */
     void doPartition(const mfem::SparseMatrix& wtable,
                      int& num_partitions,
-                     mfem::Array<int>& partitioning);
+                     mfem::Array<int>& partitioning,
+                     bool use_edge_weight = false);
+
+    // TODO: move this function to MatrixUtilities?
+    static mfem::SparseMatrix getAdjacency(const mfem::SparseMatrix& wtable);
 
     /**
        Isolate some critical vertices of the graph into their own partition, so
@@ -106,8 +110,6 @@ private:
     void removeEmptyParts(mfem::Array<int>& partitioning,
                           int& num_partitions) const;
 
-    mfem::SparseMatrix getAdjacency(const mfem::SparseMatrix& wtable) const;
-
     int connectedComponents(mfem::Array<int>& partitioning,
                             const mfem::SparseMatrix& conn);
 
@@ -123,7 +125,11 @@ private:
                       int*, int*, float*, float*, int*, int*, int*)> CallMetis;
 };
 
-void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning, int num_parts);
+void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
+               int num_parts, bool use_edge_weight = false);
+
+void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
+                  mfem::Array<int>& partitioning, int coarsening_factor);
 
 } // namespace smoothg
 

@@ -34,7 +34,8 @@ MetisGraphPartitioner::MetisGraphPartitioner(PartType _part_type)
 
 void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
                                         int& num_partitions,
-                                        mfem::Array<int>& partitioning)
+                                        mfem::Array<int>& partitioning,
+                                        bool use_edge_weight)
 {
     const int nvertices = wtable.Size();
 
@@ -62,6 +63,17 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
     int* j_ptr = adjacency.GetJ();
 
     int* edge_weight_ptr = nullptr;
+    mfem::Array<int> adj_weight_int;
+    if (use_edge_weight)
+    {
+        adj_weight_int.SetSize(adjacency.NumNonZeroElems());
+        mfem::Vector adj_weight(adjacency.GetData(), adj_weight_int.Size());
+        double adj_wt_min = adj_weight.Min();
+        for (int i = 0; i < adj_weight.Size(); i++)
+            adj_weight_int[i] = floor(log2(adj_weight[i] / adj_wt_min)) + 1;
+        edge_weight_ptr = adj_weight_int.GetData();
+    }
+
     int* vertex_weight_ptr = nullptr;
 
     int ncon = 1;
@@ -149,7 +161,7 @@ void MetisGraphPartitioner::SetPostIsolateVertices(const mfem::Array<int>& indic
 }
 
 mfem::SparseMatrix MetisGraphPartitioner::getAdjacency(
-    const mfem::SparseMatrix& wtable) const
+    const mfem::SparseMatrix& wtable)
 {
     const int nvertices = wtable.Size();
     const int nedges = wtable.NumNonZeroElems();
@@ -315,11 +327,24 @@ int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
     return offset_comp.Last();
 }
 
-void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning, int num_parts)
+void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
+               int num_parts, bool use_edge_weight)
 {
     MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(2);
-    partitioner.doPartition(w_table, num_parts, partitioning);
+    partitioner.doPartition(w_table, num_parts, partitioning, use_edge_weight);
+}
+
+void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
+                  mfem::Array<int>& partitioning, int coarsening_factor)
+{
+    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
+    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
+
+    const int nvertices = vert_vert.Height();
+    int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
+    num_partitions = std::max(1, num_partitions);
+    Partition(vert_vert, partitioning, num_partitions);
 }
 
 } // namespace smoothg
