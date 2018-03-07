@@ -103,36 +103,39 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
                                coarsener_->construct_face_facedof_table()));
 }
 
+void FiniteVolumeMLMC::ForceMakeFineSolver(const mfem::Array<int>& marker) const
+{
+    // L2-H1 block diagonal preconditioner
+    mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
+    mfem::SparseMatrix& Dref = GetFineMatrix().getD();
+    const bool w_exists = GetFineMatrix().CheckW();
+
+    for (int mm = 0; mm < marker.Size(); ++mm)
+    {
+        if (marker[mm])
+        {
+            //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
+
+            const bool set_diag = true;
+            Mref.EliminateRow(mm, set_diag);
+        }
+    }
+    mfem::Array<int> mfem_const_broken;
+    mfem_const_broken.MakeRef(marker);
+    Dref.EliminateCols(mfem_const_broken);
+    if (!w_exists && myid_ == 0)
+    {
+        Dref.EliminateRow(0);
+    }
+
+    fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+}
+
 void FiniteVolumeMLMC::MakeFineSolver(const mfem::Array<int>& marker) const
 {
     if (!fine_solver_)
     {
-        // L2-H1 block diagonal preconditioner
-        {
-            mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
-            mfem::SparseMatrix& Dref = GetFineMatrix().getD();
-            const bool w_exists = GetFineMatrix().CheckW();
-
-            for (int mm = 0; mm < marker.Size(); ++mm)
-            {
-                if (marker[mm])
-                {
-                    //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
-
-                    const bool set_diag = true;
-                    Mref.EliminateRow(mm, set_diag);
-                }
-            }
-            mfem::Array<int> mfem_const_broken;
-            mfem_const_broken.MakeRef(marker);
-            Dref.EliminateCols(mfem_const_broken);
-            if (!w_exists && myid_ == 0)
-            {
-                Dref.EliminateRow(0);
-            }
-
-            fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
-        }
+        ForceMakeFineSolver(marker);
     }
 }
 

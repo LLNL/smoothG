@@ -63,7 +63,8 @@ public:
 
     mfem::Vector& GetCoarseCoefficient(int sample)
     {
-        coarse_ = 100.0 * (1.0 + sample);
+        // coarse_ = 100.0 * (1.0 + sample);
+        coarse_ = 1.0 / (100.0 * (1.0 + sample));
         return coarse_;
     }
 
@@ -275,6 +276,7 @@ int main(int argc, char* argv[])
     StupidSampler sampler(num_fine_edges, num_aggs);
 
     const int num_samples = 2;
+    // for (int sample = num_samples-1; sample >= 0; sample--)
     for (int sample = 0; sample < num_samples; ++sample)
     {
         std::cout << "---\nSample " << sample << "\n---" << std::endl;
@@ -286,9 +288,12 @@ int main(int argc, char* argv[])
 
         auto fine_coefficient = sampler.GetFineCoefficient(sample);
         fvupscale.RescaleFineCoefficient(fine_coefficient);
-        fvupscale.MakeFineSolver(marker);
+        fvupscale.ForceMakeFineSolver(marker);
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
+
+        std::cout << "sol_fine max = " << sol_fine.GetBlock(1).Max() << std::endl;
+        std::cout << "sol_fine min = " << sol_fine.GetBlock(1).Min() << std::endl;
 
         auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 
