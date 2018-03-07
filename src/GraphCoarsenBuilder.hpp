@@ -192,11 +192,18 @@ private:
 /**
    @brief Stores components of local coarse mass matrix so that it can
    have its coefficients rescaled without re-coarsening.
+
+   This implementation is quite different from the other CoarseMBuilder
+   objects, many of its methods are no-ops, which suggests we should
+   maybe redesign some things.
 */
 class CoefficientMBuilder : public CoarseMBuilder
 {
 public:
-    CoefficientMBuilder(const GraphTopology& topology) : topology_(topology) {}
+    CoefficientMBuilder(const GraphTopology& topology) :
+        topology_(topology),
+        components_built_(false)
+    {}
 
     void Setup(
         std::vector<mfem::DenseMatrix>& edge_traces,
@@ -271,6 +278,8 @@ private:
     std::vector<mfem::DenseMatrix> comp_EF_E_;
     /// P_{E(A)}^T M_{E(A)} P_{E(A)}
     std::vector<mfem::DenseMatrix> comp_E_E_;
+
+    bool components_built_;
 };
 
 /**

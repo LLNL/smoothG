@@ -73,6 +73,11 @@ void CoefficientMBuilder::Setup(
     {
         coarse_agg_dof_offsets_[i] = coarse_agg_dof_offsets_[i - 1] + vertex_target[i - 1].Width() - 1;
     }
+
+    // initialize weights with ones
+    mfem::Vector agg_weights(num_aggs);
+    agg_weights = 1.0;
+    SetCoefficient(agg_weights);
 }
 
 void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
@@ -375,6 +380,7 @@ void CoefficientMBuilder::BuildComponents(mfem::SparseMatrix& Pedges,
             }
         }
     }
+    components_built_ = true;
 }
 
 /// this shares a lot of code with BuildComponents, but I'm not sure it makes
@@ -382,22 +388,14 @@ void CoefficientMBuilder::BuildComponents(mfem::SparseMatrix& Pedges,
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
     mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
-    // what we're doing:
-    //   1. assemble from components, identity weights, compare to original
-    //   2. change interface so we can actually change weights
-    //   3. what to do in parallel....
+    // build the components, if necessary
+    if (!components_built_)
+    {
+        BuildComponents(Pedges, face_cdof);
+    }
 
-    // ---
-    // build the components...
-    // ---
-    BuildComponents(Pedges, face_cdof);
-
-    // temporarily just use hard-coded weights = 1
     const int num_aggs = topology_.Agg_face_.Height();
     const int num_faces = topology_.Agg_face_.Width();
-    mfem::Vector agg_weights(num_aggs);
-    agg_weights = 1.0;
-    SetCoefficient(agg_weights);
 
     // ---
     // assemble from components...

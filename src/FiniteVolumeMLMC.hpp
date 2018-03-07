@@ -66,9 +66,15 @@ public:
 
     void MakeFineSolver(const mfem::Array<int>& marker) const;
 
+    void RescaleFineCoefficient(const mfem::Vector& coeff);
+
+    void RescaleCoarseCoefficient(const mfem::Vector& coeff);
+
 private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
+
+    std::unique_ptr<CoefficientMBuilder> mbuilder_;
 };
 
 } // namespace smoothg

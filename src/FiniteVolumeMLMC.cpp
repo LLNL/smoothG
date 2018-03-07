@@ -51,13 +51,11 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, global_partitioning,
                                                      &edge_boundary_att_);
 
-    std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
-    mbuilder_ptr = std::make_shared<CoefficientMBuilder>(*graph_topology);
-
+    mbuilder_ = make_unique<CoefficientMBuilder>(*graph_topology);
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     *mbuilder_ptr);
+                     *mbuilder_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -90,6 +88,14 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
+}
+
+void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
+{
+}
+
+void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
+{
 }
 
 void FiniteVolumeMLMC::MakeFineSolver(const mfem::Array<int>& marker) const
