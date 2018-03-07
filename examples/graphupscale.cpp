@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
 
         // Do work at Coarse Level
-        auto rhs_u_coarse = upscale.Coarsen(rhs_u_fine);
+        auto rhs_u_coarse = upscale.Restrict(rhs_u_fine);
         auto sol_u_coarse = upscale.SolveCoarse(rhs_u_coarse);
 
         // If multiple iterations, reuse vector

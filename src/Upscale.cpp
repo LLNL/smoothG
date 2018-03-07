@@ -32,7 +32,7 @@ void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
     assert(coarsener_);
     assert(coarse_solver_);
 
-    coarsener_->coarsen(x, rhs_coarse_->GetBlock(1));
+    coarsener_->restrict(x, rhs_coarse_->GetBlock(1));
     rhs_coarse_->GetBlock(0) = 0.0;
     rhs_coarse_->GetBlock(1) *= -1.0;
 
@@ -64,7 +64,7 @@ void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
     assert(coarsener_);
     assert(coarse_solver_);
 
-    coarsener_->coarsen(x, *rhs_coarse_);
+    coarsener_->restrict(x, *rhs_coarse_);
     rhs_coarse_->GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
@@ -184,32 +184,32 @@ mfem::BlockVector Upscale::Interpolate(const mfem::BlockVector& x) const
     return fine_vect;
 }
 
-void Upscale::Coarsen(const mfem::Vector& x, mfem::Vector& y) const
+void Upscale::Restrict(const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(coarsener_);
 
-    coarsener_->coarsen(x, y);
+    coarsener_->restrict(x, y);
 }
 
-mfem::Vector Upscale::Coarsen(const mfem::Vector& x) const
+mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
 {
     mfem::Vector coarse_vect = GetCoarseVector();
-    Coarsen(x, coarse_vect);
+    Restrict(x, coarse_vect);
 
     return coarse_vect;
 }
 
-void Upscale::Coarsen(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void Upscale::Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
     assert(coarsener_);
 
-    coarsener_->coarsen(x, y);
+    coarsener_->restrict(x, y);
 }
 
-mfem::BlockVector Upscale::Coarsen(const mfem::BlockVector& x) const
+mfem::BlockVector Upscale::Restrict(const mfem::BlockVector& x) const
 {
     mfem::BlockVector coarse_vect(GetCoarseBlockVector());
-    Coarsen(x, coarse_vect);
+    Restrict(x, coarse_vect);
 
     return coarse_vect;
 }

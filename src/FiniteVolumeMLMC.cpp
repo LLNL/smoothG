@@ -96,6 +96,7 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
+    mbuilder_->SetCoefficient(coeff);
 }
 
 void FiniteVolumeMLMC::MakeFineSolver(const mfem::Array<int>& marker) const

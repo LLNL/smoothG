@@ -73,13 +73,13 @@ public:
     virtual void Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Interpolate(const mfem::BlockVector& x) const;
 
-    /// Coarsen a fine vector to the coarse level
-    virtual void Coarsen(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Coarsen(const mfem::Vector& x) const;
+    /// Restrict a fine vector to the coarse level
+    virtual void Restrict(const mfem::Vector& x, mfem::Vector& y) const;
+    virtual mfem::Vector Restrict(const mfem::Vector& x) const;
 
-    /// Coarsen a fine vector to the coarse level, in mixed form
-    virtual void Coarsen(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Coarsen(const mfem::BlockVector& x) const;
+    /// Restrict a fine vector to the coarse level, in mixed form
+    virtual void Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    virtual mfem::BlockVector Restrict(const mfem::BlockVector& x) const;
 
     /// Get block offsets
     virtual void FineBlockOffsets(mfem::Array<int>& offsets) const;

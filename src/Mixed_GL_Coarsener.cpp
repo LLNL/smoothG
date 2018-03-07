@@ -46,17 +46,17 @@ const std::vector<mfem::DenseMatrix>& Mixed_GL_Coarsener::get_CM_el() const
     return CM_el_;
 }
 
-std::unique_ptr<mfem::BlockVector> Mixed_GL_Coarsener::coarsen_rhs(
+std::unique_ptr<mfem::BlockVector> Mixed_GL_Coarsener::restrict_rhs(
     const mfem::BlockVector& rhs) const
 {
     auto coarse_rhs = make_unique<mfem::BlockVector>(get_blockoffsets());
-    coarsen(rhs, *coarse_rhs);
+    restrict(rhs, *coarse_rhs);
 
     return coarse_rhs;
 }
 
-void Mixed_GL_Coarsener::coarsen(const mfem::BlockVector& fine_vect,
-                                 mfem::BlockVector& coarse_vect) const
+void Mixed_GL_Coarsener::restrict(const mfem::BlockVector& fine_vect,
+                                  mfem::BlockVector& coarse_vect) const
 {
     Psigma_.MultTranspose(fine_vect.GetBlock(0), coarse_vect.GetBlock(0));
     Pu_.MultTranspose(fine_vect.GetBlock(1), coarse_vect.GetBlock(1));
@@ -69,8 +69,8 @@ void Mixed_GL_Coarsener::interpolate(const mfem::BlockVector& coarse_vect,
     Pu_.Mult(coarse_vect.GetBlock(1), fine_vect.GetBlock(1));
 }
 
-void Mixed_GL_Coarsener::coarsen(const mfem::Vector& fine_vect,
-                                 mfem::Vector& coarse_vect) const
+void Mixed_GL_Coarsener::restrict(const mfem::Vector& fine_vect,
+                                  mfem::Vector& coarse_vect) const
 {
     Pu_.MultTranspose(fine_vect, coarse_vect);
 }

@@ -73,16 +73,16 @@ public:
     const std::vector<mfem::DenseMatrix>& get_CM_el() const;
     //const std::vector<std::unique_ptr<mfem::DenseMatrix>>& get_CM_el() const;
 
-    /// Coarsen the (block) right-hand side by multiplying by \f$ P_\sigma, P_u \f$
-    std::unique_ptr<mfem::BlockVector> coarsen_rhs(
+    /// Restrict (coarsen) the (block) right-hand side by multiplying by \f$ P_\sigma, P_u \f$
+    std::unique_ptr<mfem::BlockVector> restrict_rhs(
         const mfem::BlockVector& rhs) const;
 
     // Mixed form
-    void coarsen(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
+    void restrict(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
     void interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
 
     // Primal form
-    void coarsen(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
+    void restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
     void interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
     const mfem::SparseMatrix& construct_Agg_cvertexdof_table() const;
