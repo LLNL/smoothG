@@ -77,7 +77,7 @@ public:
                                      const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof) = 0;
+        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof) = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
 
@@ -121,7 +121,7 @@ public:
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
+        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
 private:
     std::unique_ptr<mfem::SparseMatrix> CoarseM_;
@@ -168,7 +168,7 @@ public:
     /// Here returns a null pointer
     /// @todo change interface so this is optional?
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
+        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
     bool NeedsCoarseVertexDofs() { return true; }
 
@@ -246,11 +246,11 @@ public:
        you call SetCoefficient you can call GetCoarseM() and get the new
        global coarse M with different coefficients.
     */
-    void BuildComponents(mfem::SparseMatrix& Pedges,
+    void BuildComponents(const mfem::SparseMatrix& Pedges,
                          const mfem::SparseMatrix& face_cdof);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
+        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
 private:
     /// @todo remove this (GetTableRowCopy is the same thing?)

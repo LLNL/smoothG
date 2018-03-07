@@ -97,6 +97,9 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     mbuilder_->SetCoefficient(coeff);
+    mixed_laplacians_.back().setWeight(
+        *mbuilder_->GetCoarseM(coarsener_->get_Psigma(),
+                               coarsener_->construct_face_facedof_table()));
 }
 
 void FiniteVolumeMLMC::MakeFineSolver(const mfem::Array<int>& marker) const

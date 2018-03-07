@@ -248,13 +248,13 @@ void CoefficientMBuilder::AddTraceAcross(int row, int col, double value)
 }
 
 std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM(
-    mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
+    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
     return std::unique_ptr<mfem::SparseMatrix>(nullptr);
 }
 
 std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
-    mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
+    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
     CoarseM_->Finalize(0);
     return std::move(CoarseM_);
@@ -294,7 +294,7 @@ mfem::DenseMatrix CoefficientMBuilder::RTP(const mfem::DenseMatrix& R,
     return out;
 }
 
-void CoefficientMBuilder::BuildComponents(mfem::SparseMatrix& Pedges,
+void CoefficientMBuilder::BuildComponents(const mfem::SparseMatrix& Pedges,
                                           const mfem::SparseMatrix& face_cdof)
 {
     // instead of indexing/maps, we will just go through everything in the same
@@ -386,7 +386,7 @@ void CoefficientMBuilder::BuildComponents(mfem::SparseMatrix& Pedges,
 /// this shares a lot of code with BuildComponents, but I'm not sure it makes
 /// sense to combine them in any way.
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
-    mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
+    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
     // build the components, if necessary
     if (!components_built_)
