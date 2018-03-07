@@ -175,6 +175,64 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
 
+HybridSolver::HybridSolver(MPI_Comm comm,
+                           const MixedMatrix& mgL,
+                           const int agg_size,
+                           const mfem::SparseMatrix* face_bdrattr,
+                           const mfem::Array<int>* ess_edge_dofs,
+                           const int rescale_iter,
+                           const SAAMGeParam* saamge_param)
+    :
+    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    comm_(comm),
+    D_(mgL.getD()),
+    W_(mgL.getW()),
+    use_spectralAMGe_((saamge_param != nullptr)),
+    use_w_(mgL.CheckW()),
+    rescale_iter_(rescale_iter),
+    saamge_param_(saamge_param)
+{
+    MPI_Comm_rank(comm, &myid_);
+
+    mfem::SparseMatrix vertex_edge(mgL.getD());
+    vertex_edge = 1.0;
+
+    mfem::Array<int> partitioning;
+    PartitionAAT(vertex_edge, partitioning, agg_size);
+
+    GraphTopology topo(vertex_edge, mgL.get_edge_d_td(), partitioning, face_bdrattr);
+
+    const mfem::SparseMatrix& face_edgedof(topo.face_edge_);
+    Agg_vertexdof_.Swap(topo.Agg_vertex_);
+
+    auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
+    Agg_edgedof_.Swap(Agg_edgedof_tmp);
+
+    std::vector<mfem::Vector> M_el_tmp;
+    BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el_tmp);
+
+    std::vector<mfem::DenseMatrix> M_el(M_el_tmp.size());
+    for (unsigned int i = 0; i < M_el.size(); i++)
+    {
+        mfem::Vector& M_el_tmp_i(M_el_tmp[i]);
+        mfem::DenseMatrix& M_el_i(M_el[i]);
+
+        M_el_i.SetSize(M_el_tmp_i.Size());
+        M_el_i = 0.0;
+        for (int j = 0; j < M_el_tmp_i.Size(); j++)
+        {
+            M_el_i(j, j) = M_el_tmp_i(j);
+        }
+    }
+
+    if (face_bdrattr)
+    {
+        face_bdrattr = &(topo.face_bdratt_);
+    }
+
+    Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+}
+
 HybridSolver::~HybridSolver()
 {
 #if SMOOTHG_USE_SAAMGE
