@@ -33,7 +33,8 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    double spect_tol, int max_evects)
     : Upscale(comm, vertex_edge.Height(), false),
       edge_d_td_(edge_d_td),
-      edge_boundary_att_(edge_boundary_att)
+      edge_boundary_att_(edge_boundary_att),
+      ess_attr_(ess_attr)
 {
     const bool dual_target = false;
     const bool scaled_dual = false;
@@ -60,29 +61,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
-    mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
-    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
-
-    mfem::Array<int> marker(Dref.Width());
-    marker = 0;
-
-    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
-                       coarsener_->construct_face_facedof_table(),
-                       ess_attr, marker);
-
-    // L2-H1 block diagonal preconditioner
-    {
-        for (int mm = 0; mm < marker.Size(); ++mm)
-        {
-            // Assume M diagonal, no ess data
-            if (marker[mm])
-                Mref.EliminateRow(mm, true);
-        }
-
-        Dref.EliminateCols(marker);
-
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm, mixed_laplacians_.back());
-    }
+    MakeCoarseSolver();
 
     MakeCoarseVectors();
 
@@ -101,6 +80,35 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     GetCoarseMatrix().setWeight(
         *mbuilder_->GetCoarseM(coarsener_->get_Psigma(),
                                coarsener_->construct_face_facedof_table()));
+}
+
+/// @todo remove MPI_COMM_WORLD
+void FiniteVolumeMLMC::MakeCoarseSolver()
+{
+    // L2-H1 block diagonal preconditioner
+    mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
+    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
+
+    mfem::Array<int> marker(Dref.Width());
+    marker = 0;
+
+    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
+                       coarsener_->construct_face_facedof_table(),
+                       ess_attr_, marker);
+
+    {
+        for (int mm = 0; mm < marker.Size(); ++mm)
+        {
+            // Assume M diagonal, no ess data
+            if (marker[mm])
+                Mref.EliminateRow(mm, true);
+        }
+
+        Dref.EliminateCols(marker);
+
+        coarse_solver_ = make_unique<MinresBlockSolverFalse>(
+            MPI_COMM_WORLD, mixed_laplacians_.back());
+    }
 }
 
 void FiniteVolumeMLMC::ForceMakeFineSolver(const mfem::Array<int>& marker) const

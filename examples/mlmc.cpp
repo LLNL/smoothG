@@ -79,7 +79,7 @@ private:
 // auto Visualize = [&](const mfem::Vector & sol)
 
 void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
-               const mfem::ParMesh& pmesh)
+               const mfem::ParMesh& pmesh, int tag)
 {
     char vishost[] = "localhost";
     int  visport   = 19916;
@@ -93,7 +93,7 @@ void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
     vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
     vis_v << "solution\n" << pmesh << field;
     vis_v << "window_size 500 800\n";
-    vis_v << "window_title 'pressure'\n";
+    vis_v << "window_title 'pressure" << tag << "'\n";
     vis_v << "autoscale values\n";
 
     if (pmesh.Dimension() == 2)
@@ -283,6 +283,7 @@ int main(int argc, char* argv[])
 
         auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
         fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
+        fvupscale.MakeCoarseSolver();
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
 
@@ -307,8 +308,8 @@ int main(int argc, char* argv[])
         {
             mfem::ParGridFunction field(&ufespace);
 
-            Visualize(sol_upscaled.GetBlock(1), field, *pmesh);
-            Visualize(sol_fine.GetBlock(1), field, *pmesh);
+            Visualize(sol_upscaled.GetBlock(1), field, *pmesh, sample);
+            Visualize(sol_fine.GetBlock(1), field, *pmesh, sample);
         }
     }
 

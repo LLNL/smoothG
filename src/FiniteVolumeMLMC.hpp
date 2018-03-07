@@ -80,9 +80,12 @@ public:
     /// @todo maybe don't have to rebuild whole thing, just M part?
     void ForceMakeFineSolver(const mfem::Array<int>& marker) const;
 
+    void MakeCoarseSolver();
+
 private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
+    const mfem::Array<int>& ess_attr_;
 
     std::unique_ptr<CoefficientMBuilder> mbuilder_;
 };
