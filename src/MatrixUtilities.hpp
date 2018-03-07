@@ -387,6 +387,12 @@ double InnerProduct(const mfem::Vector& u, const mfem::Vector& v);
 std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
     const mfem::HypreParMatrix& entity_trueentity_entity);
 
+/// mat = diag(scale)^{-1} * mat
+void InvScaleRows(const mfem::Vector& scale, mfem::SparseMatrix& mat);
+
+/// return A_inv * B
+mfem::DenseMatrix Mult(const mfem::UMFPackSolver& A_inv, const mfem::SparseMatrix& B);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */
