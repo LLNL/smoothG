@@ -47,6 +47,16 @@ class CoarseMBuilder
 public:
     virtual ~CoarseMBuilder() {}
 
+    /// this is arguably poor design, most implementations of this interface
+    /// do not need all these arguments
+    virtual void Setup(
+        mfem::SparseMatrix& Pedges,
+        const mfem::SparseMatrix& face_cdof,
+        std::vector<mfem::DenseMatrix>& edge_traces,
+        std::vector<mfem::DenseMatrix>& vertex_target,
+        const mfem::SparseMatrix& Agg_face,
+        int total_num_traces, int ncoarse_vertexdofs) = 0;
+
     /// The names of the next several methods are not that descriptive or
     /// informative; they result from removing lines from BuildPEdges()
     /// and putting it here.
@@ -70,6 +80,8 @@ public:
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM() = 0;
 
+    virtual bool NeedsCoarseVertexDofs() { return false; }
+
 protected:
     int total_num_traces_;
 };
@@ -83,8 +95,14 @@ protected:
 class AssembleMBuilder : public CoarseMBuilder
 {
 public:
-    AssembleMBuilder(
+    AssembleMBuilder() {}
+
+    void Setup(
+        mfem::SparseMatrix& Pedges,
+        const mfem::SparseMatrix& face_cdof,
+        std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
+        const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs);
 
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
@@ -123,10 +141,13 @@ private:
 class ElementMBuilder : public CoarseMBuilder
 {
 public:
-    ElementMBuilder(
+    ElementMBuilder() {}
+
+    void Setup(
+        mfem::SparseMatrix& Pedges,
+        const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
-        std::vector<mfem::DenseMatrix>& CM_el,
         const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs);
 
@@ -152,8 +173,15 @@ public:
     /// @todo change interface so this is optional?
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
 
+    bool NeedsCoarseVertexDofs() { return true; }
+
+    /// @todo does DenseMatrix have a move constructor? will this do a deep copy?
+    /// @todo a better interface is probably GetElementMatrix(i) that returns
+    /// a reference to them individually
+    const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return CM_el_; }
+
 private:
-    std::vector<mfem::DenseMatrix>& CM_el_;
+    std::vector<mfem::DenseMatrix> CM_el_;
 
     mfem::Array<int> edge_cdof_marker_;
     mfem::Array<int> edge_cdof_marker2_;
@@ -171,13 +199,14 @@ private:
 class CoefficientMBuilder : public CoarseMBuilder
 {
 public:
-    CoefficientMBuilder(
-        const GraphTopology& topology,
+    CoefficientMBuilder(const GraphTopology& topology) : topology_(topology) {}
+
+    void Setup(
         mfem::SparseMatrix& Pedges,
         const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
-        std::vector<mfem::DenseMatrix>& CM_el,
+        const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs);
 
     void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
@@ -228,8 +257,8 @@ private:
     mfem::DenseMatrix RTP(const mfem::DenseMatrix& R, const mfem::DenseMatrix& P);
 
     const GraphTopology& topology_;
-    mfem::SparseMatrix& Pedges_;
-    const mfem::SparseMatrix& face_cdof_;
+    std::shared_ptr<mfem::SparseMatrix> Pedges_;
+    std::shared_ptr<const mfem::SparseMatrix> face_cdof_;
 
     int total_num_traces_;
     int ncoarse_vertexdofs_;

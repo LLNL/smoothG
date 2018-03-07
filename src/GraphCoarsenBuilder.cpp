@@ -20,19 +20,18 @@
 namespace smoothg
 {
 
-ElementMBuilder::ElementMBuilder(
+void ElementMBuilder::Setup(
+    mfem::SparseMatrix& Pedges,
+    const mfem::SparseMatrix& face_cdof,
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
-    std::vector<mfem::DenseMatrix>& CM_el,
     const mfem::SparseMatrix& Agg_face,
     int total_num_traces, int ncoarse_vertexdofs)
-    :
-    CM_el_(CM_el)
 {
     total_num_traces_ = total_num_traces;
     const unsigned int nAggs = vertex_target.size();
 
-    CM_el.resize(nAggs);
+    CM_el_.resize(nAggs);
     mfem::Array<int> faces;
     for (unsigned int i = 0; i < nAggs; i++)
     {
@@ -40,14 +39,18 @@ ElementMBuilder::ElementMBuilder(
         GetTableRow(Agg_face, i, faces);
         for (int j = 0; j < faces.Size(); ++j)
             nlocal_coarse_dofs += edge_traces[faces[j]].Width();
-        CM_el[i].SetSize(nlocal_coarse_dofs);
+        CM_el_[i].SetSize(nlocal_coarse_dofs);
     }
     edge_cdof_marker_.SetSize(total_num_traces + ncoarse_vertexdofs - nAggs);
     edge_cdof_marker_ = -1;
 }
 
-AssembleMBuilder::AssembleMBuilder(
+void AssembleMBuilder::Setup(
+    mfem::SparseMatrix& Pedges,
+    const mfem::SparseMatrix& face_cdof,
+    std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
+    const mfem::SparseMatrix& Agg_face,
     int total_num_traces, int ncoarse_vertexdofs)
 {
     total_num_traces_ = total_num_traces;
@@ -58,22 +61,20 @@ AssembleMBuilder::AssembleMBuilder(
                    total_num_traces + ncoarse_vertexdofs - nAggs);
 }
 
-CoefficientMBuilder::CoefficientMBuilder(
-    const GraphTopology& topology,
+void CoefficientMBuilder::Setup(
     mfem::SparseMatrix& Pedges,
     const mfem::SparseMatrix& face_cdof,
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
-    std::vector<mfem::DenseMatrix>& CM_el,
+    const mfem::SparseMatrix& Agg_face,
     int total_num_traces, int ncoarse_vertexdofs)
-    :
-    topology_(topology),
-    Pedges_(Pedges),
-    face_cdof_(face_cdof),
-    total_num_traces_(total_num_traces),
-    ncoarse_vertexdofs_(ncoarse_vertexdofs),
-    coarse_agg_dof_offsets_(topology_.Agg_face_.Height() + 1)
 {
+    Pedges_ = std::shared_ptr<mfem::SparseMatrix>(&Pedges);
+    face_cdof_ = std::shared_ptr<const mfem::SparseMatrix>(&face_cdof);
+    total_num_traces_ = total_num_traces;
+    ncoarse_vertexdofs_ = ncoarse_vertexdofs;
+    coarse_agg_dof_offsets_ = topology_.Agg_face_.Height() + 1;
+
     const unsigned int num_aggs = topology_.Agg_face_.Height();
     coarse_agg_dof_offsets_[0] = total_num_traces;
     for (unsigned int i = 1; i < num_aggs + 1; ++i)
@@ -269,7 +270,7 @@ void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weights)
 void CoefficientMBuilder::GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs) const
 {
     mfem::Array<int> temp;
-    GetTableRow(face_cdof_, face, temp); // returns a writeable reference
+    GetTableRow(*face_cdof_, face, temp); // returns a writeable reference
     temp.Copy(local_coarse_dofs); // make sure we do not modify the matrix
 }
 
@@ -309,7 +310,7 @@ void CoefficientMBuilder::BuildComponents()
         GetCoarseFaceDofs(face, local_coarse_dofs);
         GetTableRowCopy(topology_.face_edge_, face, local_fine_dofs);
         mfem::DenseMatrix P_F(local_fine_dofs.Size(), local_coarse_dofs.Size());
-        Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_F);
+        Pedges_->GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_F);
         comp_F_F_[face] = RTP(P_F, P_F);
     }
 
@@ -330,14 +331,14 @@ void CoefficientMBuilder::BuildComponents()
             int face = local_faces[f];
             GetCoarseFaceDofs(face, local_coarse_dofs);
             mfem::DenseMatrix P_EF(local_fine_dofs.Size(), local_coarse_dofs.Size());
-            Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
+            Pedges_->GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
             for (int fprime = f; fprime < local_faces.Size(); ++fprime)
             {
                 int faceprime = local_faces[fprime];
                 // GetTableRowCopy(topology_.face_edge_, faceprime, local_fine_dofs_prime);
                 GetCoarseFaceDofs(faceprime, local_coarse_dofs_prime);
                 mfem::DenseMatrix P_EFprime(local_fine_dofs.Size(), local_coarse_dofs_prime.Size());
-                Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs_prime, P_EFprime);
+                Pedges_->GetSubMatrix(local_fine_dofs, local_coarse_dofs_prime, P_EFprime);
                 comp_EF_EF_.push_back(RTP(P_EF, P_EFprime));
                 auto pair = std::make_pair(face, faceprime);
                 face_pair_to_index[pair] = counter++;
@@ -363,7 +364,7 @@ void CoefficientMBuilder::BuildComponents()
         {
             GetTableRowCopy(topology_.Agg_edge_, agg, local_fine_dofs);
             mfem::DenseMatrix P_E(local_fine_dofs.Size(), local_coarse_dofs.Size());
-            Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);
+            Pedges_->GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);
             comp_E_E_[agg] = RTP(P_E, P_E);
             GetTableRowCopy(topology_.Agg_face_, agg, local_faces);
             for (int af = 0; af < local_faces.Size(); ++af)
@@ -371,7 +372,7 @@ void CoefficientMBuilder::BuildComponents()
                 int face = local_faces[af];
                 GetCoarseFaceDofs(face, local_coarse_dofs);
                 mfem::DenseMatrix P_EF(local_fine_dofs.Size(), local_coarse_dofs.Size());
-                Pedges_.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
+                Pedges_->GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_EF);
                 // comp_EF_E[index] = RTP(P_EF, P_E);
                 comp_EF_E_.push_back(RTP(P_EF, P_E));
                 // also store transpose, or just have it implicitly?

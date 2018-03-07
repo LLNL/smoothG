@@ -44,6 +44,7 @@
 #include "LocalMixedGraphSpectralTargets.hpp"
 #include "utilities.hpp"
 #include "MixedMatrix.hpp"
+#include "GraphCoarsenBuilder.hpp"
 
 /// The overall namespace for the smoothG project
 namespace smoothg
@@ -55,8 +56,6 @@ namespace smoothg
 class GraphCoarsen
 {
 public:
-    enum class CoarseMType { Assemble = 0, CoarseElement, CoarseCoefficient };
-
     /**
        @brief Constructor based on the fine graph and a vertex partitioning.
 
@@ -118,8 +117,7 @@ public:
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,
         mfem::SparseMatrix& face_dof,
-        std::vector<mfem::DenseMatrix>& CM_el,
-        CoarseMType coarse_m_type = CoarseMType::Assemble);
+        CoarseMBuilder& coarse_m_builder);
 
     /**
        @brief Get the aggregate to coarse vertex dofs relation table
@@ -179,7 +177,7 @@ private:
     /// @brief take vertex-based target functions and assemble them in matrix
     void BuildPVertices(std::vector<mfem::DenseMatrix>& vertex_targets,
                         mfem::SparseMatrix& Pvertices,
-                        CoarseMType coarse_m_type);
+                        CoarseMBuilder& coarse_m_builder);
 
     /**
        Method called from BuildPEdges
@@ -260,8 +258,7 @@ private:
         std::vector<mfem::DenseMatrix>& vertex_target,
         mfem::SparseMatrix& face_cdof,
         mfem::SparseMatrix& Pedges,
-        std::vector<mfem::DenseMatrix>& CM_el,
-        CoarseMType coarse_m_type);
+        CoarseMBuilder& coarse_m_builder);
 
     void BuildW(const mfem::SparseMatrix& Pvertices);
 

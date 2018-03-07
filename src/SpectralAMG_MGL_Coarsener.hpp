@@ -64,8 +64,7 @@ public:
                               bool dual_target,
                               bool scaled_dual,
                               bool energy_dual,
-                              bool is_hybridization_used,
-                              bool coarse_coefficient);
+                              CoarseMBuilder& coarse_m_builder);
 
 private:
     /**
@@ -80,7 +79,7 @@ private:
     bool dual_target_;
     bool scaled_dual_;
     bool energy_dual_;
-    bool coarse_coefficient_;
+    CoarseMBuilder& coarse_m_builder_;
 
 }; // SpectralAMG_MGL_Coarsener
 

@@ -37,16 +37,15 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                                                      bool dual_target,
                                                      bool scaled_dual,
                                                      bool energy_dual,
-                                                     bool is_hybridization_used,
-                                                     bool coarse_coefficient)
+                                                     CoarseMBuilder& coarse_m_builder)
     : Mixed_GL_Coarsener(mgL, std::move(gt)),
-      is_hybridization_used_(is_hybridization_used),
+      is_hybridization_used_(false),
       spectral_tol_(spectral_tol),
       max_evecs_per_agg_(max_evecs_per_agg),
       dual_target_(dual_target),
       scaled_dual_(scaled_dual),
       energy_dual_(energy_dual),
-      coarse_coefficient_(coarse_coefficient)
+      coarse_m_builder_(coarse_m_builder)
 {
 }
 
@@ -62,17 +61,11 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
                        mgL_.getD(), mgL_.getW(), *graph_topology_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
-    GraphCoarsen::CoarseMType coarse_m_type;
-    if (is_hybridization_used_)
-        coarse_m_type = GraphCoarsen::CoarseMType::CoarseElement;
-    else if (coarse_coefficient_)
-        coarse_m_type = GraphCoarsen::CoarseMType::CoarseCoefficient;
-    else
-        coarse_m_type = GraphCoarsen::CoarseMType::Assemble;
+
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
-                                       CM_el_, coarse_m_type);
+                                       coarse_m_builder_);
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
     CoarseM_ = graph_coarsen_->GetCoarseM();

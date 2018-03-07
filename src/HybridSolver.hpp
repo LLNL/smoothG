@@ -152,6 +152,7 @@ public:
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const Mixed_GL_Coarsener& mgLc,
+                 const ElementMBuilder& mbuilder,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,

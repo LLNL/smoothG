@@ -61,7 +61,7 @@ GraphCoarsen::GraphCoarsen(const mfem::SparseMatrix& M_proc,
 
 void GraphCoarsen::BuildPVertices(
     std::vector<mfem::DenseMatrix>& vertex_target,
-    mfem::SparseMatrix& Pvertices, CoarseMType coarse_m_type)
+    mfem::SparseMatrix& Pvertices, CoarseMBuilder& coarse_m_builder)
 {
     // simply put vertex_target into Pvertices
 
@@ -116,7 +116,7 @@ void GraphCoarsen::BuildPVertices(
     GenerateOffsets(comm, coarse_vertex_dof_counter, vertex_cd_start_);
 
     // Construct the aggregate to coarse vertex dofs relation table
-    if (coarse_m_type == CoarseMType::CoarseElement)
+    if (coarse_m_builder.NeedsCoarseVertexDofs())
     {
         int* Agg_dof_i = new int[nAggs + 1];
         Agg_dof_i[0] = 0;
@@ -261,8 +261,7 @@ void GraphCoarsen::BuildPEdges(
     std::vector<mfem::DenseMatrix>& vertex_target,
     mfem::SparseMatrix& face_cdof,
     mfem::SparseMatrix& Pedges,
-    std::vector<mfem::DenseMatrix>& CM_el,
-    CoarseMType coarse_m_type)
+    CoarseMBuilder& mbuilder)
 {
     // put trace_extensions and bubble_functions in Pedges
     // the coarse dof numbering is as follows: first loop over each face, count
@@ -281,7 +280,7 @@ void GraphCoarsen::BuildPEdges(
     int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
 
     Agg_cdof_edge_Builder agg_dof_builder(edge_traces, vertex_target, Agg_face,
-                                          (coarse_m_type == CoarseMType::CoarseElement));
+                                          mbuilder.NeedsCoarseVertexDofs());
 
     int* Pedges_i = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
                                         face_edge, Agg_face);
@@ -298,6 +297,9 @@ void GraphCoarsen::BuildPEdges(
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     NormalizeTraces(edge_traces, Agg_vertex, face_edge);
 
+    mbuilder.Setup(Pedges, face_cdof, edge_traces, vertex_target,
+                   Agg_face, total_num_traces, ncoarse_vertexdofs);
+/*
     std::unique_ptr<CoarseMBuilder> mbuilder_ptr;
     if (coarse_m_type == CoarseMType::CoarseElement)
     {
@@ -317,6 +319,7 @@ void GraphCoarsen::BuildPEdges(
                            vertex_target, total_num_traces, ncoarse_vertexdofs);
     }
     CoarseMBuilder& mbuilder = *mbuilder_ptr;
+*/
 
     int bubble_counter = 0;
     double entry_value;
@@ -544,13 +547,12 @@ void GraphCoarsen::BuildInterpolation(
     std::vector<mfem::DenseMatrix>& vertex_targets,
     mfem::SparseMatrix& Pvertices, mfem::SparseMatrix& Pedges,
     mfem::SparseMatrix& face_cdof,
-    std::vector<mfem::DenseMatrix>& CM_el,
-    CoarseMType coarse_m_type)
+    CoarseMBuilder& coarse_m_builder)
 {
-    BuildPVertices(vertex_targets, Pvertices, coarse_m_type);
+    BuildPVertices(vertex_targets, Pvertices, coarse_m_builder);
 
-    BuildPEdges(edge_traces, vertex_targets, face_cdof, Pedges, CM_el,
-                coarse_m_type);
+    BuildPEdges(edge_traces, vertex_targets, face_cdof, Pedges,
+                coarse_m_builder);
 
     BuildW(Pvertices);
 }

@@ -269,8 +269,9 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> CM_el_;
 
     GraphCoarsen graph_coarsen(graph.GetM(), graph.GetD(), graph_topology);
+    AssembleMBuilder builder;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, face_dof, CM_el_);
+                                     Pp, Pu, face_dof, builder);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;
