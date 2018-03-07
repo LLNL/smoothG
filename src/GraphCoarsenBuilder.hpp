@@ -50,8 +50,6 @@ public:
     /// this is arguably poor design, most implementations of this interface
     /// do not need all these arguments
     virtual void Setup(
-        mfem::SparseMatrix& Pedges,
-        const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
@@ -78,7 +76,8 @@ public:
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                                      const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
-    virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM() = 0;
+    virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof) = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
 
@@ -98,8 +97,6 @@ public:
     AssembleMBuilder() {}
 
     void Setup(
-        mfem::SparseMatrix& Pedges,
-        const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
@@ -123,7 +120,8 @@ public:
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
 private:
     std::unique_ptr<mfem::SparseMatrix> CoarseM_;
@@ -144,8 +142,6 @@ public:
     ElementMBuilder() {}
 
     void Setup(
-        mfem::SparseMatrix& Pedges,
-        const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
@@ -171,7 +167,8 @@ public:
 
     /// Here returns a null pointer
     /// @todo change interface so this is optional?
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
     bool NeedsCoarseVertexDofs() { return true; }
 
@@ -202,8 +199,6 @@ public:
     CoefficientMBuilder(const GraphTopology& topology) : topology_(topology) {}
 
     void Setup(
-        mfem::SparseMatrix& Pedges,
-        const mfem::SparseMatrix& face_cdof,
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
@@ -244,21 +239,22 @@ public:
        you call SetCoefficient you can call GetCoarseM() and get the new
        global coarse M with different coefficients.
     */
-    void BuildComponents();
+    void BuildComponents(mfem::SparseMatrix& Pedges,
+                         const mfem::SparseMatrix& face_cdof);
 
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM();
+    std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
 private:
-    /// @todo remove this?
-    void GetCoarseFaceDofs(int face, mfem::Array<int>& local_coarse_dofs) const;
+    /// @todo remove this (GetTableRowCopy is the same thing?)
+    void GetCoarseFaceDofs(
+        const mfem::SparseMatrix& face_cdof, int face, mfem::Array<int>& local_coarse_dofs) const;
 
     void GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs) const;
 
     mfem::DenseMatrix RTP(const mfem::DenseMatrix& R, const mfem::DenseMatrix& P);
 
     const GraphTopology& topology_;
-    std::shared_ptr<mfem::SparseMatrix> Pedges_;
-    std::shared_ptr<const mfem::SparseMatrix> face_cdof_;
 
     int total_num_traces_;
     int ncoarse_vertexdofs_;

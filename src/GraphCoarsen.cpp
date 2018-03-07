@@ -297,29 +297,8 @@ void GraphCoarsen::BuildPEdges(
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     NormalizeTraces(edge_traces, Agg_vertex, face_edge);
 
-    mbuilder.Setup(Pedges, face_cdof, edge_traces, vertex_target,
-                   Agg_face, total_num_traces, ncoarse_vertexdofs);
-/*
-    std::unique_ptr<CoarseMBuilder> mbuilder_ptr;
-    if (coarse_m_type == CoarseMType::CoarseElement)
-    {
-        mbuilder_ptr = make_unique<ElementMBuilder>(
-                           edge_traces, vertex_target, CM_el, Agg_face, total_num_traces,
-                           ncoarse_vertexdofs);
-    }
-    else if (coarse_m_type == CoarseMType::CoarseCoefficient)
-    {
-        mbuilder_ptr = make_unique<CoefficientMBuilder>(
-                           graph_topology_, Pedges, face_cdof, edge_traces, vertex_target,
-                           CM_el, total_num_traces, ncoarse_vertexdofs);
-    }
-    else
-    {
-        mbuilder_ptr = make_unique<AssembleMBuilder>(
-                           vertex_target, total_num_traces, ncoarse_vertexdofs);
-    }
-    CoarseMBuilder& mbuilder = *mbuilder_ptr;
-*/
+    mbuilder.Setup(edge_traces, vertex_target, Agg_face, total_num_traces,
+                   ncoarse_vertexdofs);
 
     int bubble_counter = 0;
     double entry_value;
@@ -527,7 +506,7 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
-    CoarseM_ = mbuilder.GetCoarseM();
+    CoarseM_ = mbuilder.GetCoarseM(Pedges, face_cdof);
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
