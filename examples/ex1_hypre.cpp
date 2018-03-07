@@ -32,6 +32,7 @@ using std::unique_ptr;
 using std::shared_ptr;
 using std::make_shared;
 
+using namespace std;
 using namespace smoothg;
 using namespace mfem;
 
@@ -54,94 +55,94 @@ int main(int argc, char* argv[])
     mfem::OptionsParser args(argc, argv);
     int coarse_factor = 100;
     args.AddOption(&coarse_factor, "-cf", "--coarse-factor",
-                   "Coarsening factor");
+            "Coarsening factor");
     const char* graphFileName = "../../graphdata/vertex_edge_sample.txt";
     args.AddOption(&graphFileName, "-g", "--graph",
-                   "File to load for graph connection data.");
+            "File to load for graph connection data.");
     const char* FiedlerFileName = "../../graphdata/fiedler_sample.txt";
     args.AddOption(&FiedlerFileName, "-f", "--fiedler",
-                   "File to load for the Fiedler vector.");
+            "File to load for the Fiedler vector.");
     const char* partition_filename = "../../graphdata/partition_sample.txt";
     args.AddOption(&partition_filename, "-p", "--partition",
-                   "Partition file to load (instead of using metis).");
+            "Partition file to load (instead of using metis).");
     const char* weight_filename = "";
     args.AddOption(&weight_filename, "-w", "--weight",
-                   "File to load for graph edge weights.");
+            "File to load for graph edge weights.");
     const char* w_block_filename = "";
     args.AddOption(&w_block_filename, "-wb", "--w_block",
-                   "File to load for w block.");
+            "File to load for w block.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
-                   "-nm", "--no-metis-agglomeration",
-                   "Use Metis as the partitioner (instead of loading partition).");
+            "-nm", "--no-metis-agglomeration",
+            "Use Metis as the partitioner (instead of loading partition).");
     int max_evects = 4;
     args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
+            "Maximum eigenvectors per aggregate.");
     double spect_tol = 1.e-3;
     args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
+            "Spectral tolerance for eigenvalue problems.");
     bool hybridization = true;
     args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
+            "--no-hybridization", "Enable hybridization.");
     bool generate_graph = false;
     args.AddOption(&generate_graph, "-gg", "--generate-graph", "-no-gg",
-                   "--no-generate-graph", "Generate a graph at runtime.");
+            "--no-generate-graph", "Generate a graph at runtime.");
     bool generate_fiedler = false;
     args.AddOption(&generate_fiedler, "-gf", "--generate-fiedler", "-no-gf",
-                   "--no-generate-fiedler", "Generate a fiedler vector at runtime.");
+            "--no-generate-fiedler", "Generate a fiedler vector at runtime.");
     bool save_fiedler = false;
     args.AddOption(&save_fiedler, "-sf", "--save-fiedler", "-no-sf",
-                   "--no-save-fiedler", "Save a generate a fiedler vector at runtime.");
+            "--no-save-fiedler", "Save a generate a fiedler vector at runtime.");
     int gen_vertices = 1000;
     args.AddOption(&gen_vertices, "-nv", "--num-vert",
-                   "Number of vertices of the graph to be generated.");
+            "Number of vertices of the graph to be generated.");
     int mean_degree = 40;
     args.AddOption(&mean_degree, "-md", "--mean-degree",
-                   "Average vertex degree of the graph to be generated.");
+            "Average vertex degree of the graph to be generated.");
     double beta = 0.15;
     args.AddOption(&beta, "-b", "--beta",
-                   "Probability of rewiring in the Watts-Strogatz model.");
+            "Probability of rewiring in the Watts-Strogatz model.");
     int seed = 0;
     args.AddOption(&seed, "-s", "--seed",
-                   "Seed (unsigned integer) for the random number generator.");
+            "Seed (unsigned integer) for the random number generator.");
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
-                   "Isolate a single vertex (for debugging so far).");
+            "Isolate a single vertex (for debugging so far).");
     bool dual_target = false;
     args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
+            "--no-dual-target", "Use dual graph Laplacian in trace generation.");
     bool scaled_dual = false;
     args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
+            "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
     bool energy_dual = false;
     args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
+            "--no-energy-dual", "Use energy matrix in trace generation.");
     bool verbose = false;
     args.AddOption(&verbose, "-v", "--verbose", "-no-v",
-                   "--no-verbose", "Verbose solver output.");
+            "--no-verbose", "Verbose solver output.");
     int max_iter = 10000;
     args.AddOption(&max_iter, "-mi", "--max-iter",
-                   "Max number of solver iterations.");
+            "Max number of solver iterations.");
 
 
     // MFEM Options
     const char* mesh_file = "../data/star.mesh";
     args.AddOption(&mesh_file, "-mesh", "--mesh",
-                   "Mesh file to use.");
+            "Mesh file to use.");
     int order = 1;
     args.AddOption(&order, "-o", "--order",
-                   "Finite element order (polynomial degree) or -1 for"
-                   " isoparametric space.");
+            "Finite element order (polynomial degree) or -1 for"
+            " isoparametric space.");
     int ref_levels = 1;
     args.AddOption(&ref_levels, "-nr", "--num-refine",
-                   "Number of times to refine mesh.");
+            "Number of times to refine mesh.");
     bool static_cond = false;
     args.AddOption(&static_cond, "-sc", "--static-condensation", "-no-sc",
-                   "--no-static-condensation", "Enable static condensation.");
+            "--no-static-condensation", "Enable static condensation.");
     bool visualization = 1;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
-                   "--no-visualization",
-                   "Enable or disable GLVis visualization.");
+            "--no-visualization",
+            "Enable or disable GLVis visualization.");
 
     args.Parse();
     if (!args.Good())
@@ -158,7 +159,7 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    Mesh* mesh = new Mesh(mesh_file, 1, 1);
+    Mesh *mesh = new Mesh(mesh_file, 1, 1);
     int dim = mesh->Dimension();
 
     for (int l = 0; l < ref_levels; l++)
@@ -166,138 +167,91 @@ int main(int argc, char* argv[])
         mesh->UniformRefinement();
     }
 
-    FiniteElementCollection* fec;
+    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+    delete mesh;
+
+    FiniteElementCollection *fec;
     if (order > 0)
     {
         fec = new H1_FECollection(order, dim);
     }
-    else if (mesh->GetNodes())
+    else if (pmesh->GetNodes())
     {
-        fec = mesh->GetNodes()->OwnFEC();
+        fec = pmesh->GetNodes()->OwnFEC();
+        if (myid == 0)
+        {
+            cout << "Using isoparametric FEs: " << fec->Name() << endl;
+        }
     }
     else
     {
         fec = new H1_FECollection(order = 1, dim);
     }
-    FiniteElementSpace* fespace = new FiniteElementSpace(mesh, fec);
+    ParFiniteElementSpace *fespace = new ParFiniteElementSpace(pmesh, fec);
+    HYPRE_Int size = fespace->GlobalTrueVSize();
+    if (myid == 0)
+    {
+        cout << "Number of finite element unknowns: " << size << endl;
+    }
 
     Array<int> ess_tdof_list;
-    if (mesh->bdr_attributes.Size())
+    if (pmesh->bdr_attributes.Size())
     {
-        Array<int> ess_bdr(mesh->bdr_attributes.Max());
+        Array<int> ess_bdr(pmesh->bdr_attributes.Max());
         ess_bdr = 0;
         fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
     }
 
-    LinearForm* b = new LinearForm(fespace);
+    ParLinearForm *b = new ParLinearForm(fespace);
     ConstantCoefficient one(1.0);
     b->AddDomainIntegrator(new DomainLFIntegrator(one));
     b->Assemble();
 
-    GridFunction x(fespace);
+    ParGridFunction x(fespace);
     x = 0.0;
 
-    BilinearForm* a = new BilinearForm(fespace);
+    ParBilinearForm *a = new ParBilinearForm(fespace);
     a->AddDomainIntegrator(new DiffusionIntegrator(one));
 
     if (static_cond) { a->EnableStaticCondensation(); }
     a->Assemble();
 
-    SparseMatrix A;
+    HypreParMatrix A;
     Vector B, X;
     a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
 
-    /// [Load graph from file or generate one]
-    mfem::Vector weight;
-    mfem::SparseMatrix vertex_edge_global;
 
-    Split(A, vertex_edge_global, weight);
+
+    par_orthogonalize_from_constant(B, size);
 
     if (myid == 0)
     {
-        printf("Mesh: %ld VE: %d %d A: %d\n", mesh->GetGlobalNE(), vertex_edge_global.Height(), vertex_edge_global.Width(),
-                A.NumNonZeroElems());
+        cout << "Size of linear system: " << A.GetGlobalNumRows() << endl;
     }
-    /// [Load graph from file or generate one]
 
-    /// [Partitioning]
-    mfem::Array<int> global_partitioning;
-    MetisPart(vertex_edge_global, global_partitioning, num_procs, isolate);
-    /// [Partitioning]
+    // 12. Define and apply a parallel PCG solver for AX=B with the BoomerAMG
+    //     preconditioner from hypre.
+    HypreBoomerAMG *amg = new HypreBoomerAMG(A);
+    amg->SetPrintLevel(1);
 
-    int count = 0;
+    HyprePCG *solver = new HyprePCG(A);
+    //HypreGMRES *solver = new HypreGMRES(A);
+    solver->SetTol(1e-12);
+    solver->SetMaxIter(200);
+    solver->SetPrintLevel(1);
+    solver->SetPreconditioner(*amg);
 
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        if (weight[i] < 0)
-        {
-            count++;
-        }
-    }
+    StopWatch chrono;
+    chrono.Start();
+    solver->Mult(B, X);
+    chrono.Stop();
 
     if (myid == 0)
     {
-        printf("%d / %d negative weights\n", count, weight.Size());
-    }
-
-    /// [Load the edge weights]
-
-    // Set up GraphUpscale
-    {
-        /// [Upscale]
-        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, weight);
-
-        //upscale.PrintInfo();
-        //upscale.ShowSetupTime();
-        //upscale.SetMaxIter(max_iter);
-
-        if (verbose)
-        {
-            upscale.SetPrintLevel(1);
-        }
-        /// [Upscale]
-
-        /// [Right Hand Side]
-        //mfem::Vector rhs_u_fine(A.Height());
-        //rhs_u_fine = B;
-        //rhs_u_fine.Randomize();
-        //rhs_u_fine -= 0.5;
-        //rhs_u_fine *= 100000.0;
-        //upscale.Orthogonalize(rhs_u_fine);
-
-
-        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
-        fine_rhs.GetBlock(0) = 0.0;
-        fine_rhs.GetBlock(1) = upscale.GetLocalVector(B);
-        //fine_rhs.GetBlock(1) = rhs_u_fine;
-        //int seed = 1;
-        //fine_rhs.GetBlock(1).Randomize(seed);
-        //upscale.Orthogonalize(fine_rhs);
-        /// [Right Hand Side]
-
-        /// [Solve]
-        //mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        //upscale.ShowCoarseSolveInfo();
-
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        upscale.ShowFineSolveInfo();
-        /// [Solve]
-
-        /// [Check Error]
-        //upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
-
-        /*
-        assert(num_procs == 1);
-
-        mfem::Vector one(A.Height());
-        mfem::Vector Azero(A.Height());
-        one = 1.0;
-        A.Mult(one, Azero);
-        printf("A 1 = : %.4e B* 1: %.4e\n", Azero.Norml2(), (rhs_u_fine * one));
-        */
+        //int num_iter;
+        //solver->GetNumIterations(num_iter);
+        printf("Fine Solve Time: %.5f\n", chrono.RealTime());
+        //printf("Fine Solve Iterations: %d\n", num_iter);
     }
 
     MPI_Finalize();

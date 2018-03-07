@@ -32,6 +32,11 @@ using std::unique_ptr;
 using std::shared_ptr;
 using std::make_shared;
 
+using std::flush;
+using std::cout;
+using std::endl;
+using std::cerr;
+
 using namespace smoothg;
 using namespace mfem;
 
@@ -158,54 +163,86 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    Mesh* mesh = new Mesh(mesh_file, 1, 1);
-    int dim = mesh->Dimension();
+   Mesh *mesh = new Mesh(mesh_file, 1, 1);
+   int dim = mesh->Dimension();
 
-    for (int l = 0; l < ref_levels; l++)
-    {
-        mesh->UniformRefinement();
-    }
+   if (mesh->attributes.Max() < 2 || mesh->bdr_attributes.Max() < 2)
+   {
+      cerr << "\nInput mesh should have at least two materials and "
+           << "two boundary attributes! (See schematic in ex2.cpp)\n"
+           << endl;
+      return 3;
+   }
 
-    FiniteElementCollection* fec;
-    if (order > 0)
-    {
-        fec = new H1_FECollection(order, dim);
-    }
-    else if (mesh->GetNodes())
-    {
-        fec = mesh->GetNodes()->OwnFEC();
-    }
-    else
-    {
-        fec = new H1_FECollection(order = 1, dim);
-    }
-    FiniteElementSpace* fespace = new FiniteElementSpace(mesh, fec);
+   if (mesh->NURBSext && order > mesh->NURBSext->GetOrder())
+   {
+      mesh->DegreeElevate(order - mesh->NURBSext->GetOrder());
+   }
 
-    Array<int> ess_tdof_list;
-    if (mesh->bdr_attributes.Size())
-    {
-        Array<int> ess_bdr(mesh->bdr_attributes.Max());
-        ess_bdr = 0;
-        fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
-    }
+      for (int l = 0; l < ref_levels; l++)
+      {
+         mesh->UniformRefinement();
+      }
 
-    LinearForm* b = new LinearForm(fespace);
-    ConstantCoefficient one(1.0);
-    b->AddDomainIntegrator(new DomainLFIntegrator(one));
-    b->Assemble();
+   FiniteElementCollection *fec;
+   FiniteElementSpace *fespace;
+   if (mesh->NURBSext)
+   {
+      fec = NULL;
+      fespace = mesh->GetNodes()->FESpace();
+   }
+   else
+   {
+      fec = new H1_FECollection(order, dim);
+      fespace = new FiniteElementSpace(mesh, fec, dim);
+   }
+   cout << "Number of finite element unknowns: " << fespace->GetTrueVSize()
+        << endl << "Assembling: " << flush;
 
-    GridFunction x(fespace);
-    x = 0.0;
+   Array<int> ess_tdof_list, ess_bdr(mesh->bdr_attributes.Max());
+   ess_bdr = 0;
+   ess_bdr[0] = 0;
+   fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
 
-    BilinearForm* a = new BilinearForm(fespace);
-    a->AddDomainIntegrator(new DiffusionIntegrator(one));
+   VectorArrayCoefficient f(dim);
+   for (int i = 0; i < dim-1; i++)
+   {
+      f.Set(i, new ConstantCoefficient(0.0));
+   }
+   {
+      Vector pull_force(mesh->bdr_attributes.Max());
+      pull_force = 0.0;
+      pull_force(1) = -1.0e-2;
+      f.Set(dim-1, new PWConstCoefficient(pull_force));
+   }
 
-    if (static_cond) { a->EnableStaticCondensation(); }
-    a->Assemble();
+   LinearForm *b = new LinearForm(fespace);
+   b->AddBoundaryIntegrator(new VectorBoundaryLFIntegrator(f));
+   cout << "r.h.s. ... " << flush;
+   b->Assemble();
 
-    SparseMatrix A;
-    Vector B, X;
-    a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
+   GridFunction x(fespace);
+   x = 0.0;
+
+   Vector lambda(mesh->attributes.Max());
+   lambda = 1.0;
+   lambda(0) = lambda(1)*50;
+   PWConstCoefficient lambda_func(lambda);
+   Vector mu(mesh->attributes.Max());
+   mu = 1.0;
+   mu(0) = mu(1)*50;
+   PWConstCoefficient mu_func(mu);
+
+   BilinearForm *a = new BilinearForm(fespace);
+   a->AddDomainIntegrator(new ElasticityIntegrator(lambda_func,mu_func));
+
+   cout << "matrix ... " << flush;
+   if (static_cond) { a->EnableStaticCondensation(); }
+   a->Assemble();
+
+   SparseMatrix A;
+   Vector B, X;
+   a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
 
     /// [Load graph from file or generate one]
     mfem::Vector weight;
@@ -248,56 +285,20 @@ int main(int argc, char* argv[])
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
                              spect_tol, max_evects, dual_target, scaled_dual,
                              energy_dual, hybridization, weight);
-
-        //upscale.PrintInfo();
-        //upscale.ShowSetupTime();
-        //upscale.SetMaxIter(max_iter);
-
-        if (verbose)
-        {
-            upscale.SetPrintLevel(1);
-        }
         /// [Upscale]
 
         /// [Right Hand Side]
-        //mfem::Vector rhs_u_fine(A.Height());
-        //rhs_u_fine = B;
-        //rhs_u_fine.Randomize();
-        //rhs_u_fine -= 0.5;
-        //rhs_u_fine *= 100000.0;
-        //upscale.Orthogonalize(rhs_u_fine);
-
 
         mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = upscale.GetLocalVector(B);
-        //fine_rhs.GetBlock(1) = rhs_u_fine;
-        //int seed = 1;
-        //fine_rhs.GetBlock(1).Randomize(seed);
         //upscale.Orthogonalize(fine_rhs);
-        /// [Right Hand Side]
 
         /// [Solve]
-        //mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        //upscale.ShowCoarseSolveInfo();
-
         mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
         upscale.ShowFineSolveInfo();
         /// [Solve]
 
-        /// [Check Error]
-        //upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
-
-        /*
-        assert(num_procs == 1);
-
-        mfem::Vector one(A.Height());
-        mfem::Vector Azero(A.Height());
-        one = 1.0;
-        A.Mult(one, Azero);
-        printf("A 1 = : %.4e B* 1: %.4e\n", Azero.Norml2(), (rhs_u_fine * one));
-        */
     }
 
     MPI_Finalize();

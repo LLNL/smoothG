@@ -291,7 +291,9 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
 
     //solver_ = make_unique<mfem::MINRESSolver>(comm_);
     solver_ = make_unique<mfem::GMRESSolver>(comm_);
-    solver_->SetPrintLevel(print_level_);
+    //solver_ = make_unique<mfem::CGSolver>(comm_);
+    //solver_->SetPrintLevel(print_level_);
+    solver_->SetPrintLevel(1);
     solver_->SetMaxIter(max_num_iter_);
     solver_->SetRelTol(rtol_);
     solver_->SetAbsTol(atol_);
@@ -301,7 +303,9 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     const bool use_prec = true;
     if (use_prec)
     {
-        prec_ = make_unique<mfem::HypreDiagScale>(*pHybridSystem_);
+        //prec_ = make_unique<mfem::HypreDiagScale>(*pHybridSystem_);
+        prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
+        static_cast<mfem::HypreBoomerAMG*>(prec_.get())->SetPrintLevel(1);
         solver_->SetPreconditioner(*prec_);
     }
 

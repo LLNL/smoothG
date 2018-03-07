@@ -105,6 +105,9 @@ public:
     // Create Fine Level Solver
     void MakeFineSolver() const;
 
+    /// Read permuted vertex vector
+    mfem::Vector GetLocalVector(const mfem::Vector& global_vect) const;
+
 private:
     void Init(const mfem::SparseMatrix& vertex_edge,
               const mfem::Array<int>& global_partitioning,

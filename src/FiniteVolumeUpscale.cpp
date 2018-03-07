@@ -47,6 +47,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mixed_laplacians_.emplace_back(ve_copy, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
+    /*
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, global_partitioning,
                                                      &edge_boundary_att_);
 
@@ -88,6 +89,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     }
 
     MakeCoarseVectors();
+    */
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();

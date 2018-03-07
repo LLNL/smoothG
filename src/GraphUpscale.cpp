@@ -94,6 +94,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         mixed_laplacians_.emplace_back(vertex_edge, *edge_e_te_);
     }
 
+    /*
     auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
@@ -114,6 +115,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     }
 
     MakeCoarseVectors();
+    */
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -135,6 +137,16 @@ void GraphUpscale::MakeFineSolver() const
             fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
         }
     }
+}
+
+mfem::Vector GraphUpscale::GetLocalVector(const mfem::Vector& global_vect) const
+{
+    mfem::Vector local_vect;
+
+    global_vect.GetSubVector(pgraph_->GetVertexLocalToGlobalMap(), local_vect);
+
+    return local_vect;
+
 }
 
 mfem::Vector GraphUpscale::ReadVertexVector(const std::string& filename) const

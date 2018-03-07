@@ -34,6 +34,15 @@ target_link_libraries(poweriter smoothg ${TPL_LIBRARIES})
 add_executable(ex1 ex1.cpp)
 target_link_libraries(ex1 smoothg ${TPL_LIBRARIES})
 
+add_executable(ex1_hypre ex1_hypre.cpp)
+target_link_libraries(ex1_hypre smoothg ${TPL_LIBRARIES})
+
+add_executable(ex2 ex2.cpp)
+target_link_libraries(ex2 smoothg ${TPL_LIBRARIES})
+
+add_executable(ex2_hypre ex2_hypre.cpp)
+target_link_libraries(ex2_hypre smoothg ${TPL_LIBRARIES})
+
 # add tests
 configure_file(
   "${PROJECT_SOURCE_DIR}/examples/stest.py"
