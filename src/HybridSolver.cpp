@@ -122,6 +122,59 @@ HybridSolver::HybridSolver(MPI_Comm comm,
          face_bdrattr, ess_edge_dofs);
 }
 
+HybridSolver::HybridSolver(MPI_Comm comm,
+                           const MixedMatrix& mgL,
+                           const GraphTopology& topo,
+                           const mfem::SparseMatrix* face_bdrattr,
+                           const mfem::Array<int>* ess_edge_dofs,
+                           const int rescale_iter,
+                           const SAAMGeParam* saamge_param)
+    :
+    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    comm_(comm),
+    D_(mgL.getD()),
+    W_(mgL.getW()),
+    use_spectralAMGe_((saamge_param != nullptr)),
+    use_w_(mgL.CheckW()),
+    rescale_iter_(rescale_iter),
+    saamge_param_(saamge_param)
+{
+    MPI_Comm_rank(comm, &myid_);
+    const mfem::SparseMatrix& face_edgedof(topo.face_edge_);
+
+    Agg_vertexdof_.MakeRef(topo.Agg_vertex_);
+
+    mfem::SparseMatrix vertex_edge(mgL.getD());
+    vertex_edge = 1.0;
+
+    auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
+    Agg_edgedof_.Swap(Agg_edgedof_tmp);
+
+    std::vector<mfem::Vector> M_el_tmp;
+    BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el_tmp);
+
+    std::vector<mfem::DenseMatrix> M_el(M_el_tmp.size());
+    for (unsigned int i = 0; i < M_el.size(); i++)
+    {
+        mfem::Vector& M_el_tmp_i(M_el_tmp[i]);
+        mfem::DenseMatrix& M_el_i(M_el[i]);
+
+        M_el_i.SetSize(M_el_tmp_i.Size());
+        M_el_i = 0.0;
+        for (int j = 0; j < M_el_tmp_i.Size(); j++)
+        {
+            M_el_i(j, j) = M_el_tmp_i(j);
+        }
+    }
+
+    if (face_bdrattr)
+    {
+        face_bdrattr = &(topo.face_bdratt_);
+    }
+
+    Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+}
+
 HybridSolver::~HybridSolver()
 {
 #if SMOOTHG_USE_SAAMGE
@@ -202,18 +255,40 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
         unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
         unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
 
-        num_multiplier_dofs_ = face_edgedof.Width();
+//        num_multiplier_dofs_ = face_edgedof.Width();
 
         int* i_edgedof_multiplier = new int[num_edge_dofs_ + 1];
-        std::iota(i_edgedof_multiplier,
-                  i_edgedof_multiplier + num_multiplier_dofs_ + 1, 0);
-        std::fill_n(i_edgedof_multiplier + num_multiplier_dofs_ + 1,
-                    num_edge_dofs_ - num_multiplier_dofs_,
-                    i_edgedof_multiplier[num_multiplier_dofs_]);
+//        std::iota(i_edgedof_multiplier, i_edgedof_multiplier + num_multiplier_dofs_ + 1, 0);
+//        std::fill_n(i_edgedof_multiplier + num_multiplier_dofs_ + 1,
+//                    num_edge_dofs_ - num_multiplier_dofs_,
+//                    i_edgedof_multiplier[num_multiplier_dofs_]);
+
+        // more general case
+        num_multiplier_dofs_ = face_edgedof.NumNonZeroElems();
+
+        mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
+        i_edgedof_multiplier[0] = 0;
+        for (int i = 0; i < edgedof_face.Height(); i++)
+        {
+            if (edgedof_face.RowSize(i) > 0)
+            {
+                assert(edgedof_face.RowSize(i) == 1);
+                i_edgedof_multiplier[i + 1] = i_edgedof_multiplier[i] + 1;
+            }
+            else
+            {
+                i_edgedof_multiplier[i + 1] = i_edgedof_multiplier[i];
+            }
+        }
+        // for coarse level problem width of face_edgedof only include face extension
+        assert(edgedof_face.Height() <= num_edge_dofs_);
+        for (int i = edgedof_face.Height(); i < num_edge_dofs_; i++)
+        {
+                i_edgedof_multiplier[i + 1] = i_edgedof_multiplier[i];
+        }
 
         int* j_edgedof_multiplier = new int[num_multiplier_dofs_];
-        std::iota(j_edgedof_multiplier,
-                  j_edgedof_multiplier + num_multiplier_dofs_, 0);
+        std::iota(j_edgedof_multiplier, j_edgedof_multiplier + num_multiplier_dofs_, 0);
         double* data_edgedof_multiplier = new double[num_multiplier_dofs_];
         std::fill_n(data_edgedof_multiplier, num_multiplier_dofs_, 1.0);
         mfem::SparseMatrix edgedof_multiplier(
