@@ -288,6 +288,8 @@ public:
     /// Determine if W block is nonzero
     bool CheckW() const;
 
+    void SetMFromWeightVector(const mfem::Vector& weight);
+
 private:
     /**
        Helper routine for the constructors of distributed graph. Note well that

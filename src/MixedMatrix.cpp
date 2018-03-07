@@ -110,16 +110,9 @@ MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
     GenerateRowStarts();
 }
 
-/// @todo better documentation of the 1/-1 issue, make it optional?
-void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
-                       const mfem::Vector& weight,
-                       const mfem::SparseMatrix& w_block)
+void MixedMatrix::SetMFromWeightVector(const mfem::Vector& weight)
 {
-
-
-    const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
-    const int nvertices = vertex_edge.Height();
-    const int nedges = vertex_edge.Width();
+    const int nedges = weight.Size();
 
     int* M_fine_i = new int [nedges + 1];
     int* M_fine_j = new int [nedges];
@@ -136,6 +129,17 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
 
     M_ = make_unique<mfem::SparseMatrix>(M_fine_i, M_fine_j, M_fine_data,
                                          nedges, nedges);
+}
+
+/// @todo better documentation of the 1/-1 issue, make it optional?
+void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
+                       const mfem::Vector& weight,
+                       const mfem::SparseMatrix& w_block)
+{
+    const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
+    const int nvertices = vertex_edge.Height();
+
+    SetMFromWeightVector(weight);
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
     {

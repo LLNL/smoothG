@@ -92,12 +92,14 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
+    // GetFineMatrix().setWeight
 }
 
+/// the .back() assumes this is two-level, that is TLMC not MLMC
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     mbuilder_->SetCoefficient(coeff);
-    mixed_laplacians_.back().setWeight(
+    GetCoarseMatrix().setWeight(
         *mbuilder_->GetCoarseM(coarsener_->get_Psigma(),
                                coarsener_->construct_face_facedof_table()));
 }
