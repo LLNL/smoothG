@@ -104,11 +104,6 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
         auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
         Agg_edgedof_.Swap(Agg_edgedof_tmp);
-
-        if (face_bdrattr)
-        {
-            face_bdrattr = &(topo.face_bdratt_);
-        }
     }
 
     std::vector<mfem::Vector> M_el;
@@ -174,11 +169,6 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     std::vector<mfem::Vector> M_el;
     BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
-
-    if (face_bdrattr)
-    {
-        face_bdrattr = &(topo.face_bdratt_);
-    }
 
     Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
@@ -318,9 +308,10 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
         ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
         for (int i = 0; i < num_multiplier_dofs_; i++)
         {
+            int edgedof = j_multiplier_edgedof[i];
+
             // natural BC for H(div) dof <=> essential BC for multiplier dof
-            //if (edgedof_bdrattr.RowSize(i) > 0 && ess_edge_dofs->operator[](i) != 0)
-            if (edgedof_bdrattr.RowSize(i) && !ess_edge_dofs->operator[](i))
+            if (edgedof_bdrattr.RowSize(edgedof) && !(*ess_edge_dofs)[edgedof])
             {
                 ess_multiplier_dofs_[i] = 1;
                 ess_multiplier_bc_ = true;
