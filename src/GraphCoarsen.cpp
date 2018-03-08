@@ -30,40 +30,28 @@ GraphCoarsen::GraphCoarsen(const Graph& graph, const MixedMatrix& mgl, const Gra
       edge_targets_(gt.face_edge_.Rows()),
       agg_ext_sigma_(gt.agg_ext_edge_.Rows())
 {
-    const SparseMatrix& M_local = mgl.M_local_;
-    const SparseMatrix& D_local = mgl.D_local_;
-    const SparseMatrix& W_local = mgl.W_local_;
-
-    const ParMatrix& M_global = mgl.M_global_;
-    const ParMatrix& D_global = mgl.D_global_;
-    const ParMatrix& W_global = mgl.W_global_;
-
     ParMatrix permute_v = MakeExtPermutation(gt.agg_ext_vertex_);
     ParMatrix permute_e = MakeExtPermutation(gt.agg_ext_edge_);
 
     ParMatrix permute_v_T = permute_v.Transpose();
     ParMatrix permute_e_T = permute_e.Transpose();
 
-    ParMatrix M_ext_global = permute_e.Mult(M_global.Mult(permute_e_T));
-    ParMatrix D_ext_global = permute_v.Mult(D_global.Mult(permute_e_T));
-    ParMatrix W_ext_global = permute_v.Mult(W_global.Mult(permute_v_T));
+    ParMatrix M_ext_global = permute_e.Mult(mgl.M_global_.Mult(permute_e_T));
+    ParMatrix D_ext_global = permute_v.Mult(mgl.D_global_.Mult(permute_e_T));
 
-    ParMatrix face_edge_true_edge = gt.face_edge_.Mult(graph.edge_true_edge_);
-    ParMatrix face_perm_edge = face_edge_true_edge.Mult(permute_e_T);
-
-    const SparseMatrix& M_ext = M_ext_global.GetDiag();
-    const SparseMatrix& D_ext = D_ext_global.GetDiag();
-    const SparseMatrix& W_ext = W_ext_global.GetDiag();
+    ParMatrix face_perm_edge = gt.face_edge_.Mult(graph.edge_true_edge_.Mult(permute_e_T));
     const SparseMatrix& face_edge = face_perm_edge.GetDiag();
 
     int marker_size = std::max(permute_v.Rows(), permute_e.Rows());
     col_marker_.resize(marker_size, -1);
 
-    ComputeVertexTargets(gt, M_ext, D_ext);
+    ComputeVertexTargets(gt, M_ext_global, D_ext_global);
 
     auto shared_sigma = CollectSigma(gt, face_edge);
-    auto shared_D = CollectD(gt, D_local);
-    auto shared_M = CollectM(gt, M_local);
+    auto shared_M = CollectM(gt, mgl.M_local_);
+    auto shared_D = CollectD(gt, mgl.D_local_);
+
+    ComputeEdgeTargets(gt, face_edge, shared_sigma, shared_M, shared_D);
 
     printf("%d: %d %d %d\n", permute_v.GetMyId(), shared_sigma.size(), shared_D.size(), shared_M.size());
 }
@@ -111,8 +99,11 @@ void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept
 }
 
 void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
-        const SparseMatrix& M_ext, const SparseMatrix& D_ext)
+        const ParMatrix& M_ext_global, const ParMatrix& D_ext_global)
 {
+    const SparseMatrix& M_ext = M_ext_global.GetDiag();
+    const SparseMatrix& D_ext = D_ext_global.GetDiag();
+
     int num_aggs = gt.agg_ext_edge_.Rows();
 
     linalgcpp::EigenSolver eigen;
@@ -227,10 +218,10 @@ std::vector<std::vector<SparseMatrix>> GraphCoarsen::CollectD(const GraphTopolog
     return sec_D.Collect();
 }
 
-std::vector<std::vector<Vector>> GraphCoarsen::CollectM(const GraphTopology& gt,
+std::vector<std::vector<std::vector<double>>> GraphCoarsen::CollectM(const GraphTopology& gt,
         const SparseMatrix& M_local)
 {
-    SharedEntityComm<Vector> sec_M(gt.face_true_face_);
+    SharedEntityComm<std::vector<double>> sec_M(gt.face_true_face_);
 
     int num_faces = gt.face_edge_local_.Rows();
 
@@ -247,13 +238,141 @@ std::vector<std::vector<Vector>> GraphCoarsen::CollectM(const GraphTopology& gt,
         }
 
         SparseMatrix M_face = M_local.GetSubMatrix(edge_ext_dofs, edge_ext_dofs, col_marker_);
-        std::vector<double> M_diag_data = M_face.GetDiag();
-        Vector M_diag(std::move(M_diag_data));
+        std::vector<double> M_diag = M_face.GetData();
 
         sec_M.ReduceSend(face, std::move(M_diag));
     }
 
     return sec_M.Collect();
+}
+
+void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
+                                const SparseMatrix& face_edge,
+                                const Vect2D<DenseMatrix>& shared_sigma,
+                                const Vect2D<std::vector<double>>& shared_M,
+                                const Vect2D<SparseMatrix>& shared_D)
+{
+    const SparseMatrix& face_shared = gt.face_face_.GetOffd();
+
+    SharedEntityComm<DenseMatrix> sec_face(gt.face_true_face_);
+    DenseMatrix collected_sigma;
+
+    int num_faces = gt.face_edge_local_.Rows();
+
+    for (int face = 0; face < num_faces; ++face)
+    {
+        int num_face_edges = face_edge.RowSize(face);
+
+        if (!sec_face.IsOwnedByMe(face))
+        {
+            edge_targets_[face].Resize(num_face_edges, 0);
+            continue;
+        }
+
+        const auto& face_sigma = shared_sigma[face];
+        const auto& face_M = shared_M[face];
+        const auto& face_D = shared_D[face];
+
+        int col_count = 0;
+        int total_vects = SumCols(face_sigma);
+        collected_sigma.Resize(num_face_edges, total_vects);
+
+        for (const auto& sigma : face_sigma)
+        {
+            collected_sigma.SetCol(col_count, sigma);
+            col_count += sigma.Cols();
+        }
+
+        if (face_shared.RowSize(face))
+        {
+            std::vector<double> M_sum = Combine(face_M, num_face_edges);
+            SparseMatrix D_sum = Combine(face_D, num_face_edges);
+        }
+        else
+        {
+
+        }
+    }
+}
+
+std::vector<double> GraphCoarsen::Combine(const std::vector<std::vector<double>>& face_M, int num_face_edges) const
+{
+    assert(face_M.size() == 2);
+
+    int size = -num_face_edges;
+
+    for (auto& M : face_M)
+    {
+        size += M.size();
+    }
+
+    std::vector<double> combined(size);
+
+    for (int i = 0; i < num_face_edges; ++i)
+    {
+        combined[i] = face_M[0][i] + face_M[1][i];
+    }
+
+    std::copy(std::begin(face_M[0]) + num_face_edges,
+              std::end(face_M[0]),
+              std::begin(combined) + num_face_edges);
+
+    std::copy(std::begin(face_M[1]) + num_face_edges,
+              std::end(face_M[1]),
+              std::begin(combined) + face_M[0].size());
+
+    return combined;
+}
+
+SparseMatrix GraphCoarsen::Combine(const std::vector<SparseMatrix>& face_D, int num_face_edges) const
+{
+    assert(face_D.size() == 2);
+
+    int rows = face_D[0].Rows() + face_D[1].Rows();
+    int cols = -num_face_edges;
+
+    for (auto& D : face_D)
+    {
+        cols += D.Cols();
+    }
+
+    CooMatrix D_coo(rows, cols);
+    D_coo.Reserve(face_D[0].nnz() + face_D[1].nnz());
+
+    auto add_to_coo = [&] (auto& D, int row_offset = 0, int col_offset = 0)
+    {
+        const auto& indptr = D.GetIndptr();
+        const auto& indices = D.GetIndices();
+        const auto& data = D.GetData();
+
+        int rows = D.Rows();
+
+        for (int row = 0; row < rows; ++row)
+        {
+            int row_i = row + row_offset;
+
+            for (int j = indptr[row]; j < indptr[row + 1]; ++j)
+            {
+                int col_i = indices[j];
+                double val = data[j];
+
+                if (col_i >= num_face_edges)
+                {
+                    col_i += col_offset;
+                }
+
+                D_coo.Add(row_i, col_i, val);
+            }
+        }
+    };
+
+    int row_offset = face_D[0].Rows();
+    int col_offset = face_D[0].Cols() - num_face_edges;
+
+    add_to_coo(face_D[0]);
+    add_to_coo(face_D[1], row_offset, col_offset);
+
+    return D_coo.ToSparse();
 }
 
 } // namespace smoothg

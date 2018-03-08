@@ -34,8 +34,11 @@ using VectorView = linalgcpp::VectorView<double>;
 using BlockVector = linalgcpp::BlockVector<double>;
 using SparseMatrix = linalgcpp::SparseMatrix<double>;
 using DenseMatrix = linalgcpp::DenseMatrix;
+using CooMatrix = linalgcpp::CooMatrix<double>;
 using BlockMatrix = linalgcpp::BlockMatrix<double>;
 using ParMatrix = parlinalgcpp::ParMatrix;
+
+int MyId(MPI_Comm comm = MPI_COMM_WORLD);
 
 SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
                         const ParMatrix& edge_edge,

@@ -28,7 +28,7 @@
    necessary.
 
    This is "fairly" generic but not completely, if you want to use for a
-   datatype other than mfem::DenseMatrix or mfem::Vector you need to implement:
+   datatype other than DenseMatrix or Vector you need to implement:
    SetSizeSpecifer(), PackSizes(), SendData(), ReceiveData(), and CopyData()
    routines yourself.
 
@@ -44,6 +44,12 @@ namespace smoothg
 
 template<>
 void SharedEntityComm<Vector>::SetSizeSpecifier()
+{
+    size_specifier_ = 1;
+}
+
+template<>
+void SharedEntityComm<std::vector<double>>::SetSizeSpecifier()
 {
     size_specifier_ = 1;
 }
@@ -69,6 +75,13 @@ SharedEntityComm<Vector>::PackSendSize(const Vector& vect) const
 
 template<>
 std::vector<int>
+SharedEntityComm<std::vector<double>>::PackSendSize(const std::vector<double>& vect) const
+{
+    return std::vector<int>{vect.size()};
+}
+
+template<>
+std::vector<int>
 SharedEntityComm<DenseMatrix>::PackSendSize(const DenseMatrix& mat) const
 {
     return std::vector<int>{mat.Rows(), mat.Cols()};
@@ -87,6 +100,15 @@ SharedEntityComm<Vector>::SendData(const Vector& vect,
         int recipient, int tag, MPI_Request& request) const
 {
     MPI_Isend(std::begin(vect), vect.size(), MPI_DOUBLE,
+              recipient, tag, comm_, &request);
+}
+
+template<>
+void
+SharedEntityComm<std::vector<double>>::SendData(const std::vector<double>& vect,
+        int recipient, int tag, MPI_Request& request) const
+{
+    MPI_Isend(vect.data(), vect.size(), MPI_DOUBLE,
               recipient, tag, comm_, &request);
 }
 
@@ -120,6 +142,20 @@ Vector SharedEntityComm<Vector>::ReceiveData(const std::vector<int>& sizes, int 
     Vector vect(size);
 
     MPI_Irecv(std::begin(vect), size, MPI_DOUBLE,
+              sender, tag, comm_, &request);
+
+    return vect;
+}
+
+template<>
+std::vector<double>
+SharedEntityComm<std::vector<double>>::ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const
+{
+    const int size = sizes[0];
+
+    std::vector<double> vect(size);
+
+    MPI_Irecv(vect.data(), size, MPI_DOUBLE,
               sender, tag, comm_, &request);
 
     return vect;

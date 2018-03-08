@@ -35,6 +35,8 @@ class SharedEntityComm
 
         void ReduceSend(int entity, T mat);
 
+        bool IsOwnedByMe(int entity) const;
+
         int GetTrueEntity(int entity) const;
 
         std::vector<std::vector<T>> Collect();
@@ -267,6 +269,15 @@ int SharedEntityComm<T>::GetTrueEntity(int entity) const
 
         return ete_colmap[ete_offd_indices[ete_offd_indptr[entity]]];
     }
+}
+
+template <class T>
+bool SharedEntityComm<T>::IsOwnedByMe(int entity) const
+{
+    assert(entity >= 0);
+    assert(entity < static_cast<int>(entity_master_.size()));
+
+    return (entity_master_[entity] == myid_);
 }
 
 template <typename T>

@@ -24,6 +24,15 @@
 
 namespace smoothg
 {
+
+int MyId(MPI_Comm comm)
+{
+    int myid;
+    MPI_Comm_rank(comm, &myid);
+
+    return myid;
+}
+
 SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
                         const ParMatrix& edge_edge,
                         const std::vector<int>& edge_map,
@@ -513,7 +522,7 @@ ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
     MPI_Comm comm = entity_entity.GetComm();
     auto true_starts = parlinalgcpp::GenerateOffsets(comm, num_true_entities);
 
-    ParMatrix select_d(comm, entity_entity.GetRowStarts(), true_starts, select);
+    ParMatrix select_d(comm, entity_entity.GetRowStarts(), true_starts, std::move(select));
 
     return entity_entity.Mult(select_d);
 }
