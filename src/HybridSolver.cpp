@@ -846,7 +846,7 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
             sigma_loc.SetSize(nlocal_edgedof);
             MinvDT_[iAgg]->Mult(u_loc, sigma_loc);
             tmp_loc.SetSize(nlocal_edgedof);
-            MinvCT_[iAgg]->Mult(mu_loc, sigma_loc);
+            MinvCT_[iAgg]->Mult(mu_loc, tmp_loc);
             sigma_loc += tmp_loc;
         }
 
