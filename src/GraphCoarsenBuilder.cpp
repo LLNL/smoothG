@@ -260,9 +260,13 @@ std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
     return std::move(CoarseM_);
 }
 
-void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weights)
+void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weight_inverse)
 {
-    agg_weights_ = agg_weights;
+    agg_weights_.SetSize(agg_weight_inverse.Size());
+    for (int i = 0; i < agg_weights_.Size(); ++i)
+    {
+        agg_weights_[i] = 1.0 / agg_weight_inverse[i];
+    }
 }
 
 /// this method may be unnecessary, could just use GetTableRow()
@@ -297,8 +301,6 @@ mfem::DenseMatrix CoefficientMBuilder::RTP(const mfem::DenseMatrix& R,
 void CoefficientMBuilder::BuildComponents(const mfem::SparseMatrix& Pedges,
                                           const mfem::SparseMatrix& face_cdof)
 {
-    std::cout << "BuildComponents runs." << std::endl;
-
     // instead of indexing/maps, we will just go through everything in the same
     // order when we assemble.
 
@@ -420,10 +422,8 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
         }
         else
         {
-            const double recip = 2.0 / (1.0 / agg_weights_[neighbor_aggs[0]] +
-                                        1.0 / agg_weights_[neighbor_aggs[1]]);
-            // face_weight = 1.0 / recip;
-            face_weight = recip;
+            face_weight = 2.0 / (1.0 / agg_weights_[neighbor_aggs[0]] +
+                                 1.0 / agg_weights_[neighbor_aggs[1]]);
         }
         GetCoarseFaceDofs(face_cdof, face, coarse_face_dofs);
         AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_face_dofs,

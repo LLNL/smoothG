@@ -58,16 +58,12 @@ public:
     mfem::Vector& GetFineCoefficient(int sample)
     {
         fine_ = (1.0 + sample);
-        // fine_ = 10.0 * (1.0 + sample);
         return fine_;
     }
 
     mfem::Vector& GetCoarseCoefficient(int sample)
     {
-        // coarse_ = 10.0 * (1.0 + sample);
-        // coarse_ = 1.0 / (100.0 * (1.0 + sample));
-        // coarse_ = 10.0 * (1.0 + sample);
-        coarse_ = 1.0 / (1.0 + sample);
+        coarse_ = (1.0 + sample);
         return coarse_;
     }
 

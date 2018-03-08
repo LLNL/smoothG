@@ -235,9 +235,12 @@ public:
        The point of this class is to be able to build the coarse mass matrix
        with different weights, without recoarsening the whole thing.
 
-       weights are (deep) copied (for now)
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
     */
-    void SetCoefficient(const mfem::Vector& agg_weights);
+    void SetCoefficient(const mfem::Vector& agg_weights_inverse);
 
     /**
        @brief Assemble local components, independent of coefficient.

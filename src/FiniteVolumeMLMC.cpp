@@ -105,7 +105,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     Dref.EliminateCols(marker);
 
     coarse_solver_ = make_unique<MinresBlockSolverFalse>(
-        comm_, mixed_laplacians_.back());
+                         comm_, mixed_laplacians_.back());
 }
 
 void FiniteVolumeMLMC::ForceMakeFineSolver(const mfem::Array<int>& marker) const
