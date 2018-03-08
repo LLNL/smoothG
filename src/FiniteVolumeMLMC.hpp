@@ -68,12 +68,10 @@ public:
 
     /// coeff should have the size of the number of *edges* in the
     /// fine graph (not exactly analagous to RescaleCoarseCoefficient)
-    /// even worse, this inverts, the other doesn't
     void RescaleFineCoefficient(const mfem::Vector& coeff);
 
     /// coeff should have the size of the number of *aggregates*
     /// in the coarse graph
-    /// this does not invert the numbers
     void RescaleCoarseCoefficient(const mfem::Vector& coeff);
 
     /// recreate the fine solver, ie if coefficients have changed
