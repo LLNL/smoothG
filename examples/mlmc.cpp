@@ -22,7 +22,7 @@
 
    A simple way to run the example:
 
-   ./mlmc
+   ./mlmc --perm spe_perm.dat
 */
 
 #include <fstream>
@@ -57,14 +57,17 @@ public:
 
     mfem::Vector& GetFineCoefficient(int sample)
     {
-        fine_ = 100.0 * (1.0 + sample);
+        fine_ = (1.0 + sample);
+        // fine_ = 10.0 * (1.0 + sample);
         return fine_;
     }
 
     mfem::Vector& GetCoarseCoefficient(int sample)
     {
-        // coarse_ = 100.0 * (1.0 + sample);
-        coarse_ = 1.0 / (100.0 * (1.0 + sample));
+        // coarse_ = 10.0 * (1.0 + sample);
+        // coarse_ = 1.0 / (100.0 * (1.0 + sample));
+        // coarse_ = 10.0 * (1.0 + sample);
+        coarse_ = 1.0 / (1.0 + sample);
         return coarse_;
     }
 
@@ -75,8 +78,6 @@ private:
     mfem::Vector fine_;
     mfem::Vector coarse_;
 };
-
-// auto Visualize = [&](const mfem::Vector & sol)
 
 void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
                const mfem::ParMesh& pmesh, int tag)
@@ -272,7 +273,7 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
     const int num_fine_edges = vertex_edge.Width();
-    const int num_aggs = partitioning.Max(); // ???
+    const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
     StupidSampler sampler(num_fine_edges, num_aggs);
 
     const int num_samples = 2;
@@ -287,14 +288,17 @@ int main(int argc, char* argv[])
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
 
+        std::cout << "sol_upscaled min = " << sol_upscaled.GetBlock(1).Min() << std::endl;
+        std::cout << "sol_upscaled max = " << sol_upscaled.GetBlock(1).Max() << std::endl;
+
         auto fine_coefficient = sampler.GetFineCoefficient(sample);
         fvupscale.RescaleFineCoefficient(fine_coefficient);
         fvupscale.ForceMakeFineSolver(marker);
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
 
-        std::cout << "sol_fine max = " << sol_fine.GetBlock(1).Max() << std::endl;
         std::cout << "sol_fine min = " << sol_fine.GetBlock(1).Min() << std::endl;
+        std::cout << "sol_fine max = " << sol_fine.GetBlock(1).Max() << std::endl;
 
         auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 

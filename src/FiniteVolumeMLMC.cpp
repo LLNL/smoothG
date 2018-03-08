@@ -82,7 +82,6 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
                                coarsener_->construct_face_facedof_table()));
 }
 
-/// @todo remove MPI_COMM_WORLD
 void FiniteVolumeMLMC::MakeCoarseSolver()
 {
     // L2-H1 block diagonal preconditioner
@@ -96,19 +95,17 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
                        coarsener_->construct_face_facedof_table(),
                        ess_attr_, marker);
 
+    for (int mm = 0; mm < marker.Size(); ++mm)
     {
-        for (int mm = 0; mm < marker.Size(); ++mm)
-        {
-            // Assume M diagonal, no ess data
-            if (marker[mm])
-                Mref.EliminateRow(mm, true);
-        }
-
-        Dref.EliminateCols(marker);
-
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(
-            MPI_COMM_WORLD, mixed_laplacians_.back());
+        // Assume M diagonal, no ess data
+        if (marker[mm])
+            Mref.EliminateRow(mm, true);
     }
+
+    Dref.EliminateCols(marker);
+
+    coarse_solver_ = make_unique<MinresBlockSolverFalse>(
+        comm_, mixed_laplacians_.back());
 }
 
 void FiniteVolumeMLMC::ForceMakeFineSolver(const mfem::Array<int>& marker) const

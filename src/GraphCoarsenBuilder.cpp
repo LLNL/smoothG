@@ -297,6 +297,8 @@ mfem::DenseMatrix CoefficientMBuilder::RTP(const mfem::DenseMatrix& R,
 void CoefficientMBuilder::BuildComponents(const mfem::SparseMatrix& Pedges,
                                           const mfem::SparseMatrix& face_cdof)
 {
+    std::cout << "BuildComponents runs." << std::endl;
+
     // instead of indexing/maps, we will just go through everything in the same
     // order when we assemble.
 
@@ -420,7 +422,8 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
         {
             const double recip = 2.0 / (1.0 / agg_weights_[neighbor_aggs[0]] +
                                         1.0 / agg_weights_[neighbor_aggs[1]]);
-            face_weight = 1.0 / recip;
+            // face_weight = 1.0 / recip;
+            face_weight = recip;
         }
         GetCoarseFaceDofs(face_cdof, face, coarse_face_dofs);
         AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_face_dofs,
