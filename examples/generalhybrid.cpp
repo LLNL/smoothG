@@ -159,10 +159,15 @@ int main(int argc, char* argv[])
         cg.SetAbsTol(1e-12);
         cg.SetOperator(*gL);
 
-        mfem::Array<int> ess_dof(1);
-        ess_dof = 0;
-        gL->EliminateRowsCols(ess_dof);
-        rhs_u_fine(0) = 0.0;
+        mfem::Array<int> ess_dof;
+        if (myid == 0)
+        {
+            rhs_u_fine(0) = 0.0;
+            ess_dof.Append(0);
+        }
+
+        auto raw_memory = gL->EliminateRowsCols(ess_dof);
+        delete raw_memory;
 
         mfem::HypreBoomerAMG prec(*gL);
         prec.SetPrintLevel(0);
