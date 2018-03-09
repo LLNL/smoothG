@@ -38,6 +38,7 @@ using namespace mfem;
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
 void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::Vector& weight);
+mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
 {
@@ -146,10 +147,21 @@ int main(int argc, char* argv[])
 
     Split(A, vertex_edge_global, weight);
 
-    //if (myid == 0)
+    int negative_count = 0;
+
+    for (int i = 0; i < weight.Size(); ++i)
+    {
+        if (weight[i] < 0)
+        {
+            negative_count++;
+        }
+    }
+
+    if (myid == 0)
     {
         printf("Mesh: %ld VE: %d %d A: %d\n", mesh->GetGlobalNE(), vertex_edge_global.Height(), vertex_edge_global.Width(),
                 A.NumNonZeroElems());
+        printf("NegativeWeights: %d / %d\n", negative_count, weight.Size());
     }
 
     /// [Set up parallel graph and Laplacian]
@@ -168,11 +180,54 @@ int main(int argc, char* argv[])
     /// [Right Hand Side]
     mfem::Vector rhs_u_fine(vertex_edge.Width());
     B.GetSubVector(pgraph.GetVertexLocalToGlobalMap(), rhs_u_fine);
+    par_orthogonalize_from_constant(rhs_u_fine, vertex_edge_global.Height());
+    //mfem::Vector rhs_u_fine = ComputeFiedlerVector(mixed_laplacian);
+
     mfem::BlockVector fine_rhs(mixed_laplacian.get_blockoffsets());
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = rhs_u_fine;
     fine_rhs *= -1.0;
     /// [Right Hand Side]
+
+    /// [Solve mixed problem by generalized hybridization]
+    mfem::BlockVector mixed_sol(fine_rhs);
+    {
+        if (myid == 0)
+        {
+            std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+        HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
+        if (myid == 0)
+        {
+            std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
+            std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
+            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+        }
+
+        hb_solver.SetPrintLevel(2);
+        hb_solver.SetMaxIter(5000);
+        hb_solver.SetRelTol(1e-12);
+        hb_solver.SetAbsTol(1e-12);
+
+        chrono.Clear();
+        chrono.Start();
+        mixed_sol = 0.0;
+        if (myid == 0)
+        {
+            fine_rhs.GetBlock(1)[0] = 0.0;
+        }
+        hb_solver.Solve(fine_rhs, mixed_sol);
+        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
+        if (myid == 0)
+        {
+            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
+        }
+    }
+    /// [Solve mixed problem by generalized hybridization]
 
     /// [Solve primal problem by CG + BoomerAMG]
     mfem::Vector primal_sol(rhs_u_fine);
@@ -187,14 +242,21 @@ int main(int argc, char* argv[])
         mfem::CGSolver cg(comm);
         cg.SetPrintLevel(0);
         cg.SetMaxIter(5000);
-        cg.SetRelTol(1e-9);
+        cg.SetRelTol(1e-12);
         cg.SetAbsTol(1e-12);
         cg.SetOperator(*gL);
 
-        mfem::Array<int> ess_dof(1);
-        ess_dof = 0;
-        gL->EliminateRowsCols(ess_dof);
-        rhs_u_fine(0) = 0.0;
+
+        mfem::Array<int> ess_dof;
+        if (myid == 0)
+        {
+            rhs_u_fine(0) = 0.0;
+            ess_dof.Append(0);
+        }
+
+        auto raw_memory = gL->EliminateRowsCols(ess_dof);
+        delete raw_memory;
+
 
         mfem::HypreBoomerAMG prec(*gL);
         prec.SetPrintLevel(0);
@@ -220,58 +282,38 @@ int main(int argc, char* argv[])
     }
     /// [Solve primal problem by CG + BoomerAMG]
 
-    /// [Solve mixed problem by generalized hybridization]
-    mfem::BlockVector mixed_sol(fine_rhs);
-    {
-        if (myid == 0)
-        {
-            std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
-        }
-
-        chrono.Clear();
-        chrono.Start();
-        HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
-        if (myid == 0)
-        {
-            std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
-            std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
-            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
-        }
-
-        chrono.Clear();
-        chrono.Start();
-        mixed_sol = 0.0;
-        hb_solver.Solve(fine_rhs, mixed_sol);
-        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
-        if (myid == 0)
-        {
-            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
-            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
-        }
-    }
-    /// [Solve mixed problem by generalized hybridization]
-
     /// [Check solution difference]
-    primal_sol -= mixed_sol.GetBlock(1);
-    double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
+    mfem::Vector diff = primal_sol;
+    diff -= mixed_sol.GetBlock(1);
+    double error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
     if (myid == 0)
     {
-        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) <<" \n";
+        std::cout << "|| primal_sol - mixed_sol || = " << error <<" \n";
     }
     /// [Check solution difference]
 
     MPI_Finalize();
+
+    delete b;
+    delete a;
+    delete fec;
+    delete fespace;
+    delete mesh;
+
     return 0;
 }
 
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts)
 {
     smoothg::MetisGraphPartitioner partitioner;
-    partitioner.setUnbalanceTol(2);
+    partitioner.setUnbalanceTol(1.001);
     mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
     mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
 
-    partitioner.doPartition(vertex_vertex, num_parts, part);
+    int total_parts = num_parts;
+    partitioner.doPartition(vertex_vertex, total_parts, part);
+
+    assert(total_parts == num_parts);
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian)
@@ -342,4 +384,74 @@ void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::V
 
     SparseMatrix ve = smoothg::Transpose(ev);
     vertex_edge.Swap(ve);
+}
+
+mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
+{
+    auto& pM = mixed_laplacian.get_pM();
+    auto& pD = mixed_laplacian.get_pD();
+    auto* pW = mixed_laplacian.get_pW();
+    const bool use_w = mixed_laplacian.CheckW();
+
+    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
+
+    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
+    pM.GetDiag(M_inv);
+    MinvDT->InvScaleRows(M_inv);
+
+    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
+
+    if (use_w)
+    {
+        (*pW) *= -1.0;
+        // TODO(gelever1): define ParSub lol
+        A.reset(ParAdd(*A, *pW));
+        (*pW) *= -1.0;
+    }
+    else
+    {
+        // Adding identity to A so that it is non-singular
+        mfem::SparseMatrix diag;
+        A->GetDiag(diag);
+        for (int i = 0; i < diag.Width(); i++)
+            diag(i, i) += 1.0;
+    }
+
+    mfem::HypreBoomerAMG prec(*A);
+    prec.SetPrintLevel(0);
+
+    mfem::HypreLOBPCG lobpcg(A->GetComm());
+    lobpcg.SetMaxIter(5000);
+    lobpcg.SetTol(1e-8);
+    lobpcg.SetPrintLevel(0);
+    lobpcg.SetNumModes(2);
+    lobpcg.SetOperator(*A);
+    lobpcg.SetPreconditioner(prec);
+    lobpcg.Solve();
+
+    mfem::Array<double> evals;
+    lobpcg.GetEigenvalues(evals);
+
+    bool converged = true;
+
+    // First eigenvalue of A+I should be 1 (graph Laplacian has a 1D null space)
+    if (!use_w)
+    {
+        converged &= std::abs(evals[0] - 1.0) < 1e-8;
+    }
+
+    // Second eigenvalue of A+I should be greater than 1 for connected graphs
+    converged &= std::abs(evals[1] - 1.0) > 1e-8;
+
+    int myid;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+
+    if (!converged && myid == 0)
+    {
+        std::cout << "LOBPCG Failed to converge: \n";
+        std::cout << evals[0] << "\n";
+        std::cout << evals[1] << "\n";
+    }
+
+    return lobpcg.GetEigenvector(1);
 }

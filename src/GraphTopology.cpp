@@ -317,7 +317,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
         mfem::SparseMatrix face_bdr = smoothg::Mult(face_edge_, *edge_boundaryattr);
         face_bdratt_.Swap(face_bdr);
     }
-    face_bdratt_.Finalize(0);
+    //face_bdratt_.Finalize(0);
 
     // Complete face to aggregate table
     mfem::SparseMatrix face_agg_tmp(face_Agg_i, face_Agg_j,

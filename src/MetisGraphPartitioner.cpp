@@ -328,15 +328,15 @@ int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
 }
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
-               int num_parts, bool use_edge_weight)
+               int num_parts, bool use_edge_weight, double ubal_tol)
 {
     MetisGraphPartitioner partitioner;
-    partitioner.setUnbalanceTol(2);
+    partitioner.setUnbalanceTol(ubal_tol);
     partitioner.doPartition(w_table, num_parts, partitioning, use_edge_weight);
 }
 
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
-                  mfem::Array<int>& partitioning, int coarsening_factor)
+                  mfem::Array<int>& partitioning, int coarsening_factor, double ubal_tol)
 {
     const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
     const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
@@ -344,7 +344,7 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
     const int nvertices = vert_vert.Height();
     int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
     num_partitions = std::max(1, num_partitions);
-    Partition(vert_vert, partitioning, num_partitions);
+    Partition(vert_vert, partitioning, num_partitions, false, ubal_tol);
 }
 
 } // namespace smoothg

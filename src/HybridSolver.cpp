@@ -96,7 +96,8 @@ HybridSolver::HybridSolver(MPI_Comm comm,
         vertex_edge = 1.0;
 
         mfem::Array<int> partitioning;
-        PartitionAAT(vertex_edge, partitioning, agg_size);
+        double ubal_tol = 1.001;
+        PartitionAAT(vertex_edge, partitioning, agg_size, ubal_tol);
 
         GraphTopology topo(vertex_edge, mgL.get_edge_d_td(), partitioning, face_bdrattr);
         Agg_vertexdof_.Swap(topo.Agg_vertex_);
@@ -855,7 +856,7 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
             sigma_loc.SetSize(nlocal_edgedof);
             MinvDT_[iAgg]->Mult(u_loc, sigma_loc);
             tmp_loc.SetSize(nlocal_edgedof);
-            MinvCT_[iAgg]->Mult(mu_loc, sigma_loc);
+            MinvCT_[iAgg]->Mult(mu_loc, tmp_loc);
             sigma_loc += tmp_loc;
         }
 
