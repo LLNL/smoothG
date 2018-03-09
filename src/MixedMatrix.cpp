@@ -33,7 +33,7 @@ MixedMatrix::MixedMatrix(const Graph& graph, const std::vector<double>& global_w
 }
 
 MixedMatrix::MixedMatrix(SparseMatrix M_local, SparseMatrix D_local,
-                         SparseMatrix W_local, ParMatrix edge_true_edge)
+                         SparseMatrix W_local, const ParMatrix& edge_true_edge)
     : M_local_(std::move(M_local)), D_local_(std::move(D_local)),
       W_local_(std::move(W_local))
 {

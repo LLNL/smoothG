@@ -37,7 +37,7 @@ class MixedMatrix
     public:
         MixedMatrix() = default;
         MixedMatrix(const Graph& graph, const std::vector<double>& global_weight);
-        MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local, ParMatrix edge_true_edge);
+        MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local, const ParMatrix& edge_true_edge);
 
         ~MixedMatrix() noexcept = default;
 

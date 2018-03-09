@@ -90,7 +90,9 @@ SharedEntityComm<T>::SharedEntityComm(const ParMatrix& entity_true_entity)
     : entity_true_entity_(entity_true_entity),
       entity_diag_T_(entity_true_entity_.GetDiag().Transpose()),
       entity_offd_T_(entity_true_entity_.GetOffd().Transpose()),
+      comm_pkg_(entity_true_entity_.MakeCommPkg()),
       comm_(entity_true_entity_.GetComm()),
+      myid_(entity_true_entity_.GetMyId()),
       num_entities_(entity_true_entity_.Rows()),
       size_specifier_(0),
       send_counter_(0),
@@ -100,10 +102,6 @@ SharedEntityComm<T>::SharedEntityComm(const ParMatrix& entity_true_entity)
       num_slave_comms_(0),
       recv_buffer_(num_entities_)
 {
-    MPI_Comm_rank(comm_, &myid_);
-
-    comm_pkg_ = entity_true_entity_.MakeCommPkg();
-
     MakeEntityProc();
 
     for (int i = 0; i < num_entities_; ++i)

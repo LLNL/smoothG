@@ -67,6 +67,8 @@ class GraphCoarsen
         std::vector<double> Combine(const std::vector<std::vector<double>>& face_M, int num_face_edges) const;
         SparseMatrix Combine(const std::vector<SparseMatrix>& face_D, int num_face_edges) const;
 
+        Vector MakeOneNegOne(int size, int split) const;
+
         int max_evects_;
         double spect_tol_;
 

@@ -287,6 +287,8 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
         {
             std::vector<double> M_sum = Combine(face_M, num_face_edges);
             SparseMatrix D_sum = Combine(face_D, num_face_edges);
+
+            Vector one_neg_one = MakeOneNegOne(D_sum.Rows(), face_D[0].Rows());
         }
         else
         {
@@ -299,12 +301,7 @@ std::vector<double> GraphCoarsen::Combine(const std::vector<std::vector<double>>
 {
     assert(face_M.size() == 2);
 
-    int size = -num_face_edges;
-
-    for (auto& M : face_M)
-    {
-        size += M.size();
-    }
+    int size = face_M[0].size() + face_M[1].size() - num_face_edges;
 
     std::vector<double> combined(size);
 
@@ -329,50 +326,67 @@ SparseMatrix GraphCoarsen::Combine(const std::vector<SparseMatrix>& face_D, int 
     assert(face_D.size() == 2);
 
     int rows = face_D[0].Rows() + face_D[1].Rows();
-    int cols = -num_face_edges;
+    int cols = face_D[0].Cols() + face_D[1].Cols() - num_face_edges;
 
-    for (auto& D : face_D)
+    std::vector<int> indptr = face_D[0].GetIndptr();
+    indptr.insert(std::end(indptr), std::begin(face_D[1].GetIndptr()) + 1,
+                  std::end(face_D[1].GetIndptr()));
+
+    int row_start = face_D[0].Rows() + 1;
+    int row_end = indptr.size();
+    int nnz_offset = face_D[0].nnz();
+
+    for (int i = row_start; i < row_end; ++i)
     {
-        cols += D.Cols();
+        indptr[i] += nnz_offset;
     }
 
-    CooMatrix D_coo(rows, cols);
-    D_coo.Reserve(face_D[0].nnz() + face_D[1].nnz());
+    std::vector<int> indices = face_D[0].GetIndices();
+    indices.insert(std::end(indices), std::begin(face_D[1].GetIndices()),
+                  std::end(face_D[1].GetIndices()));
 
-    auto add_to_coo = [&] (auto& D, int row_offset = 0, int col_offset = 0)
-    {
-        const auto& indptr = D.GetIndptr();
-        const auto& indices = D.GetIndices();
-        const auto& data = D.GetData();
-
-        int rows = D.Rows();
-
-        for (int row = 0; row < rows; ++row)
-        {
-            int row_i = row + row_offset;
-
-            for (int j = indptr[row]; j < indptr[row + 1]; ++j)
-            {
-                int col_i = indices[j];
-                double val = data[j];
-
-                if (col_i >= num_face_edges)
-                {
-                    col_i += col_offset;
-                }
-
-                D_coo.Add(row_i, col_i, val);
-            }
-        }
-    };
-
-    int row_offset = face_D[0].Rows();
     int col_offset = face_D[0].Cols() - num_face_edges;
+    int nnz_end = indices.size();
 
-    add_to_coo(face_D[0]);
-    add_to_coo(face_D[1], row_offset, col_offset);
+    for (int i = nnz_offset; i < nnz_end; ++i)
+    {
+        if (indices[i] >= num_face_edges)
+        {
+            indices[i] += col_offset;
+        }
+    }
 
-    return D_coo.ToSparse();
+    std::vector<double> data = face_D[0].GetData();
+    data.insert(std::end(data), std::begin(face_D[1].GetData()),
+                  std::end(face_D[1].GetData()));
+
+    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+                        rows, cols);
 }
 
+Vector GraphCoarsen::MakeOneNegOne(int size, int split) const
+{
+    assert(size >= 0);
+    assert(split >= 0);
+
+    Vector vect(size);
+
+    for (int i = 0; i < split; ++i)
+    {
+        vect[i] = 1.0 / split;
+    }
+
+    for (int i = split; i < size; ++i)
+    {
+        vect[i] = -1.0 / (size - split);
+    }
+
+    if (MyId() == 0)
+    {
+        printf("%d %d\n", size, split);
+        vect.Print("VECT:");
+    }
+
+    return vect;
+}
 } // namespace smoothg
