@@ -25,6 +25,7 @@
 #include "MixedMatrix.hpp"
 #include "SharedEntityComm.hpp"
 #include "GraphTopology.hpp"
+#include "GraphEdgeSolver.hpp"
 
 namespace smoothg
 {
@@ -68,6 +69,8 @@ class GraphCoarsen
         SparseMatrix Combine(const std::vector<SparseMatrix>& face_D, int num_face_edges) const;
 
         Vector MakeOneNegOne(int size, int split) const;
+
+        int GetSplit(const GraphTopology& gt, int face) const;
 
         int max_evects_;
         double spect_tol_;

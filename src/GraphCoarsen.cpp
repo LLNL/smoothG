@@ -269,31 +269,31 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
             continue;
         }
 
+        if (num_face_edges == 1)
+        {
+            edge_targets_[face] = DenseMatrix(1, 1, {1.0});
+            continue;
+        }
+
         const auto& face_sigma = shared_sigma[face];
         const auto& face_M = shared_M[face];
         const auto& face_D = shared_D[face];
 
-        int col_count = 0;
-        int total_vects = SumCols(face_sigma);
-        collected_sigma.Resize(num_face_edges, total_vects);
+        linalgcpp::HStack(face_sigma, collected_sigma);
 
-        for (const auto& sigma : face_sigma)
-        {
-            collected_sigma.SetCol(col_count, sigma);
-            col_count += sigma.Cols();
-        }
+        bool shared = face_shared.RowSize(face) > 0;
 
-        if (face_shared.RowSize(face))
-        {
-            std::vector<double> M_sum = Combine(face_M, num_face_edges);
-            SparseMatrix D_sum = Combine(face_D, num_face_edges);
+        const auto& M_local = shared ? Combine(face_M, num_face_edges) : face_M[0];
+        const auto& D_local = shared ? Combine(face_D, num_face_edges) : face_D[0];
+        const int split = shared ? face_D[0].Rows() : GetSplit(gt, face);
 
-            Vector one_neg_one = MakeOneNegOne(D_sum.Rows(), face_D[0].Rows());
-        }
-        else
-        {
+        GraphEdgeSolver solver(M_local, D_local);
+        Vector one_neg_one = MakeOneNegOne(D_local.Rows(), split);
 
-        }
+        Vector pv_sol = solver.Mult(one_neg_one);
+        VectorView pv_sigma(pv_sol.begin(), num_face_edges);
+
+        edge_targets_[face] = Orthogonalize(collected_sigma, pv_sigma, max_evects_);
     }
 }
 
@@ -381,12 +381,16 @@ Vector GraphCoarsen::MakeOneNegOne(int size, int split) const
         vect[i] = -1.0 / (size - split);
     }
 
-    if (MyId() == 0)
-    {
-        printf("%d %d\n", size, split);
-        vect.Print("VECT:");
-    }
-
     return vect;
 }
+
+int GraphCoarsen::GetSplit(const GraphTopology& gt, int face) const
+{
+    std::vector<int> neighbors = gt.face_agg_local_.GetIndices(face);
+    assert(neighbors.size() >= 1);
+    int agg = neighbors[0];
+
+    return gt.agg_vertex_local_.RowSize(agg);
+}
+
 } // namespace smoothg
