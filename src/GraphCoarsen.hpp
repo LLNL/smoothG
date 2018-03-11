@@ -59,6 +59,7 @@ class GraphCoarsen
                                 const Vect2D<DenseMatrix>& shared_sigma,
                                 const Vect2D<std::vector<double>>& shared_M,
                                 const Vect2D<SparseMatrix>& shared_D);
+        void ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local);
 
 
         Vect2D<DenseMatrix> CollectSigma(const GraphTopology& gt, const SparseMatrix& face_edge);
@@ -72,6 +73,10 @@ class GraphCoarsen
 
         int GetSplit(const GraphTopology& gt, int face) const;
 
+        void BuildFaceCoarseDof(const GraphTopology& gt);
+        void BuildPvertex(const GraphTopology& gt);
+        void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
+
         int max_evects_;
         double spect_tol_;
 
@@ -79,6 +84,7 @@ class GraphCoarsen
 
         SparseMatrix P_edge_;
         SparseMatrix P_vertex_;
+        SparseMatrix face_cdof_;
 
         std::vector<DenseMatrix> vertex_targets_;
         std::vector<DenseMatrix> edge_targets_;

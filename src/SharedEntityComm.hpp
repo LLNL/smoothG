@@ -41,6 +41,8 @@ class SharedEntityComm
 
         std::vector<std::vector<T>> Collect();
 
+        void Broadcast(std::vector<T>& mats);
+
     private:
         void MakeEntityProc();
 
@@ -51,6 +53,9 @@ class SharedEntityComm
         T ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const;
 
         void ReducePrepare();
+
+        void BroadcastSizes(std::vector<T>& mats);
+        void BroadcastData(std::vector<T>& mats);
 
         const ParMatrix& entity_true_entity_;
         SparseMatrix entity_diag_T_;
@@ -365,6 +370,113 @@ std::vector<std::vector<T>> SharedEntityComm<T>::Collect()
             data_requests_.data(), data_statuses.data());
 
     return std::move(recv_buffer_);
+}
+
+template <class T>
+void SharedEntityComm<T>::Broadcast(std::vector<T>& mats)
+{
+    BroadcastSizes(mats);
+    BroadcastData(mats);
+}
+
+template <class T>
+void SharedEntityComm<T>::BroadcastSizes(std::vector<T>& mats)
+{
+    send_headers_.resize(num_master_comms_);
+    recv_headers_.resize(num_slave_comms_, std::vector<int>(size_specifier_));
+
+    header_requests_.resize(num_master_comms_ + num_slave_comms_);
+
+    const auto& offd_T_indices = entity_offd_T_.GetIndices();
+    const auto& entity_offd = entity_true_entity_.GetOffd();
+    int num_recv = entity_offd.Cols();
+    assert(num_recv == num_slave_comms_);
+
+    for (int i = 0; i < num_recv; ++i)
+    {
+        int entity = offd_T_indices[i];
+        int owner = entity_master_[entity];
+
+        MPI_Irecv(recv_headers_[i].data(), size_specifier_, MPI_INT,
+                  owner, ENTITY_HEADER_TAG, comm_,
+                  &header_requests_[i]);
+    }
+
+    const auto& diag_T_indices = entity_diag_T_.GetIndices();
+    int num_send = entity_true_entity_.Cols();
+    int send_counter = 0;
+
+    for (int i = 0; i < num_send; ++i)
+    {
+        int entity = diag_T_indices[i];
+        std::vector<int> neighbor_row = entity_proc_.GetIndices(entity);
+
+        for (auto neighbor : neighbor_row)
+        {
+            if (neighbor != myid_)
+            {
+                send_headers_[send_counter] = PackSendSize(mats[entity]);
+
+                MPI_Isend(send_headers_[send_counter].data(), size_specifier_,
+                        MPI_INT, neighbor, ENTITY_HEADER_TAG, comm_,
+                        &header_requests_[num_slave_comms_ + send_counter]);
+                send_counter++;
+            }
+        }
+    }
+
+    assert(send_counter == num_master_comms_);
+
+    std::vector<MPI_Status> header_statuses(num_slave_comms_ + num_master_comms_);
+    MPI_Waitall(num_slave_comms_ + num_master_comms_,
+                header_requests_.data(), header_statuses.data());
+}
+
+template <class T>
+void SharedEntityComm<T>::BroadcastData(std::vector<T>& mats)
+{
+    data_requests_.resize(num_master_comms_ + num_slave_comms_);
+
+    const auto& offd_T_indices = entity_offd_T_.GetIndices();
+    const auto& entity_offd = entity_true_entity_.GetOffd();
+    int num_recv = entity_offd.Cols();
+    assert(num_recv == num_slave_comms_);
+
+    for (int i = 0; i < num_recv; ++i)
+    {
+        int entity = offd_T_indices[i];
+        int owner = entity_master_[entity];
+
+        mats[entity] = ReceiveData(recv_headers_[i], owner,
+                                   ENTITY_MESSAGE_TAG,
+                                   data_requests_[i]);
+    }
+
+    const auto& diag_T_indices = entity_diag_T_.GetIndices();
+    int num_send = entity_true_entity_.Cols();
+    int send_counter = 0;
+
+    for (int i = 0; i < num_send; ++i)
+    {
+        int entity = diag_T_indices[i];
+        std::vector<int> neighbor_row = entity_proc_.GetIndices(entity);
+
+        for (auto neighbor : neighbor_row)
+        {
+            if (neighbor != myid_)
+            {
+                SendData(mats[entity], neighbor, ENTITY_MESSAGE_TAG,
+                        data_requests_[num_slave_comms_ + send_counter]);
+                send_counter++;
+            }
+        }
+    }
+
+    assert(send_counter == num_master_comms_);
+
+    std::vector<MPI_Status> data_statuses(num_slave_comms_ + num_master_comms_);
+    MPI_Waitall(num_slave_comms_ + num_master_comms_,
+                data_requests_.data(), data_statuses.data());
 }
 
 

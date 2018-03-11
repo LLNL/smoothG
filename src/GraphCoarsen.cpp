@@ -52,8 +52,13 @@ GraphCoarsen::GraphCoarsen(const Graph& graph, const MixedMatrix& mgl, const Gra
     auto shared_D = CollectD(gt, mgl.D_local_);
 
     ComputeEdgeTargets(gt, face_edge, shared_sigma, shared_M, shared_D);
+    ScaleEdgeTargets(gt, mgl.D_local_);
 
     printf("%d: %d %d %d\n", permute_v.GetMyId(), shared_sigma.size(), shared_D.size(), shared_M.size());
+
+    BuildFaceCoarseDof(gt);
+    BuildPvertex(gt);
+    BuildPedge(gt, mgl);
 }
 
 GraphCoarsen::GraphCoarsen(const GraphCoarsen& other) noexcept
@@ -295,6 +300,45 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
 
         edge_targets_[face] = Orthogonalize(collected_sigma, pv_sigma, max_evects_);
     }
+
+    sec_face.Broadcast(edge_targets_);
+}
+
+void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local)
+{
+    int num_faces = gt.face_edge_.Rows();
+
+    for (int face = 0; face < num_faces; ++face)
+    {
+        int agg = gt.face_agg_local_.GetIndices(face)[0];
+
+        std::vector<int> vertices = gt.agg_vertex_local_.GetIndices(agg);
+        std::vector<int> face_dofs = gt.face_edge_local_.GetIndices(face);
+
+        SparseMatrix D_transfer = D_local.GetSubMatrix(vertices, face_dofs, col_marker_);
+        DenseMatrix& edge_traces(edge_targets_[face]);
+
+        Vector one(D_transfer.Rows(), 1.0);
+        VectorView pv_trace = edge_traces.GetColView(0);
+
+        double oneDpv = one.Mult(D_transfer.Mult(pv_trace));
+        double beta = (oneDpv < 0) ? -1.0 : 1.0;
+
+        pv_trace /= oneDpv;
+
+        int num_traces = edge_traces.Cols();
+
+        for (int k = 1; k < num_traces; ++k)
+        {
+            VectorView trace = edge_traces.GetColView(k);
+            double alpha = one.Mult(D_transfer.Mult(trace));
+
+            Vector scaled_pv(pv_trace);
+            scaled_pv *= alpha * beta;
+
+            trace -= scaled_pv;
+        }
+    }
 }
 
 std::vector<double> GraphCoarsen::Combine(const std::vector<std::vector<double>>& face_M, int num_face_edges) const
@@ -391,6 +435,94 @@ int GraphCoarsen::GetSplit(const GraphTopology& gt, int face) const
     int agg = neighbors[0];
 
     return gt.agg_vertex_local_.RowSize(agg);
+}
+
+void GraphCoarsen::BuildFaceCoarseDof(const GraphTopology& gt)
+{
+    int num_faces = gt.face_edge_.Rows();
+
+    std::vector<int> indptr(num_faces + 1);
+    indptr[0] = 0;
+
+    for (int i = 0; i < num_faces; ++i)
+    {
+        indptr[i + 1] = indptr[i] + edge_targets_[i].Cols();
+    }
+
+    int num_traces = indptr.back();
+
+    std::vector<int> indices(num_traces);
+    std::iota(std::begin(indices), std::end(indices), 0);
+
+    std::vector<double> data(num_traces, 1.0);
+
+    face_cdof_ = SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+                              num_faces, num_traces);
+}
+
+void GraphCoarsen::BuildPvertex(const GraphTopology& gt)
+{
+    const SparseMatrix& agg_vertex = gt.agg_vertex_local_;
+    int num_aggs = vertex_targets_.size();
+    int num_vertices = agg_vertex.Cols();
+
+    std::vector<int> indptr(num_vertices + 1);
+    indptr[0] = 0;
+
+    for (int i = 0; i < num_aggs; ++i)
+    {
+        std::vector<int> vertices = agg_vertex.GetIndices(i);
+        int num_coarse_dofs = vertex_targets_[i].Cols();
+
+        for (auto vertex : vertices)
+        {
+            indptr[vertex + 1] = num_coarse_dofs;
+        }
+    }
+
+    for (int i = 0; i < num_vertices; ++i)
+    {
+        indptr[i + 1] += indptr[i];
+    }
+
+    int nnz = indptr.back();
+    std::vector<int> indices(nnz);
+    std::vector<double> data(nnz);
+
+    int coarse_dof_counter = 0;
+
+    for (int i = 0; i < num_aggs; ++i)
+    {
+        std::vector<int> fine_dofs = agg_vertex.GetIndices(i);
+        int num_fine_dofs = fine_dofs.size();
+        int num_coarse_dofs = vertex_targets_[i].Cols();
+
+        const DenseMatrix& target_i = vertex_targets_[i];
+
+        for (int j = 0; j < num_fine_dofs; ++j)
+        {
+            int counter = indptr[fine_dofs[j]];
+
+            for (int k = 0; k < num_coarse_dofs; ++k)
+            {
+                indices[counter] = coarse_dof_counter + k;
+                data[counter] = target_i(j, k);
+
+                counter++;
+            }
+        }
+
+        coarse_dof_counter += num_coarse_dofs;
+    }
+
+    P_vertex_ = SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+                             num_vertices, coarse_dof_counter);
+
+}
+
+void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
+{
+
 }
 
 } // namespace smoothg
