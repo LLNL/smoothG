@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
     /// [Right Hand Side]
     mfem::Vector rhs_u_fine(vertex_edge.Width());
     B.GetSubVector(pgraph.GetVertexLocalToGlobalMap(), rhs_u_fine);
-    par_orthogonalize_from_constant(rhs_u_fine, vertex_edge_global.Height());
+    //par_orthogonalize_from_constant(rhs_u_fine, vertex_edge_global.Height());
     //mfem::Vector rhs_u_fine = ComputeFiedlerVector(mixed_laplacian);
 
     mfem::BlockVector fine_rhs(mixed_laplacian.get_blockoffsets());
@@ -207,18 +207,19 @@ int main(int argc, char* argv[])
             std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
         }
 
-        hb_solver.SetPrintLevel(2);
+        hb_solver.SetPrintLevel(0);
         hb_solver.SetMaxIter(5000);
         hb_solver.SetRelTol(1e-12);
         hb_solver.SetAbsTol(1e-12);
 
+        if (myid == 0)
+        {
+            fine_rhs.GetBlock(1)[0] += B.Sum();
+        }
+
         chrono.Clear();
         chrono.Start();
         mixed_sol = 0.0;
-        if (myid == 0)
-        {
-            fine_rhs.GetBlock(1)[0] = 0.0;
-        }
         hb_solver.Solve(fine_rhs, mixed_sol);
         par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
         if (myid == 0)

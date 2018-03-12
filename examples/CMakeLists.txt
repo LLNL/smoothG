@@ -49,6 +49,9 @@ target_link_libraries(mltopo smoothg ${TPL_LIBRARIES})
 add_executable(generalhybrid generalhybrid.cpp)
 target_link_libraries(generalhybrid smoothg ${TPL_LIBRARIES})
 
+add_executable(hybridprec hybridprec.cpp)
+target_link_libraries(hybridprec smoothg ${TPL_LIBRARIES})
+
 # add tests
 configure_file(
   "${PROJECT_SOURCE_DIR}/examples/stest.py"
