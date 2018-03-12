@@ -311,9 +311,6 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
 
     AssembleHybridSystem(M_el, j_multiplier_edgedof);
     HybridSystem_->Finalize();
-    
-    mfem::SparseMatrix tmp_thresh(Threshold(*HybridSystem_));
-    HybridSystem_->Swap(tmp_thresh);
 
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
@@ -381,7 +378,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     solver_ = make_unique<mfem::GMRESSolver>(comm_);
     //solver_ = make_unique<mfem::CGSolver>(comm_);
     //solver_->SetPrintLevel(print_level_);
-    solver_->SetPrintLevel(1);
+    solver_->SetPrintLevel(0);
     solver_->SetMaxIter(max_num_iter_);
     solver_->SetRelTol(rtol_);
     solver_->SetAbsTol(atol_);

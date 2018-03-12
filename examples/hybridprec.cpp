@@ -49,7 +49,7 @@ class HybridPrec : public mfem::Solver
 
         mfem::HypreParMatrix& gL_;
         mfem::HypreSmoother smoother_;
-        mfem::SparseMatrix P_c_;
+        mfem::SparseMatrix P_vertex_;
         unique_ptr<HybridSolver> solver_;
         unique_ptr<MixedMatrix> mgl_;
         unique_ptr<GraphTopology> topo_;
@@ -105,22 +105,21 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
     int num_aggs = agg_vertex.Height();
     int num_vertices = vertex_agg_ext->Height();
 
-    mfem::Array<int> marker(num_vertices);
-    marker = 0;
+    mfem::Array<int> vertex_marker(num_vertices);
+    vertex_marker = 0;
 
     for (int i = 0; i < num_vertices; ++i)
     {
         if (vertex_agg_diag.RowSize(i) > 1 ||
             vertex_agg_offd.RowSize(i) > 0)
         {
-            marker[i]++;
+            vertex_marker[i]++;
         }
     }
 
-    mfem::SparseMatrix P_c(num_vertices);
+    mfem::SparseMatrix P_vertex(num_vertices);
 
     mfem::Array<int> vertices;
-
     int counter = 0;
 
     for (int i = 0; i < num_aggs; ++i)
@@ -131,7 +130,7 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
 
         for (auto vertex : vertices)
         {
-            if (marker[vertex] > 0) // Boundary Vertex
+            if (vertex_marker[vertex] > 0) // Boundary Vertex
             {
                 if (boundary < 0)
                 {
@@ -139,24 +138,24 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
                     counter++;
                 }
 
-                P_c.Add(vertex, boundary, 1.0);
+                P_vertex.Add(vertex, boundary, 1.0);
             }
             else                    // Internal Vertex
             {
-                P_c.Add(vertex, counter, 1.0);
+                P_vertex.Add(vertex, counter, 1.0);
                 counter++;
             }
         }
     }
 
-    P_c.SetWidth(counter);
-    P_c.Finalize();
-    P_c_.Swap(P_c);
+    P_vertex.SetWidth(counter);
+    P_vertex.Finalize();
+    P_vertex_.Swap(P_vertex);
 
-    auto P_c_T = smoothg::Transpose(P_c_);
-    auto agg_cdof = smoothg::Mult(agg_vertex, P_c_);
-    auto cdof_agg = smoothg::Transpose(agg_cdof);
-    auto ve_c = smoothg::Mult(P_c_T, vertex_edge);
+    mfem::SparseMatrix P_vertex_T = smoothg::Transpose(P_vertex_);
+    mfem::SparseMatrix agg_cdof = smoothg::Mult(agg_vertex, P_vertex_);
+    mfem::SparseMatrix cdof_agg = smoothg::Transpose(agg_cdof);
+    mfem::SparseMatrix ve_c = smoothg::Mult(P_vertex_T, vertex_edge);
 
     mfem::Array<int> part_c(cdof_agg.GetJ(), cdof_agg.Height());
 
@@ -169,7 +168,7 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
 
     if (myid == 0)
     {
-        printf("Coarsen: %d -> %d\n", P_c_.Height(), P_c_.Width());
+        printf("Coarsen: %d -> %d\n", P_vertex_.Height(), P_vertex_.Width());
     }
 
     tmp_fine_.SetSize(vertex_edge.Height());
@@ -190,13 +189,13 @@ void HybridPrec::Mult(const mfem::Vector& b, mfem::Vector& x) const
     tmp_fine_ += b;
 
     // Restrict Residual
-    P_c_.MultTranspose(tmp_fine_, tmp_coarse_->GetBlock(1));
+    P_vertex_.MultTranspose(tmp_fine_, tmp_coarse_->GetBlock(1));
 
     // Solve Coarse Level w/ HB solver
     solver_->Mult(*tmp_coarse_, *sol_coarse_);
 
     // Coarse Grid Correction
-    P_c_.Mult(sol_coarse_->GetBlock(1), tmp_fine_);
+    P_vertex_.Mult(sol_coarse_->GetBlock(1), tmp_fine_);
     x += tmp_fine_;
 
     // Post
