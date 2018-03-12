@@ -522,6 +522,26 @@ void GraphCoarsen::BuildPvertex(const GraphTopology& gt)
 
 void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
 {
+    const SparseMatrix& agg_edge = gt.agg_edge_local_;
+    const SparseMatrix& agg_vertex = gt.agg_vertex_local_;
+    const SparseMatrix& agg_face = gt.agg_face_local_;
+
+    int num_aggs = agg_edge.Rows();
+    int num_edges = agg_edge.Cols();
+    int num_vertices = agg_vertex.Cols();
+
+    for (int i = 0; i < num_aggs; ++i)
+    {
+        std::vector<int> edge_dofs = agg_edge.GetIndices(i);
+        std::vector<int> vertex_dofs = agg_vertex.GetIndices(i);
+        std::vector<int> faces = agg_face.GetIndices(i);
+
+        SparseMatrix M = mgl.M_local_.GetSubMatrix(edge_dofs, edge_dofs, col_marker_);
+        SparseMatrix D = mgl.D_local_.GetSubMatrix(vertex_dofs, edge_dofs, col_marker_);
+
+        GraphEdgeSolver solver(M, D);
+
+    }
 
 }
 

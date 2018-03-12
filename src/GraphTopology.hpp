@@ -49,6 +49,7 @@ struct GraphTopology
     SparseMatrix agg_edge_local_;
     SparseMatrix face_edge_local_;
     SparseMatrix face_agg_local_;
+    SparseMatrix agg_face_local_;
 
     ParMatrix face_face_;
     ParMatrix face_true_face_;

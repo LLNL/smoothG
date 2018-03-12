@@ -57,6 +57,7 @@ GraphTopology::GraphTopology(MPI_Comm comm, const Graph& graph)
                                     agg_edge_ext, face_edge_ext);
 
     face_agg_local_ = ExtendFaceAgg(agg_agg, face_agg_int);
+    agg_face_local_ = face_agg_local_.Transpose();
 
     auto face_starts = parlinalgcpp::GenerateOffsets(comm, face_agg_local_.Rows());
 
@@ -85,6 +86,7 @@ GraphTopology::GraphTopology(const GraphTopology& other) noexcept
       agg_edge_local_(other.agg_edge_local_),
       face_edge_local_(other.face_edge_local_),
       face_agg_local_(other.face_agg_local_),
+      agg_face_local_(other.agg_face_local_),
       face_face_(other.face_face_),
       face_true_face_(other.face_true_face_),
       face_edge_(other.face_edge_),
@@ -112,6 +114,7 @@ void swap(GraphTopology& lhs, GraphTopology& rhs) noexcept
     swap(lhs.agg_edge_local_, rhs.agg_edge_local_);
     swap(lhs.face_edge_local_, rhs.face_edge_local_);
     swap(lhs.face_agg_local_, rhs.face_agg_local_);
+    swap(lhs.agg_face_local_, rhs.agg_face_local_);
 
     swap(lhs.face_face_, rhs.face_face_);
     swap(lhs.face_true_face_, rhs.face_true_face_);
