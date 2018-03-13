@@ -53,6 +53,7 @@ class HybridPrec : public mfem::Solver
         unique_ptr<HybridSolver> solver_;
         unique_ptr<MixedMatrix> mgl_;
         unique_ptr<GraphTopology> topo_;
+        unique_ptr<mfem::HypreParMatrix> A_c_;
 
         mutable unique_ptr<mfem::BlockVector> tmp_coarse_;
         mutable unique_ptr<mfem::BlockVector> sol_coarse_;
@@ -157,6 +158,7 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
     mfem::SparseMatrix cdof_agg = smoothg::Transpose(agg_cdof);
     mfem::SparseMatrix ve_c = smoothg::Mult(P_vertex_T, vertex_edge);
 
+
     mfem::Array<int> part_c(cdof_agg.GetJ(), cdof_agg.Height());
 
     mfem::Vector local_weight(vertex_edge.Width());
@@ -165,6 +167,14 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
     mgl_ = make_unique<MixedMatrix>(ve_c, local_weight, edge_trueedge);
     topo_ = make_unique<GraphTopology>(ve_c, edge_trueedge, part_c);
     solver_ = make_unique<HybridSolver>(comm, *mgl_, *topo_);
+
+    mfem::Array<int> coarse_starts;
+    GenerateOffsets(comm, P_vertex_.Width(), coarse_starts);
+
+    mfem::HypreParMatrix P_d(comm, vertex_starts.Last(), coarse_starts.Last(),
+                             vertex_starts, coarse_starts, &P_vertex_);
+
+    A_c_ = unique_ptr<mfem::HypreParMatrix>(mfem::RAP(&gL_, &P_d));
 
     if (myid == 0)
     {
@@ -175,6 +185,9 @@ HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& 
 
     tmp_coarse_ = make_unique<mfem::BlockVector>(mgl_->get_blockoffsets());
     sol_coarse_ = make_unique<mfem::BlockVector>(mgl_->get_blockoffsets());
+
+    tmp_coarse_->GetBlock(0) = 0.0;
+    sol_coarse_->GetBlock(0) = 0.0;
 }
 
 void HybridPrec::Mult(const mfem::Vector& b, mfem::Vector& x) const
