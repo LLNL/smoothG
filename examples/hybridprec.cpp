@@ -25,6 +25,7 @@
 
 #include "mfem.hpp"
 
+#include "hybridprecond.hpp"
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"
 
@@ -33,187 +34,11 @@ using std::shared_ptr;
 using std::make_shared;
 
 using namespace smoothg;
+using namespace mfem;
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
-
-class HybridPrec : public mfem::Solver
-{
-    public:
-        HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& pgraph, const mfem::Vector& weight);
-
-        void Mult(const mfem::Vector& input, mfem::Vector& output) const;
-    private:
-        void SetOperator(const mfem::Operator&) {}
-
-        mfem::HypreParMatrix& gL_;
-        mfem::HypreSmoother smoother_;
-        mfem::SparseMatrix P_vertex_;
-        unique_ptr<HybridSolver> solver_;
-        unique_ptr<MixedMatrix> mgl_;
-        unique_ptr<GraphTopology> topo_;
-        unique_ptr<mfem::HypreParMatrix> A_c_;
-
-        mutable unique_ptr<mfem::BlockVector> tmp_coarse_;
-        mutable unique_ptr<mfem::BlockVector> sol_coarse_;
-
-        mutable mfem::Vector tmp_fine_;
-};
-
-HybridPrec::HybridPrec(MPI_Comm comm, mfem::HypreParMatrix& gL, const ParGraph& pgraph, const mfem::Vector& weight)
-    : gL_(gL), smoother_(gL_)
-{
-    int num_procs, myid;
-    MPI_Comm_size(comm, &num_procs);
-    MPI_Comm_rank(comm, &myid);
-
-    const auto& vertex_edge = pgraph.GetLocalVertexToEdge();
-    const auto& edge_trueedge = pgraph.GetEdgeToTrueEdge();
-    const auto& local_part = pgraph.GetLocalPartition();
-
-    int num_parts = local_part.Max() + 1;
-
-    auto agg_vertex = PartitionToMatrix(local_part, num_parts);
-
-    mfem::Array<HYPRE_Int> agg_starts;
-    mfem::Array<HYPRE_Int> vertex_starts;
-    mfem::Array<HYPRE_Int> edge_starts;
-
-    GenerateOffsets(comm, agg_vertex.Height(), agg_starts);
-    GenerateOffsets(comm, agg_vertex.Width(), vertex_starts);
-    GenerateOffsets(comm, vertex_edge.Width(), edge_starts);
-
-    mfem::HypreParMatrix agg_vertex_d(comm, agg_starts.Last(), vertex_starts.Last(),
-                                      agg_starts, vertex_starts, &agg_vertex);
-
-    auto ve_copy = vertex_edge;
-    mfem::HypreParMatrix ve_d(comm, vertex_starts.Last(), edge_starts.Last(),
-                              vertex_starts, edge_starts, &ve_copy);
-
-    auto ve = unique_ptr<mfem::HypreParMatrix>(ParMult(&ve_d, &edge_trueedge));
-    auto ev = unique_ptr<mfem::HypreParMatrix>(ve->Transpose());
-    auto vertex_vertex = unique_ptr<mfem::HypreParMatrix>(ParMult(ve.get(), ev.get()));
-    auto agg_ext_vertex = unique_ptr<mfem::HypreParMatrix>(ParMult(&agg_vertex_d, vertex_vertex.get()));
-    auto vertex_agg_ext = unique_ptr<mfem::HypreParMatrix>(agg_ext_vertex->Transpose());
-
-    mfem::SparseMatrix vertex_agg_diag;
-    mfem::SparseMatrix vertex_agg_offd;
-    HYPRE_Int* junk;
-    vertex_agg_ext->GetDiag(vertex_agg_diag);
-    vertex_agg_ext->GetOffd(vertex_agg_offd, junk);
-
-    int num_aggs = agg_vertex.Height();
-    int num_vertices = vertex_agg_ext->Height();
-
-    mfem::Array<int> vertex_marker(num_vertices);
-    vertex_marker = 0;
-
-    for (int i = 0; i < num_vertices; ++i)
-    {
-        if (vertex_agg_diag.RowSize(i) > 1 ||
-            vertex_agg_offd.RowSize(i) > 0)
-        {
-            vertex_marker[i]++;
-        }
-    }
-
-    mfem::SparseMatrix P_vertex(num_vertices);
-
-    mfem::Array<int> vertices;
-    int counter = 0;
-
-    for (int i = 0; i < num_aggs; ++i)
-    {
-        int boundary = -1;
-
-        GetTableRow(agg_vertex, i, vertices);
-
-        for (auto vertex : vertices)
-        {
-            if (vertex_marker[vertex] > 0) // Boundary Vertex
-            {
-                if (boundary < 0)
-                {
-                    boundary = counter;
-                    counter++;
-                }
-
-                P_vertex.Add(vertex, boundary, 1.0);
-            }
-            else                    // Internal Vertex
-            {
-                P_vertex.Add(vertex, counter, 1.0);
-                counter++;
-            }
-        }
-    }
-
-    P_vertex.SetWidth(counter);
-    P_vertex.Finalize();
-    P_vertex_.Swap(P_vertex);
-
-    mfem::SparseMatrix P_vertex_T = smoothg::Transpose(P_vertex_);
-    mfem::SparseMatrix agg_cdof = smoothg::Mult(agg_vertex, P_vertex_);
-    mfem::SparseMatrix cdof_agg = smoothg::Transpose(agg_cdof);
-    mfem::SparseMatrix ve_c = smoothg::Mult(P_vertex_T, vertex_edge);
-
-
-    mfem::Array<int> part_c(cdof_agg.GetJ(), cdof_agg.Height());
-
-    mfem::Vector local_weight(vertex_edge.Width());
-    weight.GetSubVector(pgraph.GetEdgeLocalToGlobalMap(), local_weight);
-
-    mgl_ = make_unique<MixedMatrix>(ve_c, local_weight, edge_trueedge);
-    topo_ = make_unique<GraphTopology>(ve_c, edge_trueedge, part_c);
-    solver_ = make_unique<HybridSolver>(comm, *mgl_, *topo_);
-
-    mfem::Array<int> coarse_starts;
-    GenerateOffsets(comm, P_vertex_.Width(), coarse_starts);
-
-    mfem::HypreParMatrix P_d(comm, vertex_starts.Last(), coarse_starts.Last(),
-                             vertex_starts, coarse_starts, &P_vertex_);
-
-    A_c_ = unique_ptr<mfem::HypreParMatrix>(mfem::RAP(&gL_, &P_d));
-
-    if (myid == 0)
-    {
-        printf("Coarsen: %d -> %d\n", P_vertex_.Height(), P_vertex_.Width());
-    }
-
-    tmp_fine_.SetSize(vertex_edge.Height());
-
-    tmp_coarse_ = make_unique<mfem::BlockVector>(mgl_->get_blockoffsets());
-    sol_coarse_ = make_unique<mfem::BlockVector>(mgl_->get_blockoffsets());
-
-    tmp_coarse_->GetBlock(0) = 0.0;
-    sol_coarse_->GetBlock(0) = 0.0;
-}
-
-void HybridPrec::Mult(const mfem::Vector& b, mfem::Vector& x) const
-{
-    // PreSmooth
-    x = 0.0;
-    smoother_.Mult(b, x);
-
-    // Residual
-    gL_.Mult(x, tmp_fine_);
-    tmp_fine_ *= -1.0;
-    tmp_fine_ += b;
-
-    // Restrict Residual
-    P_vertex_.MultTranspose(tmp_fine_, tmp_coarse_->GetBlock(1));
-
-    // Solve Coarse Level w/ HB solver
-    solver_->Mult(*tmp_coarse_, *sol_coarse_);
-
-    // Coarse Grid Correction
-    P_vertex_.Mult(sol_coarse_->GetBlock(1), tmp_fine_);
-    x += tmp_fine_;
-
-    // Post
-    smoother_.Mult(b, x);
-}
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
 
 int main(int argc, char* argv[])
 {
@@ -335,10 +160,10 @@ int main(int argc, char* argv[])
         chrono.Start();
         mfem::CGSolver cg(comm);
 
-        HybridPrec prec(comm, *gL_hybrid_, pgraph, weight);
+        HybridPrec prec(comm, *gL_hybrid_, vertex_edge_global, weight, global_partitioning);
 
         cg.SetPreconditioner(prec);
-        cg.SetPrintLevel(1);
+        cg.SetPrintLevel(0);
         cg.SetMaxIter(5000);
         cg.SetRelTol(1e-9);
         cg.SetAbsTol(1e-12);

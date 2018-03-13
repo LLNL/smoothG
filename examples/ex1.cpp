@@ -27,6 +27,7 @@
 
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"
+#include "hybridprecond.hpp"
 
 using std::unique_ptr;
 using std::shared_ptr;
@@ -37,7 +38,6 @@ using namespace mfem;
 
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
-void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::Vector& weight);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
@@ -56,6 +56,9 @@ int main(int argc, char* argv[])
     int agg_size = 12;
     args.AddOption(&agg_size, "-as", "--agg-size",
                    "Number of vertices in an aggregated in hybridization.");
+    int parts_per_proc = 2;
+    args.AddOption(&parts_per_proc, "-ppc", "--parts-per-proc",
+                   "Parts per processor to partition hybrid solver.");
 
 
     // MFEM Options
@@ -166,15 +169,19 @@ int main(int argc, char* argv[])
 
     /// [Set up parallel graph and Laplacian]
     mfem::Array<int> global_partitioning;
-    MetisPart(vertex_edge_global, global_partitioning, num_procs);
+    MetisPart(vertex_edge_global, global_partitioning, num_procs * parts_per_proc);
+
     smoothg::ParGraph pgraph(comm, vertex_edge_global, global_partitioning);
     auto& vertex_edge = pgraph.GetLocalVertexToEdge();
     const auto& edge_trueedge = pgraph.GetEdgeToTrueEdge();
+
     mfem::Vector local_weight(vertex_edge.Width());
     weight.GetSubVector(pgraph.GetEdgeLocalToGlobalMap(), local_weight);
 
     MixedMatrix mixed_laplacian(vertex_edge, local_weight, edge_trueedge);
     unique_ptr<mfem::HypreParMatrix> gL = GraphLaplacian(mixed_laplacian);
+    unique_ptr<mfem::HypreParMatrix> gL_hybrid = GraphLaplacian(mixed_laplacian);
+
     /// [Set up parallel graph and Laplacian]
 
     /// [Right Hand Side]
@@ -230,6 +237,59 @@ int main(int argc, char* argv[])
     }
     /// [Solve mixed problem by generalized hybridization]
 
+    /// [Solve mixed problem by hybridization preconditioner]
+    mfem::Vector hybrid_prec_sol(rhs_u_fine);
+    {
+        if (myid == 0)
+        {
+            std::cout << "\nSolving mixed problem by hybridization preconditioner ...\n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+        mfem::CGSolver cg(comm);
+
+        HybridPrec prec(comm, *gL_hybrid, vertex_edge_global, weight, global_partitioning);
+
+        cg.SetPreconditioner(prec);
+        cg.SetPrintLevel(0);
+        cg.SetMaxIter(5000);
+        cg.SetRelTol(1e-9);
+        cg.SetAbsTol(1e-12);
+
+
+        mfem::Array<int> ess_dof;
+        if (myid == 0)
+        {
+            rhs_u_fine(0) = 0.0;
+            ess_dof.Append(0);
+        }
+        auto raw_memory = gL_hybrid->EliminateRowsCols(ess_dof);
+        delete raw_memory;
+
+        cg.SetOperator(*gL_hybrid);
+
+        if (myid == 0)
+        {
+            std::cout << "System size: " << gL_hybrid->N() <<"\n";
+            std::cout << "System NNZ: " << gL_hybrid->NNZ() <<"\n";
+            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+
+        hybrid_prec_sol = 0.0;
+        cg.Mult(rhs_u_fine, hybrid_prec_sol);
+        par_orthogonalize_from_constant(hybrid_prec_sol, vertex_edge_global.Height());
+        if (myid == 0)
+        {
+            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "Number of iterations: " << cg.GetNumIterations() <<"\n";
+        }
+    }
+    /// [Solve mixed problem by hybridization preconditioner]
+
     /// [Solve primal problem by CG + BoomerAMG]
     mfem::Vector primal_sol(rhs_u_fine);
     {
@@ -284,9 +344,18 @@ int main(int argc, char* argv[])
     /// [Solve primal problem by CG + BoomerAMG]
 
     /// [Check solution difference]
+
     mfem::Vector diff = primal_sol;
-    diff -= mixed_sol.GetBlock(1);
+    diff -= hybrid_prec_sol;
     double error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
+    if (myid == 0)
+    {
+        std::cout << "|| primal_sol - hybrid_prec_sol || = " << error <<" \n";
+    }
+
+    diff = primal_sol;
+    diff -= mixed_sol.GetBlock(1);
+    error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
     if (myid == 0)
     {
         std::cout << "|| primal_sol - mixed_sol || = " << error <<" \n";
@@ -345,46 +414,6 @@ unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplaci
     A->CopyColStarts();
 
     return A;
-}
-
-void Split(const mfem::SparseMatrix& A, mfem::SparseMatrix& vertex_edge, mfem::Vector& weight)
-{
-    int num_vertices = A.Height();
-    int nnz_total = A.NumNonZeroElems();
-    assert((nnz_total - num_vertices) % 2 == 0);
-    int num_edges = (nnz_total - num_vertices) / 2;
-
-    SparseMatrix ev(num_edges, num_vertices);
-    weight.SetSize(num_edges);
-
-    auto A_i = A.GetI();
-    auto A_j = A.GetJ();
-    auto A_a = A.GetData();
-
-    int count = 0;
-
-    for (int i = 0; i < num_vertices; ++i)
-    {
-        for (int j = A_i[i]; j < A_i[i + 1]; ++j)
-        {
-            int col = A_j[j];
-
-            if (col > i)
-            {
-                weight[count] = -1.0 * A_a[j];
-                ev.Add(count, i, 1.0);
-                ev.Add(count, col, 1.0);
-                count++;
-            }
-        }
-    }
-
-    ev.Finalize();
-
-    assert(count == num_edges);
-
-    SparseMatrix ve = smoothg::Transpose(ev);
-    vertex_edge.Swap(ve);
 }
 
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
