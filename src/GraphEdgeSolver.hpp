@@ -49,6 +49,12 @@ class GraphEdgeSolver
         Vector Mult(const VectorView& input) const;
         void Mult(const VectorView& input, VectorView& output) const;
 
+        DenseMatrix Mult(const DenseMatrix& input) const;
+        void Mult(const DenseMatrix& input, DenseMatrix& output) const;
+
+        void PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const;
+        void PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const;
+
     private:
         SparseMatrix MinvDT_;
         SparseSolver Ainv_;

@@ -525,10 +525,15 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
     const SparseMatrix& agg_edge = gt.agg_edge_local_;
     const SparseMatrix& agg_vertex = gt.agg_vertex_local_;
     const SparseMatrix& agg_face = gt.agg_face_local_;
+    const SparseMatrix& face_edge = gt.face_edge_local_;
 
     int num_aggs = agg_edge.Rows();
     int num_edges = agg_edge.Cols();
     int num_vertices = agg_vertex.Cols();
+
+    DenseMatrix bubbles;
+    DenseMatrix trace_ext;
+    DenseMatrix D_trace;
 
     for (int i = 0; i < num_aggs; ++i)
     {
@@ -540,6 +545,21 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
         SparseMatrix D = mgl.D_local_.GetSubMatrix(vertex_dofs, edge_dofs, col_marker_);
 
         GraphEdgeSolver solver(M, D);
+
+        solver.PartMult(1, vertex_targets_[i], bubbles);
+
+        for (auto face : faces)
+        {
+            std::vector<int> face_dofs = face_edge.GetIndices(face);
+
+            SparseMatrix D_transfer = mgl.D_local_.GetSubMatrix(vertex_dofs, face_dofs, col_marker_);
+            D_trace.Resize(D_transfer.Rows(), edge_targets_[face].Cols());
+            D_transfer.Mult(edge_targets_[face], D_trace);
+
+            OrthoConstant(D_trace);
+
+            solver.Mult(D_trace, trace_ext);
+        }
 
     }
 

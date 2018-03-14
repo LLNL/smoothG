@@ -675,6 +675,17 @@ DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect_view, int max
     return out;
 }
 
+void OrthoConstant(DenseMatrix& mat)
+{
+    int cols = mat.Cols();
+
+    for (int i = 0; i < cols; ++i)
+    {
+        VectorView col = mat.GetColView(i);
+        SubAvg(col);
+    }
+}
+
 void Deflate(DenseMatrix& A, const VectorView& v)
 {
     int rows = A.Rows();

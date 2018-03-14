@@ -78,6 +78,8 @@ void ClearMarker(std::vector<int>& marker, const std::vector<int>& indices);
 DenseMatrix Orthogonalize(DenseMatrix& mat, int max_keep = -1);
 DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect, int max_keep = -1);
 
+void OrthoConstant(DenseMatrix& mat);
+
 void Deflate(DenseMatrix& A, const VectorView& vect);
 
 DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,

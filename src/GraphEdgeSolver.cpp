@@ -85,6 +85,53 @@ void GraphEdgeSolver::Mult(const VectorView& input, VectorView& output) const
     MinvDT_.Mult(vect_sol_, output);
 }
 
+DenseMatrix GraphEdgeSolver::Mult(const DenseMatrix& input) const
+{
+    DenseMatrix output;
+    Mult(input, output);
+
+    return output;
+}
+
+void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& output) const
+{
+    int rows = MinvDT_.Rows();
+    int cols = input.Cols();
+
+    output.Resize(rows, cols);
+
+    for (int i = 0; i < cols; ++i)
+    {
+        const VectorView& in_col = input.GetColView(i);
+        VectorView out_col = output.GetColView(i);
+
+        Mult(in_col, out_col);
+    }
+}
+
+void GraphEdgeSolver::PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const
+{
+    PartMult(offset, input.Cols(), input, output);
+}
+
+void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const
+{
+    assert(start >= 0);
+    assert(end <= input.Cols());
+
+    int size = end - start;
+
+    output.Resize(MinvDT_.Rows(), size);
+
+    for (int i = 0; i < size; ++i)
+    {
+        const VectorView& in_col = input.GetColView(i + start);
+        VectorView out_col = output.GetColView(i);
+
+        Mult(in_col, out_col);
+    }
+}
+
 
 
 
