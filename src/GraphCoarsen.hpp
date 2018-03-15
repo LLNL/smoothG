@@ -73,6 +73,7 @@ class GraphCoarsen
 
         int GetSplit(const GraphTopology& gt, int face) const;
 
+        void BuildAggBubbleDof();
         void BuildFaceCoarseDof(const GraphTopology& gt);
         void BuildPvertex(const GraphTopology& gt);
         void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
@@ -85,6 +86,7 @@ class GraphCoarsen
         SparseMatrix P_edge_;
         SparseMatrix P_vertex_;
         SparseMatrix face_cdof_;
+        SparseMatrix agg_bubble_dof_;
 
         std::vector<DenseMatrix> vertex_targets_;
         std::vector<DenseMatrix> edge_targets_;
