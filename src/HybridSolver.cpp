@@ -634,7 +634,8 @@ void HybridSolver::AssembleHybridSystem(
         }
         else
         {
-            Aloc = new mfem::SparseMatrix(0);
+            Aloc = new mfem::SparseMatrix(1, 1);
+            Aloc->Add(0, 0, 1.0);
         }
 
         if (W_)
@@ -643,6 +644,8 @@ void HybridSolver::AssembleHybridSystem(
                                              edgedof_global_to_local_map);
             Aloc->Add(-1.0, Wloc);
         }
+
+            Aloc->Finalize();
 
         // Compute the LU factorization of Aloc
         mfem::UMFPackSolver* Ainv_i = new mfem::UMFPackSolver(*Aloc);

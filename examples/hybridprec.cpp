@@ -38,7 +38,7 @@ using namespace mfem;
 
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int coarse_factor);
 
 int main(int argc, char* argv[])
 {
@@ -53,9 +53,9 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    int parts_per_proc = 2;
-    args.AddOption(&parts_per_proc, "-ppc", "--parts-per-proc",
-                   "Parts per processor to partition hybrid solver.");
+    int agg_size = 12;
+    args.AddOption(&agg_size, "-as", "--agg-size",
+                   "Aggregate size");
     const char* graphFileName = "../../graphdata/vertex_edge_sample.txt";
     args.AddOption(&graphFileName, "-g", "--graph",
                    "File to load for graph connection data.");
@@ -127,7 +127,9 @@ int main(int argc, char* argv[])
     /// [Set up parallel graph and Laplacian]
 
     mfem::Array<int> global_partitioning;
-    MetisPart(vertex_edge_global, global_partitioning, num_procs * parts_per_proc);
+    MetisPart(vertex_edge_global, global_partitioning, agg_size);
+
+    assert(global_partitioning.Max() + 1 >= num_procs);
 
     smoothg::ParGraph pgraph(comm, vertex_edge_global, global_partitioning);
     auto& vertex_edge = pgraph.GetLocalVertexToEdge();
@@ -272,12 +274,14 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts)
+void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int coarse_factor)
 {
     smoothg::MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(1.001);
     mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
     mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
+
+    int num_parts = std::max(1, (int)((vertex_vertex.Height() / (double)coarse_factor) + 0.5));
 
     partitioner.doPartition(vertex_vertex, num_parts, part);
 }

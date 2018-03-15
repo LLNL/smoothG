@@ -63,6 +63,11 @@ mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& A, const mfem::HypreParMat
 void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat);
 
 /**
+    @brief Parallel to serial on all processors
+*/
+mfem::SparseMatrix Collect(MPI_Comm comm, const mfem::HypreParMatrix& mat);
+
+/**
     @brief Compute transpose of a matrix
 */
 mfem::SparseMatrix Transpose(const mfem::SparseMatrix& A);

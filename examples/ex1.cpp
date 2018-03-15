@@ -37,6 +37,7 @@ using namespace smoothg;
 using namespace mfem;
 
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
+void MetisPartCF(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int coarse_factor);
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
@@ -55,30 +56,30 @@ int main(int argc, char* argv[])
     mfem::OptionsParser args(argc, argv);
     int agg_size = 12;
     args.AddOption(&agg_size, "-as", "--agg-size",
-                   "Number of vertices in an aggregated in hybridization.");
+            "Number of vertices in an aggregated in hybridization.");
     int parts_per_proc = 2;
     args.AddOption(&parts_per_proc, "-ppc", "--parts-per-proc",
-                   "Parts per processor to partition hybrid solver.");
+            "Parts per processor to partition hybrid solver.");
 
 
     // MFEM Options
     const char* mesh_file = "star.mesh";
     args.AddOption(&mesh_file, "-mesh", "--mesh",
-                   "Mesh file to use.");
+            "Mesh file to use.");
     int order = 1;
     args.AddOption(&order, "-o", "--order",
-                   "Finite element order (polynomial degree) or -1 for"
-                   " isoparametric space.");
+            "Finite element order (polynomial degree) or -1 for"
+            " isoparametric space.");
     int ref_levels = 1;
     args.AddOption(&ref_levels, "-nr", "--num-refine",
-                   "Number of times to refine mesh.");
+            "Number of times to refine mesh.");
     bool static_cond = false;
     args.AddOption(&static_cond, "-sc", "--static-condensation", "-no-sc",
-                   "--no-static-condensation", "Enable static condensation.");
+            "--no-static-condensation", "Enable static condensation.");
     bool visualization = 1;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
-                   "--no-visualization",
-                   "Enable or disable GLVis visualization.");
+            "--no-visualization",
+            "Enable or disable GLVis visualization.");
 
     args.Parse();
     if (!args.Good())
@@ -144,6 +145,7 @@ int main(int argc, char* argv[])
     Vector B, X;
     a->FormLinearSystem(ess_tdof_list, x, *b, A, X, B);
 
+
     /// [Load graph from file or generate one]
     mfem::Vector weight;
     mfem::SparseMatrix vertex_edge_global;
@@ -169,7 +171,9 @@ int main(int argc, char* argv[])
 
     /// [Set up parallel graph and Laplacian]
     mfem::Array<int> global_partitioning;
-    MetisPart(vertex_edge_global, global_partitioning, num_procs * parts_per_proc);
+    //MetisPart(vertex_edge_global, global_partitioning, num_procs * parts_per_proc);
+    MetisPartCF(vertex_edge_global, global_partitioning, agg_size);
+    assert(global_partitioning.Max() + 1 >= num_procs);
 
     smoothg::ParGraph pgraph(comm, vertex_edge_global, global_partitioning);
     auto& vertex_edge = pgraph.GetLocalVertexToEdge();
@@ -180,6 +184,7 @@ int main(int argc, char* argv[])
 
     MixedMatrix mixed_laplacian(vertex_edge, local_weight, edge_trueedge);
     unique_ptr<mfem::HypreParMatrix> gL = GraphLaplacian(mixed_laplacian);
+    unique_ptr<mfem::HypreParMatrix> gL_unelim = GraphLaplacian(mixed_laplacian);
     unique_ptr<mfem::HypreParMatrix> gL_hybrid = GraphLaplacian(mixed_laplacian);
 
     /// [Set up parallel graph and Laplacian]
@@ -187,8 +192,12 @@ int main(int argc, char* argv[])
     /// [Right Hand Side]
     mfem::Vector rhs_u_fine(vertex_edge.Width());
     B.GetSubVector(pgraph.GetVertexLocalToGlobalMap(), rhs_u_fine);
-    //par_orthogonalize_from_constant(rhs_u_fine, vertex_edge_global.Height());
     //mfem::Vector rhs_u_fine = ComputeFiedlerVector(mixed_laplacian);
+
+    if (myid == 0)
+    {
+        rhs_u_fine(0) -= B.Sum();
+    }
 
     mfem::BlockVector fine_rhs(mixed_laplacian.get_blockoffsets());
     fine_rhs.GetBlock(0) = 0.0;
@@ -197,44 +206,47 @@ int main(int argc, char* argv[])
     /// [Right Hand Side]
 
     /// [Solve mixed problem by generalized hybridization]
-    mfem::BlockVector mixed_sol(fine_rhs);
+    /*
+       mfem::BlockVector mixed_sol(fine_rhs);
+       {
+       if (myid == 0)
+       {
+       std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
+       }
+
+       chrono.Clear();
+       chrono.Start();
+    //HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
+    HybridSolver hb_solver(comm, mixed_laplacian, 1);
+    if (myid == 0)
     {
-        if (myid == 0)
-        {
-            std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
-        }
-
-        chrono.Clear();
-        chrono.Start();
-        HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
-        if (myid == 0)
-        {
-            std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
-            std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
-            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
-        }
-
-        hb_solver.SetPrintLevel(0);
-        hb_solver.SetMaxIter(5000);
-        hb_solver.SetRelTol(1e-12);
-        hb_solver.SetAbsTol(1e-12);
-
-        if (myid == 0)
-        {
-            fine_rhs.GetBlock(1)[0] += B.Sum();
-        }
-
-        chrono.Clear();
-        chrono.Start();
-        mixed_sol = 0.0;
-        hb_solver.Solve(fine_rhs, mixed_sol);
-        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
-        if (myid == 0)
-        {
-            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
-            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
-        }
+    std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
+    std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
+    std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
     }
+
+    hb_solver.SetPrintLevel(0);
+    hb_solver.SetMaxIter(5000);
+    hb_solver.SetRelTol(1e-12);
+    hb_solver.SetAbsTol(1e-12);
+
+    if (myid == 0)
+    {
+    fine_rhs.GetBlock(1)[0] += B.Sum();
+    }
+
+    chrono.Clear();
+    chrono.Start();
+    mixed_sol = 0.0;
+    hb_solver.Solve(fine_rhs, mixed_sol);
+    par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
+    if (myid == 0)
+    {
+    std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+    std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
+    }
+    }
+    */
     /// [Solve mixed problem by generalized hybridization]
 
     /// [Solve mixed problem by hybridization preconditioner]
@@ -248,32 +260,34 @@ int main(int argc, char* argv[])
         chrono.Clear();
         chrono.Start();
         mfem::CGSolver cg(comm);
-
         HybridPrec prec(comm, *gL_hybrid, vertex_edge_global, weight, global_partitioning);
 
-        cg.SetPreconditioner(prec);
+
         cg.SetPrintLevel(0);
         cg.SetMaxIter(5000);
         cg.SetRelTol(1e-9);
         cg.SetAbsTol(1e-12);
-
+        cg.iterative_mode = false;
 
         mfem::Array<int> ess_dof;
         if (myid == 0)
         {
-            rhs_u_fine(0) = 0.0;
             ess_dof.Append(0);
         }
+
         auto raw_memory = gL_hybrid->EliminateRowsCols(ess_dof);
         delete raw_memory;
 
+        cg.SetPreconditioner(prec);
         cg.SetOperator(*gL_hybrid);
+
 
         if (myid == 0)
         {
             std::cout << "System size: " << gL_hybrid->N() <<"\n";
             std::cout << "System NNZ: " << gL_hybrid->NNZ() <<"\n";
             std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+            printf("Num Parts: %d\n", global_partitioning.Max() + 1);
         }
 
         chrono.Clear();
@@ -311,7 +325,6 @@ int main(int argc, char* argv[])
         mfem::Array<int> ess_dof;
         if (myid == 0)
         {
-            rhs_u_fine(0) = 0.0;
             ess_dof.Append(0);
         }
 
@@ -353,13 +366,15 @@ int main(int argc, char* argv[])
         std::cout << "|| primal_sol - hybrid_prec_sol || = " << error <<" \n";
     }
 
-    diff = primal_sol;
-    diff -= mixed_sol.GetBlock(1);
-    error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
-    if (myid == 0)
-    {
-        std::cout << "|| primal_sol - mixed_sol || = " << error <<" \n";
-    }
+    /*
+       diff = primal_sol;
+       diff -= mixed_sol.GetBlock(1);
+       error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
+       if (myid == 0)
+       {
+       std::cout << "|| primal_sol - mixed_sol || = " << error <<" \n";
+       }
+       */
     /// [Check solution difference]
 
     MPI_Finalize();
@@ -371,6 +386,19 @@ int main(int argc, char* argv[])
     delete mesh;
 
     return 0;
+}
+
+
+void MetisPartCF(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int coarse_factor)
+{
+    smoothg::MetisGraphPartitioner partitioner;
+    partitioner.setUnbalanceTol(1.001);
+    mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
+    mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
+
+    int num_parts = std::max(1, (int)((vertex_vertex.Height() / (double)coarse_factor) + 0.5));
+
+    partitioner.doPartition(vertex_vertex, num_parts, part);
 }
 
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts)
