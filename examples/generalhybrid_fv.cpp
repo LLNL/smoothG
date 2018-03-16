@@ -40,7 +40,31 @@ unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplaci
                                                 const mfem::SparseMatrix* bdr = nullptr);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
+              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor, int spe10scale);
+
+class Multigrid : public mfem::Solver
+{
+public:
+    Multigrid(mfem::HypreParMatrix &Operator, mfem::Operator& CoarseSolver)
+        : mfem::Solver(Operator.Height()), Operator_(Operator), Smoother_(Operator),
+          CoarseSolver_(CoarseSolver), correction_(Operator_.Height()),
+          residual_(Operator_.Height()), help_vec_(Operator_.Height())
+    {}
+
+    virtual void Mult(const mfem::Vector & x, mfem::Vector & y) const;
+    virtual void SetOperator(const mfem::Operator &op) {}
+    ~Multigrid() {}
+private:
+    void MG_Cycle() const;
+
+    const mfem::HypreParMatrix& Operator_;
+    mfem::HypreSmoother Smoother_;
+    Operator& CoarseSolver_;
+
+    mutable mfem::Vector correction_;
+    mutable mfem::Vector residual_;
+    mutable mfem::Vector help_vec_;
+};
 
 int main(int argc, char* argv[])
 {
@@ -75,8 +99,8 @@ int main(int argc, char* argv[])
 
     int nDimensions = 2;
     mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 5;
-    coarseningFactor[1] = 5;
+    coarseningFactor[0] = 4;
+    coarseningFactor[1] = 4;
     if (nDimensions == 3)
         coarseningFactor[2] = 5;
 
@@ -97,7 +121,8 @@ int main(int argc, char* argv[])
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem("spe_perm.dat", nDimensions, 5, 0,
+    int spe10scale = 5;
+    SPE10Problem spe10problem("spe_perm.dat", nDimensions, spe10scale, 0,
                               false, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
@@ -147,7 +172,9 @@ int main(int argc, char* argv[])
 
 
     MixedMatrix mixed_laplacian(vertex_edge, local_weight, *edge_trueedge);
-    unique_ptr<mfem::HypreParMatrix> gL = GraphLaplacian(mixed_laplacian, &edge_boundary_att);
+    auto gL = GraphLaplacian(mixed_laplacian, &edge_boundary_att);
+
+    auto gL2 = GraphLaplacian(mixed_laplacian, &edge_boundary_att);
     /// [Set up parallel graph and Laplacian]
 
     /// [Right Hand Side]
@@ -155,6 +182,7 @@ int main(int argc, char* argv[])
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = rhs_u_fine;
     fine_rhs *= -1.0;
+    mfem::Vector rhs_u_fine2(rhs_u_fine);
     /// [Right Hand Side]
 
     /// [Solve primal problem by CG + BoomerAMG]
@@ -173,15 +201,6 @@ int main(int argc, char* argv[])
         cg.SetRelTol(1e-9);
         cg.SetAbsTol(1e-12);
         cg.SetOperator(*gL);
-
-        mfem::Array<int> ess_dof;
-        if (myid == 0)
-        {
-            ess_dof.SetSize(1);
-            ess_dof = 0;
-        }
-        gL->EliminateRowsCols(ess_dof);
-        rhs_u_fine(0) = 0.0;
 
         mfem::HypreBoomerAMG prec(*gL);
         prec.SetPrintLevel(0);
@@ -208,7 +227,7 @@ int main(int argc, char* argv[])
     /// [Solve primal problem by CG + BoomerAMG]
 
     /// [Solve mixed problem by generalized hybridization]
-    mfem::BlockVector mixed_sol(fine_rhs);
+    mfem::Vector mixed_sol(rhs_u_fine);
     {
         if (myid == 0)
         {
@@ -222,30 +241,47 @@ int main(int argc, char* argv[])
         sigmafespace.GetEssentialVDofs(ess_attr, marker);
         mfem::Array<int> partitioning;
         auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
-        HybridSolver hb_solver(comm, mixed_laplacian, partitioning, &edge_boundary_att, &marker);
+        CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor, spe10scale);
+//        std::iota(partitioning.begin(), partitioning.end(), 0);
+//        HybridSolver hb_solver(comm, mixed_laplacian, 1,
+//                               &edge_boundary_att, &marker, 0, nullptr, true);
+
+        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
+                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
+
+        mfem::CGSolver cg(comm);
+        cg.SetPrintLevel(0);
+        cg.SetMaxIter(5000);
+        cg.SetRelTol(1e-9);
+        cg.SetAbsTol(1e-12);
+        cg.SetOperator(*gL2);
+
+        Multigrid prec(*gL2, fvup);
+        cg.SetPreconditioner(prec);
+
         if (myid == 0)
         {
-            std::cout << "System size: " << hb_solver.GetHybridSystemSize() << "\n";
-            std::cout << "System NNZ: " << hb_solver.GetNNZ() << "\n";
+//            std::cout << "System size: " << hb_solver.GetHybridSystemSize() << "\n";
+//            std::cout << "System NNZ: " << hb_solver.GetNNZ() << "\n";
             std::cout << "Setup time: " << chrono.RealTime() << "s. \n";
         }
 
         chrono.Clear();
         chrono.Start();
         mixed_sol = 0.0;
-        hb_solver.Solve(fine_rhs, mixed_sol);
-        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), gL->N());
+//        hb_solver.Solve(fine_rhs, mixed_sol);
+        cg.Mult(rhs_u_fine2, mixed_sol);
+        par_orthogonalize_from_constant(mixed_sol, gL->N());
         if (myid == 0)
         {
             std::cout << "Solve time: " << chrono.RealTime() << "s. \n";
-            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() << "\n\n";
+            std::cout << "Number of iterations: " << cg.GetNumIterations() << "\n\n";
         }
     }
     /// [Solve mixed problem by generalized hybridization]
 
     /// [Check solution difference]
-    primal_sol -= mixed_sol.GetBlock(1);
+    primal_sol -= mixed_sol;
     double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
     if (myid == 0)
     {
@@ -388,15 +424,15 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 
 
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor)
+              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor, int spe10scale)
 {
     const int nDimensions = num_procs_xyz.size();
 
     mfem::Array<int> nxyz(nDimensions);
-    nxyz[0] = 60 / num_procs_xyz[0] / coarsening_factor[0];
-    nxyz[1] = 220 / num_procs_xyz[1] / coarsening_factor[1];
+    nxyz[0] = 12 * spe10scale / num_procs_xyz[0] / coarsening_factor[0];
+    nxyz[1] = 44 * spe10scale / num_procs_xyz[1] / coarsening_factor[1];
     if (nDimensions == 3)
-        nxyz[2] = 85 / num_procs_xyz[2] / coarsening_factor[2];
+        nxyz[2] = 17 * num_procs_xyz[2] / coarsening_factor[2];
 
     for (int& i : nxyz)
     {
@@ -407,4 +443,27 @@ void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
     partitioning.Append(cart_part);
 
     cart_part.MakeDataOwner();
+}
+
+void Multigrid::Mult(const mfem::Vector & x, mfem::Vector & y) const
+{
+    residual_ = x;
+    correction_.SetDataAndSize(y.GetData(), y.Size());
+    MG_Cycle();
+}
+
+void Multigrid::MG_Cycle() const
+{
+    // PreSmoothing
+    Smoother_.Mult(residual_, correction_);
+    Operator_.Mult(-1.0, correction_, 1.0, residual_);
+
+    // Coarse grid correction
+    CoarseSolver_.Mult(residual_, help_vec_);
+    correction_ += help_vec_;
+    Operator_.Mult(-1.0, help_vec_, 1.0, residual_);
+
+    // PostSmoothing
+    Smoother_.Mult(residual_, help_vec_);
+    correction_ += help_vec_;
 }

@@ -133,7 +133,8 @@ public:
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
-                 const SAAMGeParam* saamge_param = nullptr);
+                 const SAAMGeParam* saamge_param = nullptr,
+                 const bool approx = false);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
@@ -176,7 +177,8 @@ public:
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
-                 const SAAMGeParam* saamge_param = nullptr);
+                 const SAAMGeParam* saamge_param = nullptr,
+                 const bool approx = false);
 
     virtual ~HybridSolver();
 
@@ -257,7 +259,7 @@ private:
     mfem::SparseMatrix Agg_edgedof_;
     mfem::SparseMatrix edgedof_IsOwned_;
 
-    const mfem::SparseMatrix& D_;
+    mfem::SparseMatrix D_;
     const mfem::SparseMatrix* W_;
 
     std::unique_ptr<mfem::SparseMatrix> HybridSystem_;

@@ -61,13 +61,65 @@ void HybridSolver::BuildFineLevelLocalMassMatrix(
     }
 }
 
+mfem::SparseMatrix* SimpleInterpolation(const mfem::SparseMatrix& face_edgedof)
+{
+    auto edgedof_face = smoothg::Transpose(face_edgedof);
+    const int num_edofs = edgedof_face.Height();
+    int* P_i = new int[num_edofs+1];
+    int* P_j = new int[num_edofs];
+    double* P_data = new double[num_edofs];
+
+    int count = edgedof_face.Width();
+    std::iota(P_i, P_i + num_edofs + 1, 0);
+    std::fill_n(P_data, num_edofs, 1.0);
+    for (int i = 0; i < num_edofs; i++)
+    {
+        if (edgedof_face.RowSize(i) > 0)
+        {
+            assert(edgedof_face.RowSize(i) == 1);
+            P_j[i] = edgedof_face.GetRowColumns(i)[0];
+        }
+        else
+        {
+            P_j[i] = count;
+            count++;
+        }
+    }
+    assert(count==num_edofs-edgedof_face.NumNonZeroElems()+edgedof_face.Width());
+    return new mfem::SparseMatrix(P_i, P_j, P_data, num_edofs, count);
+}
+
+void CoarsenElementMatrices(std::vector<mfem::Vector>& M_el,
+                            const mfem::SparseMatrix& Agg_edof,
+                            const mfem::SparseMatrix& Agg_cedof,
+                            const mfem::SparseMatrix& P_e)
+{
+    mfem::Array<int> edofs, cedofs, col_map;
+    col_map.SetSize(P_e.Width(), -1);
+    for (int iAgg = 0; iAgg < Agg_edof.Height(); iAgg++)
+    {
+        mfem::Vector& M_el_i = M_el[iAgg];
+
+        GetTableRow(Agg_edof, iAgg, edofs);
+        GetTableRow(Agg_cedof, iAgg, cedofs);
+        auto P_e_loc = ExtractRowAndColumns(P_e, edofs, cedofs, col_map);
+        auto P_e_locT = smoothg::Transpose(P_e_loc);
+
+        P_e_loc.ScaleRows(M_el_i);
+        auto CM_el_i = smoothg::Mult(P_e_locT, P_e_loc);
+        assert(CM_el_i.Height() == CM_el_i.NumNonZeroElems());
+        CM_el_i.GetDiag(M_el_i);
+    }
+}
+
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const int agg_size,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
+                           const SAAMGeParam* saamge_param,
+                           const bool approx)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
@@ -80,7 +132,8 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 {
     MPI_Comm_rank(comm, &myid_);
 
-    mfem::SparseMatrix face_edgedof;
+    mfem::SparseMatrix face_edgedof, P_e, Agg_cedgedof;
+    std::unique_ptr<mfem::HypreParMatrix> edge_d_td;
     if (agg_size == 1)
     {
         // TODO(gelever1): use operator= when mfem version is updated
@@ -104,10 +157,53 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
         auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
         Agg_edgedof_.Swap(Agg_edgedof_tmp);
+
+        edge_d_td = make_unique<mfem::HypreParMatrix>();
+        edge_d_td->MakeRef(mgL.get_edge_d_td());
+        if (approx)
+        {
+            auto P_e_tmp = SimpleInterpolation(face_edgedof);
+            P_e.Swap(*P_e_tmp);
+            delete P_e_tmp;
+
+            auto face_edgedof_tmp = smoothg::Mult(face_edgedof, P_e);
+            face_edgedof.Swap(face_edgedof_tmp);
+
+            auto Agg_cedgedof_tmp = smoothg::Mult(Agg_edgedof_, P_e);
+            Agg_cedgedof.Swap(Agg_cedgedof_tmp);
+
+            auto D_c = smoothg::Mult(D_, P_e);
+            D_.Swap(D_c);
+
+            mfem::Array<int> cdof_starts;
+            GenerateOffsets(comm, P_e.Width(), cdof_starts);
+
+            auto P_e_T = smoothg::Transpose(P_e);
+//            unique_ptr<mfem::HypreParMatrix> edge_cd_td(
+//                    mgL.get_edge_d_td().LeftDiagMult(P_e_T, cdof_starts));
+
+            edge_d_td->MakeRef(mgL.get_edge_d_td());
+            mfem::HypreParMatrix pP_e_T(comm, cdof_starts.Last(), edge_d_td->N(),
+                                        cdof_starts, edge_d_td->ColPart(), &P_e_T);
+            unique_ptr<mfem::HypreParMatrix> edge_cd_td(ParMult(&pP_e_T, &(*edge_d_td)));
+
+            unique_ptr<mfem::HypreParMatrix> edge_td_cd(edge_cd_td->Transpose());
+
+            unique_ptr<mfem::HypreParMatrix> edge_cd_td_cd(
+                mfem::ParMult(edge_td_cd.get(), edge_cd_td.get()) );
+
+            // Construct edge "coarse dof to true coarse dof" table
+            edge_d_td = BuildEntityToTrueEntity(*edge_cd_td_cd);
+        }
     }
 
     std::vector<mfem::Vector> M_el;
     BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
+    if (agg_size > 1 && approx)
+    {
+        CoarsenElementMatrices(M_el, Agg_edgedof_, Agg_cedgedof, P_e);
+        Agg_edgedof_.Swap(Agg_cedgedof);
+    }
 
     Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
@@ -145,7 +241,8 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
+                           const SAAMGeParam* saamge_param,
+                           const bool approx)
     :
     MixedLaplacianSolver(mgL.get_blockoffsets()),
     comm_(comm),
@@ -158,7 +255,8 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 {
     MPI_Comm_rank(comm, &myid_);
 
-    mfem::SparseMatrix face_edgedof;
+    mfem::SparseMatrix face_edgedof, P_e, Agg_cedgedof;
+    std::unique_ptr<mfem::HypreParMatrix> edge_d_td;
     {
         mfem::SparseMatrix vertex_edge(D_);
         vertex_edge = 1.0;
@@ -169,12 +267,54 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
         auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
         Agg_edgedof_.Swap(Agg_edgedof_tmp);
+
+        edge_d_td = make_unique<mfem::HypreParMatrix>();
+        edge_d_td->MakeRef(mgL.get_edge_d_td());
+        if (approx)
+        {
+            auto P_e_tmp = SimpleInterpolation(face_edgedof);
+            P_e.Swap(*P_e_tmp);
+            delete P_e_tmp;
+
+            auto face_edgedof_tmp = smoothg::Mult(face_edgedof, P_e);
+            face_edgedof.Swap(face_edgedof_tmp);
+
+            auto Agg_cedgedof_tmp = smoothg::Mult(Agg_edgedof_, P_e);
+            Agg_cedgedof.Swap(Agg_cedgedof_tmp);
+
+            auto D_c = smoothg::Mult(D_, P_e);
+            D_.Swap(D_c);
+
+            mfem::Array<int> cdof_starts;
+            GenerateOffsets(comm, P_e.Width(), cdof_starts);
+
+            auto P_e_T = smoothg::Transpose(P_e);
+//            unique_ptr<mfem::HypreParMatrix> edge_cd_td(
+//                    mgL.get_edge_d_td().LeftDiagMult(P_e_T, cdof_starts));
+
+            mfem::HypreParMatrix pP_e_T(comm, cdof_starts.Last(), edge_d_td->N(),
+                                        cdof_starts, edge_d_td->ColPart(), &P_e_T);
+            unique_ptr<mfem::HypreParMatrix> edge_cd_td(ParMult(&pP_e_T, &(*edge_d_td)));
+
+            unique_ptr<mfem::HypreParMatrix> edge_td_cd(edge_cd_td->Transpose());
+
+            unique_ptr<mfem::HypreParMatrix> edge_cd_td_cd(
+                mfem::ParMult(edge_td_cd.get(), edge_cd_td.get()) );
+
+            // Construct edge "coarse dof to true coarse dof" table
+            edge_d_td = BuildEntityToTrueEntity(*edge_cd_td_cd);
+        }
     }
 
     std::vector<mfem::Vector> M_el;
     BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
-
-    Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+    if (approx)
+    {
+//        CoarsenElementMatrices(M_el, Agg_edgedof_, Agg_cedgedof, P_e);
+        Agg_edgedof_.Swap(Agg_cedgedof);
+    }
+mfem::SparseMatrix face_edgedof_cp(face_edgedof);
+    Init(face_edgedof_cp, M_el, *edge_d_td, face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::~HybridSolver()
@@ -242,9 +382,6 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
 
     // construct multiplier dof to true dof table
     {
-        unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
-        unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
-
         int* i_edgedof_multiplier = new int[num_edge_dofs_ + 1];
         i_edgedof_multiplier[0] = 0;
         for (int i = 0; i < edgedof_face.Height(); i++)
@@ -289,6 +426,10 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
                                         comm_, edgedof_d_td_.GetGlobalNumRows(),
                                         multiplier_start_.Last(), edgedof_d_td_.RowPart(),
                                         multiplier_start_, &edgedof_multiplier);
+//edgedof_multiplier.Print();
+
+        unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
+        unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
 
         assert(edgedof_d_td_d && edgedof_multiplier_d);
         unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(
@@ -722,7 +863,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     chrono.Clear();
     chrono.Start();
 
-    cg_->Mult(trueHrhs_, trueMu_);
+    prec_->Mult(trueHrhs_, trueMu_);
 
     chrono.Stop();
     timing_ += chrono.RealTime();
