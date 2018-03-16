@@ -82,6 +82,7 @@ void GraphEdgeSolver::Mult(const VectorView& input, VectorView& output) const
     elim_input[0] = 0.0;
 
     Ainv_.Mult(elim_input, vect_sol_);
+    SubAvg(vect_sol_);
     MinvDT_.Mult(vect_sol_, output);
 }
 

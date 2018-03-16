@@ -63,8 +63,11 @@ GraphCoarsen::GraphCoarsen(const Graph& graph, const MixedMatrix& mgl, const Gra
     SparseMatrix P_edge_T = P_edge_.Transpose();
     SparseMatrix P_vertex_T = P_vertex_.Transpose();
 
-    SparseMatrix M_c = P_edge_T.Mult(mgl.M_local_).Mult(P_edge_);
-    SparseMatrix D_c = P_vertex_T.Mult(mgl.D_local_).Mult(P_edge_);
+    SparseMatrix M_c = P_edge_T.Mult(mgl.M_local_.Mult(P_edge_));
+    SparseMatrix D_c = P_vertex_T.Mult(mgl.D_local_.Mult(P_edge_));
+
+    M_c.Print("M:");
+    D_c.Print("D:");
     // End Test //
 }
 
@@ -562,6 +565,7 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
     int num_aggs = agg_edge.Rows();
     int num_edges = agg_edge.Cols();
     int num_vertices = agg_vertex.Cols();
+    int num_faces = face_edge.Rows();
     int num_coarse_dofs = agg_bubble_dof_.Cols();
 
     CooMatrix P_edge(num_edges, num_coarse_dofs);
@@ -600,6 +604,14 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
 
         solver.PartMult(1, vertex_targets_[agg], bubbles);
         P_edge.Add(edge_dofs, bubble_dofs, bubbles);
+    }
+
+    for (int face = 0; face < num_faces; ++face)
+    {
+        std::vector<int> face_fine_dofs = face_edge.GetIndices(face);
+        std::vector<int> face_coarse_dofs = face_cdof_.GetIndices(face);
+
+        P_edge.Add(face_fine_dofs, face_coarse_dofs, edge_targets_[face]);
     }
 
     double zero_tol = 1e-8;
