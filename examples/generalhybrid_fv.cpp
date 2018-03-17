@@ -38,7 +38,6 @@ using namespace smoothg;
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian,
                                                 const mfem::SparseMatrix* bdr = nullptr);
-mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor, int spe10scale);
 
@@ -99,8 +98,8 @@ int main(int argc, char* argv[])
 
     int nDimensions = 2;
     mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 4;
-    coarseningFactor[1] = 4;
+    coarseningFactor[0] = 5;
+    coarseningFactor[1] = 5;
     if (nDimensions == 3)
         coarseningFactor[2] = 5;
 
@@ -228,6 +227,7 @@ int main(int argc, char* argv[])
 
     /// [Solve mixed problem by generalized hybridization]
     mfem::Vector mixed_sol(rhs_u_fine);
+//    mfem::BlockVector mixed_sol(fine_rhs);
     {
         if (myid == 0)
         {
@@ -243,11 +243,11 @@ int main(int argc, char* argv[])
         auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
         CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor, spe10scale);
 //        std::iota(partitioning.begin(), partitioning.end(), 0);
-//        HybridSolver hb_solver(comm, mixed_laplacian, 1,
-//                               &edge_boundary_att, &marker, 0, nullptr, true);
+        HybridSolver hb_solver(comm, mixed_laplacian, partitioning,
+                               &edge_boundary_att, &marker, 0, nullptr, true);
 
-        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
-                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
+//        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
+//                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
 
         mfem::CGSolver cg(comm);
         cg.SetPrintLevel(0);
@@ -256,7 +256,7 @@ int main(int argc, char* argv[])
         cg.SetAbsTol(1e-12);
         cg.SetOperator(*gL2);
 
-        Multigrid prec(*gL2, fvup);
+        Multigrid prec(*gL2, hb_solver);
         cg.SetPreconditioner(prec);
 
         if (myid == 0)
@@ -266,6 +266,8 @@ int main(int argc, char* argv[])
             std::cout << "Setup time: " << chrono.RealTime() << "s. \n";
         }
 
+
+//        hb_solver.SetPrintLevel(1);
         chrono.Clear();
         chrono.Start();
         mixed_sol = 0.0;
@@ -352,77 +354,6 @@ unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplaci
     return A;
 }
 
-mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
-{
-    auto& pM = mixed_laplacian.get_pM();
-    auto& pD = mixed_laplacian.get_pD();
-    auto* pW = mixed_laplacian.get_pW();
-    const bool use_w = mixed_laplacian.CheckW();
-
-    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
-
-    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
-    pM.GetDiag(M_inv);
-    MinvDT->InvScaleRows(M_inv);
-
-    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
-
-    if (use_w)
-    {
-        (*pW) *= -1.0;
-        // TODO(gelever1): define ParSub lol
-        A.reset(ParAdd(*A, *pW));
-        (*pW) *= -1.0;
-    }
-    else
-    {
-        // Adding identity to A so that it is non-singular
-        mfem::SparseMatrix diag;
-        A->GetDiag(diag);
-        for (int i = 0; i < diag.Width(); i++)
-            diag(i, i) += 1.0;
-    }
-
-    mfem::HypreBoomerAMG prec(*A);
-    prec.SetPrintLevel(0);
-
-    mfem::HypreLOBPCG lobpcg(A->GetComm());
-    lobpcg.SetMaxIter(5000);
-    lobpcg.SetTol(1e-8);
-    lobpcg.SetPrintLevel(0);
-    lobpcg.SetNumModes(2);
-    lobpcg.SetOperator(*A);
-    lobpcg.SetPreconditioner(prec);
-    lobpcg.Solve();
-
-    mfem::Array<double> evals;
-    lobpcg.GetEigenvalues(evals);
-
-    bool converged = true;
-
-    // First eigenvalue of A+I should be 1 (graph Laplacian has a 1D null space)
-    if (!use_w)
-    {
-        converged &= std::abs(evals[0] - 1.0) < 1e-8;
-    }
-
-    // Second eigenvalue of A+I should be greater than 1 for connected graphs
-    converged &= std::abs(evals[1] - 1.0) > 1e-8;
-
-    int myid;
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-
-    if (!converged && myid == 0)
-    {
-        std::cout << "LOBPCG Failed to converge: \n";
-        std::cout << evals[0] << "\n";
-        std::cout << evals[1] << "\n";
-    }
-
-    return lobpcg.GetEigenvector(1);
-}
-
-
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor, int spe10scale)
 {
@@ -457,6 +388,7 @@ void Multigrid::MG_Cycle() const
     // PreSmoothing
     Smoother_.Mult(residual_, correction_);
     Operator_.Mult(-1.0, correction_, 1.0, residual_);
+//par_orthogonalize_from_constant(residual_, Operator_.N());
 
     // Coarse grid correction
     CoarseSolver_.Mult(residual_, help_vec_);

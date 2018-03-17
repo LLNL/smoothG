@@ -40,7 +40,7 @@ void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
 
     coarsener_->interpolate(sol_coarse_->GetBlock(1), y);
 
-//    Orthogonalize(y);
+    Orthogonalize(y);
 }
 
 void Upscale::Solve(const mfem::Vector& x, mfem::Vector& y) const

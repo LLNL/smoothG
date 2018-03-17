@@ -186,6 +186,16 @@ public:
     void Mult(const mfem::BlockVector& Rhs,
               mfem::BlockVector& Sol) const;
 
+    void Mult(const mfem::Vector& x, mfem::Vector& y) const
+    {
+        block_rhs_->GetBlock(1) = x;
+        block_rhs_->GetBlock(0) = 0.0;
+        block_rhs_->GetBlock(1) *= -1.0;
+
+        Mult(*block_rhs_, *block_sol_);
+        y = block_sol_->GetBlock(1);
+    }
+
     /// Same as Mult()
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
     {
@@ -276,6 +286,7 @@ private:
     std::vector<mfem::DenseMatrix> AinvDMinvCT_;
     std::vector<std::unique_ptr<mfem::Operator> > Ainv_;
     std::vector<std::unique_ptr<mfem::Operator> > A_;
+    std::vector<std::unique_ptr<mfem::Operator>> DMinvCT_;
 
     mutable std::vector<mfem::Vector> Ainv_f_;
 
@@ -293,6 +304,10 @@ private:
     int nAggs_;
     int num_edge_dofs_;
     int num_multiplier_dofs_;
+
+    mfem::Array<int> block_offsets_;
+    std::unique_ptr<mfem::BlockVector> block_rhs_;
+    std::unique_ptr<mfem::BlockVector> block_sol_;
 
     bool use_spectralAMGe_;
     bool use_w_;
