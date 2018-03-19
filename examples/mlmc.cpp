@@ -254,7 +254,6 @@ int main(int argc, char* argv[])
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
     // Create Upscaler and Solve
-
     FiniteVolumeMLMC fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
                                edge_boundary_att, ess_attr, spect_tol, max_evects);
 
@@ -277,7 +276,8 @@ int main(int argc, char* argv[])
     // for (int sample = num_samples-1; sample >= 0; sample--)
     for (int sample = 0; sample < num_samples; ++sample)
     {
-        std::cout << "---\nSample " << sample << "\n---" << std::endl;
+        if (myid == 0)
+            std::cout << "---\nSample " << sample << "\n---" << std::endl;
 
         auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
         fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
@@ -285,17 +285,11 @@ int main(int argc, char* argv[])
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
 
-        std::cout << "sol_upscaled min = " << sol_upscaled.GetBlock(1).Min() << std::endl;
-        std::cout << "sol_upscaled max = " << sol_upscaled.GetBlock(1).Max() << std::endl;
-
         auto fine_coefficient = sampler.GetFineCoefficient(sample);
         fvupscale.RescaleFineCoefficient(fine_coefficient);
         fvupscale.ForceMakeFineSolver(marker);
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
-
-        std::cout << "sol_fine min = " << sol_fine.GetBlock(1).Min() << std::endl;
-        std::cout << "sol_fine max = " << sol_fine.GetBlock(1).Max() << std::endl;
 
         auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 
