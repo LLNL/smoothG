@@ -70,9 +70,13 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
+/// this implementation is sloppy
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
-    GetFineMatrix().SetMFromWeightVector(coeff);
+    mfem::Vector temp(coeff);
+    for (int i = 0; i < coeff.Size(); ++i)
+        temp(i) = 1.0 / coeff(i);
+    GetFineMatrix().ScaleM(temp);
 }
 
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)

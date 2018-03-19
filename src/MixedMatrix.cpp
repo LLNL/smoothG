@@ -131,6 +131,11 @@ void MixedMatrix::SetMFromWeightVector(const mfem::Vector& weight)
                                          nedges, nedges);
 }
 
+void MixedMatrix::ScaleM(const mfem::Vector& weight)
+{
+    M_->ScaleRows(weight);
+}
+
 /// @todo better documentation of the 1/-1 issue, make it optional?
 void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
                        const mfem::Vector& weight,

@@ -290,6 +290,8 @@ public:
 
     void SetMFromWeightVector(const mfem::Vector& weight);
 
+    void ScaleM(const mfem::Vector& weight);
+
 private:
     /**
        Helper routine for the constructors of distributed graph. Note well that
