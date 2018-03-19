@@ -252,7 +252,8 @@ public:
        you call SetCoefficient you can call GetCoarseM() and get the new
        global coarse M with different coefficients.
     */
-    void BuildComponents(const mfem::SparseMatrix& Pedges,
+    void BuildComponents(const mfem::Vector& fineMdiag,
+                         const mfem::SparseMatrix& Pedges,
                          const mfem::SparseMatrix& face_cdof);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
@@ -266,7 +267,10 @@ private:
 
     void GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs) const;
 
-    mfem::DenseMatrix RTP(const mfem::DenseMatrix& R, const mfem::DenseMatrix& P);
+    /// Return triple product \f$ R^T D P \f$ where \f$ D \f$ is assumed diagonal.
+    mfem::DenseMatrix RTDP(const mfem::DenseMatrix& R,
+                           const mfem::Vector& D,
+                           const mfem::DenseMatrix& P);
 
     const GraphTopology& topology_;
 
