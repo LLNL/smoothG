@@ -32,6 +32,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::Array<int>& ess_attr,
                                    double spect_tol, int max_evects)
     : Upscale(comm, vertex_edge.Height(), false),
+      weight_(weight),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
       ess_attr_(ess_attr)
@@ -78,7 +79,8 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     mbuilder_->SetCoefficient(coeff);
     GetCoarseMatrix().setWeight(
-        *mbuilder_->GetCoarseM(coarsener_->get_Psigma(),
+        *mbuilder_->GetCoarseM(weight_,
+                               coarsener_->get_Psigma(),
                                coarsener_->construct_face_facedof_table()));
 }
 

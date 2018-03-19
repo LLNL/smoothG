@@ -55,9 +55,6 @@ public:
         const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs) = 0;
 
-    /// The names of the next several methods are not that descriptive or
-    /// informative; they result from removing lines from BuildPEdges()
-    /// and putting it here.
     virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) = 0;
 
     virtual void SetTraceBubbleBlock(int l, double value) = 0;
@@ -77,6 +74,7 @@ public:
                                      const mfem::SparseMatrix& Agg_cdof_edge) = 0;
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        const mfem::Vector& fineMdiag,
         const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof) = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
@@ -121,6 +119,7 @@ public:
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        const mfem::Vector& fineMdiag,
         const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
 private:
@@ -168,6 +167,7 @@ public:
     /// Here returns a null pointer
     /// @todo change interface so this is optional?
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        const mfem::Vector& fineMdiag,
         const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
     bool NeedsCoarseVertexDofs() { return true; }
@@ -194,8 +194,11 @@ private:
    have its coefficients rescaled without re-coarsening.
 
    This implementation is quite different from the other CoarseMBuilder
-   objects, many of its methods are no-ops, which suggests we should
+   objects, many (most!) of its methods are no-ops, which suggests we should
    maybe redesign some things.
+
+   In particular, in BuildPEdges(), this does basically nothing except
+   in Setup() and GetCoarseM()
 */
 class CoefficientMBuilder : public CoarseMBuilder
 {
@@ -253,6 +256,7 @@ public:
                          const mfem::SparseMatrix& face_cdof);
 
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
+        const mfem::Vector& fineMdiag,
         const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
 
 private:

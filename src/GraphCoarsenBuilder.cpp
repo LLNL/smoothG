@@ -248,12 +248,14 @@ void CoefficientMBuilder::AddTraceAcross(int row, int col, double value)
 }
 
 std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM(
+    const mfem::Vector& fineMdiag,
     const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
     return std::unique_ptr<mfem::SparseMatrix>(nullptr);
 }
 
 std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
+    const mfem::Vector& fineMdiag,
     const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
     CoarseM_->Finalize(0);
@@ -394,6 +396,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::SparseMatrix& Pedges,
 /// this shares a lot of code with BuildComponents, but I'm not sure it makes
 /// sense to combine them in any way.
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
+    const mfem::Vector& fineMdiag,
     const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
     // build the components, if necessary

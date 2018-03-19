@@ -81,6 +81,7 @@ public:
     void MakeCoarseSolver();
 
 private:
+    const mfem::Vector& weight_;
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
     const mfem::Array<int>& ess_attr_;

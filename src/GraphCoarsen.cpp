@@ -318,6 +318,7 @@ void GraphCoarsen::BuildPEdges(
                                          local_fine_dofs, colMapper_);
         auto Dloc = ExtractRowAndColumns(D_proc_, local_verts,
                                          local_fine_dofs, colMapper_);
+        // next line does *not* assume M_proc_ is diagonal
         LocalGraphEdgeSolver solver(Mloc, Dloc);
 
         int nlocal_verts = local_verts.Size();
@@ -461,6 +462,7 @@ void GraphCoarsen::BuildPEdges(
     Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
+    // next line assume M_proc_ is diagonal
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
     mbuilder.ResetEdgeCdofMarkers(total_num_traces + bubble_counter);
 
@@ -506,7 +508,7 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
-    CoarseM_ = mbuilder.GetCoarseM(Pedges, face_cdof);
+    CoarseM_ = mbuilder.GetCoarseM(M_v, Pedges, face_cdof);
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)
