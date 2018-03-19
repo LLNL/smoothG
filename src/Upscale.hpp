@@ -26,6 +26,7 @@
 #include "Utilities.hpp"
 #include "MixedMatrix.hpp"
 #include "GraphCoarsen.hpp"
+#include "MGLSolver.hpp"
 
 namespace smoothg
 {
@@ -37,32 +38,32 @@ class Upscale : public linalgcpp::Operator
 {
 public:
     /// Wrapper for applying the upscaling, in linalgcpp terminology
-    virtual void Mult(const VectorView& x, VectorView& y) const override {}
+    virtual void Mult(const VectorView& x, VectorView& y) const override;
 
     /// Wrapper for applying the upscaling
-    virtual void Solve(const VectorView& x, VectorView& y) const {}
-    virtual linalgcpp::Vector<double> Solve(const VectorView& x) const {}
+    virtual void Solve(const VectorView& x, VectorView& y) const;
+    virtual Vector Solve(const VectorView& x) const;
 
     /// Wrapper for applying the upscaling in mixed form
-    virtual void Solve(const BlockVector& x, BlockVector& y) const {}
-    virtual BlockVector Solve(const BlockVector& x) const {}
+    virtual void Solve(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector Solve(const BlockVector& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level
-    virtual void SolveCoarse(const VectorView& x, VectorView& y) const {}
-    virtual Vector SolveCoarse(const VectorView& x) const {}
+    virtual void SolveCoarse(const VectorView& x, VectorView& y) const;
+    virtual Vector SolveCoarse(const VectorView& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level,
     //  in mixed form
-    virtual void SolveCoarse(const BlockVector& x, BlockVector& y) const {}
-    virtual BlockVector SolveCoarse(const BlockVector& x) const {}
+    virtual void SolveCoarse(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector SolveCoarse(const BlockVector& x) const;
 
     /// Solve Fine Level
-    virtual void SolveFine(const VectorView& x, VectorView& y) const {}
-    virtual Vector SolveFine(const VectorView& x) const {}
+    virtual void SolveFine(const VectorView& x, VectorView& y) const;
+    virtual Vector SolveFine(const VectorView& x) const;
 
     /// Solve Fine Level, in mixed form
-    virtual void SolveFine(const BlockVector& x, BlockVector& y) const {}
-    virtual BlockVector SolveFine(const BlockVector& x) const {}
+    virtual void SolveFine(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector SolveFine(const BlockVector& x) const;
 
     /// Interpolate a coarse vector to the fine level
     virtual void Interpolate(const VectorView& x, VectorView& y) const;
@@ -181,12 +182,13 @@ protected:
 
     void MakeCoarseVectors()
     {
-        //rhs_coarse_ = make_unique<linalgcpp::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
-        //sol_coarse_ = make_unique<linalgcpp::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
+        rhs_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
+        sol_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
     }
 
     std::vector<MixedMatrix> mgl_;
     GraphCoarsen coarsener_;
+    std::unique_ptr<MGLSolver> coarse_solver_;
 
     //std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
     //std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
@@ -199,11 +201,11 @@ protected:
 
     double setup_time_;
 
-    BlockVector rhs_coarse_;
-    BlockVector sol_coarse_;
+    mutable BlockVector rhs_coarse_;
+    mutable BlockVector sol_coarse_;
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    //mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+    mutable std::unique_ptr<MGLSolver> fine_solver_;
 };
 
 } // namespace smoothg

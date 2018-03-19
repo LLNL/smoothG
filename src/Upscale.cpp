@@ -23,6 +23,138 @@
 namespace smoothg
 {
 
+void Upscale::Mult(const VectorView& x, VectorView& y) const
+{
+    assert(coarse_solver_);
+
+    VectorView coarse_sigma = rhs_coarse_.GetBlock(0);
+    VectorView coarse_u = rhs_coarse_.GetBlock(1);
+    coarsener_.Restrict(x, coarse_u);
+
+    x.Print("x");
+    coarse_u.Print("coarse_x");
+
+    coarse_sigma = 0.0;
+    coarse_u *= -1.0;
+
+    coarse_solver_->Solve(rhs_coarse_, sol_coarse_);
+
+    coarsener_.Interpolate(sol_coarse_.GetBlock(1), y);
+
+    Orthogonalize(y);
+}
+
+void Upscale::Solve(const VectorView& x, VectorView& y) const
+{
+    Mult(x, y);
+}
+
+Vector Upscale::Solve(const VectorView& x) const
+{
+    Vector y(x.size());
+
+    Solve(x, y);
+
+    return y;
+}
+
+void Upscale::Solve(const BlockVector& x, BlockVector& y) const
+{
+    assert(coarse_solver_);
+
+    coarsener_.Restrict(x, rhs_coarse_);
+    VectorView coarse_u = rhs_coarse_.GetBlock(1);
+    coarse_u *= -1.0;
+
+    x.Print("x");
+    std::cout.precision(12);
+    coarse_u.Print("coarse_x");
+
+    coarse_solver_->Solve(rhs_coarse_, sol_coarse_);
+
+    coarsener_.Interpolate(sol_coarse_, y);
+
+    Orthogonalize(y);
+}
+
+BlockVector Upscale::Solve(const BlockVector& x) const
+{
+    BlockVector y = GetFineBlockVector();
+
+    Solve(x, y);
+
+    return y;
+}
+
+void Upscale::SolveCoarse(const VectorView& x, VectorView& y) const
+{
+    assert(coarse_solver_);
+
+    coarse_solver_->Solve(x, y);
+}
+
+Vector Upscale::SolveCoarse(const VectorView& x) const
+{
+    Vector coarse_vect = GetCoarseVector();
+    SolveCoarse(x, coarse_vect);
+
+    return coarse_vect;
+}
+
+void Upscale::SolveCoarse(const BlockVector& x, BlockVector& y) const
+{
+    assert(coarse_solver_);
+
+    coarse_solver_->Solve(x, y);
+    y *= -1.0;
+}
+
+BlockVector Upscale::SolveCoarse(const BlockVector& x) const
+{
+    BlockVector coarse_vect = GetCoarseBlockVector();
+    SolveCoarse(x, coarse_vect);
+
+    return coarse_vect;
+}
+
+void Upscale::SolveFine(const VectorView& x, VectorView& y) const
+{
+    assert(fine_solver_);
+
+    fine_solver_->Solve(x, y);
+    y *= -1.0;
+
+    Orthogonalize(y);
+}
+
+Vector Upscale::SolveFine(const VectorView& x) const
+{
+    Vector y(x.size());
+
+    SolveFine(x, y);
+
+    return y;
+}
+
+void Upscale::SolveFine(const BlockVector& x, BlockVector& y) const
+{
+    assert(fine_solver_);
+
+    fine_solver_->Solve(x, y);
+    y *= -1.0;
+
+    Orthogonalize(y);
+}
+
+BlockVector Upscale::SolveFine(const BlockVector& x) const
+{
+    BlockVector y = GetFineBlockVector();
+
+    SolveFine(x, y);
+
+    return y;
+}
+
 void Upscale::Interpolate(const VectorView& x, VectorView& y) const
 {
     coarsener_.Interpolate(x, y);
@@ -87,6 +219,7 @@ void Upscale::Orthogonalize(VectorView& vect) const
 {
     OrthoConstant(comm_, vect, GetFineMatrix().D_local_.Rows());
 }
+
 void Upscale::Orthogonalize(BlockVector& vect) const
 {
     VectorView u_block = vect.GetBlock(1);

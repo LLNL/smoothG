@@ -26,6 +26,7 @@
 #include "SharedEntityComm.hpp"
 #include "GraphTopology.hpp"
 #include "GraphEdgeSolver.hpp"
+#include "MinresBlockSolver.hpp"
 
 namespace smoothg
 {
