@@ -255,7 +255,6 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
 
-    // weight = 1.0; // for the old unweighted version
     FiniteVolumeMLMC fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
                                edge_boundary_att, ess_attr, spect_tol, max_evects);
 

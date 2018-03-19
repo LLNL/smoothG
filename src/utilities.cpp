@@ -839,7 +839,7 @@ void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileNa
 
     if (!permfile.is_open())
     {
-        std::cout << "Error in opening file " << fileName << std::endl;
+        std::cerr << "Error in opening file " << fileName << std::endl;
         mfem::mfem_error("File does not exist");
     }
 
