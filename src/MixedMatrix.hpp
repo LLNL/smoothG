@@ -37,7 +37,7 @@ class MixedMatrix
     public:
         MixedMatrix() = default;
         MixedMatrix(const Graph& graph, const std::vector<double>& global_weight);
-        MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local, const ParMatrix& edge_true_edge);
+        MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local, ParMatrix edge_true_edge);
 
         ~MixedMatrix() noexcept = default;
 
@@ -47,6 +47,14 @@ class MixedMatrix
 
         friend void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept;
 
+        int Rows() const;
+        int Cols() const;
+
+        int NNZ() const;
+        int GlobalNNZ() const;
+
+        bool CheckW() const;
+
         SparseMatrix M_local_;
         SparseMatrix D_local_;
         SparseMatrix W_local_;
@@ -55,11 +63,13 @@ class MixedMatrix
         ParMatrix D_global_;
         ParMatrix W_global_;
 
+        ParMatrix edge_true_edge_;
+
         std::vector<int> offsets_;
         std::vector<int> true_offsets_;
 
     private:
-        void Init(const ParMatrix& edge_true_edge);
+        void Init();
 
 };
 

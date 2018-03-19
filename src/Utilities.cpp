@@ -502,7 +502,7 @@ ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
 
         int row_size = offd.RowSize(i);
 
-        if (row_size == 0 || offd_colmap[offd_indices[offd_indptr[i]]] > last_row )
+        if (row_size == 0 || offd_colmap[offd_indices[offd_indptr[i]]] >= last_row )
         {
             assert(row_size == 0 || row_size == 1);
             num_true_entities++;
@@ -684,6 +684,21 @@ void OrthoConstant(DenseMatrix& mat)
         VectorView col = mat.GetColView(i);
         SubAvg(col);
     }
+}
+
+void OrthoConstant(VectorView& vect)
+{
+    SubAvg(vect);
+}
+
+void OrthoConstant(MPI_Comm comm, VectorView& vect, int global_size)
+{
+    double local_sum = vect.Sum();
+    double global_sum = 0.0;
+
+    MPI_Allreduce(&local_sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+
+    vect -= global_sum / global_size;
 }
 
 void Deflate(DenseMatrix& A, const VectorView& v)

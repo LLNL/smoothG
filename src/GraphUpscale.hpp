@@ -25,13 +25,10 @@
 #include "parlinalgcpp.hpp"
 #include "partition.hpp"
 
-#include "Graph.hpp"
-#include "MixedMatrix.hpp"
-#include "GraphTopology.hpp"
-#include "GraphCoarsen.hpp"
-#include "SharedEntityComm.hpp"
-#include "Utilities.hpp"
 #include "Upscale.hpp"
+#include "Graph.hpp"
+#include "GraphTopology.hpp"
+#include "SharedEntityComm.hpp"
 
 namespace smoothg
 {
@@ -114,11 +111,7 @@ private:
     int max_evects_;
 
     Graph graph_;
-
-    MixedMatrix mixed_mat_fine_;
-
     GraphTopology gt_;
-    GraphCoarsen coarsener_;
 };
 
 } // namespace smoothg

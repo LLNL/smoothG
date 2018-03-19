@@ -61,10 +61,15 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
               const std::vector<double>& weight)
 {
     graph_ = Graph(comm_, vertex_edge, global_partitioning);
-    mixed_mat_fine_ = MixedMatrix(graph_, weight);
+    mgl_.emplace_back(graph_, weight);
     gt_ = GraphTopology(comm_, graph_);
-    coarsener_ = GraphCoarsen(graph_, mixed_mat_fine_, gt_,
+
+    coarsener_ = GraphCoarsen(GetFineMatrix(), gt_,
                               max_evects_, spect_tol_);
+
+    mgl_.push_back(coarsener_.Coarsen(gt_, GetFineMatrix()));
+
+
 }
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const

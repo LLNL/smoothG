@@ -24,6 +24,8 @@
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
 #include "Utilities.hpp"
+#include "MixedMatrix.hpp"
+#include "GraphCoarsen.hpp"
 
 namespace smoothg
 {
@@ -63,71 +65,68 @@ public:
     virtual BlockVector SolveFine(const BlockVector& x) const {}
 
     /// Interpolate a coarse vector to the fine level
-    virtual void Interpolate(const VectorView& x, VectorView& y) const {}
-    virtual Vector Interpolate(const VectorView& x) const {}
+    virtual void Interpolate(const VectorView& x, VectorView& y) const;
+    virtual Vector Interpolate(const VectorView& x) const;
 
     /// Interpolate a coarse vector to the fine level, in mixed form
-    virtual void Interpolate(const BlockVector& x, BlockVector& y) const {}
-    virtual BlockVector Interpolate(const BlockVector& x) const {}
+    virtual void Interpolate(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector Interpolate(const BlockVector& x) const;
 
-    /// Coarsen a fine vector to the coarse level
-    virtual void Coarsen(const VectorView& x, VectorView& y) const {}
-    virtual Vector Coarsen(const VectorView& x) const {}
+    /// Restrict a fine vector to the coarse level
+    virtual void Restrict(const VectorView& x, VectorView& y) const;
+    virtual Vector Restrict(const VectorView& x) const;
 
-    /// Coarsen a fine vector to the coarse level, in mixed form
-    virtual void Coarsen(const BlockVector& x, BlockVector& y) const {}
-    virtual BlockVector Coarsen(const BlockVector& x) const {}
+    /// Restrict a fine vector to the coarse level, in mixed form
+    virtual void Restrict(const BlockVector& x, BlockVector& y) const;
+    virtual BlockVector Restrict(const BlockVector& x) const;
 
     /// Get block offsets
-    virtual std::vector<HYPRE_Int> FineBlockOffsets() const {}
-    virtual std::vector<HYPRE_Int> CoarseBlockOffsets() const {}
+    virtual const std::vector<int>& FineBlockOffsets() const;
+    virtual const std::vector<int>& CoarseBlockOffsets() const;
 
     /// Get true block offsets
-    virtual std::vector<HYPRE_Int> FineTrueBlockOffsets() const {}
-    virtual std::vector<HYPRE_Int> CoarseTrueBlockOffsets() const {}
+    virtual const std::vector<int>& FineTrueBlockOffsets() const;
+    virtual const std::vector<int>& CoarseTrueBlockOffsets() const;
 
     /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(VectorView& vect) const {}
-    virtual void Orthogonalize(BlockVector& vect) const {}
+    virtual void Orthogonalize(VectorView& vect) const;
+    virtual void Orthogonalize(BlockVector& vect) const;
 
     /// Create a coarse vertex space vector
-    virtual Vector GetCoarseVector() const {}
+    virtual Vector GetCoarseVector() const;
 
     /// Create a fine vertex space vector
-    virtual Vector GetFineVector() const {}
+    virtual Vector GetFineVector() const;
 
     /// Create a coarse mixed form vector
-    virtual BlockVector GetCoarseBlockVector() const {}
+    virtual BlockVector GetCoarseBlockVector() const;
 
     /// Create a fine mixed form vector
-    virtual BlockVector GetFineBlockVector() const {}
+    virtual BlockVector GetFineBlockVector() const;
 
     /// Create a coarse mixed form vector on true dofs
-    virtual BlockVector GetCoarseTrueBlockVector() const {}
+    virtual BlockVector GetCoarseTrueBlockVector() const;
 
     /// Create a fine mixed form vector on true dofs
-    virtual BlockVector GetFineTrueBlockVector() const {}
+    virtual BlockVector GetFineTrueBlockVector() const;
 
     // Get Mixed Matrix
-    //virtual MixedMatrix& GetMatrix(int level);
-    //virtual const MixedMatrix& GetMatrix(int level) const;
+    virtual MixedMatrix& GetMatrix(int level);
+    virtual const MixedMatrix& GetMatrix(int level) const;
 
     /// Get Fine level Mixed Matrix
-    //virtual MixedMatrix& GetFineMatrix();
-    //virtual const MixedMatrix& GetFineMatrix() const;
+    virtual MixedMatrix& GetFineMatrix();
+    virtual const MixedMatrix& GetFineMatrix() const;
 
     /// Get Coarse level Mixed Matrix
-    //virtual MixedMatrix& GetCoarseMatrix();
-    //virtual const MixedMatrix& GetCoarseMatrix() const;
+    virtual MixedMatrix& GetCoarseMatrix();
+    virtual const MixedMatrix& GetCoarseMatrix() const;
 
     /// Show Solver Information
-    virtual void PrintInfo(std::ostream& out = std::cout) const {}
+    virtual void PrintInfo(std::ostream& out = std::cout) const;
 
     /// Compute Operator Complexity
-    double OperatorComplexity() const {}
-
-    /// Get Row Starts
-    //virtual std::vector<HYPRE_Int>& get_Drow_start() const { return mixed_laplacians_[0].get_Drow_start();};
+    double OperatorComplexity() const;
 
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
@@ -186,7 +185,8 @@ protected:
         //sol_coarse_ = make_unique<linalgcpp::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
     }
 
-    //std::vector<smoothg::MixedMatrix> mixed_laplacians_;
+    std::vector<MixedMatrix> mgl_;
+    GraphCoarsen coarsener_;
 
     //std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
     //std::unique_ptr<MixedLaplacianSolver> coarse_solver_;

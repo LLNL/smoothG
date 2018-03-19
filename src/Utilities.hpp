@@ -79,6 +79,8 @@ DenseMatrix Orthogonalize(DenseMatrix& mat, int max_keep = -1);
 DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect, int max_keep = -1);
 
 void OrthoConstant(DenseMatrix& mat);
+void OrthoConstant(VectorView& vect);
+void OrthoConstant(MPI_Comm comm, VectorView& vect, int global_size);
 
 void Deflate(DenseMatrix& A, const VectorView& vect);
 

@@ -38,7 +38,7 @@ class GraphCoarsen
 {
     public:
         GraphCoarsen() = default;
-        GraphCoarsen(const Graph& graph, const MixedMatrix& mgl, const GraphTopology& gt,
+        GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
                 int max_evects, double spect_tol);
 
         ~GraphCoarsen() noexcept = default;
@@ -48,6 +48,20 @@ class GraphCoarsen
         GraphCoarsen& operator=(GraphCoarsen other) noexcept;
 
         friend void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept;
+
+        MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl) const;
+
+        Vector Interpolate(const Vector& coarse_vect) const;
+        void Interpolate(const Vector& coarse_vect, Vector& fine_vect) const;
+
+        Vector Restrict(const Vector& fine_vect) const;
+        void Restrict(const Vector& fine_vect, Vector& coarse_vect) const;
+
+        BlockVector Interpolate(const BlockVector& coarse_vect) const;
+        void Interpolate(const BlockVector& coarse_vect, BlockVector& fine_vect) const;
+
+        BlockVector Restrict(const BlockVector& fine_vect) const;
+        void Restrict(const BlockVector& fine_vect, BlockVector& coarse_vect) const;
 
     private:
         template <class T>
@@ -77,11 +91,10 @@ class GraphCoarsen
         void BuildFaceCoarseDof(const GraphTopology& gt);
         void BuildPvertex(const GraphTopology& gt);
         void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
+        ParMatrix BuildEdgeTrueEdge(const GraphTopology& gt) const;
 
         int max_evects_;
         double spect_tol_;
-
-        MixedMatrix coarse_;
 
         SparseMatrix P_edge_;
         SparseMatrix P_vertex_;

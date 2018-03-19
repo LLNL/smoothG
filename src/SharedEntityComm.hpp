@@ -87,6 +87,8 @@ class SharedEntityComm
         std::vector<MPI_Request> header_requests_;
         std::vector<MPI_Request> data_requests_;
 
+        bool preparing_to_reduce_;
+
         enum { ENTITY_HEADER_TAG, ENTITY_MESSAGE_TAG, };
 };
 
@@ -105,7 +107,8 @@ SharedEntityComm<T>::SharedEntityComm(const ParMatrix& entity_true_entity)
       entity_slave_id_(num_entities_),
       num_master_comms_(0),
       num_slave_comms_(0),
-      recv_buffer_(num_entities_)
+      recv_buffer_(num_entities_),
+      preparing_to_reduce_(false)
 {
     MakeEntityProc();
 
@@ -125,7 +128,6 @@ SharedEntityComm<T>::SharedEntityComm(const ParMatrix& entity_true_entity)
     send_buffer_.resize(num_slave_comms_);
 
     SetSizeSpecifier();
-    ReducePrepare();
 }
 
 template <typename T>
@@ -249,6 +251,8 @@ void SharedEntityComm<T>::ReducePrepare()
     }
 
     assert(header_recv_counter == num_master_comms_);
+
+    preparing_to_reduce_ = true;
 }
 
 template <class T>
@@ -286,6 +290,11 @@ bool SharedEntityComm<T>::IsOwnedByMe(int entity) const
 template <typename T>
 void SharedEntityComm<T>::ReduceSend(int entity, T mat)
 {
+    if (!preparing_to_reduce_)
+    {
+        ReducePrepare();
+    }
+
     int owner = entity_master_[entity];
 
     if (owner == myid_)
@@ -369,12 +378,16 @@ std::vector<std::vector<T>> SharedEntityComm<T>::Collect()
     MPI_Waitall(num_slave_comms_ + num_master_comms_,
             data_requests_.data(), data_statuses.data());
 
+    preparing_to_reduce_ = false;
+
     return std::move(recv_buffer_);
 }
 
 template <class T>
 void SharedEntityComm<T>::Broadcast(std::vector<T>& mats)
 {
+    assert(!preparing_to_reduce_);
+
     BroadcastSizes(mats);
     BroadcastData(mats);
 }
