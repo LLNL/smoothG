@@ -226,6 +226,16 @@ def make_tests():
           "finest-u-error": 0.38079825403520218,
           "operator-complexity": 1.016509834901651}]
 
+    tests["parsamplegraph1-coeff"] = \
+        [["mpirun", "-n", "4", "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-coefficient"],
+         {"finest-div-error": 0.37918423727222522,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.016509834901651}]
+
     tests["graph-metis"] = \
         [["./generalgraph",
           "--spect-tol", "1.0",
