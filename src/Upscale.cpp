@@ -25,37 +25,42 @@ namespace smoothg
 
 void Upscale::Interpolate(const VectorView& x, VectorView& y) const
 {
+    coarsener_.Interpolate(x, y);
 }
 
 Vector Upscale::Interpolate(const VectorView& x) const
 {
+    return coarsener_.Interpolate(x);
 }
-
 
 void Upscale::Interpolate(const BlockVector& x, BlockVector& y) const
 {
+    coarsener_.Interpolate(x, y);
 }
 
 BlockVector Upscale::Interpolate(const BlockVector& x) const
 {
+    return coarsener_.Interpolate(x);
 }
-
 
 void Upscale::Restrict(const VectorView& x, VectorView& y) const
 {
+    coarsener_.Restrict(x, y);
 }
 
 Vector Upscale::Restrict(const VectorView& x) const
 {
+    return coarsener_.Restrict(x);
 }
-
 
 void Upscale::Restrict(const BlockVector& x, BlockVector& y) const
 {
+    coarsener_.Restrict(x, y);
 }
 
 BlockVector Upscale::Restrict(const BlockVector& x) const
 {
+    return coarsener_.Restrict(x);
 }
 
 const std::vector<int>& Upscale::FineBlockOffsets() const

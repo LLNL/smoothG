@@ -51,11 +51,11 @@ class GraphCoarsen
 
         MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl) const;
 
-        Vector Interpolate(const Vector& coarse_vect) const;
-        void Interpolate(const Vector& coarse_vect, Vector& fine_vect) const;
+        Vector Interpolate(const VectorView& coarse_vect) const;
+        void Interpolate(const VectorView& coarse_vect, VectorView& fine_vect) const;
 
-        Vector Restrict(const Vector& fine_vect) const;
-        void Restrict(const Vector& fine_vect, Vector& coarse_vect) const;
+        Vector Restrict(const VectorView& fine_vect) const;
+        void Restrict(const VectorView& fine_vect, VectorView& coarse_vect) const;
 
         BlockVector Interpolate(const BlockVector& coarse_vect) const;
         void Interpolate(const BlockVector& coarse_vect, BlockVector& fine_vect) const;

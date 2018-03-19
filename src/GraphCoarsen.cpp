@@ -713,22 +713,22 @@ MixedMatrix GraphCoarsen::Coarsen(const GraphTopology& gt, const MixedMatrix& mg
                        std::move(edge_true_edge));
 }
 
-Vector GraphCoarsen::Interpolate(const Vector& coarse_vect) const
+Vector GraphCoarsen::Interpolate(const VectorView& coarse_vect) const
 {
     return P_vertex_.MultAT(coarse_vect);
 }
 
-void GraphCoarsen::Interpolate(const Vector& coarse_vect, Vector& fine_vect) const
+void GraphCoarsen::Interpolate(const VectorView& coarse_vect, VectorView& fine_vect) const
 {
     P_vertex_.Mult(coarse_vect, fine_vect);
 }
 
-Vector GraphCoarsen::Restrict(const Vector& fine_vect) const
+Vector GraphCoarsen::Restrict(const VectorView& fine_vect) const
 {
     return P_vertex_.MultAT(fine_vect);
 }
 
-void GraphCoarsen::Restrict(const Vector& fine_vect, Vector& coarse_vect) const
+void GraphCoarsen::Restrict(const VectorView& fine_vect, VectorView& coarse_vect) const
 {
     P_vertex_.MultAT(fine_vect, coarse_vect);
 }
