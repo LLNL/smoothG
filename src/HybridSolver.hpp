@@ -315,10 +315,6 @@ private:
     int num_edge_dofs_;
     int num_multiplier_dofs_;
 
-    mfem::Array<int> block_offsets_;
-    std::unique_ptr<mfem::BlockVector> block_rhs_;
-    std::unique_ptr<mfem::BlockVector> block_sol_;
-
     bool use_spectralAMGe_;
     bool use_w_;
 

@@ -44,10 +44,9 @@ void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
 class Multigrid : public mfem::Solver
 {
 public:
-    Multigrid(mfem::HypreParMatrix &Operator, mfem::Operator& CoarseSolver)
+    Multigrid(mfem::HypreParMatrix &Operator, const mfem::Operator& CoarseSolver)
         : mfem::Solver(Operator.Height()), Operator_(Operator), Smoother_(Operator),
-          CoarseSolver_(CoarseSolver), correction_(Operator_.Height()),
-          residual_(Operator_.Height()), help_vec_(Operator_.Height())
+          CoarseSolver_(CoarseSolver), residual_(height), help_vec_(height)
     {}
 
     virtual void Mult(const mfem::Vector & x, mfem::Vector & y) const;
@@ -57,8 +56,8 @@ private:
     void MG_Cycle() const;
 
     const mfem::HypreParMatrix& Operator_;
-    mfem::HypreSmoother Smoother_;
-    Operator& CoarseSolver_;
+    const mfem::HypreSmoother Smoother_;
+    const Operator& CoarseSolver_;
 
     mutable mfem::Vector correction_;
     mutable mfem::Vector residual_;
@@ -98,8 +97,8 @@ int main(int argc, char* argv[])
 
     int nDimensions = 2;
     mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 5;
-    coarseningFactor[1] = 5;
+    coarseningFactor[0] = 4;
+    coarseningFactor[1] = 4;
     if (nDimensions == 3)
         coarseningFactor[2] = 5;
 
@@ -268,12 +267,9 @@ int main(int argc, char* argv[])
             std::cout << "Setup time: " << chrono.RealTime() << "s. \n";
         }
 
-
-//        hb_solver.SetPrintLevel(1);
         chrono.Clear();
         chrono.Start();
         mixed_sol = 0.0;
-//        hb_solver.Solve(fine_rhs, mixed_sol);
         cg.Mult(rhs_u_fine2, mixed_sol);
         par_orthogonalize_from_constant(mixed_sol, gL->N());
         if (myid == 0)

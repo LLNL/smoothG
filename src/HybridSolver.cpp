@@ -199,6 +199,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     MPI_Comm_rank(comm, &myid_);
     CoarseInit(partitioning, mgL, face_bdrattr, ess_edge_dofs, approx);
 }
+
 void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
                               const MixedMatrix& mgL,
                               const mfem::SparseMatrix* face_bdrattr,
@@ -318,11 +319,6 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
         Agg_edgedof_.Swap(Agg_cedgedof);
     }
 
-    block_offsets_.SetSize(3, 0);
-    block_offsets_[1] = P_e_T.Height();
-    block_offsets_[2] = P_e_T.Height() + P_vert_.Width();
-    block_rhs_ = make_unique<mfem::BlockVector>(block_offsets_);
-    block_sol_ = make_unique<mfem::BlockVector>(block_offsets_);
     Rhs_c_.SetSize(P_vert_.Height());
     Sol_c_.SetSize(P_vert_.Height());
 
@@ -797,16 +793,16 @@ void HybridSolver::AssembleHybridSystem(
         mfem::UMFPackSolver* Ainv_i = new mfem::UMFPackSolver(*Aloc);
 
         // Compute DMinvCT = Dloc * MinvCT
-        mfem::SparseMatrix* DMinvCT_i = mfem::Mult(Dloc, *MinvCT_i);
+        mfem::SparseMatrix DMinvCT_i = smoothg::Mult(Dloc, *MinvCT_i);
 
         // AinvDMinvCT_i = Ainv_i * DMinvCT;
         mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
-        smoothg::Mult(*Ainv_i, *DMinvCT_i, AinvDMinvCT_i);
+        smoothg::Mult(*Ainv_i, DMinvCT_i, AinvDMinvCT_i);
 
         // Compute CMinvDTAinvDMinvCT = -CMinvDT * AinvDMinvCT_
         tmpHybrid_el.SetSize(nlocal_multiplier, nlocal_multiplier);
 
-        mfem::SparseMatrix CMinvDT = smoothg::Transpose(*DMinvCT_i);
+        mfem::SparseMatrix CMinvDT = smoothg::Transpose(DMinvCT_i);
         CMinvDT *= -1.0;
         if (CMinvDT.Height() > 0 && CMinvDT.Width() > 0)
         {
