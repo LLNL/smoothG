@@ -38,10 +38,10 @@ class Upscale : public linalgcpp::Operator
 {
 public:
     /// Wrapper for applying the upscaling, in linalgcpp terminology
-    virtual void Mult(const VectorView& x, VectorView& y) const override;
+    virtual void Mult(const VectorView& x, VectorView y) const override;
 
     /// Wrapper for applying the upscaling
-    virtual void Solve(const VectorView& x, VectorView& y) const;
+    virtual void Solve(const VectorView& x, VectorView y) const;
     virtual Vector Solve(const VectorView& x) const;
 
     /// Wrapper for applying the upscaling in mixed form
@@ -49,7 +49,7 @@ public:
     virtual BlockVector Solve(const BlockVector& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level
-    virtual void SolveCoarse(const VectorView& x, VectorView& y) const;
+    virtual void SolveCoarse(const VectorView& x, VectorView y) const;
     virtual Vector SolveCoarse(const VectorView& x) const;
 
     /// Wrapper for only the coarse level, no coarsen, interpolate with fine level,
@@ -58,7 +58,7 @@ public:
     virtual BlockVector SolveCoarse(const BlockVector& x) const;
 
     /// Solve Fine Level
-    virtual void SolveFine(const VectorView& x, VectorView& y) const;
+    virtual void SolveFine(const VectorView& x, VectorView y) const;
     virtual Vector SolveFine(const VectorView& x) const;
 
     /// Solve Fine Level, in mixed form
@@ -66,7 +66,7 @@ public:
     virtual BlockVector SolveFine(const BlockVector& x) const;
 
     /// Interpolate a coarse vector to the fine level
-    virtual void Interpolate(const VectorView& x, VectorView& y) const;
+    virtual void Interpolate(const VectorView& x, VectorView y) const;
     virtual Vector Interpolate(const VectorView& x) const;
 
     /// Interpolate a coarse vector to the fine level, in mixed form
@@ -74,7 +74,7 @@ public:
     virtual BlockVector Interpolate(const BlockVector& x) const;
 
     /// Restrict a fine vector to the coarse level
-    virtual void Restrict(const VectorView& x, VectorView& y) const;
+    virtual void Restrict(const VectorView& x, VectorView y) const;
     virtual Vector Restrict(const VectorView& x) const;
 
     /// Restrict a fine vector to the coarse level, in mixed form
@@ -90,7 +90,7 @@ public:
     virtual const std::vector<int>& CoarseTrueBlockOffsets() const;
 
     /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(VectorView& vect) const;
+    virtual void Orthogonalize(VectorView vect) const;
     virtual void Orthogonalize(BlockVector& vect) const;
 
     /// Create a coarse vertex space vector
@@ -138,10 +138,10 @@ public:
     virtual void SetRelTol(double rtol) {}
     virtual void SetAbsTol(double atol) {}
 
-    /// Show Total Solve time on the coarse level, negative id will show on all processors
+    /// Show Total Solve time on the coarse level on processor 0
     void ShowCoarseSolveInfo(std::ostream& out = std::cout) const {}
 
-    /// Show Total Solve time on the fine level, negative id will show on all processors
+    /// Show Total Solve time on the fine level on processor 0
     void ShowFineSolveInfo(std::ostream& out = std::cout) const {}
 
     /// Show Total setup time, negative id will show on all processors
@@ -165,12 +165,12 @@ public:
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
     std::vector<double> ComputeErrors(const BlockVector& upscaled_sol,
-                                      const BlockVector& fine_sol) const {}
+                                      const BlockVector& fine_sol) const;
 
     /// Compare errors between upscaled and fine solution.
     /// Displays error to stdout on processor 0
     void ShowErrors(const BlockVector& upscaled_sol,
-                    const BlockVector& fine_sol) const {}
+                    const BlockVector& fine_sol) const;
 
 protected:
     Upscale(MPI_Comm comm, int size)
@@ -189,11 +189,6 @@ protected:
     std::vector<MixedMatrix> mgl_;
     GraphCoarsen coarsener_;
     std::unique_ptr<MGLSolver> coarse_solver_;
-
-    //std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
-    //std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
-
-    //const linalgcpp::HypreParMatrix* edge_e_te_;
 
     MPI_Comm comm_;
     int myid_;

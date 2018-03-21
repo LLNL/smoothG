@@ -718,7 +718,7 @@ Vector GraphCoarsen::Interpolate(const VectorView& coarse_vect) const
     return P_vertex_.MultAT(coarse_vect);
 }
 
-void GraphCoarsen::Interpolate(const VectorView& coarse_vect, VectorView& fine_vect) const
+void GraphCoarsen::Interpolate(const VectorView& coarse_vect, VectorView fine_vect) const
 {
     P_vertex_.Mult(coarse_vect, fine_vect);
 }
@@ -728,7 +728,7 @@ Vector GraphCoarsen::Restrict(const VectorView& fine_vect) const
     return P_vertex_.MultAT(fine_vect);
 }
 
-void GraphCoarsen::Restrict(const VectorView& fine_vect, VectorView& coarse_vect) const
+void GraphCoarsen::Restrict(const VectorView& fine_vect, VectorView coarse_vect) const
 {
     P_vertex_.MultAT(fine_vect, coarse_vect);
 }
@@ -745,11 +745,8 @@ BlockVector GraphCoarsen::Interpolate(const BlockVector& coarse_vect) const
 
 void GraphCoarsen::Interpolate(const BlockVector& coarse_vect, BlockVector& fine_vect) const
 {
-    VectorView fine_sigma = fine_vect.GetBlock(0);
-    VectorView fine_u = fine_vect.GetBlock(1);
-
-    P_edge_.Mult(coarse_vect.GetBlock(0), fine_sigma);
-    P_vertex_.Mult(coarse_vect.GetBlock(1), fine_u);
+    P_edge_.Mult(coarse_vect.GetBlock(0), fine_vect.GetBlock(0));
+    P_vertex_.Mult(coarse_vect.GetBlock(1), fine_vect.GetBlock(1));
 }
 
 BlockVector GraphCoarsen::Restrict(const BlockVector& fine_vect) const
@@ -764,11 +761,8 @@ BlockVector GraphCoarsen::Restrict(const BlockVector& fine_vect) const
 
 void GraphCoarsen::Restrict(const BlockVector& fine_vect, BlockVector& coarse_vect) const
 {
-    VectorView coarse_sigma = coarse_vect.GetBlock(0);
-    VectorView coarse_u = coarse_vect.GetBlock(1);
-
-    P_edge_.MultAT(fine_vect.GetBlock(0), coarse_sigma);
-    P_vertex_.MultAT(fine_vect.GetBlock(1), coarse_u);
+    P_edge_.MultAT(fine_vect.GetBlock(0), coarse_vect.GetBlock(0));
+    P_vertex_.MultAT(fine_vect.GetBlock(1), coarse_vect.GetBlock(1));
 }
 
 

@@ -23,6 +23,8 @@
 #ifndef __UTILITIES_HPP__
 #define __UTILITIES_HPP__
 
+#include <map>
+
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
 
@@ -79,8 +81,8 @@ DenseMatrix Orthogonalize(DenseMatrix& mat, int max_keep = -1);
 DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect, int max_keep = -1);
 
 void OrthoConstant(DenseMatrix& mat);
-void OrthoConstant(VectorView& vect);
-void OrthoConstant(MPI_Comm comm, VectorView& vect, int global_size);
+void OrthoConstant(VectorView vect);
+void OrthoConstant(MPI_Comm comm, VectorView vect, int global_size);
 
 void Deflate(DenseMatrix& A, const VectorView& vect);
 
@@ -88,6 +90,17 @@ DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,
                           std::vector<int>& global_marker,
                           const std::vector<int>& ext_indices,
                           const std::vector<int>& local_indices);
+double DivError(MPI_Comm comm, const SparseMatrix& D, const VectorView& numer,
+                const VectorView& denom);
+double CompareError(MPI_Comm comm, const VectorView& numer, const VectorView& denom);
+void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::cout, bool pretty = true);
+std::vector<double> ComputeErrors(MPI_Comm comm, const SparseMatrix& M,
+                                  const SparseMatrix& D,
+                                  const BlockVector& upscaled_sol,
+                                  const BlockVector& fine_sol);
+
+void PrintJSON(const std::map<std::string, double>& values, std::ostream& out = std::cout,
+               bool pretty = true);
 
 template <typename T = double>
 linalgcpp::SparseMatrix<T> MakeAggVertex(const std::vector<int>& partition)

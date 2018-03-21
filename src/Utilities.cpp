@@ -686,12 +686,12 @@ void OrthoConstant(DenseMatrix& mat)
     }
 }
 
-void OrthoConstant(VectorView& vect)
+void OrthoConstant(VectorView vect)
 {
     SubAvg(vect);
 }
 
-void OrthoConstant(MPI_Comm comm, VectorView& vect, int global_size)
+void OrthoConstant(MPI_Comm comm, VectorView vect, int global_size)
 {
     double local_sum = vect.Sum();
     double global_sum = 0.0;
@@ -741,6 +741,120 @@ DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,
     ClearMarker(global_marker, ext_indices);
 
     return ext_mat.GetRow(row_map);
+}
+
+double DivError(MPI_Comm comm, const SparseMatrix& D, const VectorView& numer,
+                const VectorView& denom)
+{
+    Vector sigma_diff(denom);
+    sigma_diff -= numer;
+
+    Vector Dfine = D.Mult(denom);
+    Vector Ddiff = D.Mult(sigma_diff);
+
+    const double error = parlinalgcpp::ParL2Norm(comm, Ddiff) /
+                         parlinalgcpp::ParL2Norm(comm, Dfine);
+
+    return error;
+}
+
+double CompareError(MPI_Comm comm, const VectorView& numer, const VectorView& denom)
+{
+    Vector diff(denom);
+    diff -= numer;
+
+    const double error = parlinalgcpp::ParL2Norm(comm, diff) /
+                         parlinalgcpp::ParL2Norm(comm, denom);
+
+    return error;
+}
+
+void ShowErrors(const std::vector<double>& error_info, std::ostream& out, bool pretty)
+{
+    assert(error_info.size() >= 3);
+
+    std::map<std::string, double> values =
+    {
+        {"finest-p-error", error_info[0]},
+        {"finest-u-error", error_info[1]},
+        {"finest-div-error", error_info[2]}
+    };
+
+    if (error_info.size() > 3)
+    {
+        values.emplace(std::make_pair("operator-complexity", error_info[3]));
+    }
+
+    PrintJSON(values, out, pretty);
+    /*
+    picojson::object serialize;
+    serialize["finest-p-error"] = picojson::value(error_info[0]);
+    serialize["finest-u-error"] = picojson::value(error_info[1]);
+    serialize["finest-div-error"] = picojson::value(error_info[2]);
+
+    if (error_info.size() > 3)
+    {
+        serialize["operator-complexity"] = picojson::value(error_info[3]);
+    }
+
+    out << picojson::value(serialize).serialize(pretty) << std::endl;
+    */
+}
+
+std::vector<double> ComputeErrors(MPI_Comm comm, const SparseMatrix& M,
+                                  const SparseMatrix& D,
+                                  const BlockVector& upscaled_sol,
+                                  const BlockVector& fine_sol)
+{
+    BlockVector M_scaled_up_sol(upscaled_sol);
+    BlockVector M_scaled_fine_sol(fine_sol);
+
+    const std::vector<double>& M_data = M.GetData();
+
+    const int num_edges = upscaled_sol.GetBlock(0).size();
+
+    for (int i = 0; i < num_edges; ++i)
+    {
+        assert(M_data[i] >= 0);
+
+        M_scaled_up_sol[i] *= std::sqrt(M_data[i]);
+        M_scaled_fine_sol[i] *= std::sqrt(M_data[i]);
+    }
+
+    std::vector<double> info(3);
+
+    info[0] = CompareError(comm, M_scaled_up_sol.GetBlock(1), M_scaled_fine_sol.GetBlock(1));  // vertex
+    info[1] = CompareError(comm, M_scaled_up_sol.GetBlock(0), M_scaled_fine_sol.GetBlock(0));  // edge
+    info[2] = DivError(comm, D, upscaled_sol.GetBlock(0), fine_sol.GetBlock(0));   // div
+
+    return info;
+}
+
+void PrintJSON(const std::map<std::string, double>& values, std::ostream& out,
+               bool pretty)
+{
+    const std::string new_line = pretty ? "\n" : "";
+    const std::string indent = pretty ? "  " : "";
+    std::stringstream ss;
+
+    out << "{" << new_line;
+
+    for (const auto& pair : values)
+    {
+        ss.str("");
+        ss << indent << "\"" << pair.first << "\": " << std::setprecision(16) << std::setw(16) << pair.second;
+
+        if (pair != (*std::rbegin(values)))
+        {
+            ss << ",";
+        }
+
+        ss << new_line;
+
+        out << ss.str();
+    }
+
+    out << "}" << new_line;
 }
 
 } // namespace smoothg

@@ -31,7 +31,7 @@ MGLSolver::MGLSolver(const std::vector<int>& offsets)
 
 }
 
-void MGLSolver::Solve(const VectorView& rhs, VectorView& sol) const
+void MGLSolver::Solve(const VectorView& rhs, VectorView sol) const
 {
     rhs_.GetBlock(0) = 0.0;
     rhs_.GetBlock(1) = rhs;
@@ -41,7 +41,7 @@ void MGLSolver::Solve(const VectorView& rhs, VectorView& sol) const
     sol = sol_.GetBlock(1);
 }
 
-void MGLSolver::Mult(const VectorView& rhs, VectorView& sol) const
+void MGLSolver::Mult(const VectorView& rhs, VectorView sol) const
 {
     Solve(rhs, sol);
 }

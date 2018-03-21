@@ -23,19 +23,14 @@
 namespace smoothg
 {
 
-void Upscale::Mult(const VectorView& x, VectorView& y) const
+void Upscale::Mult(const VectorView& x, VectorView y) const
 {
     assert(coarse_solver_);
 
-    VectorView coarse_sigma = rhs_coarse_.GetBlock(0);
-    VectorView coarse_u = rhs_coarse_.GetBlock(1);
-    coarsener_.Restrict(x, coarse_u);
+    coarsener_.Restrict(x, rhs_coarse_.GetBlock(1));
 
-    x.Print("x");
-    coarse_u.Print("coarse_x");
-
-    coarse_sigma = 0.0;
-    coarse_u *= -1.0;
+    rhs_coarse_.GetBlock(0) = 0.0;
+    rhs_coarse_.GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(rhs_coarse_, sol_coarse_);
 
@@ -44,7 +39,7 @@ void Upscale::Mult(const VectorView& x, VectorView& y) const
     Orthogonalize(y);
 }
 
-void Upscale::Solve(const VectorView& x, VectorView& y) const
+void Upscale::Solve(const VectorView& x, VectorView y) const
 {
     Mult(x, y);
 }
@@ -63,12 +58,7 @@ void Upscale::Solve(const BlockVector& x, BlockVector& y) const
     assert(coarse_solver_);
 
     coarsener_.Restrict(x, rhs_coarse_);
-    VectorView coarse_u = rhs_coarse_.GetBlock(1);
-    coarse_u *= -1.0;
-
-    x.Print("x");
-    std::cout.precision(12);
-    coarse_u.Print("coarse_x");
+    rhs_coarse_.GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(rhs_coarse_, sol_coarse_);
 
@@ -86,7 +76,7 @@ BlockVector Upscale::Solve(const BlockVector& x) const
     return y;
 }
 
-void Upscale::SolveCoarse(const VectorView& x, VectorView& y) const
+void Upscale::SolveCoarse(const VectorView& x, VectorView y) const
 {
     assert(coarse_solver_);
 
@@ -117,7 +107,7 @@ BlockVector Upscale::SolveCoarse(const BlockVector& x) const
     return coarse_vect;
 }
 
-void Upscale::SolveFine(const VectorView& x, VectorView& y) const
+void Upscale::SolveFine(const VectorView& x, VectorView y) const
 {
     assert(fine_solver_);
 
@@ -155,7 +145,7 @@ BlockVector Upscale::SolveFine(const BlockVector& x) const
     return y;
 }
 
-void Upscale::Interpolate(const VectorView& x, VectorView& y) const
+void Upscale::Interpolate(const VectorView& x, VectorView y) const
 {
     coarsener_.Interpolate(x, y);
 }
@@ -175,7 +165,7 @@ BlockVector Upscale::Interpolate(const BlockVector& x) const
     return coarsener_.Interpolate(x);
 }
 
-void Upscale::Restrict(const VectorView& x, VectorView& y) const
+void Upscale::Restrict(const VectorView& x, VectorView y) const
 {
     coarsener_.Restrict(x, y);
 }
@@ -215,15 +205,15 @@ const std::vector<int>& Upscale::CoarseTrueBlockOffsets() const
     return GetCoarseMatrix().true_offsets_;
 }
 
-void Upscale::Orthogonalize(VectorView& vect) const
+void Upscale::Orthogonalize(VectorView vect) const
 {
-    OrthoConstant(comm_, vect, GetFineMatrix().D_local_.Rows());
+    OrthoConstant(comm_, vect, GetFineMatrix().D_global_.GlobalRows());
+    printf("D: %d %d\n", myid_, GetFineMatrix().D_global_.GlobalRows());
 }
 
 void Upscale::Orthogonalize(BlockVector& vect) const
 {
-    VectorView u_block = vect.GetBlock(1);
-    Orthogonalize(u_block);
+    Orthogonalize(vect.GetBlock(1));
 }
 
 Vector Upscale::GetCoarseVector() const
@@ -340,8 +330,47 @@ void Upscale::PrintInfo(std::ostream& out) const
 
 double Upscale::OperatorComplexity() const
 {
-    // TODO(gelever1): Implement correctly!
-    return -1.0;
+    assert(coarse_solver_);
+
+    int nnz_coarse = coarse_solver_->GetNNZ();
+    int nnz_fine;
+
+    if (fine_solver_)
+    {
+        nnz_fine = fine_solver_->GetNNZ();
+    }
+    else
+    {
+        nnz_fine = GetFineMatrix().GlobalNNZ();
+    }
+
+
+    double op_comp = 1.0 + (nnz_coarse / (double) nnz_fine);
+
+    return op_comp;
+}
+
+std::vector<double> Upscale::ComputeErrors(const BlockVector& upscaled_sol,
+                                           const BlockVector& fine_sol) const
+{
+    const SparseMatrix& M = GetFineMatrix().M_local_;
+    const SparseMatrix& D = GetFineMatrix().D_local_;
+
+    auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
+    info.push_back(OperatorComplexity());
+
+    return info;
+}
+
+void Upscale::ShowErrors(const BlockVector& upscaled_sol,
+                         const BlockVector& fine_sol) const
+{
+    auto info = ComputeErrors(upscaled_sol, fine_sol);
+
+    if (myid_ == 0)
+    {
+        smoothg::ShowErrors(info);
+    }
 }
 
 

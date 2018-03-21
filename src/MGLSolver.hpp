@@ -47,8 +47,8 @@ public:
        come into and go out of this method.
     */
     virtual void Solve(const BlockVector& rhs, BlockVector& sol) const = 0;
-    virtual void Solve(const VectorView& rhs, VectorView& sol) const;
-    virtual void Mult(const VectorView& rhs, VectorView& sol) const;
+    virtual void Solve(const VectorView& rhs, VectorView sol) const;
+    virtual void Mult(const VectorView& rhs, VectorView sol) const;
 
     ///@name Set solver parameters
     ///@{
