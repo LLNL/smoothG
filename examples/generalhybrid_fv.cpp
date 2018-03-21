@@ -44,13 +44,13 @@ void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
 class Multigrid : public mfem::Solver
 {
 public:
-    Multigrid(mfem::HypreParMatrix &Operator, const mfem::Operator& CoarseSolver)
+    Multigrid(mfem::HypreParMatrix& Operator, const mfem::Operator& CoarseSolver)
         : mfem::Solver(Operator.Height()), Operator_(Operator), Smoother_(Operator),
           CoarseSolver_(CoarseSolver), residual_(height), help_vec_(height)
     {}
 
-    virtual void Mult(const mfem::Vector & x, mfem::Vector & y) const;
-    virtual void SetOperator(const mfem::Operator &op) {}
+    virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
+    virtual void SetOperator(const mfem::Operator& op) {}
     ~Multigrid() {}
 private:
     void MG_Cycle() const;
@@ -97,8 +97,8 @@ int main(int argc, char* argv[])
 
     int nDimensions = 2;
     mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 4;
-    coarseningFactor[1] = 4;
+    coarseningFactor[0] = 5;
+    coarseningFactor[1] = 5;
     if (nDimensions == 3)
         coarseningFactor[2] = 5;
 
@@ -120,8 +120,9 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     int spe10scale = 5;
+    bool metis_partition = false;
     SPE10Problem spe10problem("spe_perm.dat", nDimensions, spe10scale, 0,
-                              false, coarseningFactor);
+                              metis_partition, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
@@ -226,7 +227,6 @@ int main(int argc, char* argv[])
 
     /// [Solve mixed problem by generalized hybridization]
     mfem::Vector mixed_sol(rhs_u_fine);
-//    mfem::BlockVector mixed_sol(fine_rhs);
     {
         if (myid == 0)
         {
@@ -241,14 +241,14 @@ int main(int argc, char* argv[])
         mfem::Array<int> partitioning;
         auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
         CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor, spe10scale);
-//        std::iota(partitioning.begin(), partitioning.end(), 0);
+
         HybridSolver hb_solver(comm, mixed_laplacian, partitioning,
                                &edge_boundary_att, &marker, 0, nullptr, true);
         hb_solver.SetMaxIter(4);
         hb_solver.SetPrintLevel(-1);
 
-//        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
-//                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
+        //        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
+        //                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
 
         mfem::CGSolver cg(comm);
         cg.SetPrintLevel(0);
@@ -374,7 +374,7 @@ void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
     cart_part.MakeDataOwner();
 }
 
-void Multigrid::Mult(const mfem::Vector & x, mfem::Vector & y) const
+void Multigrid::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
     residual_ = x;
     correction_.SetDataAndSize(y.GetData(), y.Size());
@@ -389,7 +389,6 @@ void Multigrid::MG_Cycle() const
 
     // Coarse grid correction
     CoarseSolver_.Mult(residual_, help_vec_);
-//    par_orthogonalize_from_constant(help_vec_, Operator_.N());
     correction_ += help_vec_;
     Operator_.Mult(-1.0, help_vec_, 1.0, residual_);
 

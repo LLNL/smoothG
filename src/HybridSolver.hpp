@@ -195,10 +195,10 @@ public:
     }
 
     /// Transform original RHS to the RHS of the hybridized system
-    void RHSTransform(const mfem::BlockVector &OriginalRHS,
+    void RHSTransform(const mfem::BlockVector& OriginalRHS,
                       mfem::Vector& HybridRHS) const;
 
-    void RHSTransform(const mfem::Vector &OriginalRHS_block2,
+    void RHSTransform(const mfem::Vector& OriginalRHS_block2,
                       mfem::Vector& HybridRHS) const;
 
     /**

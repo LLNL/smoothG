@@ -65,7 +65,7 @@ mfem::SparseMatrix SimpleInterpolation(const mfem::SparseMatrix& face_edgedof)
 {
     auto edgedof_face = smoothg::Transpose(face_edgedof);
     const int num_edofs = edgedof_face.Height();
-    int* P_i = new int[num_edofs+1];
+    int* P_i = new int[num_edofs + 1];
     int* P_j = new int[num_edofs];
     double* P_data = new double[num_edofs];
 
@@ -85,7 +85,7 @@ mfem::SparseMatrix SimpleInterpolation(const mfem::SparseMatrix& face_edgedof)
             count++;
         }
     }
-    assert(count==num_edofs-edgedof_face.NumNonZeroElems()+edgedof_face.Width());
+    assert(count == num_edofs - edgedof_face.NumNonZeroElems() + edgedof_face.Width());
     return mfem::SparseMatrix(P_i, P_j, P_data, num_edofs, count);
 }
 
@@ -206,7 +206,7 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
                               const mfem::Array<int>* ess_edge_dofs,
                               const bool approx)
 {
-    mfem::SparseMatrix face_edgedof, P_e_T, Agg_cedgedof, I_ce, actual_face_bdrattr;
+    mfem::SparseMatrix face_edgedof, P_e_T, Agg_cedgedof, actual_face_bdrattr;
     std::unique_ptr<mfem::HypreParMatrix> edge_d_td;
     mfem::Array<int> actual_ess_edge_dofs;
 
@@ -224,9 +224,9 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
     {
         auto Agg_cvertexdof = SparseIdentity(Agg_vertexdof_.Width());
         P_vert_.Swap(Agg_cvertexdof);
-//        P_vert_.Swap(Agg_vertexdof_);
-//        auto Agg_cvertexdof = SparseIdentity(P_vert_.Height());
-//        Agg_vertexdof_.Swap(Agg_cvertexdof);
+        //        P_vert_.Swap(Agg_vertexdof_);
+        //        auto Agg_cvertexdof = SparseIdentity(P_vert_.Height());
+        //        Agg_vertexdof_.Swap(Agg_cvertexdof);
 
         auto P_e = SimpleInterpolation(face_edgedof);
 
@@ -246,42 +246,15 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
         auto P_e_T_tmp = smoothg::Transpose(P_e);
         P_e_T.Swap(P_e_T_tmp);
 
-//        unique_ptr<mfem::HypreParMatrix> edge_cd_td(
-//                    mgL.get_edge_d_td().LeftDiagMult(P_e_T, cdof_starts));
+        unique_ptr<mfem::HypreParMatrix> edge_cd_td(
+            mgL.get_edge_d_td().LeftDiagMult(P_e_T, cdof_starts));
 
-//        num_edge_dofs_ = P_e.Height();
-//        mfem::Array<int> edgedof_start;
-//        GenerateOffsets(comm_, num_edge_dofs_, edgedof_start);
+        unique_ptr<mfem::HypreParMatrix> edge_td_cd(edge_cd_td->Transpose());
+        unique_ptr<mfem::HypreParMatrix> edge_cd_td_cd(
+            mfem::ParMult(edge_cd_td.get(), edge_td_cd.get()) );
 
-//        auto I_e = SparseIdentity(num_edge_dofs_);
-//        mfem::HypreParMatrix tmp(comm, edgedof_start.Last(), edgedof_start, &I_e);
-//        //            tmp.MakeRef(mgL.get_edge_d_td());
-
-//        mfem::HypreParMatrix pP_e_T(comm, cdof_starts.Last(), edgedof_start.Last(),
-//                                    cdof_starts, edgedof_start, &P_e_T);
-//        //            unique_ptr<mfem::HypreParMatrix> edge_cd_td(ParMult(&pP_e_T, &(*edge_d_td)));
-
-
-//        auto tmpT = tmp.Transpose();
-//        auto edge_d_td_d = mfem::ParMult(&tmp, tmpT);
-//        auto edge_cd_td_cd = smoothg::RAP(*edge_d_td_d, pP_e_T);
-
-//        unique_ptr<mfem::HypreParMatrix> edge_td_cd(edge_cd_td->Transpose());
-
-//        unique_ptr<mfem::HypreParMatrix> edge_cd_td_cd(
-//                    mfem::ParMult(edge_td_cd.get(), edge_cd_td.get()) );
-
-//        Construct edge "coarse dof to true coarse dof" table
-//                edge_d_td = BuildEntityToTrueEntity(*edge_cd_td_cd);
-
-        auto I_ce_tmp = SparseIdentity(P_e.Width());
-        I_ce.Swap(I_ce_tmp);
-        edge_d_td = make_unique<mfem::HypreParMatrix>(comm_, cdof_starts.Last(), cdof_starts, &I_ce);
-        edge_d_td->CopyRowStarts();
-        edge_d_td->CopyColStarts();
-//        delete tmpT;
-//        delete edge_d_td_d;
-//        delete edge_cd_td_cd;
+        // Construct edge "coarse dof to true coarse dof" table
+        edge_d_td = BuildEntityToTrueEntity(*edge_cd_td_cd);
 
         if (face_bdrattr)
         {
@@ -837,20 +810,20 @@ void HybridSolver::AssembleHybridSystem(
 /// @todo nonzero BC, solve on true dof
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
-//    P_vert_.Mult(Rhs.GetBlock(1), Rhs_c_);
+    //    P_vert_.Mult(Rhs.GetBlock(1), Rhs_c_);
     RHSTransform(Rhs, Hrhs_);
     SolveHybridSystem();
     RecoverOriginalSolution(Mu_, Sol);
-//    P_vert_.MultTranspose(Sol_c_, Sol.GetBlock(1));
+    //    P_vert_.MultTranspose(Sol_c_, Sol.GetBlock(1));
 }
 
 void HybridSolver::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
-    //    P_vert_.Mult(Rhs.GetBlock(1), Rhs_c_);
+    //    P_vert_.Mult(x, Rhs_c_);
     RHSTransform(x, Hrhs_);
     SolveHybridSystem();
     RecoverOriginalSolution(Mu_, y);
-//    P_vert_.MultTranspose(Sol_c_, Sol.GetBlock(1));
+    //    P_vert_.MultTranspose(Sol_c_, y);
 }
 
 /// @todo impose nonzero boundary condition for u.n
