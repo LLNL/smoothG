@@ -245,6 +245,8 @@ int main(int argc, char* argv[])
 //        std::iota(partitioning.begin(), partitioning.end(), 0);
         HybridSolver hb_solver(comm, mixed_laplacian, partitioning,
                                &edge_boundary_att, &marker, 0, nullptr, true);
+        hb_solver.SetMaxIter(4);
+        hb_solver.SetPrintLevel(-1);
 
 //        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
 //                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
@@ -261,8 +263,8 @@ int main(int argc, char* argv[])
 
         if (myid == 0)
         {
-//            std::cout << "System size: " << hb_solver.GetHybridSystemSize() << "\n";
-//            std::cout << "System NNZ: " << hb_solver.GetNNZ() << "\n";
+            std::cout << "System size: " << hb_solver.GetHybridSystemSize() << "\n";
+            std::cout << "System NNZ: " << hb_solver.GetNNZ() << "\n";
             std::cout << "Setup time: " << chrono.RealTime() << "s. \n";
         }
 
@@ -388,10 +390,10 @@ void Multigrid::MG_Cycle() const
     // PreSmoothing
     Smoother_.Mult(residual_, correction_);
     Operator_.Mult(-1.0, correction_, 1.0, residual_);
-//par_orthogonalize_from_constant(residual_, Operator_.N());
 
     // Coarse grid correction
     CoarseSolver_.Mult(residual_, help_vec_);
+//    par_orthogonalize_from_constant(help_vec_, Operator_.N());
     correction_ += help_vec_;
     Operator_.Mult(-1.0, help_vec_, 1.0, residual_);
 

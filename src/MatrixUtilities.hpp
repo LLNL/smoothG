@@ -390,8 +390,9 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
 /// mat = diag(scale)^{-1} * mat
 void InvScaleRows(const mfem::Vector& scale, mfem::SparseMatrix& mat);
 
-/// return A_inv * B
-mfem::DenseMatrix Mult(const mfem::UMFPackSolver& A_inv, const mfem::SparseMatrix& B);
+/// out = A_inv * B
+void Mult(const mfem::UMFPackSolver& A_inv, const mfem::SparseMatrix& B,
+          mfem::DenseMatrix& out);
 
 } // namespace smoothg
 

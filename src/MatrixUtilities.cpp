@@ -1072,21 +1072,21 @@ void InvScaleRows(const mfem::Vector& scale, mfem::SparseMatrix& mat)
     mat.ScaleRows(inv_scale);
 }
 
-mfem::DenseMatrix Mult(const mfem::UMFPackSolver& A_inv, const mfem::SparseMatrix& B)
+void Mult(const mfem::UMFPackSolver& A_inv, const mfem::SparseMatrix& B,
+          mfem::DenseMatrix& out)
 {
     mfem::DenseMatrix B_dense;
     Full(B, B_dense);
 
     mfem::Vector col_in, col_out;
 
-    mfem::DenseMatrix out(A_inv.Height(), B.Width());
+    out.SetSize(A_inv.Height(), B.Width());
     for (int i = 0; i < B.Width(); i++)
     {
         B_dense.GetColumnReference(i, col_in);
         out.GetColumnReference(i, col_out);
         A_inv.Mult(col_in, col_out);
     }
-    return out;
 }
 
 } // namespace smoothg

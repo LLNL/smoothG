@@ -186,15 +186,7 @@ public:
     void Mult(const mfem::BlockVector& Rhs,
               mfem::BlockVector& Sol) const;
 
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const
-    {
-        block_rhs_->GetBlock(1) = x;
-        block_rhs_->GetBlock(0) = 0.0;
-        block_rhs_->GetBlock(1) *= -1.0;
-
-        Mult(*block_rhs_, *block_sol_);
-        y = block_sol_->GetBlock(1);
-    }
+    void Mult(const mfem::Vector& x, mfem::Vector& y) const;
 
     /// Same as Mult()
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
@@ -203,7 +195,10 @@ public:
     }
 
     /// Transform original RHS to the RHS of the hybridized system
-    void RHSTransform(const mfem::BlockVector& OriginalRHS,
+    void RHSTransform(const mfem::BlockVector &OriginalRHS,
+                      mfem::Vector& HybridRHS) const;
+
+    void RHSTransform(const mfem::Vector &OriginalRHS_block2,
                       mfem::Vector& HybridRHS) const;
 
     /**
@@ -225,6 +220,9 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
+    void RecoverOriginalSolution(const mfem::Vector& HybridSol,
+                                 mfem::Vector& RecoveredSol_block2) const;
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;
@@ -243,6 +241,12 @@ protected:
               const mfem::SparseMatrix* face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
+    void CoarseInit(const mfem::Array<int>& partitioning,
+                    const MixedMatrix& mgL,
+                    const mfem::SparseMatrix* face_bdrattr,
+                    const mfem::Array<int>* ess_edge_dofs,
+                    const bool approx);
+
     /**
        @todo this method and its cousin share a lot of duplicated code
     */
@@ -259,6 +263,8 @@ protected:
 
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();
+
+    void SolveHybridSystem() const;
 
 private:
     MPI_Comm comm_;
@@ -287,6 +293,7 @@ private:
     std::vector<std::unique_ptr<mfem::Operator> > Ainv_;
     std::vector<std::unique_ptr<mfem::Operator> > A_;
     std::vector<std::unique_ptr<mfem::Operator>> DMinvCT_;
+    mfem::SparseMatrix P_vert_;
 
     mutable std::vector<mfem::Vector> Ainv_f_;
 
@@ -300,6 +307,9 @@ private:
     mutable mfem::Vector trueMu_;
     mutable mfem::Vector Hrhs_;
     mutable mfem::Vector Mu_;
+
+    mutable mfem::Vector Rhs_c_;
+    mutable mfem::Vector Sol_c_;
 
     int nAggs_;
     int num_edge_dofs_;
