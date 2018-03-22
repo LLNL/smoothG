@@ -104,19 +104,10 @@ int main(int argc, char* argv[])
     if (nDimensions == 3)
         coarseningFactor[2] = 5;
 
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    mfem::Array<int> ess_zeros(nbdr);
-    mfem::Array<int> nat_one(nbdr);
-    mfem::Array<int> nat_zeros(nbdr);
-    ess_zeros = 1;
-    nat_one = 0;
-    nat_zeros = 0;
+    const int nbdr = (nDimensions == 3) ? 6 : 4;
+    mfem::Array<int> ess_attr(nbdr);
+    ess_attr = 1;
 
-    mfem::Array<int> ess_attr;
     mfem::Vector local_weight;
     mfem::Vector rhs_u_fine;
 
@@ -135,17 +126,12 @@ int main(int argc, char* argv[])
                   pmesh->GetNE() << " fine elements\n";
     }
 
-    ess_attr.SetSize(nbdr);
-    for (int i(0); i < nbdr; ++i)
-        ess_attr[i] = ess_zeros[i];
-
     // Construct "finite volume mass" matrix using mfem instead of parelag
     mfem::RT_FECollection sigmafec(0, nDimensions);
     mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
 
     mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
+    a.AddDomainIntegrator(new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()));
     a.Assemble();
     a.Finalize();
     a.SpMat().GetDiag(local_weight);
@@ -163,7 +149,6 @@ int main(int argc, char* argv[])
     q.Assemble();
     rhs_u_fine = q;
 
-    // Construct vertex_edge table in mfem::SparseMatrix format
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
                               : pmesh->ElementToFaceTable();
     mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
@@ -173,15 +158,6 @@ int main(int argc, char* argv[])
 
     MixedMatrix mixed_laplacian(vertex_edge, local_weight, *edge_trueedge);
     auto gL = GraphLaplacian(mixed_laplacian, &edge_boundary_att);
-
-    /// [Set up parallel graph and Laplacian]
-
-    /// [Right Hand Side]
-    mfem::BlockVector fine_rhs(mixed_laplacian.get_blockoffsets());
-    fine_rhs.GetBlock(0) = 0.0;
-    fine_rhs.GetBlock(1) = rhs_u_fine;
-    fine_rhs *= -1.0;
-    /// [Right Hand Side]
 
     /// [Solve primal problem by CG + BoomerAMG]
     mfem::Vector primal_sol(rhs_u_fine);
