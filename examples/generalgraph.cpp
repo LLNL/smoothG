@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
 
     int num_partitions = 25;
     std::string graphFileName = "ve.txt";
-    std::string FiedlerFileName = "../../graphdata/fiedler_sample.txt";
+    std::string FiedlerFileName = "rhs.txt";
     std::string partition_filename = "part.part";
 
     //int num_partitions = 2;
@@ -125,14 +125,14 @@ int main(int argc, char* argv[])
 
         /// [Solve]
         BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        //upscale.ShowCoarseSolveInfo();
+        upscale.ShowCoarseSolveInfo();
 
         BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        //upscale.ShowFineSolveInfo();
+        upscale.ShowFineSolveInfo();
         /// [Solve]
 
         /// [Check Error]
-        //upscale.ShowErrors(upscaled_sol, fine_sol);
+        upscale.ShowErrors(upscaled_sol, fine_sol);
         /// [Check Error]
     }
 

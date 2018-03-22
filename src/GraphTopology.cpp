@@ -43,7 +43,7 @@ GraphTopology::GraphTopology(MPI_Comm comm, const Graph& graph)
     const auto& edge_starts = starts[1];
     const auto& agg_starts = starts[2];
 
-    ParMatrix edge_agg_d(comm, edge_starts, agg_starts, edge_ext_agg);
+    ParMatrix edge_agg_d(comm, edge_starts, agg_starts, std::move(edge_ext_agg));
     ParMatrix agg_edge_d = edge_agg_d.Transpose();
 
     ParMatrix edge_agg_ext = graph.edge_edge_.Mult(edge_agg_d);

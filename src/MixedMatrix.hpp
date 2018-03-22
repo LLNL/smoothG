@@ -50,6 +50,9 @@ class MixedMatrix
         int Rows() const;
         int Cols() const;
 
+        int GlobalRows() const;
+        int GlobalCols() const;
+
         int NNZ() const;
         int GlobalNNZ() const;
 

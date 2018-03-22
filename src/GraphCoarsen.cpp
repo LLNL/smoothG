@@ -289,6 +289,8 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
 
         bool shared = face_shared.RowSize(face) > 0;
 
+        // TODO(gelever1): resolve this copy.  (Types must match so face_? gets copied and promoted
+        // to rvalue).
         const auto& M_local = shared ? Combine(face_M, num_face_edges) : face_M[0];
         const auto& D_local = shared ? Combine(face_D, num_face_edges) : face_D[0];
         const int split = shared ? face_D[0].Rows() : GetSplit(gt, face);
@@ -324,6 +326,7 @@ void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix&
 
         double oneDpv = one.Mult(D_transfer.Mult(pv_trace));
         double beta = (oneDpv < 0) ? -1.0 : 1.0;
+        oneDpv *= beta;
 
         pv_trace /= oneDpv;
 

@@ -67,41 +67,22 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
 
 void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
 {
-    linalgcpp::PMINRESSolver pminres(op_, prec_, 1000, 1e-16, false, parlinalgcpp::ParMult);
+    linalgcpp::PMINRESSolver pminres(op_, prec_, max_num_iter_, rtol_,
+                                     print_level_, parlinalgcpp::ParMult);
 
     edge_true_edge_.MultAT(rhs.GetBlock(0), true_rhs_.GetBlock(0));
-
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
-
     true_sol_ = 0.0;
 
-    if (MyId() == 0)
-    {
-        true_rhs_.GetBlock(1)[0] = 0.0;
-    }
-
     pminres.Mult(true_rhs_, true_sol_);
-    if (MyId() == 0)
-    {
-        true_rhs_.Print("true rhs");
-        true_sol_.Print("true sol");
-        M_.Print("M");
-        D_.Print("D");
-        schur_prec_.GetMatrix().Print("Schur");
-    }
-
-    Vector sols(true_sol_.size());
-    prec_.Mult(true_rhs_, sols);
-
-    if (MyId() == 0)
-    {
-        true_rhs_.Print("Prec rhs:");
-        sols.Print("Prec sol:");
-    }
 
     edge_true_edge_.Mult(true_sol_.GetBlock(0), sol.GetBlock(0));
-
     sol.GetBlock(1) = true_sol_.GetBlock(1);
+}
+
+void MinresBlockSolver::Solve(const BlockVector& rhs, BlockVector& sol) const
+{
+    Mult(rhs, sol);
 }
 
 void MinresBlockSolver::SetPrintLevel(int print_level)

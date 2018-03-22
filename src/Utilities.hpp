@@ -105,6 +105,8 @@ void PrintJSON(const std::map<std::string, double>& values, std::ostream& out = 
 template <typename T = double>
 linalgcpp::SparseMatrix<T> MakeAggVertex(const std::vector<int>& partition)
 {
+    assert(partition.size() > 0);
+
     const int num_parts = *std::max_element(std::begin(partition), std::end(partition)) + 1;
     const int num_vert = partition.size();
 

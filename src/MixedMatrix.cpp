@@ -112,6 +112,16 @@ int MixedMatrix::Cols() const
     return D_local_.Rows() + D_local_.Cols();
 }
 
+int MixedMatrix::GlobalRows() const
+{
+    return D_global_.GlobalRows() + D_global_.GlobalCols();
+}
+
+int MixedMatrix::GlobalCols() const
+{
+    return D_global_.GlobalRows() + D_global_.GlobalCols();
+}
+
 int MixedMatrix::NNZ() const
 {
     return M_local_.nnz() + (2 * D_local_.nnz())

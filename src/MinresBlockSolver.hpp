@@ -64,7 +64,6 @@ public:
        @param comm communicator on which to construct parallel MINRES solver
        @param M weighting matrix for graph edges
        @param D describes vertex-edge relation
-       @param block_true_offsets describes parallel partitioning (@todo can this be inferred from the matrices?)
        @param use_W use the W block
     */
     MinresBlockSolver() = default;
@@ -77,11 +76,7 @@ public:
     /**
        @brief Use block-preconditioned MINRES to solve the problem.
     */
-    void Solve(const BlockVector& rhs, BlockVector& sol) const override
-    // TODO(gelever1): move to .cpp file
-    {
-        Mult(rhs, sol);
-    }
+    void Solve(const BlockVector& rhs, BlockVector& sol) const override;
 
     /// Same as Solve()
     virtual void Mult(const BlockVector& rhs, BlockVector& sol) const;
@@ -117,25 +112,6 @@ private:
 
     mutable BlockVector true_rhs_;
     mutable BlockVector true_sol_;
-    /*
-    void Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-              mfem::HypreParMatrix* W);
-
-    mfem::BlockOperator operator_;
-    mfem::BlockDiagonalPreconditioner prec_;
-
-    std::unique_ptr<mfem::HypreParMatrix> schur_block_;
-
-    // Solvers' copy of potentially modified data
-    mfem::SparseMatrix M_;
-    mfem::SparseMatrix D_;
-    mfem::SparseMatrix W_;
-
-    std::unique_ptr<mfem::HypreParMatrix> hM_;
-    std::unique_ptr<mfem::HypreParMatrix> hD_;
-    std::unique_ptr<mfem::HypreParMatrix> hDt_;
-    std::unique_ptr<mfem::HypreParMatrix> hW_;
-              */
 };
 
 /**

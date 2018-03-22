@@ -208,7 +208,6 @@ const std::vector<int>& Upscale::CoarseTrueBlockOffsets() const
 void Upscale::Orthogonalize(VectorView vect) const
 {
     OrthoConstant(comm_, vect, GetFineMatrix().D_global_.GlobalRows());
-    printf("D: %d %d\n", myid_, GetFineMatrix().D_global_.GlobalRows());
 }
 
 void Upscale::Orthogonalize(BlockVector& vect) const
@@ -291,8 +290,8 @@ void Upscale::PrintInfo(std::ostream& out) const
     int nnz_fine = GetFineMatrix().GlobalNNZ();
 
     // True dof size
-    int size_fine = GetFineMatrix().true_offsets_.back();
-    int size_coarse = GetCoarseMatrix().true_offsets_.back();
+    int size_fine = GetFineMatrix().GlobalRows();
+    int size_coarse = GetCoarseMatrix().GlobalRows();
 
     int num_procs;
     MPI_Comm_size(comm_, &num_procs);
