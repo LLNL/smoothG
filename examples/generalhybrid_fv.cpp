@@ -78,8 +78,11 @@ int main(int argc, char* argv[])
     // program options from command line
     mfem::OptionsParser args(argc, argv);
     int agg_size = 12;
+    int nDimensions = 2;
     args.AddOption(&agg_size, "-as", "--agg-size",
                    "Number of vertices in an aggregated in hybridization.");
+    args.AddOption(&nDimensions, "-d", "--dim",
+                   "Dimension of physical domain.");
     args.Parse();
     if (!args.Good())
     {
@@ -95,7 +98,6 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    int nDimensions = 2;
     mfem::Array<int> coarseningFactor(nDimensions);
     coarseningFactor[0] = 5;
     coarseningFactor[1] = 5;
@@ -169,11 +171,9 @@ int main(int argc, char* argv[])
     const auto& edge_trueedge(sigmafespace.Dof_TrueDof_Matrix());
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
-
     MixedMatrix mixed_laplacian(vertex_edge, local_weight, *edge_trueedge);
     auto gL = GraphLaplacian(mixed_laplacian, &edge_boundary_att);
 
-    auto gL2 = GraphLaplacian(mixed_laplacian, &edge_boundary_att);
     /// [Set up parallel graph and Laplacian]
 
     /// [Right Hand Side]
@@ -181,7 +181,6 @@ int main(int argc, char* argv[])
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = rhs_u_fine;
     fine_rhs *= -1.0;
-    mfem::Vector rhs_u_fine2(rhs_u_fine);
     /// [Right Hand Side]
 
     /// [Solve primal problem by CG + BoomerAMG]
@@ -247,17 +246,17 @@ int main(int argc, char* argv[])
         hb_solver.SetMaxIter(4);
         hb_solver.SetPrintLevel(-1);
 
-        //        FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
-        //                                 edge_boundary_att, ess_attr, 1.0, 1, 1, 0, 0, 1);
+        //FiniteVolumeUpscale fvup(comm, vertex_edge, local_weight, partitioning, *edge_trueedge,
+        //                         edge_boundary_att, ess_attr, 1.0, 1, 0, 0, 0, 1);
 
         mfem::CGSolver cg(comm);
         cg.SetPrintLevel(0);
         cg.SetMaxIter(5000);
         cg.SetRelTol(1e-9);
         cg.SetAbsTol(1e-12);
-        cg.SetOperator(*gL2);
+        cg.SetOperator(*gL);
 
-        Multigrid prec(*gL2, hb_solver);
+        Multigrid prec(*gL, hb_solver);
         cg.SetPreconditioner(prec);
 
         if (myid == 0)
@@ -270,7 +269,7 @@ int main(int argc, char* argv[])
         chrono.Clear();
         chrono.Start();
         mixed_sol = 0.0;
-        cg.Mult(rhs_u_fine2, mixed_sol);
+        cg.Mult(rhs_u_fine, mixed_sol);
         par_orthogonalize_from_constant(mixed_sol, gL->N());
         if (myid == 0)
         {
