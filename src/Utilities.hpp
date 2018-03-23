@@ -39,6 +39,7 @@ using DenseMatrix = linalgcpp::DenseMatrix;
 using CooMatrix = linalgcpp::CooMatrix<double>;
 using BlockMatrix = linalgcpp::BlockMatrix<double>;
 using ParMatrix = parlinalgcpp::ParMatrix;
+using Timer = linalgcpp::Timer;
 
 int MyId(MPI_Comm comm = MPI_COMM_WORLD);
 

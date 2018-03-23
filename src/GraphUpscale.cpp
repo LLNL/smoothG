@@ -32,7 +32,12 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
+    Timer timer(Timer::Start::True);
+
     Init(vertex_edge_global, partitioning_global, weight_global);
+
+    timer.Click();
+    setup_time_ += timer.TotalTime();
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm,
@@ -44,6 +49,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
+    Timer timer(Timer::Start::True);
+
     SparseMatrix edge_vertex = vertex_edge_global.Transpose();
     SparseMatrix vertex_vertex = vertex_edge_global.Mult(edge_vertex);
 
@@ -54,6 +61,9 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
     std::vector<int> partitioning_global = Partition(vertex_vertex, num_parts, contig, ubal);
 
     Init(vertex_edge_global, partitioning_global, weight_global);
+
+    timer.Click();
+    setup_time_ += timer.TotalTime();
 }
 
 void GraphUpscale::Init(const SparseMatrix& vertex_edge,
@@ -76,23 +86,42 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const
 {
-    return ReadVector(filename, graph_.vertex_map_);
+    return Upscale::ReadVector(filename, graph_.vertex_map_);
 }
 
-Vector GraphUpscale::ReadVector(const std::string& filename, const std::vector<int>& local_to_global) const
+Vector GraphUpscale::ReadEdgeVector(const std::string& filename) const
 {
-    std::vector<double> global_vect = linalgcpp::ReadText<double>(filename);
+    return Upscale::ReadVector(filename, graph_.edge_map_);
+}
 
-    size_t size = local_to_global.size();
+BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filename) const
+{
+    BlockVector vect = GetFineBlockVector();
 
-    Vector local_vect(size);
+    vect.GetBlock(0) = 0.0;
+    vect.GetBlock(1) = ReadVertexVector(filename);
 
-    for (size_t i = 0; i < size; ++i)
-    {
-        local_vect[i] = global_vect[local_to_global[i]];
-    }
+    return vect;
+}
 
-    return local_vect;
+BlockVector GraphUpscale::ReadEdgeBlockVector(const std::string& filename) const
+{
+    BlockVector vect = GetFineBlockVector();
+
+    vect.GetBlock(0) = ReadEdgeVector(filename);
+    vect.GetBlock(1) = 0.0;
+
+    return vect;
+}
+
+void GraphUpscale::WriteVertexVector(const VectorView& vect, const std::string& filename) const
+{
+    WriteVector(vect, filename, global_vertices_, graph_.vertex_map_);
+}
+
+void GraphUpscale::WriteEdgeVector(const VectorView& vect, const std::string& filename) const
+{
+    WriteVector(vect, filename, global_edges_, graph_.edge_map_);
 }
 
 } // namespace smoothg

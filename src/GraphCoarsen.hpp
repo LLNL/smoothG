@@ -70,10 +70,8 @@ class GraphCoarsen
 
         void ComputeVertexTargets(const GraphTopology& gt, const ParMatrix& M_ext, const ParMatrix& D_ext);
         void ComputeEdgeTargets(const GraphTopology& gt,
-                                const SparseMatrix& face_edge,
-                                const Vect2D<DenseMatrix>& shared_sigma,
-                                const Vect2D<std::vector<double>>& shared_M,
-                                const Vect2D<SparseMatrix>& shared_D);
+                                const MixedMatrix& mgl,
+                                const ParMatrix& face_edge_perm);
         void ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local);
 
 

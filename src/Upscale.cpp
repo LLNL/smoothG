@@ -23,6 +23,13 @@
 namespace smoothg
 {
 
+Upscale::Upscale(MPI_Comm comm, int size)
+        : Operator(size), comm_(comm), setup_time_(0.0)
+{
+    MPI_Comm_size(comm_, &num_procs_);
+    MPI_Comm_rank(comm_, &myid_);
+}
+
 void Upscale::Mult(const VectorView& x, VectorView y) const
 {
     assert(coarse_solver_);
@@ -349,6 +356,116 @@ double Upscale::OperatorComplexity() const
     return op_comp;
 }
 
+void Upscale::SetPrintLevel(int print_level)
+{
+    assert(coarse_solver_);
+    coarse_solver_->SetPrintLevel(print_level);
+
+    if (fine_solver_)
+    {
+        fine_solver_->SetPrintLevel(print_level);
+    }
+}
+
+void Upscale::SetMaxIter(int max_num_iter)
+{
+    assert(coarse_solver_);
+    coarse_solver_->SetMaxIter(max_num_iter);
+
+    if (fine_solver_)
+    {
+        fine_solver_->SetMaxIter(max_num_iter);
+    }
+}
+
+void Upscale::SetRelTol(double rtol)
+{
+    assert(coarse_solver_);
+    coarse_solver_->SetRelTol(rtol);
+
+    if (fine_solver_)
+    {
+        fine_solver_->SetRelTol(rtol);
+    }
+}
+
+void Upscale::SetAbsTol(double atol)
+{
+    assert(coarse_solver_);
+    coarse_solver_->SetAbsTol(atol);
+
+    if (fine_solver_)
+    {
+        fine_solver_->SetAbsTol(atol);
+    }
+}
+
+void Upscale::ShowCoarseSolveInfo(std::ostream& out) const
+{
+    assert(coarse_solver_);
+
+    if (myid_ == 0)
+    {
+        out << "\n";
+        out << "Coarse Solve Time:       " << coarse_solver_->GetTiming() << "\n";
+        out << "Coarse Solve Iterations: " << coarse_solver_->GetNumIterations() << "\n";
+    }
+}
+
+void Upscale::ShowFineSolveInfo(std::ostream& out) const
+{
+    assert(fine_solver_);
+
+    if (myid_ == 0)
+    {
+        out << "\n";
+        out << "Fine Solve Time:         " << fine_solver_->GetTiming() << "\n";
+        out << "Fine Solve Iterations:   " << fine_solver_->GetNumIterations() << "\n";
+    }
+}
+
+void Upscale::ShowSetupTime(std::ostream& out) const
+{
+    if (myid_ == 0)
+    {
+        out << "\n";
+        out << "Upscale Setup Time:      " << setup_time_ << "\n";
+    }
+}
+
+double Upscale::GetCoarseSolveTime() const
+{
+    assert(coarse_solver_);
+
+    return coarse_solver_->GetTiming();
+}
+
+double Upscale::GetFineSolveTime() const
+{
+    assert(fine_solver_);
+
+    return fine_solver_->GetTiming();
+}
+
+int Upscale::GetCoarseSolveIters() const
+{
+    assert(coarse_solver_);
+
+    return coarse_solver_->GetNumIterations();
+}
+
+int Upscale::GetFineSolveIters() const
+{
+    assert(fine_solver_);
+
+    return fine_solver_->GetNumIterations();
+}
+
+double Upscale::GetSetupTime() const
+{
+    return setup_time_;
+}
+
 std::vector<double> Upscale::ComputeErrors(const BlockVector& upscaled_sol,
                                            const BlockVector& fine_sol) const
 {
@@ -372,6 +489,53 @@ void Upscale::ShowErrors(const BlockVector& upscaled_sol,
     }
 }
 
+void Upscale::MakeCoarseVectors()
+{
+    rhs_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
+    sol_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
+}
 
+Vector Upscale::ReadVector(const std::string& filename,
+                           const std::vector<int>& local_to_global) const
+{
+    std::vector<double> global_vect = linalgcpp::ReadText(filename);
+
+    int local_size = local_to_global.size();
+
+    Vector local_vect(local_size);
+
+    for (int i = 0; i < local_size; ++i)
+    {
+        local_vect[i] = global_vect[local_to_global[i]];
+    }
+
+    return local_vect;
+}
+
+void Upscale::WriteVector(const VectorView& vect, const std::string& filename, int global_size,
+                          const std::vector<int>& local_to_global) const
+{
+    assert(global_size > 0);
+    assert(vect.size() <= global_size);
+
+    std::vector<double> global_global(global_size, 0.0);
+    std::vector<double> global_local(global_size, 0.0);
+
+    int local_size = local_to_global.size();
+
+    for (int i = 0; i < local_size; ++i)
+    {
+        global_local[local_to_global[i]] = vect[i];
+    }
+
+
+    MPI_Scan(global_local.data(), global_global.data(), global_size,
+             MPI_DOUBLE, MPI_SUM, comm_);
+
+    if (myid_ == num_procs_ - 1)
+    {
+        linalgcpp::WriteText(global_global, filename);
+    }
+}
 
 } // namespace smoothg

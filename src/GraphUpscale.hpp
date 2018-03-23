@@ -99,11 +99,6 @@ private:
               const std::vector<int>& partitioning_global,
               const std::vector<double>& weight_global);
 
-    Vector ReadVector(const std::string& filename, const std::vector<int>& local_to_global) const;
-
-    void WriteVector(const VectorView& vect, const std::string& filename, int global_size,
-                     const std::vector<int>& local_to_global) const;
-
     const int global_edges_;
     const int global_vertices_;
 

@@ -75,9 +75,9 @@ protected:
     double rtol_ = 1e-9;
     double atol_ = 1e-12;
 
-    int nnz_;
-    mutable int num_iterations_;
-    mutable double timing_;
+    int nnz_ = 0;
+    mutable int num_iterations_ = 0;
+    mutable double timing_ = 0;
 };
 
 } // namespace smoothg

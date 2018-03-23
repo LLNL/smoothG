@@ -29,13 +29,9 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
       op_(mgl.true_offsets_), prec_(mgl.true_offsets_),
       true_rhs_(mgl.true_offsets_), true_sol_(mgl.true_offsets_)
 {
-    int myid;
-    MPI_Comm comm = M_.GetComm();
-    MPI_Comm_rank(comm, &myid);
-
     CooMatrix elim_dof(D_.Rows(), D_.Rows());
 
-    if (myid == 0)
+    if (M_.GetMyId() == 0)
     {
         D_.EliminateRow(0);
         elim_dof.Add(0, 0, 1.0);
@@ -70,6 +66,8 @@ void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
     linalgcpp::PMINRESSolver pminres(op_, prec_, max_num_iter_, rtol_,
                                      print_level_, parlinalgcpp::ParMult);
 
+    Timer timer(Timer::Start::True);
+
     edge_true_edge_.MultAT(rhs.GetBlock(0), true_rhs_.GetBlock(0));
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
     true_sol_ = 0.0;
@@ -78,6 +76,9 @@ void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
 
     edge_true_edge_.Mult(true_sol_.GetBlock(0), sol.GetBlock(0));
     sol.GetBlock(1) = true_sol_.GetBlock(1);
+
+    timer.Click();
+    timing_ += timer.TotalTime();
 }
 
 void MinresBlockSolver::Solve(const BlockVector& rhs, BlockVector& sol) const

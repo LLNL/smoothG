@@ -133,8 +133,4 @@ void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input, Den
     }
 }
 
-
-
-
-
 } // namespace smoothg

@@ -40,19 +40,12 @@ GraphCoarsen::GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
     ParMatrix D_ext_global = permute_v.Mult(mgl.D_global_.Mult(permute_e_T));
 
     ParMatrix face_perm_edge = gt.face_edge_.Mult(mgl.edge_true_edge_.Mult(permute_e_T));
-    const SparseMatrix& face_edge = face_perm_edge.GetDiag();
 
     int marker_size = std::max(permute_v.Rows(), permute_e.Rows());
     col_marker_.resize(marker_size, -1);
 
     ComputeVertexTargets(gt, M_ext_global, D_ext_global);
-
-    auto shared_sigma = CollectSigma(gt, face_edge);
-    auto shared_M = CollectM(gt, mgl.M_local_);
-    auto shared_D = CollectD(gt, mgl.D_local_);
-
-    ComputeEdgeTargets(gt, face_edge, shared_sigma, shared_M, shared_D);
-    ScaleEdgeTargets(gt, mgl.D_local_);
+    ComputeEdgeTargets(gt, mgl, face_perm_edge);
 
     BuildFaceCoarseDof(gt);
     BuildAggBubbleDof();
@@ -253,11 +246,15 @@ std::vector<std::vector<std::vector<double>>> GraphCoarsen::CollectM(const Graph
 }
 
 void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
-                                const SparseMatrix& face_edge,
-                                const Vect2D<DenseMatrix>& shared_sigma,
-                                const Vect2D<std::vector<double>>& shared_M,
-                                const Vect2D<SparseMatrix>& shared_D)
+                                const MixedMatrix& mgl,
+                                const ParMatrix& face_perm_edge)
 {
+    const SparseMatrix& face_edge = face_perm_edge.GetDiag();
+
+    auto shared_sigma = CollectSigma(gt, face_edge);
+    auto shared_M = CollectM(gt, mgl.M_local_);
+    auto shared_D = CollectD(gt, mgl.D_local_);
+
     const SparseMatrix& face_shared = gt.face_face_.GetOffd();
 
     SharedEntityComm<DenseMatrix> sec_face(gt.face_true_face_);
@@ -305,6 +302,8 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
     }
 
     sec_face.Broadcast(edge_targets_);
+
+    ScaleEdgeTargets(gt, mgl.D_local_);
 }
 
 void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local)
@@ -322,9 +321,10 @@ void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix&
         DenseMatrix& edge_traces(edge_targets_[face]);
 
         Vector one(D_transfer.Rows(), 1.0);
+        Vector oneD = D_transfer.MultAT(one);
         VectorView pv_trace = edge_traces.GetColView(0);
 
-        double oneDpv = one.Mult(D_transfer.Mult(pv_trace));
+        double oneDpv = oneD.Mult(pv_trace);
         double beta = (oneDpv < 0) ? -1.0 : 1.0;
         oneDpv *= beta;
 
@@ -335,12 +335,9 @@ void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix&
         for (int k = 1; k < num_traces; ++k)
         {
             VectorView trace = edge_traces.GetColView(k);
-            double alpha = one.Mult(D_transfer.Mult(trace));
+            double alpha = oneD.Mult(trace);
 
-            Vector scaled_pv(pv_trace);
-            scaled_pv *= alpha * beta;
-
-            trace -= scaled_pv;
+            trace.Sub(alpha * beta, pv_trace);
         }
     }
 }

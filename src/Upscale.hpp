@@ -133,34 +133,34 @@ public:
     virtual MPI_Comm GetComm() const { return comm_; }
 
     /// Set solver parameters
-    virtual void SetPrintLevel(int print_level) {}
-    virtual void SetMaxIter(int max_num_iter) {}
-    virtual void SetRelTol(double rtol) {}
-    virtual void SetAbsTol(double atol) {}
+    virtual void SetPrintLevel(int print_level);
+    virtual void SetMaxIter(int max_num_iter);
+    virtual void SetRelTol(double rtol);
+    virtual void SetAbsTol(double atol);
 
     /// Show Total Solve time on the coarse level on processor 0
-    void ShowCoarseSolveInfo(std::ostream& out = std::cout) const {}
+    void ShowCoarseSolveInfo(std::ostream& out = std::cout) const;
 
     /// Show Total Solve time on the fine level on processor 0
-    void ShowFineSolveInfo(std::ostream& out = std::cout) const {}
+    void ShowFineSolveInfo(std::ostream& out = std::cout) const;
 
-    /// Show Total setup time, negative id will show on all processors
-    void ShowSetupTime(std::ostream& out = std::cout) const {}
+    /// Show Total setup time on processor 0
+    void ShowSetupTime(std::ostream& out = std::cout) const;
 
     /// Get Total Solve time on the coarse level
-    double GetCoarseSolveTime() const {}
+    double GetCoarseSolveTime() const;
 
     /// Get Total Solve time on the fine level
-    double GetFineSolveTime() const {}
+    double GetFineSolveTime() const;
 
     /// Get Total Solve iterations on the coarse level
-    int GetCoarseSolveIters() const {}
+    int GetCoarseSolveIters() const;
 
     /// Get Total Solve iterations on the fine level
-    int GetFineSolveIters() const {}
+    int GetFineSolveIters() const;
 
     /// Get Total setup time
-    double GetSetupTime() const {}
+    double GetSetupTime() const;
 
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
@@ -173,18 +173,15 @@ public:
                     const BlockVector& fine_sol) const;
 
 protected:
-    Upscale(MPI_Comm comm, int size)
-        : Operator(size), comm_(comm), setup_time_(0.0)
-    {
-        MPI_Comm_size(comm_, &num_procs_);
-        MPI_Comm_rank(comm_, &myid_);
-    }
+    Upscale(MPI_Comm comm, int size);
 
-    void MakeCoarseVectors()
-    {
-        rhs_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
-        sol_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
-    }
+    void MakeCoarseVectors();
+
+    Vector ReadVector(const std::string& filename,
+                      const std::vector<int>& local_to_global) const;
+
+    void WriteVector(const VectorView& vect, const std::string& filename, int global_size,
+                     const std::vector<int>& local_to_global) const;
 
     std::vector<MixedMatrix> mgl_;
     GraphCoarsen coarsener_;
