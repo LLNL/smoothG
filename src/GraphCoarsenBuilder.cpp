@@ -265,6 +265,7 @@ mfem::DenseMatrix CoefficientMBuilder::RTDP(const mfem::DenseMatrix& R,
     return out;
 }
 
+/// @todo remove Pedges_noconst and const_cast when we move to MFEM 3.4
 void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
                                           const mfem::SparseMatrix& Pedges,
                                           const mfem::SparseMatrix& face_cdof)

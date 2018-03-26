@@ -75,8 +75,8 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
     mfem::Vector temp(coeff);
     for (int i = 0; i < coeff.Size(); ++i)
-        temp(i) = 1.0 / coeff(i);
-    GetFineMatrix().ScaleM(temp);
+        temp(i) = coeff(i) * weight_(i);
+    GetFineMatrix().SetMFromWeightVector(temp);
 }
 
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)

@@ -272,8 +272,7 @@ int main(int argc, char* argv[])
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
     SimpleSampler sampler(num_fine_edges, num_aggs);
 
-    const int num_samples = 2;
-    // for (int sample = num_samples-1; sample >= 0; sample--)
+    const int num_samples = 3;
     for (int sample = 0; sample < num_samples; ++sample)
     {
         if (myid == 0)
