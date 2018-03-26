@@ -55,23 +55,23 @@ public:
         const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs) = 0;
 
-    virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) = 0;
+    virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) {}
 
-    virtual void SetTraceBubbleBlock(int l, double value) = 0;
+    virtual void SetTraceBubbleBlock(int l, double value) {}
 
-    virtual void AddTraceTraceBlockDiag(double value) = 0;
+    virtual void AddTraceTraceBlockDiag(double value) {}
 
-    virtual void AddTraceTraceBlock(int l, double value) = 0;
+    virtual void AddTraceTraceBlock(int l, double value) {}
 
     /// Deal with shared dofs for Trace-Trace block
-    virtual void AddTraceAcross(int row, int col, double value) = 0;
+    virtual void AddTraceAcross(int row, int col, double value) {}
 
-    virtual void SetBubbleBubbleBlock(int l, int j, double value) = 0;
+    virtual void SetBubbleBubbleBlock(int l, int j, double value) {}
 
-    virtual void ResetEdgeCdofMarkers(int size) = 0;
+    virtual void ResetEdgeCdofMarkers(int size) {}
 
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                                     const mfem::SparseMatrix& Agg_cdof_edge) = 0;
+                                     const mfem::SparseMatrix& Agg_cdof_edge) {}
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
         const mfem::Vector& fineMdiag,
@@ -112,8 +112,6 @@ public:
     void AddTraceAcross(int row, int col, double value);
 
     void SetBubbleBubbleBlock(int l, int j, double value);
-
-    void ResetEdgeCdofMarkers(int size);
 
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
@@ -172,9 +170,6 @@ public:
 
     bool NeedsCoarseVertexDofs() { return true; }
 
-    /// @todo does DenseMatrix have a move constructor? will this do a deep copy?
-    /// @todo a better interface is probably GetElementMatrix(i) that returns
-    /// a reference to them individually
     const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return CM_el_; }
 
 private:
@@ -213,24 +208,6 @@ public:
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs);
-
-    void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
-
-    void SetTraceBubbleBlock(int l, double value);
-
-    void AddTraceTraceBlockDiag(double value);
-
-    void AddTraceTraceBlock(int l, double value);
-
-    /// Deal with shared dofs for Trace-Trace block
-    void AddTraceAcross(int row, int col, double value);
-
-    void SetBubbleBubbleBlock(int l, int j, double value);
-
-    void ResetEdgeCdofMarkers(int size);
-
-    void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                             const mfem::SparseMatrix& Agg_cdof_edge);
 
     /**
        @brief Set weights on aggregates for assembly of coarse mass matrix.

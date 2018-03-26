@@ -45,10 +45,10 @@ void MetisPart(mfem::Array<int>& partitioning,
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
-class StupidSampler
+class SimpleSampler
 {
 public:
-    StupidSampler(int fine_size, int coarse_size) :
+    SimpleSampler(int fine_size, int coarse_size) :
         fine_size_(fine_size), coarse_size_(coarse_size)
     {
         fine_.SetSize(fine_size_);
@@ -270,7 +270,7 @@ int main(int argc, char* argv[])
 
     const int num_fine_edges = vertex_edge.Width();
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
-    StupidSampler sampler(num_fine_edges, num_aggs);
+    SimpleSampler sampler(num_fine_edges, num_aggs);
 
     const int num_samples = 2;
     // for (int sample = num_samples-1; sample >= 0; sample--)
