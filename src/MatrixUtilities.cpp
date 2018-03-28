@@ -1072,7 +1072,7 @@ void InvScaleRows(const mfem::Vector& scale, mfem::SparseMatrix& mat)
     mat.ScaleRows(inv_scale);
 }
 
-void Mult(const mfem::UMFPackSolver& A_inv, const mfem::SparseMatrix& B,
+void Mult(const mfem::Operator& A_inv, const mfem::SparseMatrix& B,
           mfem::DenseMatrix& out)
 {
     mfem::DenseMatrix B_dense;

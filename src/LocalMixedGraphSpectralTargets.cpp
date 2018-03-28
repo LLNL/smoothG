@@ -781,7 +781,6 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 PV_sigma_on_face.SetSize(num_iface_edge_dof);
                 PV_sigma_on_face = 1.;
             }
-            PV_sigma_on_face = 1.;
 
             // add PV vector to other vectors and orthogonalize
             Orthogonalize(collected_sigma, PV_sigma_on_face, 0, local_edge_trace_targets[iface]);

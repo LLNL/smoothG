@@ -79,10 +79,11 @@ int main(int argc, char* argv[])
     mfem::OptionsParser args(argc, argv);
     int agg_size = 12;
     int nDimensions = 2;
+    int spe10scale = 5;
     args.AddOption(&agg_size, "-as", "--agg-size",
                    "Number of vertices in an aggregated in hybridization.");
-    args.AddOption(&nDimensions, "-d", "--dim",
-                   "Dimension of physical domain.");
+    args.AddOption(&nDimensions, "-d", "--dim", "Dimension of physical domain.");
+    args.AddOption(&spe10scale, "-sc", "--spe10-scale", "Scale of SPE10 problem.");
     args.Parse();
     if (!args.Good())
     {
@@ -99,10 +100,10 @@ int main(int argc, char* argv[])
     }
 
     mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 5;
-    coarseningFactor[1] = 5;
+    coarseningFactor[0] = 1;
+    coarseningFactor[1] = 2;
     if (nDimensions == 3)
-        coarseningFactor[2] = 5;
+        coarseningFactor[2] = 10;
 
     const int nbdr = (nDimensions == 3) ? 6 : 4;
     mfem::Array<int> ess_attr(nbdr);
@@ -112,7 +113,6 @@ int main(int argc, char* argv[])
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
-    int spe10scale = 5;
     bool metis_partition = false;
     SPE10Problem spe10problem("spe_perm.dat", nDimensions, spe10scale, 0,
                               metis_partition, coarseningFactor);
@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
         CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor, spe10scale);
 
         HybridSolver hb_solver(comm, mixed_laplacian, partitioning,
-                               &edge_boundary_att, &marker, 0, nullptr, true);
+                               &edge_boundary_att, &marker, 10, nullptr, true);
         hb_solver.SetMaxIter(4);
         hb_solver.SetPrintLevel(-1);
 
@@ -256,11 +256,12 @@ int main(int argc, char* argv[])
     /// [Solve mixed problem by generalized hybridization]
 
     /// [Check solution difference]
+    double norm = mfem::InnerProduct(comm, primal_sol, primal_sol);
     primal_sol -= mixed_sol;
     double diff = mfem::InnerProduct(comm, primal_sol, primal_sol);
     if (myid == 0)
     {
-        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff) << " \n";
+        std::cout << "|| primal_sol - mixed_sol || = " << std::sqrt(diff/norm) << " \n";
     }
     /// [Check solution difference]
 
@@ -336,7 +337,7 @@ void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
     nxyz[0] = 12 * spe10scale / num_procs_xyz[0] / coarsening_factor[0];
     nxyz[1] = 44 * spe10scale / num_procs_xyz[1] / coarsening_factor[1];
     if (nDimensions == 3)
-        nxyz[2] = 17 * num_procs_xyz[2] / coarsening_factor[2];
+        nxyz[2] = 17 * spe10scale / num_procs_xyz[2] / coarsening_factor[2];
 
     for (int& i : nxyz)
     {

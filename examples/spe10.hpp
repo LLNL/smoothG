@@ -159,6 +159,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
     h(0) = 20.0;
     h(1) = 10.0;
     h(2) = 2.0;
+
     unique_ptr<mfem::Mesh> mesh;
 
     using IPF = smoothg::InversePermeabilityFunction;

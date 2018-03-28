@@ -139,6 +139,9 @@ HybridSolver::HybridSolver(MPI_Comm comm,
         mfem::SparseMatrix face_edgedof = SparseIdentity(D_.Width());
         Agg_edgedof_.MakeRef(D_);
 
+        auto P_vert_tmp = SparseIdentity(Agg_vertexdof_.Width());
+        P_vert_.Swap(P_vert_tmp);
+
         std::vector<mfem::Vector> M_el;
         BuildFineLevelLocalMassMatrix(Agg_edgedof_, mgL.getWeight(), M_el);
         Init(face_edgedof, M_el, mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
@@ -220,10 +223,11 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
     auto Agg_edgedof_tmp = smoothg::Mult(Agg_vertexdof_, vertex_edge);
     Agg_edgedof_.Swap(Agg_edgedof_tmp);
 
+    auto P_vert_tmp = SparseIdentity(Agg_vertexdof_.Width());
+    P_vert_.Swap(P_vert_tmp);
+
     if (approx)
     {
-        auto Agg_cvertexdof = SparseIdentity(Agg_vertexdof_.Width());
-        P_vert_.Swap(Agg_cvertexdof);
         //        P_vert_.Swap(Agg_vertexdof_);
         //        auto Agg_cvertexdof = SparseIdentity(P_vert_.Height());
         //        Agg_vertexdof_.Swap(Agg_cvertexdof);
@@ -277,11 +281,15 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
     {
         edge_d_td = make_unique<mfem::HypreParMatrix>();
         edge_d_td->MakeRef(mgL.get_edge_d_td());
-
-        mfem::SparseMatrix face_bdrattr_tmp(*face_bdrattr);
-        actual_face_bdrattr.Swap(face_bdrattr_tmp);
-
-        actual_ess_edge_dofs.MakeRef(*ess_edge_dofs);
+        if (face_bdrattr)
+        {
+            mfem::SparseMatrix face_bdrattr_tmp(*face_bdrattr);
+            actual_face_bdrattr.Swap(face_bdrattr_tmp);
+        }
+        if (ess_edge_dofs)
+        {
+            actual_ess_edge_dofs.MakeRef(*ess_edge_dofs);
+        }
     }
 
     std::vector<mfem::Vector> M_el;
@@ -291,9 +299,6 @@ void HybridSolver::CoarseInit(const mfem::Array<int>& partitioning,
         CoarsenElementMatrices(M_el, Agg_edgedof_, Agg_cedgedof, P_e_T);
         Agg_edgedof_.Swap(Agg_cedgedof);
     }
-
-    Rhs_c_.SetSize(P_vert_.Height());
-    Sol_c_.SetSize(P_vert_.Height());
 
     Init(face_edgedof, M_el, *edge_d_td, &actual_face_bdrattr, &actual_ess_edge_dofs);
 }
@@ -323,6 +328,9 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     chrono.Clear();
     chrono.Start();
 
+    Rhs_c_.SetSize(P_vert_.Height());
+    Sol_c_.SetSize(P_vert_.Height());
+
     nAggs_ = Agg_edgedof_.Height();
     num_edge_dofs_ = Agg_edgedof_.Width();
 
@@ -339,7 +347,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
 
     mfem::SparseMatrix edgedof_bdrattr;
-    if (face_bdrattr)
+    if (face_bdrattr && face_bdrattr->Width() > 0)
     {
         if (fine_level)
         {
@@ -431,7 +439,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
     ess_multiplier_bc_ = false;
-    if (face_bdrattr && ess_edge_dofs)
+    if (face_bdrattr && face_bdrattr->Width() > 0 && ess_edge_dofs && ess_edge_dofs->Size() > 0)
     {
         ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
         for (int i = 0; i < num_multiplier_dofs_; i++)
@@ -763,7 +771,12 @@ void HybridSolver::AssembleHybridSystem(
         }
 
         // Compute the LU factorization of Aloc
-        mfem::UMFPackSolver* Ainv_i = new mfem::UMFPackSolver(*Aloc);
+//        mfem::UMFPackSolver* Ainv_i = new mfem::UMFPackSolver(*Aloc);
+        mfem::DenseMatrix Aloc_dense;
+        Full(*Aloc, Aloc_dense);
+        mfem::DenseMatrixInverse Ainv_op(Aloc_dense);
+        mfem::DenseMatrix* Ainv_i = new mfem::DenseMatrix;
+        Ainv_op.GetInverseMatrix(*Ainv_i);
 
         // Compute DMinvCT = Dloc * MinvCT
         mfem::SparseMatrix DMinvCT_i = smoothg::Mult(Dloc, *MinvCT_i);
@@ -798,7 +811,8 @@ void HybridSolver::AssembleHybridSystem(
         MinvCT_[iAgg].reset(MinvCT_i);
         MinvDT_[iAgg].reset(MinvDT_i);
         Ainv_[iAgg].reset(Ainv_i);
-        A_[iAgg].reset(Aloc);
+        delete Aloc;
+//        A_[iAgg].reset(Aloc);
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
@@ -925,11 +939,9 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
 void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                            mfem::Vector& RecoveredSol_block2) const
 {
-    // Recover the solution of the original system from multiplier mu, i.e.,
-    // [u;p] = [f;g] - [M B^T;B 0]^-1[C 0]^T * mu
+    // Recover the solution of the primal system from multiplier mu, i.e.,
+    // u = (B M^{-1} B^T)^{-1} (f - D M^{-1} C^T mu)
     // This procedure is done locally in each element
-
-    RecoveredSol_block2 = 0.;
 
     mfem::Vector mu_loc;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
