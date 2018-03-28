@@ -44,7 +44,7 @@ class HybridPrec : public mfem::Solver
 {
     public:
         HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& vertex_edge, const Vector& weight,
-                   const Array<int>& part);
+                   const Array<int>& part, int smooth_steps = 1, int target_size = 0);
 
         void Mult(const mfem::Vector& input, mfem::Vector& output) const;
     private:
@@ -72,8 +72,8 @@ class HybridPrec : public mfem::Solver
 };
 
 HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& vertex_edge, const Vector& weight,
-                       const Array<int>& part)
-    : gL_(gL), smoother_(gL_, 6 /* 6 = GS */, 2 /* steps */)
+                       const Array<int>& part, int smooth_steps, int target_size)
+    : gL_(gL), smoother_(gL_, 6 /* 6 = GS */, smooth_steps)
 {
     iterative_mode = true;
     smoother_.iterative_mode = true;
@@ -108,6 +108,8 @@ HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& ve
     mfem::Array<int> vertices;
     int counter = 0;
 
+    int has_empty = 0;
+
     // UNMARKS ALL!
     //vertex_marker = 0;
 
@@ -117,15 +119,20 @@ HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& ve
 
         GetTableRow(agg_vertex, i, vertices);
 
+        int num_bndr = 0;
+
 
         for (auto vertex : vertices)
         {
             if (vertex_marker[vertex] > 0) // Boundary Vertex
             {
+                num_bndr++;
+
                 if (boundary < 0)
                 {
                     boundary = counter;
                     counter++;
+
                 }
 
                 P_vertex.Add(vertex, boundary, 1.0);
@@ -138,7 +145,15 @@ HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& ve
                 counter++;
             }
         }
+
+        if (num_bndr == vertices.Size())
+        {
+            has_empty++;
+        }
     }
+
+    if (myid_ == 0 && has_empty)
+        printf("Empty Interior! %d / %d\n", has_empty, num_aggs);
 
     P_vertex.SetWidth(counter);
     P_vertex.Finalize();
@@ -155,6 +170,9 @@ HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& ve
     {
         printf("A: %d\n", A.Height());
         printf("A_c: %d\n", A_c.Height());
+        //Print(smoothg::Transpose(agg_vertex), "vertex_agg:");
+        //printf("Marker: \n");
+        //vertex_marker.Print(std::cout, 100);
         //Print(A, "Af:");
         //Print(A_c, "AC:");
         //Print(cdof_agg, "AC aggs:");
@@ -171,6 +189,21 @@ HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& ve
     SparseMatrix ve_c;
     Vector weight_c;
     Split(A_c, ve_c, weight_c);
+
+    int negative_count = 0;
+
+    for (int i = 0; i < weight_c.Size(); ++i)
+    {
+        if (weight_c[i] < 0)
+        {
+            negative_count++;
+        }
+    }
+
+    if (myid_ == 0)
+    {
+        printf("Coarse Negative Weights: %d / %d\n", negative_count, weight_c.Size());
+    }
 
     mfem::Array<int> part_c(cdof_agg.GetJ(), cdof_agg.Height());
 
@@ -195,7 +228,18 @@ HybridPrec::HybridPrec(MPI_Comm comm, HypreParMatrix& gL, const SparseMatrix& ve
 
     mgl_ = make_unique<MixedMatrix>(vertex_edge_local, local_weight, edge_trueedge);
     topo_ = make_unique<GraphTopology>(vertex_edge_local, edge_trueedge, local_part);
-    solver_ = make_unique<HybridSolver>(comm, *mgl_, *topo_);
+
+    int num_procs;
+    MPI_Comm_size(comm, &num_procs);
+
+    if (num_parts > num_procs)
+    {
+        solver_ = make_unique<HybridSolver>(comm, *mgl_, *topo_, nullptr, nullptr, -target_size);
+    }
+    else
+    {
+        solver_ = make_unique<HybridSolver>(comm, *mgl_, 1, nullptr, nullptr, -target_size, nullptr);
+    }
 
     tmp_fine_.SetSize(P_vertex_.Height());
 
@@ -274,12 +318,14 @@ SparseMatrix GraphLaplacian(const SparseMatrix& vertex_edge, const Vector& weigh
 
     for (int i = 0; i < DT.Height(); ++i)
     {
-        assert(DT.RowSize(i) == 2);
+        assert(DT.RowSize(i) == 2 || DT.RowSize(i) == 1);
 
         int start = DT.GetI()[i];
 
         DT.GetData()[start] = 1.0;
-        DT.GetData()[start + 1] = -1.0;
+
+        if (DT.RowSize(i) > 1)
+            DT.GetData()[start + 1] = -1.0;
     }
 
     SparseMatrix D = smoothg::Transpose(DT);

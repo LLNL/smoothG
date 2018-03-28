@@ -354,7 +354,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
                               comm_, multiplier_start_.Last(), multiplier_start_,
                               HybridSystemElim_.get());
 
-    if (rescale_iter_ == 0 || use_spectralAMGe_)
+    if (rescale_iter_ <= 0 || use_spectralAMGe_)
     {
         pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
     }
@@ -381,24 +381,329 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     solver_->SetPrintLevel(0);
     solver_->SetMaxIter(max_num_iter_);
     solver_->SetRelTol(rtol_);
+    //solver_->SetRelTol(1e-10);
     solver_->SetAbsTol(atol_);
-    solver_->SetOperator(*pHybridSystem_);
+    //solver_->SetOperator(*pHybridSystem_);
     solver_->iterative_mode = false;
 
-    const bool use_prec = true;
+    coarse_proc_ = false;
+    coarse_comm_ = comm_;
+
+    int target_size = -1 * rescale_iter_;
+    int current_size = pHybridSystem_->Width();
+    int cf = 0;
+
+    int num_fprocs;
+    MPI_Comm_size(comm_, &num_fprocs);
+
+    int avg_size = pHybridSystem_->M() / num_fprocs;
+
+    if (myid_ == 0)
+    {
+        assert(pHybridSystem_->Width() > 0);
+
+        //cf = target_size / pHybridSystem_->Width();
+        cf = target_size / avg_size;
+    }
+
+    MPI_Bcast(&cf, 1, MPI_INT, 0, comm_);
+
+    if (myid_ == 0)
+    {
+        printf("Target Size: %d, Global Size: %d current_size: %d avg_size: %d CF: %d\n",
+                target_size, pHybridSystem_->M(), current_size, avg_size, cf);
+    }
+
+    //cf = 8;
+    //cf = 0;
+
+    //if (coarse_proc_)
+    if (cf > 1)
+    {
+        coarse_proc_ = true;
+
+        //int cf = 32; 
+        int cols = pHybridSystem_->Width();
+        int my_cols = 0; 
+
+        ///*
+        //printf("%d Cols: %d\n", myid_, cols);
+        mfem::SparseMatrix proc_dof_diag(1, cols);
+        for (int i = 0; i < cols; ++i)
+        {
+            proc_dof_diag.Add(0, i, 1.0);
+        }
+
+        proc_dof_diag.Finalize();
+
+        mfem::Array<int> proc_dof_starts;
+        GenerateOffsets(comm_, 1, proc_dof_starts);
+
+        mfem::HypreParMatrix proc_dof_d(comm_, num_fprocs, pHybridSystem_->M(),
+                                         proc_dof_starts, pHybridSystem_->GetColStarts(),
+                                         &proc_dof_diag);
+        auto dof_proc_d = proc_dof_d.Transpose();
+
+        auto tmp = ParMult(&proc_dof_d, pHybridSystem_.get());
+        auto proc_proc = ParMult(tmp, dof_proc_d);
+        //Print(proc_dof_diag, "Proc");
+        //proc_proc->Print("proc");
+
+        ///*
+        int ident_size = 1;
+        mfem::SparseMatrix ident_0_diag = (myid_ == 0) ? SparseIdentity(ident_size) : mfem::SparseMatrix(ident_size, 0);
+        mfem::SparseMatrix ident_0_offd = (myid_ == 0) ? mfem::SparseMatrix(ident_size, 0) : SparseIdentity(ident_size);
+        std::vector<int> ident_colmap = {myid_};
+        //std::iota(std::begin(ident_colmap), std::end(ident_colmap), pHybridSystem_->GetRowStarts()[0]);
+
+        ident_0_diag.Finalize();
+        ident_0_offd.Finalize();
+
+        mfem::Array<int> ident_0_starts(3);
+        ident_0_starts[0] = (myid_ == 0) ? 0 : num_fprocs;
+        ident_0_starts[1] = num_fprocs;
+        ident_0_starts[2] = num_fprocs;
+
+        //Print(ident_0_diag, "Diag:");
+        //Print(ident_0_offd, "Offd:");
+        //ident_0_starts.Print(std::cout, 100);
+
+        for (auto i : ident_colmap)
+        {
+            //printf("%d colmap: %d\n", myid_, i);
+        }
+        
+
+        mfem::HypreParMatrix ident_d(comm_, num_fprocs, num_fprocs,
+                proc_dof_starts, ident_0_starts, &ident_0_diag, &ident_0_offd,
+                                     ident_colmap.data());
+        //ident_d.Print("Ident");
+
+        //auto proc_proc = ParMult(&proc_edge_d, edge_proc_d);
+        auto proc_proc_0 = smoothg::RAP(*proc_proc, ident_d);
+        (*proc_proc_0) = 1.0;
+
+        
+        ///*
+        mfem::Array<int> proc_part(num_fprocs);
+        if (myid_ == 0)
+        {
+            mfem::SparseMatrix diag;
+            proc_proc_0->GetDiag(diag);
+
+            //Print(diag, "proc proc");
+
+            assert(diag.Height() == num_fprocs);
+
+
+            int num_parts = std::max(1, num_fprocs / cf);
+            double ubal = 2.0000;
+            //Partition(diag, proc_part, num_parts, false, ubal);
+            MetisGraphPartitioner pt;
+            pt.setOption(METIS_OPTION_CONTIG, 0);
+            pt.doPartition(diag, num_parts, proc_part, false);
+
+            //printf("Proc Parts:\n");
+            //proc_part.Print(std::cout, 100);
+
+            /*
+            proc_part[0] = 0;
+            proc_part[1] = 0;
+            proc_part[2] = 1;
+            proc_part[3] = 1;
+            */
+
+            //assert(proc_part.Max() + 1 == num_fprocs);
+        }
+
+        MPI_Bcast(proc_part.GetData(), num_fprocs, MPI_INT, 0, comm_);
+            //printf("%d Proc part: ", myid_);
+            //proc_part.Print(std::cout, 100);
+
+
+
+        ///*
+        std::vector<int> proc_partition(num_fprocs);
+
+        for (int i = 0; i < num_fprocs; ++i)
+        {
+            proc_partition[i] = (i / cf) * cf;
+        }
+        //*/
+
+        //int proc = (myid_ / cf) * cf;
+        //int proc = proc_partition[myid_];
+        int proc = proc_part[myid_];
+
+        MPI_Comm subcomm;
+        {    
+            int color = proc;
+            int key = myid_;
+            MPI_Comm_split(comm_, color, key, &subcomm);
+        }    
+
+        int mysubid;
+        MPI_Comm_rank(subcomm, &mysubid);
+
+        int sub_master = (mysubid == 0);
+        {    
+            //int color = proc == myid_ ? 0 : 1; 
+            int color = sub_master;
+            int key = myid_;
+            MPI_Comm_split(comm_, color, key, &coarse_comm_);
+        }    
+
+        int mycid;
+        int num_cprocs;
+
+        MPI_Comm_rank(coarse_comm_, &mycid);
+        MPI_Comm_size(coarse_comm_, &num_cprocs);
+
+        bool coarse_master = (proc == myid_);
+
+        /*
+        if (coarse_master)
+        {    
+            int test_gather = 10;
+            int test_gather2 = 0; 
+            MPI_Reduce(&test_gather, &test_gather2, 1, MPI_INT, MPI_SUM, 0, coarse_comm_);
+
+            printf("Test Comm: %d %d %d : %d\n", myid_, mysubid, mycid, test_gather2);
+        }    
+        */
+
+        MPI_Reduce(&cols, &my_cols, 1, MPI_INT, MPI_SUM, 0, subcomm);
+
+        mfem::Array<HYPRE_Int> proc_starts(3);
+        GenerateOffsets(comm_, my_cols, proc_starts);
+
+        proc_starts_.resize(3);
+        std::copy(std::begin(proc_starts), std::end(proc_starts), std::begin(proc_starts_));
+
+        //mfem::SparseMatrix proc_diag = (mysubid == 0) ? SparseIdentity(my_cols) : mfem::SparseMatrix(my_rows, 0);
+
+        //int offd_cols = (mysubid == 0) ? 0 : my_rows;
+
+        //mfem::SparseMatrix proc_offd = (mysubid == 0) ? mfem::SparseMatrix(my_rows, 0) : SparseIdentity(offd_cols);
+        int global_size = pHybridSystem_->N();
+        int* A_starts = pHybridSystem_->GetRowStarts();
+        int my_rows = A_starts[1] - A_starts[0];
+
+        mfem::SparseMatrix proc_diag = sub_master ? SparseIdentity(my_rows) : mfem::SparseMatrix(my_rows, 0);
+        mfem::SparseMatrix proc_offd = sub_master ? mfem::SparseMatrix(my_rows, 0) : SparseIdentity(my_rows);
+        proc_diag.Finalize();
+        proc_offd.Finalize();
+
+        proc_diag_.Swap(proc_diag);
+        proc_offd_.Swap(proc_offd);
+
+        col_map_.resize((mysubid == 0) ? 0 : my_rows);
+        ///*
+        int proc_col_start = proc_starts[0];
+        MPI_Bcast(&proc_col_start, 1, MPI_INT, 0, subcomm);
+
+        mfem::Array<HYPRE_Int> sub_starts(3);
+        GenerateOffsets(subcomm, my_rows, sub_starts);
+
+        std::iota(std::begin(col_map_), std::end(col_map_), proc_col_start + sub_starts[0]);
+        //*/
+        //std::iota(std::begin(col_map_), std::end(col_map_), A_starts[0]);
+
+        proc_c_ = make_unique<mfem::HypreParMatrix>(comm_, global_size, global_size,
+                A_starts, proc_starts_.data(), &proc_diag_, &proc_offd_, col_map_.data());
+        proc_c_->CopyRowStarts();
+        proc_c_->CopyColStarts();
+
+        pHybridSystem_c_ = unique_ptr<mfem::HypreParMatrix>(smoothg::RAP(*pHybridSystem_, *proc_c_));
+
+
+        mfem::SparseMatrix diag, offd;
+        int* col_map;
+        pHybridSystem_c_->GetDiag(diag);
+
+        pHybridSystem_c_->GetOffd(offd, col_map);
+
+        mfem::Array<HYPRE_Int> coarse_starts(3);
+        GenerateOffsets(coarse_comm_, diag.Height(), coarse_starts);
+
+        if (offd.Height() == 0)
+        {    
+            offd.SetWidth(0);
+        }    
+
+        pHybridSystem_c_2_ = make_unique<mfem::HypreParMatrix>(coarse_comm_, coarse_starts.Last(), coarse_starts.Last(),
+                coarse_starts, coarse_starts, &diag, &offd, col_map);
+        pHybridSystem_c_2_->CopyColStarts();
+        pHybridSystem_c_2_->CopyRowStarts();
+
+        //solver_ = make_unique<mfem::CGSolver>(coarse_comm_);
+        solver_ = make_unique<mfem::GMRESSolver>(coarse_comm_);
+        solver_->SetPrintLevel(print_level_);
+        solver_->SetMaxIter(max_num_iter_);
+        solver_->SetRelTol(rtol_);
+        solver_->SetAbsTol(atol_);
+        solver_->iterative_mode = false;
+
+        solver_->SetOperator(*pHybridSystem_c_2_);
+
+        coarse_Hrhs_.SetSize(pHybridSystem_c_->Height());
+        coarse_Mu_.SetSize(pHybridSystem_c_->Height());
+
+        if (myid_ == 0)
+        {
+            printf("Reduces processors: %d -> %d\n", num_fprocs, num_cprocs);
+            printf("Increased Size: %d -> %d\n", pHybridSystem_->Height(), pHybridSystem_c_2_->Height());
+        }
+    }
+    else
+    {
+        if (myid_ == 0)
+        {
+            printf("Un coarsedn Procs\n");
+        }
+        solver_->SetOperator(*pHybridSystem_);
+    }
+
+    // HypreBoomerAMG is broken if local size is zero
+    int local_size = pHybridSystem_->Height();
+    int min_size;
+    MPI_Allreduce(&local_size, &min_size, 1, MPI_INT, MPI_MIN, comm_);
+
+    const bool use_prec = min_size > 0;
     if (use_prec)
     {
         if (use_spectralAMGe_)
         {
             BuildSpectralAMGePreconditioner();
         }
-        else
+        else if (!coarse_proc_)
         {
             prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
-            static_cast<mfem::HypreBoomerAMG*>(prec_.get())->SetPrintLevel(1);
+            ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(1);
+        }
+        else
+        {
+            //prec_ = make_unique<mfem::HypreDiagScale>(*pHybridSystem_c_2_);
+            prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_c_2_);
+                ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(0);
+
+            /*
+            if (myid_ == 0)
+            {
+                ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(1);
+            }
+            else
+            {
+                ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(0);
+
+            }
+            */
         }
 
-        solver_->SetPreconditioner(*prec_);
+        //if (!coarse_proc_)
+        {
+            solver_->SetPreconditioner(*prec_);
+        }
     }
 
     trueHrhs_.SetSize(multiplier_d_td_->GetNumCols());
@@ -732,10 +1037,20 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     chrono.Clear();
     chrono.Start();
 
-    solver_->Mult(trueHrhs_, trueMu_);
+    if (coarse_proc_)
+    {
+        proc_c_->MultTranspose(trueHrhs_, coarse_Hrhs_);
+        solver_->Mult(coarse_Hrhs_, coarse_Mu_);
+        proc_c_->Mult(coarse_Mu_, trueMu_);
+    }
+    else
+    {
+        solver_->Mult(trueHrhs_, trueMu_);
+    }
 
     chrono.Stop();
     timing_ += chrono.RealTime();
+
 
     if (myid_ == 0 && print_level_ > 0)
     {

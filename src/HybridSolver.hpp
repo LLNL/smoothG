@@ -262,7 +262,24 @@ private:
 
     std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
     std::unique_ptr<mfem::SparseMatrix> HybridSystemElim_;
+
     std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_;
+    std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_c_;
+    std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_c_2_;
+
+    MPI_Comm subcomm_;
+    MPI_Comm coarse_comm_;
+    bool coarse_proc_;
+    mfem::SparseMatrix P_; 
+    std::unique_ptr<mfem::HypreParMatrix> proc_c_;
+    mutable mfem::Vector coarse_Hrhs_;
+    mutable mfem::Vector coarse_Mu_;
+    std::vector<HYPRE_Int> col_map_;
+    std::vector<HYPRE_Int> proc_starts_;
+    mfem::SparseMatrix proc_diag_;
+    mfem::SparseMatrix proc_offd_;
+
+
     std::unique_ptr<mfem::Solver> prec_;
     std::unique_ptr<mfem::IterativeSolver> solver_;
 

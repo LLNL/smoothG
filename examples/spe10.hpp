@@ -108,7 +108,7 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 class SPE10Problem
 {
 public:
-    SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
+    SPE10Problem(MPI_Comm comm, const char* permFile, int nDimensions, int spe10_scale,
                  int slice, bool metis_partition,
                  const mfem::Array<int>& coarsening_factor);
     ~SPE10Problem();
@@ -140,12 +140,11 @@ private:
     std::vector<int> num_procs_xyz_;
 };
 
-SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
+SPE10Problem::SPE10Problem(MPI_Comm comm, const char* permFile, int nDimensions,
                            int spe10_scale, int slice,  bool metis_partition,
                            const mfem::Array<int>& coarsening_factor)
 {
     int num_procs, myid;
-    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 

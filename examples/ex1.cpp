@@ -36,8 +36,15 @@ using std::make_shared;
 using namespace smoothg;
 using namespace mfem;
 
+// Metis Partition given number of total parts
 void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts);
+// Metis Partition given coarsening factor
 void MetisPartCF(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int coarse_factor);
+
+// Partition elem_elem using mesh info
+void MeshPart(MPI_Comm comm, mfem::Mesh& mesh, mfem::FiniteElementSpace& fespace, int agg_size,
+              mfem::Array<int>& global_partitioning);
+
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
@@ -57,9 +64,12 @@ int main(int argc, char* argv[])
     int agg_size = 12;
     args.AddOption(&agg_size, "-as", "--agg-size",
             "Number of vertices in an aggregated in hybridization.");
-    int parts_per_proc = 2;
-    args.AddOption(&parts_per_proc, "-ppc", "--parts-per-proc",
-            "Parts per processor to partition hybrid solver.");
+    int smooth_steps = -1;
+    args.AddOption(&smooth_steps, "-ss", "--smooth-steps",
+            "Smooth steps for hybrid preconditioenr");
+    bool metis_agglomeration = false;
+    args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration", "-no-ma",
+            "--no-metis-agglomeration", "Enable METIS agglomeration.");
 
 
     // MFEM Options
@@ -70,9 +80,12 @@ int main(int argc, char* argv[])
     args.AddOption(&order, "-o", "--order",
             "Finite element order (polynomial degree) or -1 for"
             " isoparametric space.");
-    int ref_levels = 1;
+    int ref_levels = 0;
     args.AddOption(&ref_levels, "-nr", "--num-refine",
             "Number of times to refine mesh.");
+    int target_size = 0;
+    args.AddOption(&target_size, "-ts", "--target-size",
+            "Target Size per processor");
     bool static_cond = false;
     args.AddOption(&static_cond, "-sc", "--static-condensation", "-no-sc",
             "--no-static-condensation", "Enable static condensation.");
@@ -96,7 +109,9 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    Mesh* mesh = new Mesh(mesh_file, 1, 1);
+    bool gen_edges = true;
+    int refine = 1;
+    Mesh* mesh = new Mesh(mesh_file, gen_edges, refine);
     int dim = mesh->Dimension();
 
     for (int l = 0; l < ref_levels; l++)
@@ -171,9 +186,29 @@ int main(int argc, char* argv[])
 
     /// [Set up parallel graph and Laplacian]
     mfem::Array<int> global_partitioning;
-    //MetisPart(vertex_edge_global, global_partitioning, num_procs * parts_per_proc);
-    MetisPartCF(vertex_edge_global, global_partitioning, agg_size);
-    assert(global_partitioning.Max() + 1 >= num_procs);
+
+    if (!metis_agglomeration)
+    {
+        MeshPart(comm, *mesh, *fespace, agg_size, global_partitioning);
+    }
+    else
+    {
+        //MetisPart(vertex_edge_global, global_partitioning, num_procs * parts_per_proc);
+        MetisPartCF(vertex_edge_global, global_partitioning, agg_size);
+
+    }
+
+    if (myid == 0)
+        global_partitioning.Print(std::cout, 50);
+
+    if (global_partitioning.Max() + 1 < num_procs)
+    {
+        if (myid == 0)
+        {
+            printf("Invalid partition!%d %d\n", global_partitioning.Max() + 1, num_procs);
+        }
+        return 1;
+    }
 
     smoothg::ParGraph pgraph(comm, vertex_edge_global, global_partitioning);
     auto& vertex_edge = pgraph.GetLocalVertexToEdge();
@@ -181,6 +216,9 @@ int main(int argc, char* argv[])
 
     mfem::Vector local_weight(vertex_edge.Width());
     weight.GetSubVector(pgraph.GetEdgeLocalToGlobalMap(), local_weight);
+
+    assert(vertex_edge.Height() > 0);
+
 
     MixedMatrix mixed_laplacian(vertex_edge, local_weight, edge_trueedge);
     unique_ptr<mfem::HypreParMatrix> gL = GraphLaplacian(mixed_laplacian);
@@ -207,104 +245,46 @@ int main(int argc, char* argv[])
 
     /// [Solve mixed problem by generalized hybridization]
     /*
-       mfem::BlockVector mixed_sol(fine_rhs);
-       {
-       if (myid == 0)
-       {
-       std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
-       }
-
-       chrono.Clear();
-       chrono.Start();
-    //HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
-    HybridSolver hb_solver(comm, mixed_laplacian, 1);
-    if (myid == 0)
+    mfem::BlockVector mixed_sol(fine_rhs);
     {
-    std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
-    std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
-    std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
-    }
+        if (myid == 0)
+        {
+            std::cout << "\nSolving mixed problem by generalized hybridization ...\n";
+        }
 
-    hb_solver.SetPrintLevel(0);
-    hb_solver.SetMaxIter(5000);
-    hb_solver.SetRelTol(1e-12);
-    hb_solver.SetAbsTol(1e-12);
+        chrono.Clear();
+        chrono.Start();
+        //HybridSolver hb_solver(comm, mixed_laplacian, agg_size);
+        HybridSolver hb_solver(comm, mixed_laplacian, 1);
+        if (myid == 0)
+        {
+            std::cout << "System size: " << hb_solver.GetHybridSystemSize() <<"\n";
+            std::cout << "System NNZ: " << hb_solver.GetNNZ() <<"\n";
+            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+        }
 
-    if (myid == 0)
-    {
-    fine_rhs.GetBlock(1)[0] += B.Sum();
-    }
+        hb_solver.SetPrintLevel(0);
+        hb_solver.SetMaxIter(5000);
+        hb_solver.SetRelTol(1e-9);
+        hb_solver.SetAbsTol(1e-12);
 
-    chrono.Clear();
-    chrono.Start();
-    mixed_sol = 0.0;
-    hb_solver.Solve(fine_rhs, mixed_sol);
-    par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
-    if (myid == 0)
-    {
-    std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
-    std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
-    }
+        chrono.Clear();
+        chrono.Start();
+        mixed_sol = 0.0;
+        hb_solver.Solve(fine_rhs, mixed_sol);
+        par_orthogonalize_from_constant(mixed_sol.GetBlock(1), vertex_edge_global.Height());
+        if (myid == 0)
+        {
+            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "Number of iterations: " << hb_solver.GetNumIterations() <<"\n\n";
+        }
     }
     */
     /// [Solve mixed problem by generalized hybridization]
 
-    /// [Solve mixed problem by hybridization preconditioner]
-    mfem::Vector hybrid_prec_sol(rhs_u_fine);
-    {
-        if (myid == 0)
-        {
-            std::cout << "\nSolving mixed problem by hybridization preconditioner ...\n";
-        }
-
-        chrono.Clear();
-        chrono.Start();
-        mfem::CGSolver cg(comm);
-        HybridPrec prec(comm, *gL_hybrid, vertex_edge_global, weight, global_partitioning);
-
-
-        cg.SetPrintLevel(0);
-        cg.SetMaxIter(5000);
-        cg.SetRelTol(1e-9);
-        cg.SetAbsTol(1e-12);
-        cg.iterative_mode = false;
-
-        mfem::Array<int> ess_dof;
-        if (myid == 0)
-        {
-            ess_dof.Append(0);
-        }
-
-        auto raw_memory = gL_hybrid->EliminateRowsCols(ess_dof);
-        delete raw_memory;
-
-        cg.SetPreconditioner(prec);
-        cg.SetOperator(*gL_hybrid);
-
-
-        if (myid == 0)
-        {
-            std::cout << "System size: " << gL_hybrid->N() <<"\n";
-            std::cout << "System NNZ: " << gL_hybrid->NNZ() <<"\n";
-            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
-            printf("Num Parts: %d\n", global_partitioning.Max() + 1);
-        }
-
-        chrono.Clear();
-        chrono.Start();
-
-        hybrid_prec_sol = 0.0;
-        cg.Mult(rhs_u_fine, hybrid_prec_sol);
-        par_orthogonalize_from_constant(hybrid_prec_sol, vertex_edge_global.Height());
-        if (myid == 0)
-        {
-            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
-            std::cout << "Number of iterations: " << cg.GetNumIterations() <<"\n";
-        }
-    }
-    /// [Solve mixed problem by hybridization preconditioner]
-
     /// [Solve primal problem by CG + BoomerAMG]
+    MPI_Barrier(comm);
+
     mfem::Vector primal_sol(rhs_u_fine);
     {
         if (myid == 0)
@@ -317,7 +297,7 @@ int main(int argc, char* argv[])
         mfem::CGSolver cg(comm);
         cg.SetPrintLevel(0);
         cg.SetMaxIter(5000);
-        cg.SetRelTol(1e-12);
+        cg.SetRelTol(1e-9);
         cg.SetAbsTol(1e-12);
         cg.SetOperator(*gL);
 
@@ -342,12 +322,16 @@ int main(int argc, char* argv[])
             std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
         }
 
+        chrono.Stop();
         chrono.Clear();
         chrono.Start();
 
         primal_sol = 0.0;
         cg.Mult(rhs_u_fine, primal_sol);
         par_orthogonalize_from_constant(primal_sol, vertex_edge_global.Height());
+
+        chrono.Stop();
+
         if (myid == 0)
         {
             std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
@@ -355,6 +339,75 @@ int main(int argc, char* argv[])
         }
     }
     /// [Solve primal problem by CG + BoomerAMG]
+
+
+    MPI_Barrier(comm);
+
+    /// [Solve mixed problem by hybridization preconditioner]
+    mfem::Vector hybrid_prec_sol(rhs_u_fine);
+    {
+        if (myid == 0)
+        {
+            std::cout << "\nSolving mixed problem by hybridization preconditioner ...\n";
+        }
+
+        chrono.Clear();
+        chrono.Start();
+        mfem::CGSolver cg(comm);
+
+        if (smooth_steps <= 0)
+        {
+            smooth_steps = std::min(4, std::max(1, agg_size / 20));
+        }
+
+        HybridPrec prec(comm, *gL_hybrid, vertex_edge_global, weight,
+                        global_partitioning, smooth_steps, target_size);
+
+
+        cg.SetPrintLevel(1);
+        cg.SetMaxIter(5000);
+        cg.SetRelTol(1e-9);
+        cg.SetAbsTol(1e-4);
+        cg.iterative_mode = false;
+
+        mfem::Array<int> ess_dof;
+        if (myid == 0)
+        {
+            ess_dof.Append(0);
+        }
+
+        auto raw_memory = gL_hybrid->EliminateRowsCols(ess_dof);
+        delete raw_memory;
+
+        cg.SetPreconditioner(prec);
+        cg.SetOperator(*gL_hybrid);
+
+
+        if (myid == 0)
+        {
+            std::cout << "System size: " << gL_hybrid->N() <<"\n";
+            std::cout << "System NNZ: " << gL_hybrid->NNZ() <<"\n";
+            std::cout << "Setup time: " << chrono.RealTime() <<"s. \n";
+            printf("Num Parts: %d\n", global_partitioning.Max() + 1);
+        }
+
+        chrono.Stop();
+        chrono.Clear();
+        chrono.Start();
+
+        hybrid_prec_sol = 0.0;
+        cg.Mult(rhs_u_fine, hybrid_prec_sol);
+        par_orthogonalize_from_constant(hybrid_prec_sol, vertex_edge_global.Height());
+
+        chrono.Stop();
+
+        if (myid == 0)
+        {
+            std::cout << "Solve time: " << chrono.RealTime() <<"s. \n";
+            std::cout << "Number of iterations: " << cg.GetNumIterations() <<"\n";
+        }
+    }
+    /// [Solve mixed problem by hybridization preconditioner]
 
     /// [Check solution difference]
 
@@ -367,15 +420,23 @@ int main(int argc, char* argv[])
     }
 
     /*
-       diff = primal_sol;
-       diff -= mixed_sol.GetBlock(1);
-       error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
-       if (myid == 0)
-       {
-       std::cout << "|| primal_sol - mixed_sol || = " << error <<" \n";
-       }
-       */
+    diff = primal_sol;
+    diff -= mixed_sol.GetBlock(1);
+    error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(primal_sol, 2, comm);
+    if (myid == 0)
+    {
+        std::cout << "|| primal_sol - mixed_sol || = " << error <<" \n";
+    }
+    */
     /// [Check solution difference]
+   if (visualization && myid == 0)
+   {
+      char vishost[] = "localhost";
+      int  visport   = 19916;
+      socketstream sol_sock(vishost, visport);
+      sol_sock.precision(8);
+      sol_sock << "solution\n" << *mesh << std::flush;
+   }
 
     MPI_Finalize();
 
@@ -391,6 +452,13 @@ int main(int argc, char* argv[])
 
 void MetisPartCF(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int coarse_factor)
 {
+    if (coarse_factor == 0)
+    {
+        part.SetSize(vertex_edge.Height());
+        part = 0;
+        return;
+    }
+
     smoothg::MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(1.001);
     mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
@@ -412,6 +480,60 @@ void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, in
     partitioner.doPartition(vertex_vertex, total_parts, part);
 
     assert(total_parts == num_parts);
+}
+
+void MeshPart(MPI_Comm comm, mfem::Mesh& mesh, mfem::FiniteElementSpace& fespace, int agg_size, mfem::Array<int>& global_partitioning)
+{
+    int dim = mesh.Dimension();
+
+    SparseMatrix elem_face = TableToMatrix(dim == 2 ? mesh.ElementToEdgeTable() : mesh.ElementToFaceTable());
+    mfem::Array<int> elem_part;
+
+    /*
+    if (myid == 0)
+    {
+        printf("Partitioning %d size\n", elem_face.Height());
+    }
+    */
+
+    if (agg_size == 0)
+    {
+        int num_procs;
+        MPI_Comm_size(comm, &num_procs);
+        MetisPart(elem_face, elem_part, num_procs);
+    }
+    else
+    {
+        MetisPartCF(elem_face, elem_part, agg_size);
+    }
+
+    /*
+    if (myid == 0)
+    {
+        printf("Partitioning into %d parts\n", elem_part.Max() + 1);
+    }
+    */
+
+    global_partitioning.SetSize(fespace.GetNDofs());
+    global_partitioning = -1;
+
+    mfem::Array<int> verts;
+    for (int i = 0; i < elem_face.Height(); ++i)
+    {
+        fespace.GetElementDofs(i, verts);
+
+        int part = elem_part[i];
+
+        for (auto vertex : verts)
+        {
+            global_partitioning[vertex] = part;
+        }
+    }
+
+    for (auto vertex : global_partitioning)
+    {
+        assert(vertex >= 0);
+    }
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphLaplacian(const MixedMatrix& mixed_laplacian)

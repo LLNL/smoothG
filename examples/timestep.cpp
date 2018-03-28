@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+    SPE10Problem spe10problem(comm, permFile, nDimensions, spe10_scale, slice,
                               metis_agglomeration, coarseningFactor);
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
