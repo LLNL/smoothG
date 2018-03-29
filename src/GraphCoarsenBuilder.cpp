@@ -258,6 +258,10 @@ mfem::DenseMatrix CoefficientMBuilder::RTDP(const mfem::DenseMatrix& R,
                                             const mfem::DenseMatrix& P)
 {
     mfem::DenseMatrix out(R.Width(), P.Width());
+    if (R.Width() == 0 || P.Width() == 0)
+    {
+        return out;
+    }
     mfem::DenseMatrix Rt;
     Rt.Transpose(R);
     Rt.RightScaling(D);
@@ -323,6 +327,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     comp_E_E_.resize(num_aggs);
     for (int agg = 0; agg < num_aggs; ++agg)
     {
+        GetTableRowCopy(topology_.Agg_face_, agg, local_faces);
         GetCoarseAggDofs(agg, local_coarse_dofs);
         if (local_coarse_dofs.Size() == 0)
         {
@@ -340,7 +345,6 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
             mfem::DenseMatrix P_E(local_fine_dofs.Size(), local_coarse_dofs.Size());
             Pedges_noconst.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);
             comp_E_E_[agg] = RTDP(P_E, local_fine_weight, P_E);
-            GetTableRowCopy(topology_.Agg_face_, agg, local_faces);
             for (int af = 0; af < local_faces.Size(); ++af)
             {
                 int face = local_faces[af];
