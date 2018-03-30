@@ -631,15 +631,20 @@ DenseMatrix Orthogonalize(DenseMatrix& mat, int max_keep)
 
 DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect_view, int max_keep)
 {
-    if (mat.Rows() == 0 || mat.Cols() == 0)
-    {
-        return mat;
-    }
+    assert(mat.Rows() == vect_view.size());
 
     // If the view is of mat, deflate will destroy it,
     // so copy is needed
     Vector vect(vect_view);
     Normalize(vect);
+
+    if (mat.Rows() == 0 || mat.Cols() == 0)
+    {
+        DenseMatrix out(mat.Rows(), 1);
+        out.SetCol(0, vect);
+
+        return out;
+    }
 
     Deflate(mat, vect);
 

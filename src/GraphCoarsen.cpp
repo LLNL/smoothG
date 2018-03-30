@@ -133,8 +133,15 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
         auto& evals = eigen_pair.first;
         auto& evects = eigen_pair.second;
 
-        DenseMatrix evects_ortho = evects.GetCol(1, evects.Cols());
-        agg_ext_sigma_[agg] = D_sub_T.Mult(evects_ortho);
+        if (evects.Cols() > 1)
+        {
+            DenseMatrix evects_ortho = evects.GetCol(1, evects.Cols());
+            agg_ext_sigma_[agg] = D_sub_T.Mult(evects_ortho);
+        }
+        else
+        {
+            agg_ext_sigma_[agg].Resize(D_sub_T.Rows(), 0);
+        }
 
         DenseMatrix evects_restricted = RestrictLocal(evects, col_marker_,
                                                       vertex_dofs_ext, vertex_dofs_local);
@@ -167,13 +174,16 @@ std::vector<std::vector<DenseMatrix>> GraphCoarsen::CollectSigma(const GraphTopo
 
         for (auto agg : neighbors)
         {
-            std::vector<int> edge_dofs_ext = GetExtDofs(gt.agg_ext_edge_, agg);
+            if (agg_ext_sigma_[agg].Cols() > 0)
+            {
+                std::vector<int> edge_dofs_ext = GetExtDofs(gt.agg_ext_edge_, agg);
 
-            DenseMatrix face_restrict = RestrictLocal(agg_ext_sigma_[agg], col_marker_,
-                                                      edge_dofs_ext, face_dofs);
+                DenseMatrix face_restrict = RestrictLocal(agg_ext_sigma_[agg], col_marker_,
+                        edge_dofs_ext, face_dofs);
 
-            face_sigma.SetCol(col_count, face_restrict);
-            col_count += face_restrict.Cols();
+                face_sigma.SetCol(col_count, face_restrict);
+                col_count += face_restrict.Cols();
+            }
         }
 
         assert(col_count == total_vects);
@@ -312,13 +322,18 @@ void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix&
 
     for (int face = 0; face < num_faces; ++face)
     {
+        DenseMatrix& edge_traces(edge_targets_[face]);
+        if (edge_traces.Cols() < 1)
+        {
+            continue;
+        }
+
         int agg = gt.face_agg_local_.GetIndices(face)[0];
 
         std::vector<int> vertices = gt.agg_vertex_local_.GetIndices(agg);
         std::vector<int> face_dofs = gt.face_edge_local_.GetIndices(face);
 
         SparseMatrix D_transfer = D_local.GetSubMatrix(vertices, face_dofs, col_marker_);
-        DenseMatrix& edge_traces(edge_targets_[face]);
 
         Vector one(D_transfer.Rows(), 1.0);
         Vector oneD = D_transfer.MultAT(one);

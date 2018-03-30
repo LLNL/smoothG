@@ -173,7 +173,7 @@ public:
                     const BlockVector& fine_sol) const;
 
 protected:
-    Upscale(MPI_Comm comm, int size);
+    Upscale(MPI_Comm comm);
 
     void MakeCoarseVectors();
 

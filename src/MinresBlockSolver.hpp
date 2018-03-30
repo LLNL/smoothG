@@ -71,7 +71,13 @@ public:
     //MinresBlockSolver(ParMatrix M, ParMatrix D, ParMatrix W, bool use_W = false);
     MinresBlockSolver(const MixedMatrix& mgl);
 
-    ~MinresBlockSolver() = default;
+    MinresBlockSolver(const MinresBlockSolver& other) noexcept;
+    MinresBlockSolver(MinresBlockSolver&& other) noexcept;
+    MinresBlockSolver& operator=(MinresBlockSolver other) noexcept;
+
+    friend void swap(MinresBlockSolver& lhs, MinresBlockSolver& rhs) noexcept;
+
+    ~MinresBlockSolver() noexcept = default;
 
     /**
        @brief Use block-preconditioned MINRES to solve the problem.

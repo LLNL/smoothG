@@ -61,6 +61,39 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
     nnz_ = M_.nnz() + DT_.nnz() + D_.nnz() + W_.nnz();
 }
 
+MinresBlockSolver::MinresBlockSolver(const MinresBlockSolver& other) noexcept
+    : MGLSolver(other), op_(other.op_), prec_(other.prec_),
+      M_prec_(other.M_prec_), schur_prec_(other.schur_prec_),
+      true_rhs_(other.true_rhs_), true_sol_(other.true_sol_)
+{
+
+}
+
+MinresBlockSolver::MinresBlockSolver(MinresBlockSolver&& other) noexcept
+{
+    swap(*this, other);
+}
+
+MinresBlockSolver& MinresBlockSolver::operator=(MinresBlockSolver other) noexcept
+{
+    swap(*this, other);
+
+    return *this;
+}
+
+void swap(MinresBlockSolver& lhs, MinresBlockSolver& rhs) noexcept
+{
+    swap(static_cast<MGLSolver&>(lhs),
+         static_cast<MGLSolver&>(rhs));
+
+    swap(lhs.op_, rhs.op_);
+    swap(lhs.prec_, rhs.prec_);
+    swap(lhs.M_prec_, rhs.M_prec_);
+    swap(lhs.schur_prec_, rhs.schur_prec_);
+    swap(lhs.true_rhs_, rhs.true_rhs_);
+    swap(lhs.true_sol_, rhs.true_sol_);
+}
+
 void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
 {
     linalgcpp::PMINRESSolver pminres(op_, prec_, max_num_iter_, rtol_,

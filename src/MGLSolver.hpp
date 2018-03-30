@@ -37,6 +37,10 @@ public:
     MGLSolver() = default;
     MGLSolver(const std::vector<int>& offsets);
 
+    MGLSolver(const MGLSolver& other) noexcept;
+
+    friend void swap(MGLSolver& lhs, MGLSolver& rhs) noexcept;
+
     virtual ~MGLSolver() = default;
 
     /**

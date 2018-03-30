@@ -28,7 +28,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                  const std::vector<int>& partitioning_global,
                  double spect_tol, int max_evects,
                  const std::vector<double>& weight_global)
-    : Upscale(comm, vertex_edge_global.Rows()),
+    : Upscale(comm),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
@@ -45,7 +45,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                  double coarse_factor,
                  double spect_tol, int max_evects,
                  const std::vector<double>& weight_global)
-    : Upscale(comm, vertex_edge_global.Rows()),
+    : Upscale(comm),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
@@ -82,6 +82,9 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
     fine_solver_ = std::make_unique<MinresBlockSolver>(GetFineMatrix());
 
     MakeCoarseVectors();
+
+    Operator::rows_ = graph_.vertex_edge_local_.Rows();
+    Operator::cols_ = graph_.vertex_edge_local_.Rows();
 }
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const

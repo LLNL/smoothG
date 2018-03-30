@@ -23,8 +23,8 @@
 namespace smoothg
 {
 
-Upscale::Upscale(MPI_Comm comm, int size)
-        : Operator(size), comm_(comm), setup_time_(0.0)
+Upscale::Upscale(MPI_Comm comm)
+        : comm_(comm), setup_time_(0.0)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);

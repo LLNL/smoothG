@@ -41,41 +41,59 @@ std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts);
 
 int main(int argc, char* argv[])
 {
-    // 1. Initialize MPI
+    // Initialize MPI
     int num_procs, myid;
     MPI_Init(&argc, &argv);
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
-    bool metis_agglomeration = false;
     // program options from command line
-    //int num_partitions = 12;
-    //std::string graphFileName = "../../graphdata/vertex_edge_sample.txt";
-    //std::string FiedlerFileName = "../../graphdata/fiedler_sample.txt";
-    //std::string partition_filename = "../../graphdata/partition_sample.txt";
-
-    int num_partitions = 25;
-    std::string graphFileName = "ve.txt";
-    std::string FiedlerFileName = "rhs.txt";
+    std::string graph_filename = "ve.txt";
+    std::string fiedler_filename = "rhs.txt";
     std::string partition_filename = "part.part";
-
-    //int num_partitions = 2;
-    //std::string graphFileName = "../../graphdata/vertex_edge_tiny.txt";
-    //std::string FiedlerFileName = "../../graphdata/fiedler_tiny.txt";
-    //std::string partition_filename = "../../graphdata/partition_tiny.txt";
     std::string weight_filename = "";
     std::string w_block_filename = "";
-    int max_evects = 2;
-    //double spect_tol = 1.e-3;
-    double spect_tol = 1.0;
-    bool hybridization = false;
-    int isolate = -1;
 
-    assert(num_partitions >= num_procs);
+    int isolate = -1;
+    int max_evects = 4;
+    double spect_tol = 1e-3;
+    int num_partitions = 12;
+    bool hybridization = false;
+    bool metis_agglomeration = false;
+
+    linalgcpp::ArgParser arg_parser(argc, argv);
+
+    arg_parser.Parse(graph_filename, "-g", "Graph connection data.");
+    arg_parser.Parse(fiedler_filename, "-f", "Fiedler vector data.");
+    arg_parser.Parse(partition_filename, "-p", "Partition data.");
+    arg_parser.Parse(weight_filename, "-w", "Edge weight data.");
+    arg_parser.Parse(w_block_filename, "-wb", "W block data.");
+    arg_parser.Parse(isolate, "-isolate", "Isolate a single vertex.");
+    arg_parser.Parse(max_evects, "-m", "Maximum eigenvectors per aggregate.");
+    arg_parser.Parse(spect_tol, "-t", "Spectral tolerance for eigenvalue problem.");
+    arg_parser.Parse(num_partitions, "-np", "Number of partitions to generate.");
+    arg_parser.Parse(hybridization, "-hb", "Enable hybridization.");
+    arg_parser.Parse(metis_agglomeration, "-ma", "Enable Metis partitioning.");
+
+    if (!arg_parser.IsGood())
+    {
+        if (myid == 0)
+        {
+            arg_parser.ShowHelp();
+            arg_parser.ShowErrors();
+        }
+
+        return EXIT_FAILURE;
+    }
+
+    if (myid == 0)
+    {
+        arg_parser.ShowOptions();
+    }
 
     /// [Load graph from file or generate one]
-    SparseMatrix vertex_edge_global = ReadCSR(graphFileName);
+    SparseMatrix vertex_edge_global = ReadCSR(graph_filename);
 
     const int nvertices_global = vertex_edge_global.Rows();
     const int nedges_global = vertex_edge_global.Cols();
@@ -85,6 +103,7 @@ int main(int argc, char* argv[])
     std::vector<int> global_partitioning;
     if (metis_agglomeration)
     {
+        assert(num_partitions >= num_procs);
         global_partitioning = MetisPart(vertex_edge_global, num_partitions);
     }
     else
@@ -116,7 +135,7 @@ int main(int argc, char* argv[])
         /// [Upscale]
 
         /// [Right Hand Side]
-        Vector rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
+        Vector rhs_u_fine = upscale.ReadVertexVector(fiedler_filename);
 
         BlockVector fine_rhs(upscale.GetFineBlockVector());
         fine_rhs.GetBlock(0) = 0.0;
@@ -145,5 +164,7 @@ std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts)
     SparseMatrix edge_vertex = vertex_edge.Transpose();
     SparseMatrix vertex_vertex = vertex_edge.Mult(edge_vertex);
 
-    return Partition(vertex_vertex, num_parts);
+    double ubal_tol = 2.0;
+
+    return Partition(vertex_vertex, num_parts, ubal_tol);
 }
