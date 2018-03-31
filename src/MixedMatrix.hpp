@@ -74,6 +74,15 @@ class MixedMatrix
     private:
         void Init();
 
+        SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
+                        const ParMatrix& edge_edge,
+                        const std::vector<int>& edge_map,
+                        const std::vector<double>& global_weight);
+
+        SparseMatrix MakeLocalD(const ParMatrix& edge_true_edge,
+                const SparseMatrix& vertex_edge);
+
+
 };
 
 } // namespace smoothg

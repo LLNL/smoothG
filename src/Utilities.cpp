@@ -33,80 +33,6 @@ int MyId(MPI_Comm comm)
     return myid;
 }
 
-SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
-                        const ParMatrix& edge_edge,
-                        const std::vector<int>& edge_map,
-                        const std::vector<double>& global_weight)
-{
-    int size = edge_map.size();
-
-    std::vector<double> local_weight(size);
-
-    if (global_weight.size() == edge_true_edge.Cols())
-    {
-        for (int i = 0; i < size; ++i)
-        {
-            assert(std::fabs(global_weight[edge_map[i]]) > 1e-12);
-            local_weight[i] = 1.0 / std::fabs(global_weight[edge_map[i]]);
-        }
-    }
-    else
-    {
-        std::fill(std::begin(local_weight), std::end(local_weight), 1.0);
-    }
-
-    const SparseMatrix& edge_offd = edge_edge.GetOffd();
-
-    assert(edge_offd.Rows() == local_weight.size());
-
-    for (int i = 0; i < size; ++i)
-    {
-        if (edge_offd.RowSize(i))
-        {
-            local_weight[i] /= 2.0;
-        }
-    }
-
-    return SparseMatrix(std::move(local_weight));
-}
-
-SparseMatrix MakeLocalD(const ParMatrix& edge_true_edge,
-                          const SparseMatrix& vertex_edge)
-{
-    SparseMatrix edge_vertex = vertex_edge.Transpose();
-
-    std::vector<int> indptr = edge_vertex.GetIndptr();
-    std::vector<int> indices = edge_vertex.GetIndices();
-    std::vector<double> data = edge_vertex.GetData();
-
-    int num_edges = edge_vertex.Rows();
-    int num_vertices = edge_vertex.Cols();
-
-    const SparseMatrix& owned_edges = edge_true_edge.GetDiag();
-
-    for (int i = 0; i < num_edges; i++)
-    {
-        const int row_edges = edge_vertex.RowSize(i);
-        assert(row_edges == 1 || row_edges == 2);
-
-        data[indptr[i]] = 1.;
-
-        if (row_edges == 2)
-        {
-            data[indptr[i] + 1] = -1.;
-        }
-        else if (owned_edges.RowSize(i) == 0)
-        {
-            assert(row_edges == 1);
-            data[indptr[i]] = -1.;
-        }
-    }
-
-    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data), num_edges, num_vertices);
-
-    return DT.Transpose();
-}
-
 ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
                                          const std::vector<int>& edge_map)
 {
@@ -325,160 +251,6 @@ ParMatrix RestrictInterior(const ParMatrix& mat)
 
     return ParMatrix(mat.GetComm(), mat.GetRowStarts(), mat.GetColStarts(),
             std::move(diag), std::move(offd), std::move(col_map));
-}
-
-SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg)
-{
-    const auto& agg_agg_diag = agg_agg.GetDiag();
-    const auto& agg_agg_offd = agg_agg.GetOffd();
-
-    int num_aggs = agg_agg_diag.Rows();
-    int num_faces = agg_agg_diag.nnz() - agg_agg_diag.Rows();
-
-    assert(num_faces % 2 == 0);
-    num_faces /= 2;
-
-    std::vector<int> indptr(num_faces + 1);
-    std::vector<int> indices(num_faces * 2);
-    std::vector<double> data(num_faces * 2, 1);
-
-    indptr[0] = 0;
-
-    const auto& agg_indptr = agg_agg_diag.GetIndptr();
-    const auto& agg_indices = agg_agg_diag.GetIndices();
-    int rows = agg_agg_diag.Rows();
-    int count = 0;
-
-    for (int i = 0; i < rows; ++i)
-    {
-        for (int j = agg_indptr[i]; j < agg_indptr[i + 1]; ++j)
-        {
-            if (agg_indices[j] > i)
-            {
-                indices[count * 2] = i;
-                indices[count * 2 + 1] = agg_indices[j];
-
-                count++;
-
-                indptr[count] = count * 2;
-            }
-        }
-    }
-
-    assert(count == num_faces);
-
-    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-            num_faces, num_aggs);
-}
-
-SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
-        const ParMatrix& edge_ext_agg,
-        const SparseMatrix& agg_edge_ext,
-        const SparseMatrix& face_edge_ext)
-{
-    const auto& agg_agg_diag = agg_agg.GetDiag();
-    const auto& agg_agg_offd = agg_agg.GetOffd();
-
-    int num_aggs = agg_agg_diag.Rows();
-    int num_edges = face_edge_ext.Cols();
-    int num_faces_int = face_edge_ext.Rows();
-    int num_faces = num_faces_int + agg_agg_offd.nnz();
-
-    std::vector<int> indptr;
-    std::vector<int> indices;
-
-    indptr.reserve(num_faces + 1);
-
-    const auto& ext_indptr = face_edge_ext.GetIndptr();
-    const auto& ext_indices = face_edge_ext.GetIndices();
-    const auto& ext_data = face_edge_ext.GetData();
-
-    indptr.push_back(0);
-
-    for (int i = 0; i < num_faces_int; i++)
-    {
-        for (int j = ext_indptr[i]; j < ext_indptr[i + 1]; j++)
-        {
-            if (ext_data[j] > 1)
-            {
-                indices.push_back(ext_indices[j]);
-            }
-        }
-
-        indptr.push_back(indices.size());
-    }
-
-    const auto& agg_edge_indptr = agg_edge_ext.GetIndptr();
-    const auto& agg_edge_indices = agg_edge_ext.GetIndices();
-
-    const auto& agg_offd_indptr = agg_agg_offd.GetIndptr();
-    const auto& agg_offd_indices = agg_agg_offd.GetIndices();
-    const auto& agg_colmap = agg_agg.GetColMap();
-
-    const auto& edge_offd_indptr = edge_ext_agg.GetOffd().GetIndptr();
-    const auto& edge_offd_indices = edge_ext_agg.GetOffd().GetIndices();
-    const auto& edge_colmap = edge_ext_agg.GetColMap();
-
-    for (int i = 0; i < num_aggs; ++i)
-    {
-        for (int j = agg_offd_indptr[i]; j < agg_offd_indptr[i + 1]; ++j)
-        {
-            int shared = agg_colmap[agg_offd_indices[j]];
-
-            for (int k = agg_edge_indptr[i]; k < agg_edge_indptr[i + 1]; ++k)
-            {
-                int edge = agg_edge_indices[k];
-
-                if (edge_offd_indptr[edge + 1] > edge_offd_indptr[edge])
-                {
-                    int edge_loc = edge_offd_indices[edge_offd_indptr[edge]];
-
-                    if (edge_colmap[edge_loc] == shared)
-                    {
-                        indices.push_back(edge);
-                    }
-                }
-            }
-
-            indptr.push_back(indices.size());
-        }
-    }
-
-    assert(indptr.size() == num_faces + 1);
-
-    std::vector<double> data(indices.size(), 1);
-
-    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-            num_faces, num_edges);
-}
-
-SparseMatrix ExtendFaceAgg(const ParMatrix& agg_agg,
-        const SparseMatrix& face_agg_int)
-{
-    const auto& agg_agg_offd = agg_agg.GetOffd();
-
-    int num_aggs = agg_agg.Rows();
-
-    std::vector<int> indptr(face_agg_int.GetIndptr());
-    std::vector<int> indices(face_agg_int.GetIndices());
-
-    const auto& agg_offd_indptr = agg_agg_offd.GetIndptr();
-
-    for (int i = 0; i < num_aggs; ++i)
-    {
-        for (int j = agg_offd_indptr[i]; j < agg_offd_indptr[i + 1]; ++j)
-        {
-            indices.push_back(i);
-            indptr.push_back(indices.size());
-        }
-    }
-
-    int num_faces = indptr.size() - 1;
-
-    std::vector<double> data(indices.size(), 1);
-
-    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-            num_faces, num_aggs);
 }
 
 ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
@@ -860,6 +632,48 @@ void PrintJSON(const std::map<std::string, double>& values, std::ostream& out,
     }
 
     out << "}" << new_line;
+}
+
+SparseMatrix MakeProcAgg(int num_procs, int num_aggs_global)
+{
+    int num_aggs_local = num_aggs_global / num_procs;
+    int num_left = num_aggs_global % num_procs;
+
+    std::vector<int> indptr(num_procs + 1);
+    std::vector<int> indices(num_aggs_global);
+    std::vector<double> data(num_aggs_global, 1.0);
+
+    std::iota(std::begin(indices), std::end(indices), 0);
+
+    for (int i = 0; i <= num_left; ++i)
+    {
+        indptr[i] = i * (num_aggs_local + 1);
+    }
+
+    for (int i = num_left + 1; i <= num_procs; ++i)
+    {
+        indptr[i] = indptr[i - 1] + num_aggs_local;
+    }
+
+    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+                        num_procs, num_aggs_global);
+}
+
+SparseMatrix MakeAggVertex(const std::vector<int>& partition)
+{
+    assert(partition.size() > 0);
+
+    const int num_parts = *std::max_element(std::begin(partition), std::end(partition)) + 1;
+    const int num_vert = partition.size();
+
+    std::vector<int> indptr(num_vert + 1);
+    std::vector<double> data(num_vert, 1);
+
+    std::iota(std::begin(indptr), std::end(indptr), 0);
+
+    SparseMatrix vertex_agg(std::move(indptr), partition, std::move(data), num_vert, num_parts);
+
+    return vertex_agg.Transpose();
 }
 
 } // namespace smoothg

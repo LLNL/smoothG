@@ -23,17 +23,10 @@
 #include <sstream>
 #include <mpi.h>
 
-#include "linalgcpp.hpp"
-#include "parlinalgcpp.hpp"
-#include "partition.hpp"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
 
-using Vector = linalgcpp::Vector<double>;
-using VectorView = linalgcpp::VectorView<double>;
-using BlockVector = linalgcpp::BlockVector<double>;
-using SparseMatrix = linalgcpp::SparseMatrix<double>;
 using linalgcpp::ReadText;
 using linalgcpp::ReadCSR;
 
@@ -78,19 +71,13 @@ int main(int argc, char* argv[])
 
     if (!arg_parser.IsGood())
     {
-        if (myid == 0)
-        {
-            arg_parser.ShowHelp();
-            arg_parser.ShowErrors();
-        }
+        ParPrint(myid, arg_parser.ShowHelp());
+        ParPrint(myid, arg_parser.ShowErrors());
 
         return EXIT_FAILURE;
     }
 
-    if (myid == 0)
-    {
-        arg_parser.ShowOptions();
-    }
+    ParPrint(myid, arg_parser.ShowOptions());
 
     /// [Load graph from file or generate one]
     SparseMatrix vertex_edge_global = ReadCSR(graph_filename);
@@ -135,11 +122,7 @@ int main(int argc, char* argv[])
         /// [Upscale]
 
         /// [Right Hand Side]
-        Vector rhs_u_fine = upscale.ReadVertexVector(fiedler_filename);
-
-        BlockVector fine_rhs(upscale.GetFineBlockVector());
-        fine_rhs.GetBlock(0) = 0.0;
-        fine_rhs.GetBlock(1) = rhs_u_fine;
+        BlockVector fine_rhs = upscale.ReadVertexBlockVector(fiedler_filename);
         /// [Right Hand Side]
 
         /// [Solve]

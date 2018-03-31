@@ -123,6 +123,161 @@ void swap(GraphTopology& lhs, GraphTopology& rhs) noexcept
     swap(lhs.agg_ext_edge_, rhs.agg_ext_edge_);
 }
 
+SparseMatrix GraphTopology::MakeFaceAggInt(const ParMatrix& agg_agg)
+{
+    const auto& agg_agg_diag = agg_agg.GetDiag();
+    const auto& agg_agg_offd = agg_agg.GetOffd();
+
+    int num_aggs = agg_agg_diag.Rows();
+    int num_faces = agg_agg_diag.nnz() - agg_agg_diag.Rows();
+
+    assert(num_faces % 2 == 0);
+    num_faces /= 2;
+
+    std::vector<int> indptr(num_faces + 1);
+    std::vector<int> indices(num_faces * 2);
+    std::vector<double> data(num_faces * 2, 1);
+
+    indptr[0] = 0;
+
+    const auto& agg_indptr = agg_agg_diag.GetIndptr();
+    const auto& agg_indices = agg_agg_diag.GetIndices();
+    int rows = agg_agg_diag.Rows();
+    int count = 0;
+
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = agg_indptr[i]; j < agg_indptr[i + 1]; ++j)
+        {
+            if (agg_indices[j] > i)
+            {
+                indices[count * 2] = i;
+                indices[count * 2 + 1] = agg_indices[j];
+
+                count++;
+
+                indptr[count] = count * 2;
+            }
+        }
+    }
+
+    assert(count == num_faces);
+
+    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+            num_faces, num_aggs);
+}
+
+SparseMatrix GraphTopology::MakeFaceEdge(const ParMatrix& agg_agg,
+        const ParMatrix& edge_ext_agg,
+        const SparseMatrix& agg_edge_ext,
+        const SparseMatrix& face_edge_ext)
+{
+    const auto& agg_agg_diag = agg_agg.GetDiag();
+    const auto& agg_agg_offd = agg_agg.GetOffd();
+
+    int num_aggs = agg_agg_diag.Rows();
+    int num_edges = face_edge_ext.Cols();
+    int num_faces_int = face_edge_ext.Rows();
+    int num_faces = num_faces_int + agg_agg_offd.nnz();
+
+    std::vector<int> indptr;
+    std::vector<int> indices;
+
+    indptr.reserve(num_faces + 1);
+
+    const auto& ext_indptr = face_edge_ext.GetIndptr();
+    const auto& ext_indices = face_edge_ext.GetIndices();
+    const auto& ext_data = face_edge_ext.GetData();
+
+    indptr.push_back(0);
+
+    for (int i = 0; i < num_faces_int; i++)
+    {
+        for (int j = ext_indptr[i]; j < ext_indptr[i + 1]; j++)
+        {
+            if (ext_data[j] > 1)
+            {
+                indices.push_back(ext_indices[j]);
+            }
+        }
+
+        indptr.push_back(indices.size());
+    }
+
+    const auto& agg_edge_indptr = agg_edge_ext.GetIndptr();
+    const auto& agg_edge_indices = agg_edge_ext.GetIndices();
+
+    const auto& agg_offd_indptr = agg_agg_offd.GetIndptr();
+    const auto& agg_offd_indices = agg_agg_offd.GetIndices();
+    const auto& agg_colmap = agg_agg.GetColMap();
+
+    const auto& edge_offd_indptr = edge_ext_agg.GetOffd().GetIndptr();
+    const auto& edge_offd_indices = edge_ext_agg.GetOffd().GetIndices();
+    const auto& edge_colmap = edge_ext_agg.GetColMap();
+
+    for (int i = 0; i < num_aggs; ++i)
+    {
+        for (int j = agg_offd_indptr[i]; j < agg_offd_indptr[i + 1]; ++j)
+        {
+            int shared = agg_colmap[agg_offd_indices[j]];
+
+            for (int k = agg_edge_indptr[i]; k < agg_edge_indptr[i + 1]; ++k)
+            {
+                int edge = agg_edge_indices[k];
+
+                if (edge_offd_indptr[edge + 1] > edge_offd_indptr[edge])
+                {
+                    int edge_loc = edge_offd_indices[edge_offd_indptr[edge]];
+
+                    if (edge_colmap[edge_loc] == shared)
+                    {
+                        indices.push_back(edge);
+                    }
+                }
+            }
+
+            indptr.push_back(indices.size());
+        }
+    }
+
+    assert(indptr.size() == num_faces + 1);
+
+    std::vector<double> data(indices.size(), 1);
+
+    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+            num_faces, num_edges);
+}
+
+SparseMatrix GraphTopology::ExtendFaceAgg(const ParMatrix& agg_agg,
+        const SparseMatrix& face_agg_int)
+{
+    const auto& agg_agg_offd = agg_agg.GetOffd();
+
+    int num_aggs = agg_agg.Rows();
+
+    std::vector<int> indptr(face_agg_int.GetIndptr());
+    std::vector<int> indices(face_agg_int.GetIndices());
+
+    const auto& agg_offd_indptr = agg_agg_offd.GetIndptr();
+
+    for (int i = 0; i < num_aggs; ++i)
+    {
+        for (int j = agg_offd_indptr[i]; j < agg_offd_indptr[i + 1]; ++j)
+        {
+            indices.push_back(i);
+            indptr.push_back(indices.size());
+        }
+    }
+
+    int num_faces = indptr.size() - 1;
+
+    std::vector<double> data(indices.size(), 1);
+
+    return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+            num_faces, num_aggs);
+}
+
+
 
 } // namespace smoothg
 

@@ -102,6 +102,81 @@ void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
     std::swap(lhs.true_offsets_, rhs.true_offsets_);
 }
 
+SparseMatrix MixedMatrix::MakeLocalM(const ParMatrix& edge_true_edge,
+                        const ParMatrix& edge_edge,
+                        const std::vector<int>& edge_map,
+                        const std::vector<double>& global_weight)
+{
+    int size = edge_map.size();
+
+    std::vector<double> local_weight(size);
+
+    if (global_weight.size() == edge_true_edge.Cols())
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            assert(std::fabs(global_weight[edge_map[i]]) > 1e-12);
+            local_weight[i] = 1.0 / std::fabs(global_weight[edge_map[i]]);
+        }
+    }
+    else
+    {
+        std::fill(std::begin(local_weight), std::end(local_weight), 1.0);
+    }
+
+    const SparseMatrix& edge_offd = edge_edge.GetOffd();
+
+    assert(edge_offd.Rows() == local_weight.size());
+
+    for (int i = 0; i < size; ++i)
+    {
+        if (edge_offd.RowSize(i))
+        {
+            local_weight[i] /= 2.0;
+        }
+    }
+
+    return SparseMatrix(std::move(local_weight));
+}
+
+SparseMatrix MixedMatrix::MakeLocalD(const ParMatrix& edge_true_edge,
+                          const SparseMatrix& vertex_edge)
+{
+    SparseMatrix edge_vertex = vertex_edge.Transpose();
+
+    std::vector<int> indptr = edge_vertex.GetIndptr();
+    std::vector<int> indices = edge_vertex.GetIndices();
+    std::vector<double> data = edge_vertex.GetData();
+
+    int num_edges = edge_vertex.Rows();
+    int num_vertices = edge_vertex.Cols();
+
+    const SparseMatrix& owned_edges = edge_true_edge.GetDiag();
+
+    for (int i = 0; i < num_edges; i++)
+    {
+        const int row_edges = edge_vertex.RowSize(i);
+        assert(row_edges == 1 || row_edges == 2);
+
+        data[indptr[i]] = 1.;
+
+        if (row_edges == 2)
+        {
+            data[indptr[i] + 1] = -1.;
+        }
+        else if (owned_edges.RowSize(i) == 0)
+        {
+            assert(row_edges == 1);
+            data[indptr[i]] = -1.;
+        }
+    }
+
+    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data), num_edges, num_vertices);
+
+    return DT.Transpose();
+}
+
+
 int MixedMatrix::Rows() const
 {
     return D_local_.Rows() + D_local_.Cols();

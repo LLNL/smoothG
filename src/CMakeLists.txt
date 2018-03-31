@@ -18,13 +18,15 @@
 # generate lib file
 #####
 
-add_library(smoothg Upscale.cpp Graph.cpp GraphUpscale.cpp Utilities.cpp
-    SharedEntityComm.cpp MixedMatrix.cpp MixedMatrix.cpp GraphTopology.cpp
-    GraphCoarsen.cpp GraphEdgeSolver.cpp MGLSolver.cpp MinresBlockSolver.cpp)
-
-#add_library(smoothg LocalMixedGraphSpectralTargets.cpp GraphCoarsen.cpp
-#  utilities.cpp MinresBlockSolver.cpp sharedentitycommunication.cpp
-#  GraphTopology.cpp Mixed_GL_Coarsener.cpp SpectralAMG_MGL_Coarsener.cpp
-#  MetisGraphPartitioner.cpp MatrixUtilities.cpp MixedMatrix.cpp
-#  GraphUpscale.cpp Upscale.cpp MixedLaplacianSolver.cpp)
-
+add_library(smoothg
+    Upscale.cpp
+    Graph.cpp
+    GraphUpscale.cpp
+    Utilities.cpp
+    SharedEntityComm.cpp
+    MixedMatrix.cpp
+    GraphTopology.cpp
+    GraphCoarsen.cpp
+    GraphEdgeSolver.cpp
+    MGLSolver.cpp
+    MinresBlockSolver.cpp)

@@ -28,6 +28,9 @@
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
 
+/// Call output only on processor 0
+#define ParPrint(myid, output) if (myid == 0) output
+
 namespace smoothg
 {
 
@@ -43,29 +46,11 @@ using Timer = linalgcpp::Timer;
 
 int MyId(MPI_Comm comm = MPI_COMM_WORLD);
 
-SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
-                        const ParMatrix& edge_edge,
-                        const std::vector<int>& edge_map,
-                        const std::vector<double>& global_weight);
-
-SparseMatrix MakeLocalD(const ParMatrix& edge_true_edge,
-                        const SparseMatrix& vertex_edge);
-
 ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
                                          const std::vector<int>& edge_map);
 
 SparseMatrix RestrictInterior(const SparseMatrix& mat);
 ParMatrix RestrictInterior(const ParMatrix& mat);
-
-SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg);
-
-SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
-                                  const ParMatrix& edge_edge,
-                                  const SparseMatrix& agg_edge_ext,
-                                  const SparseMatrix& face_edge_ext);
-
-SparseMatrix ExtendFaceAgg(const ParMatrix& agg_agg,
-                           const SparseMatrix& face_agg_int);
 
 ParMatrix MakeEntityTrueEntity(const ParMatrix& face_face);
 ParMatrix MakeExtPermutation(const ParMatrix& parmat);
@@ -103,49 +88,8 @@ std::vector<double> ComputeErrors(MPI_Comm comm, const SparseMatrix& M,
 void PrintJSON(const std::map<std::string, double>& values, std::ostream& out = std::cout,
                bool pretty = true);
 
-template <typename T = double>
-linalgcpp::SparseMatrix<T> MakeAggVertex(const std::vector<int>& partition)
-{
-    assert(partition.size() > 0);
-
-    const int num_parts = *std::max_element(std::begin(partition), std::end(partition)) + 1;
-    const int num_vert = partition.size();
-
-    std::vector<int> indptr(num_vert + 1);
-    std::vector<T> data(num_vert, 1);
-
-    std::iota(std::begin(indptr), std::end(indptr), 0);
-
-    linalgcpp::SparseMatrix<T> vertex_agg(std::move(indptr), partition, std::move(data), num_vert, num_parts);
-
-    return vertex_agg.Transpose();
-}
-
-template <typename T = double>
-linalgcpp::SparseMatrix<T> MakeProcAgg(int num_procs, int num_aggs_global)
-{
-    int num_aggs_local = num_aggs_global / num_procs;
-    int num_left = num_aggs_global % num_procs;
-
-    std::vector<int> indptr(num_procs + 1);
-    std::vector<int> indices(num_aggs_global);
-    std::vector<T> data(num_aggs_global, 1.0);
-
-    std::iota(std::begin(indices), std::end(indices), 0);
-
-    for (int i = 0; i <= num_left; ++i)
-    {
-        indptr[i] = i * (num_aggs_local + 1);
-    }
-
-    for (int i = num_left + 1; i <= num_procs; ++i)
-    {
-        indptr[i] = indptr[i - 1] + num_aggs_local;
-    }
-
-    return linalgcpp::SparseMatrix<T>(std::move(indptr), std::move(indices), std::move(data),
-                                      num_procs, num_aggs_global);
-}
+SparseMatrix MakeAggVertex(const std::vector<int>& partition);
+SparseMatrix MakeProcAgg(int num_procs, int num_aggs_global);
 
 } //namespace smoothg
 
