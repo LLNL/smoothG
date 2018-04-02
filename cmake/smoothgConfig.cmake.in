@@ -1,0 +1,17 @@
+get_filename_component(smoothg_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+include(CMakeFindDependencyMacro)
+
+list(APPEND CMAKE_MODULE_PATH ${smoothg_CMAKE_DIR})
+
+find_package(linalgcpp REQUIRED)
+find_package(parlinalgcpp REQUIRED)
+find_package(partition REQUIRED)
+find_package(sparsesolve REQUIRED)
+
+LIST(REMOVE_AT CMAKE_MODULE_PATH -1)
+
+if(NOT TARGET smoothg::smoothg)
+    include("${smoothg_CMAKE_DIR}/smoothgTargets.cmake")
+endif()
+
+set(smoothg_LIBRARIES smoothg::smoothg)

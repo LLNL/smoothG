@@ -14,7 +14,5 @@
 #
 #################################################################### EHEADER #
 
-
-# add executables
 add_executable(generalgraph generalgraph.cpp)
-target_link_libraries(generalgraph smoothg ${TPL_LIBRARIES})
+target_link_libraries(generalgraph smoothG)

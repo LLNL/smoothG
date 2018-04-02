@@ -23,7 +23,7 @@
 #include <sstream>
 #include <mpi.h>
 
-#include "../src/smoothG.hpp"
+#include "smoothG.hpp"
 
 using namespace smoothg;
 
