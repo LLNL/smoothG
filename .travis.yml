@@ -1,0 +1,128 @@
+sudo: false
+
+language: cpp
+
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+            - liblapack-dev
+            - libblas-dev
+      env:
+          - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+      cache:
+        directories:
+          - $TRAVIS_BUILD_DIR/../metis-install
+          - $TRAVIS_BUILD_DIR/../SuiteSparse-install
+          - $TRAVIS_BUILD_DIR/../mpich-install
+          - $TRAVIS_BUILD_DIR/../hypre-install
+
+before_install:
+    - eval "${MATRIX_EVAL}"
+
+install:
+   # metis
+    - cd $TRAVIS_BUILD_DIR/..;
+    - if [ ! -e metis-install/lib/libmetis.a ]; then
+        wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz;
+        tar -xzf metis-5.1.0.tar.gz;
+        cd metis-5.1.0;
+        make config prefix=$TRAVIS_BUILD_DIR/../metis-install;
+        make -j3 install;
+     else
+        echo "Reusing cached metis";
+     fi;
+
+    # suitesparse
+    - cd $TRAVIS_BUILD_DIR/..;
+    - if [ ! -e SuiteSparse-install/lib/libumfpack.so ]; then
+         wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
+         tar xzf SuiteSparse-4.5.4.tar.gz;
+         cd SuiteSparse;
+         make -j3 install INSTALL=$TRAVIS_BUILD_DIR/../SuiteSparse-install BLAS=-lblas MY_METIS_LIB=$TRAVIS_BUILD_DIR/../metis-install/lib/libmetis.a MY_METIS_INC=$TRAVIS_BUILD_DIR/../metis-install/include/;
+      else
+         echo "Reusing cached SuiteSparse-4.5.4";
+      fi;
+
+    # mpich
+    - cd $TRAVIS_BUILD_DIR/..;
+    - if [ ! -e mpich-install/bin/mpirun ]; then
+         wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz;
+         tar xzf mpich-3.2.1.tar.gz;
+         rm mpich-3.2.1.tar.gz;
+         cd mpich-3.2.1;
+         ./configure --disable-fortran --prefix=$TRAVIS_BUILD_DIR/../mpich-install;
+         make -j3;
+         make install;
+         export PATH=$TRAVIS_BUILD_DIR/../mpich-install/bin:$PATH;
+      else
+         export PATH=$TRAVIS_BUILD_DIR/../mpich-install/bin:$PATH;
+         echo "Reusing cached mpich";
+      fi;
+
+    # hypre
+    - cd $TRAVIS_BUILD_DIR/..;
+    - if [ ! -e hypre-install/lib/libHYPRE.a ]; then
+        wget https://computation.llnl.gov/project/linear_solvers/download/hypre-2.10.0b.tar.gz --no-check-certificate;
+        rm -rf hypre-2.10.0b;
+        tar xzf hypre-2.10.0b.tar.gz;
+        cd hypre-2.10.0b/src;
+        ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++ prefix=$TRAVIS_BUILD_DIR/../hypre-install;
+        make -j3;
+        make install;
+     else
+         echo "Reusing cached hypre-2.10.0b/";
+     fi;
+
+    # linalgcpp
+    - cd $TRAVIS_BUILD_DIR/..;
+    - git clone https://github.com/gelever/linalgcpp.git linalg-code;
+    - cd linalg-code;
+    - mkdir build && cd build;
+    - cmake -DCMAKE_INSTALL_PREFIX=$TRAVIS_BUILD_DIR/../linalgcpp-install ..;
+    - make -j3 install;
+
+    # parlinalgcpp
+    - cd $TRAVIS_BUILD_DIR/..;
+    - git clone https://github.com/gelever/parlinalgcpp.git parlinalg-code;
+    - cd parlinalg-code;
+    - mkdir build && cd build;
+    - CC=mpicc CXX=mpic++ cmake .. -DHypre_INC_DIR=$TRAVIS_BUILD_DIR/../hypre-install/include -DHypre_LIB_DIR=$TRAVIS_BUILD_DIR/../hypre-install/lib -DCMAKE_INSTALL_PREFIX=$TRAVIS_BUILD_DIR/../parlinalgcpp-install;
+    - make -j3 install;
+
+    # partition
+    - cd $TRAVIS_BUILD_DIR/..;
+    - git clone https://github.com/gelever/partition.git partition-code;
+    - cd partition-code;
+    - mkdir build && cd build;
+    - cmake -DCMAKE_INSTALL_PREFIX=$TRAVIS_BUILD_DIR/../partition-install -DMETIS_DIR=$TRAVIS_BUILD_DIR/../metis-install ..;
+    - make -j3 install;
+
+    # sparsesolve
+    - cd $TRAVIS_BUILD_DIR/..;
+    - git clone https://github.com/gelever/sparsesolver.git sparsesolve-code;
+    - cd sparsesolve-code;
+    - mkdir build && cd build;
+    - cmake .. -DSUITESPARSE_INCLUDE_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/include -DSUITESPARSE_LIBRARY_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/lib -DCMAKE_INSTALL_PREFIX=$TRAVIS_BUILD_DIR/../sparsesolve-install;
+    - make -j3 install;
+
+script:
+   # Set some variables
+   - cd $TRAVIS_BUILD_DIR;
+
+   # Configure the library
+   - mkdir build;
+   - cd build;
+   - CC=mpicc CXX=mpic++ cmake .. -DMETIS_DIR=$TRAVIS_BUILD_DIR/../metis-install -DHypre_INC_DIR=$TRAVIS_BUILD_DIR/../hypre-install/include -DHypre_LIB_DIR=$TRAVIS_BUILD_DIR/../hypre-install/lib -DSUITESPARSE_INCLUDE_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/include -DSUITESPARSE_LIBRARY_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/lib;
+
+   # Build the library
+   - make -j3;
+
+   # Run tests
+   - mpirun -np 2 ./examples/generalgraph  -f ../graphdata/fiedler_sample.txt -g ../graphdata/vertex_edge_sample.txt -ma -np 10 -m 2 -t 1.0
