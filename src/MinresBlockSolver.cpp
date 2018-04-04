@@ -58,12 +58,16 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
     prec_.SetBlock(0, 0, M_prec_);
     prec_.SetBlock(1, 1, schur_prec_);
 
+    pminres_ = linalgcpp::PMINRESSolver(op_, prec_, max_num_iter_, rtol_,
+                                        atol_, print_level_, parlinalgcpp::ParMult);
+
     nnz_ = M_.nnz() + DT_.nnz() + D_.nnz() + W_.nnz();
 }
 
 MinresBlockSolver::MinresBlockSolver(const MinresBlockSolver& other) noexcept
     : MGLSolver(other), op_(other.op_), prec_(other.prec_),
       M_prec_(other.M_prec_), schur_prec_(other.schur_prec_),
+      pminres_(other.pminres_),
       true_rhs_(other.true_rhs_), true_sol_(other.true_sol_)
 {
 
@@ -90,22 +94,21 @@ void swap(MinresBlockSolver& lhs, MinresBlockSolver& rhs) noexcept
     swap(lhs.prec_, rhs.prec_);
     swap(lhs.M_prec_, rhs.M_prec_);
     swap(lhs.schur_prec_, rhs.schur_prec_);
+    swap(lhs.pminres_, rhs.pminres_);
     swap(lhs.true_rhs_, rhs.true_rhs_);
     swap(lhs.true_sol_, rhs.true_sol_);
 }
 
 void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
 {
-    linalgcpp::PMINRESSolver pminres(op_, prec_, max_num_iter_, rtol_,
-                                     print_level_, parlinalgcpp::ParMult);
-
     Timer timer(Timer::Start::True);
 
     edge_true_edge_.MultAT(rhs.GetBlock(0), true_rhs_.GetBlock(0));
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
     true_sol_ = 0.0;
 
-    pminres.Mult(true_rhs_, true_sol_);
+    pminres_.Mult(true_rhs_, true_sol_);
+    num_iterations_ += pminres_.GetNumIterations();
 
     edge_true_edge_.Mult(true_sol_.GetBlock(0), sol.GetBlock(0));
     sol.GetBlock(1) = true_sol_.GetBlock(1);
@@ -121,18 +124,30 @@ void MinresBlockSolver::Solve(const BlockVector& rhs, BlockVector& sol) const
 
 void MinresBlockSolver::SetPrintLevel(int print_level)
 {
+    MGLSolver::SetPrintLevel(print_level);
+
+    pminres_.SetVerbose(print_level_);
 }
 
 void MinresBlockSolver::SetMaxIter(int max_num_iter)
 {
+    MGLSolver::SetMaxIter(max_num_iter);
+
+    pminres_.SetMaxIter(max_num_iter);
 }
 
 void MinresBlockSolver::SetRelTol(double rtol)
 {
+    MGLSolver::SetRelTol(rtol);
+
+    pminres_.SetRelTol(rtol);
 }
 
 void MinresBlockSolver::SetAbsTol(double atol)
 {
+    MGLSolver::SetAbsTol(atol);
+
+    pminres_.SetAbsTol(atol);
 }
 
 

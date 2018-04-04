@@ -82,7 +82,7 @@ install:
 
     # linalgcpp
     - cd $TRAVIS_BUILD_DIR/..;
-    - git clone https://github.com/gelever/linalgcpp.git linalg-code;
+    - git clone -b develop https://github.com/gelever/linalgcpp.git linalg-code;
     - cd linalg-code;
     - mkdir build && cd build;
     - cmake -DCMAKE_INSTALL_PREFIX=$TRAVIS_BUILD_DIR/../linalgcpp-install ..;

@@ -96,7 +96,6 @@ public:
     ///@}
 
 protected:
-    //mfem::MINRESSolver minres_;
     MPI_Comm comm_;
     int myid_;
 
@@ -115,6 +114,8 @@ private:
 
     parlinalgcpp::ParDiagScale M_prec_;
     parlinalgcpp::BoomerAMG schur_prec_;
+
+    linalgcpp::PMINRESSolver pminres_;
 
     mutable BlockVector true_rhs_;
     mutable BlockVector true_sol_;
