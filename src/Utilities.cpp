@@ -114,7 +114,8 @@ ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
 
     assert(offd_counter == static_cast<int>(num_edge_diff));
 
-    auto compare = [] (const auto& lhs, const auto& rhs)
+    auto compare = [] (const std::pair<HYPRE_Int, int>& lhs,
+                       const std::pair<HYPRE_Int, int>& rhs)
     {
         return lhs.first < rhs.first;
     };
@@ -209,7 +210,7 @@ ParMatrix RestrictInterior(const ParMatrix& mat)
     indptr[num_rows] = offd_nnz;
 
     int offd_num_cols = std::count_if(std::begin(offd_marker), std::end(offd_marker),
-            [](auto i) { return i > 0; });
+            [](int i) { return i > 0; });
 
     std::vector<HYPRE_Int> col_map(offd_num_cols);
     int count = 0;
@@ -621,7 +622,7 @@ void PrintJSON(const std::map<std::string, double>& values, std::ostream& out,
         ss.str("");
         ss << indent << "\"" << pair.first << "\": " << std::setprecision(16) << std::setw(16) << pair.second;
 
-        if (pair != (*std::rbegin(values)))
+        if (&pair != &(*values.rbegin()))
         {
             ss << ",";
         }

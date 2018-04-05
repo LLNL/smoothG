@@ -31,6 +31,17 @@
 /// Call output only on processor 0
 #define ParPrint(myid, output) if (myid == 0) output
 
+#if __cplusplus > 201103L
+using std::make_unique;
+#else
+template<typename T, typename... Ts>
+std::unique_ptr<T> make_unique(Ts&& ... params)
+{
+    return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
+}
+
+#endif
+
 namespace smoothg
 {
 

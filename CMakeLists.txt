@@ -69,7 +69,7 @@ add_library(smoothG
 add_subdirectory(examples)
 
 set_target_properties(smoothG PROPERTIES
-        CXX_STANDARD 14
+        CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
 )

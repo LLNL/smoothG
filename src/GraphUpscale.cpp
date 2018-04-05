@@ -78,8 +78,8 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
                               max_evects_, spect_tol_);
 
     mgl_.push_back(coarsener_.Coarsen(gt_, GetFineMatrix()));
-    coarse_solver_ = std::make_unique<MinresBlockSolver>(GetCoarseMatrix());
-    fine_solver_ = std::make_unique<MinresBlockSolver>(GetFineMatrix());
+    coarse_solver_ = make_unique<MinresBlockSolver>(GetCoarseMatrix());
+    fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
 
     MakeCoarseVectors();
 

@@ -8,23 +8,15 @@ matrix:
       compiler: gcc
       addons:
         apt:
-          sources:
-            - ubuntu-toolchain-r-test
           packages:
-            - g++-7
             - liblapack-dev
             - libblas-dev
-      env:
-          - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
       cache:
         directories:
           - $TRAVIS_BUILD_DIR/../metis-install
           - $TRAVIS_BUILD_DIR/../SuiteSparse-install
           - $TRAVIS_BUILD_DIR/../mpich-install
           - $TRAVIS_BUILD_DIR/../hypre-install
-
-before_install:
-    - eval "${MATRIX_EVAL}"
 
 install:
    # metis
@@ -113,7 +105,6 @@ install:
     - make -j3 install;
 
 script:
-   # Set some variables
    - cd $TRAVIS_BUILD_DIR;
 
    # Configure the library
