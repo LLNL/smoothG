@@ -66,8 +66,6 @@ add_library(smoothG
     src/Utilities.cpp
 )
 
-add_subdirectory(examples)
-
 set_target_properties(smoothG PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES
@@ -87,6 +85,8 @@ target_include_directories(smoothG
 		$<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
+
+add_subdirectory(examples)
 
 include(GNUInstallDirs)
 set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/libsmoothg)

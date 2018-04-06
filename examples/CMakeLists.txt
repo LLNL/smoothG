@@ -21,3 +21,6 @@ set(CMAKE_CXX_EXTENSIONS NO)
 
 add_executable(generalgraph generalgraph.cpp)
 target_link_libraries(generalgraph smoothG)
+
+add_executable(poweriter poweriter.cpp)
+target_link_libraries(poweriter smoothG)

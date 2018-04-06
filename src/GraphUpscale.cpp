@@ -46,7 +46,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                  double spect_tol, int max_evects,
                  const std::vector<double>& weight_global)
     : Upscale(comm),
-      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
+      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
     Timer timer(Timer::Start::True);
@@ -56,9 +56,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 
     int num_parts = std::max(1.0, (global_vertices_ / (double)(coarse_factor)) + 0.5);
 
-    bool contig = true;
     double ubal = 2.0;
-    std::vector<int> partitioning_global = Partition(vertex_vertex, num_parts, contig, ubal);
+    std::vector<int> partitioning_global = Partition(vertex_vertex, num_parts, ubal);
 
     Init(vertex_edge_global, partitioning_global, weight_global);
 

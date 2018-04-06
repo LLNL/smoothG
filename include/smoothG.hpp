@@ -17,5 +17,7 @@
     @brief Contains all header files for easy include
 */
 
+#include "Utilities.hpp"
 #include "Upscale.hpp"
 #include "GraphUpscale.hpp"
+#include "UpscaleOperators.hpp"

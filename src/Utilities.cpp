@@ -564,19 +564,6 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out, bool p
     }
 
     PrintJSON(values, out, pretty);
-    /*
-    picojson::object serialize;
-    serialize["finest-p-error"] = picojson::value(error_info[0]);
-    serialize["finest-u-error"] = picojson::value(error_info[1]);
-    serialize["finest-div-error"] = picojson::value(error_info[2]);
-
-    if (error_info.size() > 3)
-    {
-        serialize["operator-complexity"] = picojson::value(error_info[3]);
-    }
-
-    out << picojson::value(serialize).serialize(pretty) << std::endl;
-    */
 }
 
 std::vector<double> ComputeErrors(MPI_Comm comm, const SparseMatrix& M,
@@ -620,11 +607,12 @@ void PrintJSON(const std::map<std::string, double>& values, std::ostream& out,
     for (const auto& pair : values)
     {
         ss.str("");
-        ss << indent << "\"" << pair.first << "\": " << std::setprecision(16) << std::setw(16) << pair.second;
+        ss << indent << "\"" << std::right << pair.first << "\": "
+           << std::left << std::setprecision(16) << pair.second;
 
         if (&pair != &(*values.rbegin()))
         {
-            ss << ",";
+            ss << std::left << ",";
         }
 
         ss << new_line;
@@ -675,6 +663,48 @@ SparseMatrix MakeAggVertex(const std::vector<int>& partition)
     SparseMatrix vertex_agg(std::move(indptr), partition, std::move(data), num_vert, num_parts);
 
     return vertex_agg.Transpose();
+}
+
+double PowerIterate(MPI_Comm comm, const linalgcpp::Operator& A, VectorView result,
+                    int max_iter, double tol, bool verbose)
+{
+    using parlinalgcpp::ParMult;
+    using parlinalgcpp::ParL2Norm;
+
+    int myid;
+    MPI_Comm_rank(comm, &myid);
+
+    Vector temp(result.size());
+
+    double rayleigh = 0.0;
+    double old_rayleigh = 0.0;
+
+    for (int i = 0; i < max_iter; ++i)
+    {
+        A.Mult(result, temp);
+
+        rayleigh = ParMult(comm, temp, result) / ParMult(comm, result, result);
+        temp /= ParL2Norm(comm, temp);
+
+        swap(temp, result);
+
+        if (verbose && myid == 0)
+        {
+            std::cout << std::scientific;
+            std::cout << " i: " << i << " ray: " << rayleigh;
+            std::cout << " inverse: " << (1.0 / rayleigh);
+            std::cout << " rate: " << (std::fabs(rayleigh - old_rayleigh) / rayleigh) << "\n";
+        }
+
+        if (std::fabs(rayleigh - old_rayleigh) / std::fabs(rayleigh) < tol)
+        {
+            break;
+        }
+
+        old_rayleigh = rayleigh;
+    }
+
+    return rayleigh;
 }
 
 } // namespace smoothg
