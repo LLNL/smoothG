@@ -130,7 +130,7 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
 
         eigen.Solve(DMinvDT, spect_tol_, max_evects_, eigen_pair);
 
-        auto& evals = eigen_pair.first;
+        // auto& evals = eigen_pair.first; // TODO(gelever1): verify correct
         auto& evects = eigen_pair.second;
 
         if (evects.Cols() > 1)
@@ -571,7 +571,6 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
     int num_aggs = agg_edge.Rows();
     int num_faces = face_edge.Rows();
     int num_edges = agg_edge.Cols();
-    int num_vertices = agg_vertex.Cols();
     int num_coarse_dofs = agg_bubble_dof_.Cols();
 
     CooMatrix P_edge(num_edges, num_coarse_dofs);
@@ -687,7 +686,7 @@ ParMatrix GraphCoarsen::BuildEdgeTrueEdge(const GraphTopology& gt) const
             int first_dof = face_cdof_indices[face_cdof_indptr[i]];
 
             std::vector<int> face_cdofs = cface_cface_offd.GetIndices(first_dof);
-            assert(face_cdofs.size() == face_cdof_.RowSize(i));
+            assert(static_cast<int>(face_cdofs.size()) == face_cdof_.RowSize(i));
 
             for (auto cdof : face_cdofs)
             {
@@ -697,7 +696,7 @@ ParMatrix GraphCoarsen::BuildEdgeTrueEdge(const GraphTopology& gt) const
     }
 
     assert(col_count == offd_nnz);
-    assert(col_count == cface_cface_colmap.size());
+    assert(col_count == static_cast<int>(cface_cface_colmap.size()));
 
     SparseMatrix d_td_d_diag = SparseIdentity(num_coarse_dofs);
     SparseMatrix d_td_d_offd(std::move(offd_indptr), std::move(offd_indices),

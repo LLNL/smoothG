@@ -26,7 +26,7 @@ namespace smoothg
 Graph::Graph(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
           const std::vector<int>& part_global)
 {
-    assert(part_global.size() == vertex_edge_global.Rows());
+    assert(static_cast<int>(part_global.size()) == vertex_edge_global.Rows());
 
     int myid;
     int num_procs;

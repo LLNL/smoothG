@@ -377,7 +377,7 @@ void SetMarker(std::vector<int>& marker, const std::vector<int>& indices)
 
     for (int i = 0; i < size; ++i)
     {
-        assert(indices[i] < marker.size());
+        assert(indices[i] < static_cast<int>(marker.size()));
 
         marker[indices[i]] = i;
     }
@@ -389,7 +389,7 @@ void ClearMarker(std::vector<int>& marker, const std::vector<int>& indices)
 
     for (int i = 0; i < size; ++i)
     {
-        assert(indices[i] < marker.size());
+        assert(indices[i] < static_cast<int>(marker.size()));
 
         marker[indices[i]] = -1;
     }

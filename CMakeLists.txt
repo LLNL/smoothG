@@ -72,6 +72,8 @@ set_target_properties(smoothG PROPERTIES
         CXX_EXTENSIONS NO
 )
 
+target_compile_options(smoothG PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall>)
+
 target_link_libraries(smoothG
     PUBLIC
         parlinalgcpp::parlinalgcpp

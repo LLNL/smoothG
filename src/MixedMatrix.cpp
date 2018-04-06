@@ -111,7 +111,7 @@ SparseMatrix MixedMatrix::MakeLocalM(const ParMatrix& edge_true_edge,
 
     std::vector<double> local_weight(size);
 
-    if (global_weight.size() == edge_true_edge.Cols())
+    if (static_cast<int>(global_weight.size()) == edge_true_edge.Cols())
     {
         for (int i = 0; i < size; ++i)
         {
@@ -126,7 +126,7 @@ SparseMatrix MixedMatrix::MakeLocalM(const ParMatrix& edge_true_edge,
 
     const SparseMatrix& edge_offd = edge_edge.GetOffd();
 
-    assert(edge_offd.Rows() == local_weight.size());
+    assert(edge_offd.Rows() == static_cast<int>(local_weight.size()));
 
     for (int i = 0; i < size; ++i)
     {

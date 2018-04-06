@@ -126,7 +126,6 @@ void swap(GraphTopology& lhs, GraphTopology& rhs) noexcept
 SparseMatrix GraphTopology::MakeFaceAggInt(const ParMatrix& agg_agg)
 {
     const auto& agg_agg_diag = agg_agg.GetDiag();
-    const auto& agg_agg_offd = agg_agg.GetOffd();
 
     int num_aggs = agg_agg_diag.Rows();
     int num_faces = agg_agg_diag.nnz() - agg_agg_diag.Rows();
@@ -240,7 +239,7 @@ SparseMatrix GraphTopology::MakeFaceEdge(const ParMatrix& agg_agg,
         }
     }
 
-    assert(indptr.size() == num_faces + 1);
+    assert(static_cast<int>(indptr.size()) == num_faces + 1);
 
     std::vector<double> data(indices.size(), 1);
 
