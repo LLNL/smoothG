@@ -70,14 +70,14 @@ template<>
 std::vector<int>
 SharedEntityComm<Vector>::PackSendSize(const Vector& vect) const
 {
-    return std::vector<int>{vect.size()};
+    return std::vector<int>{static_cast<int>(vect.size())};
 }
 
 template<>
 std::vector<int>
 SharedEntityComm<std::vector<double>>::PackSendSize(const std::vector<double>& vect) const
 {
-    return std::vector<int>{vect.size()};
+    return std::vector<int>{static_cast<int>(vect.size())};
 }
 
 template<>
