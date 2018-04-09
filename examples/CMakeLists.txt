@@ -25,6 +25,10 @@ target_link_libraries(generalgraph smoothG)
 add_executable(poweriter poweriter.cpp)
 target_link_libraries(poweriter smoothG)
 
+if (NOT DEFINED SMOOTHG_TEST_PROCS)
+    set(SMOOTHG_TEST_PROCS 4)
+endif()
+
 configure_file(
   "${PROJECT_SOURCE_DIR}/examples/stest.py"
   "${PROJECT_BINARY_DIR}/examples/stest.py" @ONLY)

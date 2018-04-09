@@ -32,6 +32,7 @@ import json
 
 spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@PROJECT_SOURCE_DIR@/graphdata"
+num_procs = "@SMOOTHG_TEST_PROCS@"
 
 
 def run_test(command, expected={}, verbose=False):
@@ -62,10 +63,12 @@ def run_test(command, expected={}, verbose=False):
 
     output = json_parse_lines(stdout.splitlines())
 
+    err_tol = 1e-2
+
     for key, expected_val in expected.items():
         test_val = output[key]
 
-        if abs(float(expected_val) - float(test_val)) > 1.e-4:
+        if abs(float(expected_val) - float(test_val)) > err_tol:
             return False
 
     return True
@@ -159,7 +162,7 @@ def make_tests():
           "operator-complexity": 1.1666666666666667}]
 
     tests["parsamplegraph1"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "-t", "1.0", "-m", "1"],
          {"finest-div-error": 0.37918423727222522,
           "finest-p-error": 0.38013398274257243,
@@ -167,7 +170,7 @@ def make_tests():
           "operator-complexity": 1.016509834901651}]
 
     tests["pargraph-metis"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "-t", "1.0", "-m", "1", "-ma"],
          {"finest-div-error": 0.44710819906667049,
           "finest-p-error": 0.44939226988126274,
@@ -175,7 +178,7 @@ def make_tests():
           "operator-complexity": 1.016509834901651}]
 
     tests["pargraph-metis-mac"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "-t", "1.0", "-m", "1", "-ma"],
          {"finest-div-error": 0.22228470008233389,
           "finest-p-error": 0.22265174467689006,
@@ -183,7 +186,7 @@ def make_tests():
           "operator-complexity": 1.016509834901651}]
 
     tests["parsamplegraph4"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "-t", "1.0", "-m", "4"],
          {"finest-div-error": 0.12043046187567592,
           "finest-p-error": 0.13514675917148347,
@@ -191,7 +194,7 @@ def make_tests():
           "operator-complexity": 1.257167428325717}]
 
     tests["parpoweriter"] = \
-        [["mpirun", "-n", "4", "./poweriter"],
+        [["mpirun", "-n", num_procs, "./poweriter"],
          {"coarse-error": 0.20499789652195419,
           "coarse-eval": 0.17663653207421526,
           "fine-error": 2.9887390635842169e-05,

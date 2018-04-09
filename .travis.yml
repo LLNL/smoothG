@@ -110,7 +110,7 @@ script:
    # Configure the library
    - mkdir build;
    - cd build;
-   - CC=mpicc CXX=mpic++ cmake .. -DMETIS_DIR=$TRAVIS_BUILD_DIR/../metis-install -DHypre_INC_DIR=$TRAVIS_BUILD_DIR/../hypre-install/include -DHypre_LIB_DIR=$TRAVIS_BUILD_DIR/../hypre-install/lib -DSUITESPARSE_INCLUDE_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/include -DSUITESPARSE_LIBRARY_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/lib;
+   - CC=mpicc CXX=mpic++ cmake .. -DMETIS_DIR=$TRAVIS_BUILD_DIR/../metis-install -DHypre_INC_DIR=$TRAVIS_BUILD_DIR/../hypre-install/include -DHypre_LIB_DIR=$TRAVIS_BUILD_DIR/../hypre-install/lib -DSUITESPARSE_INCLUDE_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/include -DSUITESPARSE_LIBRARY_DIR_HINTS=$TRAVIS_BUILD_DIR/../SuiteSparse-install/lib -DSMOOTHG_TEST_PROCS=2;
 
    # Build the library
    - make -j3;
