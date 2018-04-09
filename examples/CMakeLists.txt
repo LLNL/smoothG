@@ -24,3 +24,25 @@ target_link_libraries(generalgraph smoothG)
 
 add_executable(poweriter poweriter.cpp)
 target_link_libraries(poweriter smoothG)
+
+configure_file(
+  "${PROJECT_SOURCE_DIR}/examples/stest.py"
+  "${PROJECT_BINARY_DIR}/examples/stest.py" @ONLY)
+
+add_test(samplegraph1 python stest.py samplegraph1)
+add_test(samplegraph4 python stest.py samplegraph4)
+add_test(poweriter python stest.py poweriter)
+add_test(graph-weight python stest.py graph-weight)
+
+add_test(parsamplegraph1 python stest.py parsamplegraph1)
+add_test(parsamplegraph4 python stest.py parsamplegraph4)
+add_test(parpoweriter python stest.py parpoweriter)
+
+if (APPLE)
+  add_test(graph-metis python stest.py graph-metis-mac)
+  add_test(pargraph-metis python stest.py pargraph-metis-mac)
+else()
+  add_test(graph-metis python stest.py graph-metis)
+  add_test(pargraph-metis python stest.py pargraph-metis)
+endif()
+add_test(isolate_coarsen python stest.py isolate-coarsen)

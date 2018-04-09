@@ -216,6 +216,19 @@ bool MixedMatrix::CheckW() const
     return W_global_.MaxNorm() > zero_tol;
 }
 
+ParMatrix MixedMatrix::ToPrimal() const
+{
+    ParMatrix MinvDT = D_global_.Transpose();
+    MinvDT.InverseScaleRows(M_global_.GetDiag().GetDiag());
 
+    ParMatrix A = D_global_.Mult(MinvDT);
+
+    if (CheckW())
+    {
+        A = ParAdd(A, W_global_);
+    }
+
+    return A;
+}
 
 } // namespace smoothg

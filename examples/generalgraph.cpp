@@ -29,8 +29,11 @@ using namespace smoothg;
 
 using linalgcpp::ReadText;
 using linalgcpp::ReadCSR;
+using parlinalgcpp::LOBPCG;
+using parlinalgcpp::BoomerAMG;
 
 std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts);
+Vector ComputeFiedlerVector(const MixedMatrix& mgl);
 
 int main(int argc, char* argv[])
 {
@@ -42,9 +45,9 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
-    std::string graph_filename = "ve.txt";
-    std::string fiedler_filename = "rhs.txt";
-    std::string partition_filename = "part.part";
+    std::string graph_filename = "../../graphdata/vertex_edge_sample.txt";
+    std::string fiedler_filename = "../../graphdata/fiedler_sample.txt";
+    std::string partition_filename = "../../graphdata/partition_sample.txt";
     std::string weight_filename = "";
     std::string w_block_filename = "";
 
@@ -54,6 +57,7 @@ int main(int argc, char* argv[])
     int num_partitions = 12;
     bool hybridization = false;
     bool metis_agglomeration = false;
+    bool generate_fiedler = false;
 
     linalgcpp::ArgParser arg_parser(argc, argv);
 
@@ -68,6 +72,7 @@ int main(int argc, char* argv[])
     arg_parser.Parse(num_partitions, "-np", "Number of partitions to generate.");
     arg_parser.Parse(hybridization, "-hb", "Enable hybridization.");
     arg_parser.Parse(metis_agglomeration, "-ma", "Enable Metis partitioning.");
+    arg_parser.Parse(generate_fiedler, "-gf", "Generate Fiedler vector.");
 
     if (!arg_parser.IsGood())
     {
@@ -122,7 +127,18 @@ int main(int argc, char* argv[])
         /// [Upscale]
 
         /// [Right Hand Side]
-        BlockVector fine_rhs = upscale.ReadVertexBlockVector(fiedler_filename);
+        BlockVector fine_rhs = upscale.GetFineBlockVector();
+        fine_rhs.GetBlock(0) = 0.0;
+
+        if (generate_fiedler)
+        {
+            fine_rhs.GetBlock(1) = ComputeFiedlerVector(upscale.GetFineMatrix());
+        }
+        else
+        {
+            fine_rhs.GetBlock(1) = upscale.ReadVertexVector(fiedler_filename);
+        }
+
         /// [Right Hand Side]
 
         /// [Solve]
@@ -150,4 +166,36 @@ std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts)
     double ubal_tol = 2.0;
 
     return Partition(vertex_vertex, num_parts, ubal_tol);
+}
+
+Vector ComputeFiedlerVector(const MixedMatrix& mgl)
+{
+    ParMatrix A = mgl.ToPrimal();
+
+    bool use_w = mgl.CheckW();
+
+    if (!use_w)
+    {
+        A.AddDiag(1.0);
+    }
+
+    BoomerAMG boomer(A);
+
+    int num_evects = 2;
+    std::vector<Vector> evects(num_evects, Vector(A.Rows()));
+    for (Vector& evect : evects)
+    {
+        evect.Randomize();
+    }
+
+    std::vector<double> evals = LOBPCG(A, evects, &boomer);
+
+    assert(static_cast<int>(evals.size()) == num_evects);
+    if (!use_w)
+    {
+        assert(std::fabs(evals[0] - 1.0) < 1e-8);
+        assert(std::fabs(evals[1] - 1.0) > 1e-8);
+    }
+
+    return std::move(evects[1]);
 }

@@ -1,0 +1,280 @@
+# BHEADER ####################################################################
+#
+# Copyright (c) 2018, Lawrence Livermore National Security, LLC.
+# Produced at the Lawrence Livermore National Laboratory.
+# LLNL-CODE-745247. All Rights reserved. See file COPYRIGHT for details.
+#
+# This file is part of smoothG. For more information and source code
+# availability, see https://www.github.com/llnl/smoothG.
+#
+# smoothG is free software; you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License (as published by the Free
+# Software Foundation) version 2.1 dated February 1999.
+#
+#################################################################### EHEADER #
+
+"""
+A way to interface some basic JSON-parsing tests in python
+with the cmake/ctest testing framework.
+
+Stephan Gelever
+gelever1@llnl.gov
+17 July 2017
+"""
+
+from __future__ import print_function
+
+import subprocess
+
+import sys
+import platform
+import json
+
+spe10_perm_file = "@SPE10_PERM@"
+graph_data = "@PROJECT_SOURCE_DIR@/graphdata"
+
+
+def run_test(command, expected={}, verbose=False):
+    """ Executes test
+
+    Args:
+        command:    command to run test
+        expected:   expected result of test
+        verbose:    display additional info
+
+    Returns:
+        bool:       true if test passes
+
+    """
+    if verbose:
+        print(command)
+
+    p = subprocess.Popen(command, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, universal_newlines=True)
+    stdout, stderr = p.communicate()
+
+    if verbose:
+        print(stdout)
+        print(stderr)
+
+    if p.returncode != 0:
+        return False
+
+    output = json_parse_lines(stdout.splitlines())
+
+    for key, expected_val in expected.items():
+        test_val = output[key]
+
+        if abs(float(expected_val) - float(test_val)) > 1.e-4:
+            return False
+
+    return True
+
+
+def json_parse_lines(lines, max_depth=10, max_height=6):
+    """ Look for a JSON object on the last few lines of input
+
+    Args:
+        lines:  lines to parse
+        max_depth:   maximum number of lines to parse from end
+        max_height:   maximum number of lines to check as JSON object
+
+    Returns:
+        dict: parsed json object
+
+    """
+    for index in range(-1, -max_depth, -1):
+        for i in range(max_height):
+            try:
+                name = "".join(lines[index - i:])
+                return json.loads(name)
+            except ValueError:
+                pass
+    return {}
+
+
+def make_tests():
+    """ Generates test dictionary
+
+    Tests are the following format:
+        - dictionary key is test name
+        - dictionary value is an array containing:
+            - command to execute
+            - expected result [optional]
+
+    Returns:
+        dict:     collection of tests
+
+    """
+    tests = dict()
+
+    tests["samplegraph1"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "1"],
+         {"finest-div-error": 0.37918423747873353,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["graph-metis"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "1", "-ma"],
+         {"finest-div-error": 0.44710819907744104,
+          "finest-p-error": 0.44939226988126274,
+          "finest-u-error": 0.42773807524771068,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["graph-metis-mac"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "1",
+          "--metis-agglomeration"],
+         {"finest-div-error": 0.22228470008233389,
+          "finest-p-error": 0.22265174467689006,
+          "finest-u-error": 0.22168973853676807,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["samplegraph4"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "4"],
+         {"finest-div-error": 0.12043046187567592,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.253927460725393}]
+
+    tests["poweriter"] = \
+        [["./poweriter"],
+         {"coarse-error": 0.2050307003818391,
+          "coarse-eval": 0.17663653196285808,
+          "fine-error": 2.9382710663490486e-05,
+          "fine-eval": 0.17545528997990226}]
+
+    tests["graph-weight"] = \
+        [["./generalgraph",
+          "-g", graph_data + "/vertex_edge_tiny.txt",
+          "-w", graph_data + "/tiny_weights.txt",
+          "-gf", "-ma", "-np", "2"],
+         {"finest-div-error": 0.3033520464019937,
+          "finest-p-error": 0.31217311873637132,
+          "finest-u-error": 0.14767829457535478,
+          "operator-complexity": 1.1666666666666667}]
+
+    tests["parsamplegraph1"] = \
+        [["mpirun", "-n", "4", "./generalgraph",
+          "-t", "1.0", "-m", "1"],
+         {"finest-div-error": 0.37918423727222522,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["pargraph-metis"] = \
+        [["mpirun", "-n", "4", "./generalgraph",
+          "-t", "1.0", "-m", "1", "-ma"],
+         {"finest-div-error": 0.44710819906667049,
+          "finest-p-error": 0.44939226988126274,
+          "finest-u-error": 0.42773807524771068,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["pargraph-metis-mac"] = \
+        [["mpirun", "-n", "4", "./generalgraph",
+          "-t", "1.0", "-m", "1", "-ma"],
+         {"finest-div-error": 0.22228470008233389,
+          "finest-p-error": 0.22265174467689006,
+          "finest-u-error": 0.22168973853676807,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["parsamplegraph4"] = \
+        [["mpirun", "-n", "4", "./generalgraph",
+          "-t", "1.0", "-m", "4"],
+         {"finest-div-error": 0.12043046187567592,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.257167428325717}]
+
+    tests["parpoweriter"] = \
+        [["mpirun", "-n", "4", "./poweriter"],
+         {"coarse-error": 0.20499789652195419,
+          "coarse-eval": 0.17663653207421526,
+          "fine-error": 2.9887390635842169e-05,
+          "fine-eval": 0.17545528997977797}]
+
+    # tests["isolate-coarsen"] = \
+    #     [["./generalgraph",
+    #       "--spect-tol", "1.0",
+    #       "--max-evects", "4",
+    #       "--metis-agglomeration",
+    #       "--isolate", "0"],
+    #      {"operator-complexity": 1.2736672633273667}]
+
+    if "tux" in platform.node():
+        pass
+
+    return tests
+
+
+def run_all_tests(tests, verbose=False):
+    """ Execute all tests and display results
+
+    Any exception raised during a test counts as a
+    failure
+
+    Args:
+        tests (dict):    tests to perform,
+                         see make_tests for format
+
+    Returns:
+        int:     number of failed tests
+
+    """
+    totaltests = len(tests)
+    success = 0
+
+    for i, (name, test) in enumerate(tests.items()):
+        try:
+            result = run_test(*test, verbose=verbose)
+        except BaseException as err:
+            print("{0} Failed: {1}".format(name, err))
+            result = False
+
+        success += result
+        status = "passed" if result else "FAILED"
+
+        print("  ({0}/{1}) [{2}] {3}.".format(i + 1, totaltests, name, status))
+
+    failures = totaltests - success
+
+    print("Ran {0} tests with {1} successes and {2} failures.".format(
+        totaltests, success, failures))
+
+    return failures
+
+
+def main(argv):
+    """ Parses command line options and runs tests
+
+    Empty commandline runs all tests
+    Otherwise individual tests can be specified by name
+    Pass in '-nv' with args to remove additional information
+
+    Args:
+        argv (list):     command line parameters
+
+    Returns:
+        int:     number of failed tests
+
+    """
+    verbose = True
+
+    if "-nv" in argv:
+        verbose = False
+        argv.remove("-nv")
+
+    tests = make_tests()
+
+    if argv:
+        tests = dict((name, tests[name]) for name in argv if name in tests)
+
+    return run_all_tests(tests, verbose)
+
+
+if __name__ == "__main__":
+    exit(main(sys.argv[1:]))

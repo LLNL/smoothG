@@ -71,6 +71,8 @@ class MixedMatrix
         std::vector<int> offsets_;
         std::vector<int> true_offsets_;
 
+        ParMatrix ToPrimal() const;
+
     private:
         void Init();
 

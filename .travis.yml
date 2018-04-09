@@ -116,4 +116,4 @@ script:
    - make -j3;
 
    # Run tests
-   - mpirun -np 2 ./examples/generalgraph  -f ../graphdata/fiedler_sample.txt -g ../graphdata/vertex_edge_sample.txt -ma -np 10 -m 2 -t 1.0
+   - make test

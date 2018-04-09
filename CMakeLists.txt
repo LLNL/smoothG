@@ -43,9 +43,9 @@
 # Modified by gelever on April 1st, 2018 #
 ###############################################################
 
-
 cmake_minimum_required(VERSION 3.5)
 project(smoothG VERSION 1.0 LANGUAGES CXX)
+enable_testing()
 
 find_package(linalgcpp REQUIRED)
 find_package(parlinalgcpp REQUIRED)
