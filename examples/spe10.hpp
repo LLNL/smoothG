@@ -24,6 +24,9 @@
 
 using std::unique_ptr;
 
+namespace smoothg
+{
+
 /**
    @brief A forcing function that is supposed to very roughly represent some wells
    that are resolved on the *coarse* level.
@@ -109,7 +112,7 @@ class SPE10Problem
 {
 public:
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
-                 int slice, bool metis_partition,
+                 int slice, bool metis_partition, double proc_part_ubal,
                  const mfem::Array<int>& coarsening_factor);
     ~SPE10Problem();
     mfem::ParMesh* GetParMesh()
@@ -141,7 +144,7 @@ private:
 };
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
-                           int spe10_scale, int slice,  bool metis_partition,
+                           int spe10_scale, int slice,  bool metis_partition, double proc_part_ubal,
                            const mfem::Array<int>& coarsening_factor)
 {
     int num_procs, myid;
@@ -203,7 +206,16 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     if (metis_partition)
     {
-        pmesh_  = new mfem::ParMesh(comm, *mesh);
+        auto elem_elem = TableToSparse(mesh->ElementToElementTable());
+
+        mfem::Array<int> partition;
+        MetisGraphPartitioner partitioner;
+        partitioner.setUnbalanceTol(proc_part_ubal);
+        partitioner.doPartition(elem_elem, num_procs, partition);
+
+        pmesh_  = new mfem::ParMesh(comm, *mesh, partition);
+
+        assert(partition.Max() + 1 == num_procs);
     }
     else
     {
@@ -252,4 +264,6 @@ SPE10Problem::~SPE10Problem()
     delete kinv_;
     delete pmesh_;
 }
+
+} // namespace smoothg
 
