@@ -206,7 +206,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     if (metis_partition)
     {
-        auto elem_elem = TableToSparse(mesh->ElementToElementTable());
+        auto elem_elem = TableToMatrix(mesh->ElementToElementTable());
 
         mfem::Array<int> partition;
         MetisGraphPartitioner partitioner;
