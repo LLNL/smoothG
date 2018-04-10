@@ -28,6 +28,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <random>
 #include <mpi.h>
 
 #include "mfem.hpp"
@@ -74,6 +75,28 @@ void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
 
     MPI_Barrier(pmesh.GetComm());
 };
+
+class NormalSampler
+{
+public:
+    NormalSampler(double mean=0.0, double stddev=1.0, int seed=0);
+    double Sample();
+private:
+    std::mt19937 generator_;
+    std::normal_distribution<double> dist_;
+};
+
+NormalSampler::NormalSampler(double mean, double stddev, int seed)
+    :
+    generator_(seed),
+    dist_(mean, stddev)
+{
+}
+
+double NormalSampler::Sample()
+{
+    return dist_(generator_);
+}
 
 int main(int argc, char* argv[])
 {
@@ -187,17 +210,25 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < weight.Size(); ++i)
     {
-        weight[i] = 1.0 / weight[i];
+        // weight[i] = 1.0 / weight[i];
+        weight[i] = 1.0;
     }
 
     mfem::L2_FECollection ufec(0, nDimensions);
     mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
 
+    /*
     mfem::LinearForm q(&ufespace);
     q.AddDomainIntegrator(
         new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
     q.Assemble();
-    mfem::Vector rhs_u_fine(q);
+    */
+    mfem::Vector rhs_u_fine(ufespace.GetVSize());
+    NormalSampler sampler(0.0, 0.2);
+    for (int i=0; i<ufespace.GetVSize(); ++i)
+    {
+        rhs_u_fine(i) = sampler.Sample();
+    }
 
     // Construct vertex_edge table in mfem::SparseMatrix format
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
