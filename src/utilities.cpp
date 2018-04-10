@@ -617,11 +617,6 @@ ParGraph::ParGraph(MPI_Comm comm,
     vertex_edge_local_.Swap(tmp);
 }
 
-/**
-   This implementation basically taken from
-   DofAgglomeration::GetViewAgglomerateDofGlobalNumbering()
-   as one step to extracting from Parelag.
-*/
 void GetTableRow(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
 {
@@ -629,6 +624,18 @@ void GetTableRow(
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
     J.MakeRef(mat.GetJ() + begin, size);
+}
+
+/// instead of a reference, get a copy
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
+{
+    const int begin = mat.GetI()[rownum];
+    const int end = mat.GetI()[rownum + 1];
+    const int size = end - begin;
+    mfem::Array<int> temp;
+    temp.MakeRef(mat.GetJ() + begin, size);
+    temp.Copy(J);
 }
 
 void FiniteVolumeMassIntegrator::AssembleElementMatrix(
@@ -832,7 +839,7 @@ void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileNa
 
     if (!permfile.is_open())
     {
-        std::cout << "Error in opening file " << fileName << std::endl;
+        std::cerr << "Error in opening file " << fileName << std::endl;
         mfem::mfem_error("File does not exist");
     }
 

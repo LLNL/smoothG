@@ -250,6 +250,10 @@ private:
 void GetTableRow(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
 
+/// if you call GetTableRow repeatedly, bad things might happen
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
+
 /**
    @brief Finite volume integrator
 

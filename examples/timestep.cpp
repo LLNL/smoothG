@@ -274,8 +274,8 @@ int main(int argc, char* argv[])
         }
         else
         {
-            fvupscale.Coarsen(fine_u, work_u);
-            fvupscale.Coarsen(fine_rhs, work_rhs);
+            fvupscale.Restrict(fine_u, work_u);
+            fvupscale.Restrict(fine_rhs, work_rhs);
         }
 
         const mfem::SparseMatrix* W = fvupscale.GetMatrix(k).getW();

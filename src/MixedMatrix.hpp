@@ -105,31 +105,43 @@ public:
     {}
 
     /**
-     * Get a reference to the mass matrix M.
-     */
+       @brief Get a reference to the mass matrix M.
+    */
     mfem::SparseMatrix& getWeight() const
     {
         return *M_;
     }
+
     /**
-     * Get a reference to the edge_vertex matrix D.
-     */
+       @brief Set (or reset) the mass matrix M.
+
+       Useful for rescaling coefficients without re-coarsening.
+    */
+    void setWeight(mfem::SparseMatrix& M_in)
+    {
+        M_ = make_unique<mfem::SparseMatrix>();
+        M_->Swap(M_in);
+    }
+
+    /**
+       @brief Get a reference to the edge_vertex matrix D.
+    */
     mfem::SparseMatrix& getD() const
     {
         return *D_;
     }
 
     /**
-     * Get a reference to the matrix W.
-     */
+       @brief Get a reference to the matrix W.
+    */
     mfem::SparseMatrix* getW() const
     {
         return W_.get();
     }
 
     /**
-     * Set the matrix W.
-     */
+       Set the matrix W.
+    */
     void setW(mfem::SparseMatrix W_in)
     {
         W_ = make_unique<mfem::SparseMatrix>();
@@ -275,6 +287,10 @@ public:
 
     /// Determine if W block is nonzero
     bool CheckW() const;
+
+    void SetMFromWeightVector(const mfem::Vector& weight);
+
+    void ScaleM(const mfem::Vector& weight);
 
 private:
     /**

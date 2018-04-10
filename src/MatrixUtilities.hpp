@@ -147,6 +147,16 @@ mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D)
 mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect);
 
 /**
+   Add scaling*subm into the matrix mat at locations given by rows and cols.
+
+   The implementation is simply copied from mfem::SparseMatrix::AddSubMatrix,
+   with the scaling added.
+*/
+void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
+                        const mfem::Array<int>& cols, const mfem::DenseMatrix& subm,
+                        double scaling = 1.0, int skip_zeros = 1);
+
+/**
    @brief Add two parallel matrices C = A + B
    @param A left hand side matrix
    @param B right hand side matrix

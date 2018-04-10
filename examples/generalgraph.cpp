@@ -113,6 +113,11 @@ int main(int argc, char* argv[])
     bool energy_dual = false;
     args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
                    "--no-energy-dual", "Use energy matrix in trace generation.");
+    bool coarse_coefficient = false;
+    args.AddOption(&coarse_coefficient, "--coarse-coefficient", "--coarse-coefficient",
+                   "--no-coarse-coefficient", "--no-coarse-coefficient",
+                   "Assemble coarse mass matrix so that the coefficients (edge weights) "
+                   "can be rescaled after coarsening.");
     args.Parse();
     if (!args.Good())
     {
@@ -181,7 +186,7 @@ int main(int argc, char* argv[])
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
                              spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, weight);
+                             energy_dual, hybridization, coarse_coefficient, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

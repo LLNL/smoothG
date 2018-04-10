@@ -34,6 +34,9 @@ target_link_libraries(poweriter smoothg ${TPL_LIBRARIES})
 add_executable(mltopo mltopo.cpp)
 target_link_libraries(mltopo smoothg ${TPL_LIBRARIES})
 
+add_executable(mlmc mlmc.cpp)
+target_link_libraries(mlmc smoothg ${TPL_LIBRARIES})
+
 # add tests
 configure_file(
   "${PROJECT_SOURCE_DIR}/examples/stest.py"
@@ -52,7 +55,9 @@ add_test(scaled-dual-trace python stest.py scaled-dual-trace)
 add_test(energy-dual-trace python stest.py energy-dual-trace)
 add_test(scaled-energy-dual-trace python stest.py scaled-energy-dual-trace)
 add_test(samplegraph1 python stest.py samplegraph1)
+add_test(samplegraph1-coeff python stest.py samplegraph1-coeff)
 add_test(samplegraph4 python stest.py samplegraph4)
+add_test(samplegraph4-coeff python stest.py samplegraph4-coeff)
 add_test(graph-hybridization python stest.py graph-hybridization)
 add_test(poweriter python stest.py poweriter)
 add_test(graph-weight python stest.py graph-weight)
@@ -69,6 +74,7 @@ add_test(parscaled-dual-trace python stest.py parscaled-dual-trace)
 add_test(parenergy-dual-trace python stest.py parenergy-dual-trace)
 add_test(parscaled-energy-dual-trace python stest.py parscaled-energy-dual-trace)
 add_test(parsamplegraph1 python stest.py parsamplegraph1)
+add_test(parsamplegraph1-coeff python stest.py parsamplegraph1-coeff)
 add_test(parsamplegraph4 python stest.py parsamplegraph4)
 add_test(pargraph-hybridization python stest.py pargraph-hybridization)
 add_test(parpoweriter python stest.py parpoweriter)
