@@ -24,6 +24,11 @@
    A simple way to run the example:
 
    mpirun -n 4 ./sampler
+
+   I like the following runs:
+
+   examples/sampler --perm ~/spe10/spe_perm.dat --visualization --kappa 0.001 --coarsening-factor 3
+   examples/sampler --perm ~/spe10/spe_perm.dat --visualization --kappa 0.001 --coarsening-factor 2
 */
 
 #include <fstream>
@@ -151,6 +156,9 @@ int main(int argc, char* argv[])
     double kappa = 0.1;
     args.AddOption(&kappa, "--kappa", "--kappa",
                    "Correlation length for Gaussian samples.");
+    int coarsening_factor = 5;
+    args.AddOption(&coarsening_factor, "--coarsening-factor", "--coarsening-factor",
+                   "Coarsening factor for Cartesian agglomeration");
 
     args.Parse();
     if (!args.Good())
@@ -168,10 +176,10 @@ int main(int argc, char* argv[])
     }
 
     mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 10;
-    coarseningFactor[1] = 10;
+    coarseningFactor[0] = coarsening_factor * 2;
+    coarseningFactor[1] = coarsening_factor * 2;
     if (nDimensions == 3)
-        coarseningFactor[2] = 5;
+        coarseningFactor[2] = coarsening_factor;
 
     mfem::Vector weight;
 
@@ -217,14 +225,9 @@ int main(int argc, char* argv[])
     mfem::L2_FECollection ufec(0, nDimensions);
     mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
 
-    /*
-    mfem::LinearForm q(&ufespace);
-    q.AddDomainIntegrator(
-        new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
-    q.Assemble();
-    */
+    // construct white noise right-hand side
     mfem::Vector rhs_u_fine(ufespace.GetVSize());
-    NormalSampler sampler(0.0, 0.2);
+    NormalSampler sampler;
     for (int i=0; i<ufespace.GetVSize(); ++i)
     {
         rhs_u_fine(i) = sampler.Sample();
@@ -253,19 +256,10 @@ int main(int argc, char* argv[])
 
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
 
-    // const double delta_t = 100.0; // this is something like kappa or kappa^2 in the sampling context
     const double cell_volume = spe10problem.CellVolume(nDimensions);
-    // W_block *= cell_volume / delta_t;
-    // W_block = Mass matrix / delta_t
     W_block *= cell_volume * kappa * kappa;
 
     // Create Upscaler and Solve
-    /*
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                                  edge_boundary_att, ess_attr, spect_tol, max_evects,
-                                  dual_target, scaled_dual, energy_dual, hybridization);
-    */
-    // this constructor has a W-block
     FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
                                   partitioning, *edge_d_td, edge_boundary_att,
                                   ess_attr, spect_tol, max_evects, dual_target,
