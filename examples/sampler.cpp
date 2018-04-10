@@ -34,6 +34,7 @@
 #include <fstream>
 #include <sstream>
 #include <random>
+#include <cmath>
 #include <mpi.h>
 
 #include "mfem.hpp"
@@ -225,14 +226,6 @@ int main(int argc, char* argv[])
     mfem::L2_FECollection ufec(0, nDimensions);
     mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
 
-    // construct white noise right-hand side
-    mfem::Vector rhs_u_fine(ufespace.GetVSize());
-    NormalSampler sampler;
-    for (int i=0; i<ufespace.GetVSize(); ++i)
-    {
-        rhs_u_fine(i) = sampler.Sample();
-    }
-
     // Construct vertex_edge table in mfem::SparseMatrix format
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
                               : pmesh->ElementToFaceTable();
@@ -259,12 +252,29 @@ int main(int argc, char* argv[])
     const double cell_volume = spe10problem.CellVolume(nDimensions);
     W_block *= cell_volume * kappa * kappa;
 
+    double nu_parameter;
+    if (nDimensions == 2)
+        nu_parameter = 1.0;
+    else
+        nu_parameter = 0.5;
+    double ddim = static_cast<double>(nDimensions);
+    double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
+        std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+
+    // construct white noise right-hand side
+    // (cell_volume is supposed to represent fine-grid W_h)
+    mfem::Vector rhs_u_fine(ufespace.GetVSize());
+    NormalSampler sampler;
+    for (int i=0; i<ufespace.GetVSize(); ++i)
+    {
+        rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
+    }
+
     // Create Upscaler and Solve
     FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
                                   partitioning, *edge_d_td, edge_boundary_att,
                                   ess_attr, spect_tol, max_evects, dual_target,
                                   scaled_dual, energy_dual, hybridization);
-
 
     mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
     marker = 0;
