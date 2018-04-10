@@ -19,6 +19,9 @@
 add_executable(finitevolume finitevolume.cpp)
 target_link_libraries(finitevolume smoothg ${TPL_LIBRARIES})
 
+add_executable(sampler sampler.cpp)
+target_link_libraries(sampler smoothg ${TPL_LIBRARIES})
+
 add_executable(generalgraph generalgraph.cpp)
 target_link_libraries(generalgraph smoothg ${TPL_LIBRARIES})
 

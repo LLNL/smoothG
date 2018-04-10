@@ -14,13 +14,16 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file finitevolume.cpp
-   @brief This is an example for upscaling a graph Laplacian coming from a finite
-   volume discretization of a simple reservior model in parallel.
+   @file sampler.cpp
+
+   @brief Try to do scalable hierarchical sampling with finite volumes
+
+   See Osborn, Vassilevski, and Villa, A multilevel, hierarchical sampling technique for
+   spatially correlated random fields.
 
    A simple way to run the example:
 
-   mpirun -n 4 ./finitevolume
+   mpirun -n 4 ./sampler
 */
 
 #include <fstream>
@@ -75,9 +78,6 @@ int main(int argc, char* argv[])
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of geometric).");
-    double proc_part_ubal = 2.0;
-    args.AddOption(&proc_part_ubal, "-pub", "--part-unbalance",
-                   "Processor partition unbalance factor.");
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
@@ -117,25 +117,12 @@ int main(int argc, char* argv[])
     if (nDimensions == 3)
         coarseningFactor[2] = 5;
 
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    mfem::Array<int> ess_zeros(nbdr);
-    mfem::Array<int> nat_one(nbdr);
-    mfem::Array<int> nat_zeros(nbdr);
-    ess_zeros = 1;
-    nat_one = 0;
-    nat_zeros = 0;
-
-    mfem::Array<int> ess_attr;
     mfem::Vector weight;
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, proc_part_ubal, coarseningFactor);
+                              metis_agglomeration, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
@@ -146,9 +133,14 @@ int main(int argc, char* argv[])
                   pmesh->GetNE() << " fine elements\n";
     }
 
+    mfem::Array<int> ess_attr;
+    int nbdr;
+    if (nDimensions == 3)
+        nbdr = 6;
+    else
+        nbdr = 4;
     ess_attr.SetSize(nbdr);
-    for (int i(0); i < nbdr; ++i)
-        ess_attr[i] = ess_zeros[i];
+    ess_attr = 0;
 
     // Construct "finite volume mass" matrix using mfem instead of parelag
     mfem::RT_FECollection sigmafec(0, nDimensions);
@@ -180,7 +172,7 @@ int main(int argc, char* argv[])
                               : pmesh->ElementToFaceTable();
     mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
-    // Construct agglomerated topology based on METIS or Cartesian aggloemration
+    // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
     if (metis_agglomeration)
     {
@@ -201,7 +193,10 @@ int main(int argc, char* argv[])
                                   edge_boundary_att, ess_attr, spect_tol, max_evects,
                                   dual_target, scaled_dual, energy_dual, hybridization);
 
-    fvupscale.MakeFineSolver();
+    mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
+    marker = 0;
+    sigmafespace.GetEssentialVDofs(ess_attr, marker);
+    fvupscale.MakeFineSolver(marker);
 
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
