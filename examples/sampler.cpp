@@ -46,6 +46,35 @@ void MetisPart(mfem::Array<int>& partitioning,
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
+void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
+               const mfem::ParMesh& pmesh, int tag)
+{
+    char vishost[] = "localhost";
+    int  visport   = 19916;
+
+    mfem::socketstream vis_v;
+    vis_v.open(vishost, visport);
+    vis_v.precision(8);
+
+    field = sol;
+
+    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
+    vis_v << "solution\n" << pmesh << field;
+    vis_v << "window_size 500 800\n";
+    vis_v << "window_title 'pressure" << tag << "'\n";
+    vis_v << "autoscale values\n";
+
+    if (pmesh.Dimension() == 2)
+    {
+        vis_v << "view 0 0\n"; // view from top
+        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+    }
+
+    vis_v << "keys cjl\n";
+
+    MPI_Barrier(pmesh.GetComm());
+};
+
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -96,6 +125,10 @@ int main(int argc, char* argv[])
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    double kappa = 0.1;
+    args.AddOption(&kappa, "--kappa", "--kappa",
+                   "Correlation length for Gaussian samples.");
+
     args.Parse();
     if (!args.Good())
     {
@@ -118,7 +151,6 @@ int main(int argc, char* argv[])
         coarseningFactor[2] = 5;
 
     mfem::Vector weight;
-    mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
@@ -165,7 +197,7 @@ int main(int argc, char* argv[])
     q.AddDomainIntegrator(
         new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
     q.Assemble();
-    rhs_u_fine = q;
+    mfem::Vector rhs_u_fine(q);
 
     // Construct vertex_edge table in mfem::SparseMatrix format
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
@@ -188,10 +220,26 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
+    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
+
+    // const double delta_t = 100.0; // this is something like kappa or kappa^2 in the sampling context
+    const double cell_volume = spe10problem.CellVolume(nDimensions);
+    // W_block *= cell_volume / delta_t;
+    // W_block = Mass matrix / delta_t
+    W_block *= cell_volume * kappa * kappa;
+
     // Create Upscaler and Solve
+    /*
     FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
                                   edge_boundary_att, ess_attr, spect_tol, max_evects,
                                   dual_target, scaled_dual, energy_dual, hybridization);
+    */
+    // this constructor has a W-block
+    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
+                                  partitioning, *edge_d_td, edge_boundary_att,
+                                  ess_attr, spect_tol, max_evects, dual_target,
+                                  scaled_dual, energy_dual, hybridization);
+
 
     mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
     marker = 0;
@@ -223,36 +271,8 @@ int main(int argc, char* argv[])
     {
         mfem::ParGridFunction field(&ufespace);
 
-        auto Visualize = [&](const mfem::Vector & sol)
-        {
-            char vishost[] = "localhost";
-            int  visport   = 19916;
-
-            mfem::socketstream vis_v;
-            vis_v.open(vishost, visport);
-            vis_v.precision(8);
-
-            field = sol;
-
-            vis_v << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
-            vis_v << "solution\n" << *pmesh << field;
-            vis_v << "window_size 500 800\n";
-            vis_v << "window_title 'pressure'\n";
-            vis_v << "autoscale values\n";
-
-            if (nDimensions == 2)
-            {
-                vis_v << "view 0 0\n"; // view from top
-                vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-            }
-
-            vis_v << "keys cjl\n";
-
-            MPI_Barrier(comm);
-        };
-
-        Visualize(sol_upscaled.GetBlock(1));
-        Visualize(sol_fine.GetBlock(1));
+        Visualize(sol_upscaled.GetBlock(1), field, *pmesh, 1);
+        Visualize(sol_fine.GetBlock(1), field, *pmesh, 0);
     }
 
     return EXIT_SUCCESS;
