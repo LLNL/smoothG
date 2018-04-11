@@ -28,7 +28,9 @@
 using namespace smoothg;
 
 using linalgcpp::ReadText;
+using linalgcpp::WriteText;
 using linalgcpp::ReadCSR;
+
 using parlinalgcpp::LOBPCG;
 using parlinalgcpp::BoomerAMG;
 
@@ -57,7 +59,15 @@ int main(int argc, char* argv[])
     int num_partitions = 12;
     bool hybridization = false;
     bool metis_agglomeration = false;
+
     bool generate_fiedler = false;
+    bool save_fiedler = false;
+
+    bool generate_graph = false;
+    int gen_vertices = 1000;
+    int mean_degree = 40;
+    double beta = 0.15;
+    int seed = 0;
 
     linalgcpp::ArgParser arg_parser(argc, argv);
 
@@ -73,6 +83,12 @@ int main(int argc, char* argv[])
     arg_parser.Parse(hybridization, "-hb", "Enable hybridization.");
     arg_parser.Parse(metis_agglomeration, "-ma", "Enable Metis partitioning.");
     arg_parser.Parse(generate_fiedler, "-gf", "Generate Fiedler vector.");
+    arg_parser.Parse(save_fiedler, "-sf", "Save a generated Fiedler vector.");
+    arg_parser.Parse(generate_graph, "-gg", "Generate a graph.");
+    arg_parser.Parse(gen_vertices, "-nv", "Number of vertices of generated graph.");
+    arg_parser.Parse(mean_degree, "-md", "Average vertex degree of generated graph.");
+    arg_parser.Parse(beta, "-b", "Probability of rewiring in the Watts-Strogatz model.");
+    arg_parser.Parse(seed, "-s", "Seed for random number generator.");
 
     if (!arg_parser.IsGood())
     {
@@ -85,7 +101,16 @@ int main(int argc, char* argv[])
     ParPrint(myid, arg_parser.ShowOptions());
 
     /// [Load graph from file or generate one]
-    SparseMatrix vertex_edge_global = ReadCSR(graph_filename);
+    SparseMatrix vertex_edge_global;
+
+    if (generate_graph)
+    {
+        vertex_edge_global = GenerateGraph(comm, gen_vertices, mean_degree, beta, seed);
+    }
+    else
+    {
+        vertex_edge_global = ReadCSR(graph_filename);
+    }
 
     const int nvertices_global = vertex_edge_global.Rows();
     const int nedges_global = vertex_edge_global.Cols();
@@ -93,7 +118,7 @@ int main(int argc, char* argv[])
 
     /// [Partitioning]
     std::vector<int> global_partitioning;
-    if (metis_agglomeration)
+    if (metis_agglomeration || generate_graph)
     {
         assert(num_partitions >= num_procs);
         global_partitioning = MetisPart(vertex_edge_global, num_partitions);
@@ -106,7 +131,7 @@ int main(int argc, char* argv[])
 
     /// [Load the edge weights]
     std::vector<double> weight;
-    if (weight_filename.size() > 0)
+    if (!weight_filename.empty())
     {
         weight = linalgcpp::ReadText(weight_filename);
     }
@@ -130,7 +155,7 @@ int main(int argc, char* argv[])
         BlockVector fine_rhs = upscale.GetFineBlockVector();
         fine_rhs.GetBlock(0) = 0.0;
 
-        if (generate_fiedler)
+        if (generate_graph || generate_fiedler)
         {
             fine_rhs.GetBlock(1) = ComputeFiedlerVector(upscale.GetFineMatrix());
         }
@@ -152,6 +177,11 @@ int main(int argc, char* argv[])
         /// [Check Error]
         upscale.ShowErrors(upscaled_sol, fine_sol);
         /// [Check Error]
+
+        if (save_fiedler)
+        {
+            upscale.WriteVertexVector(fine_rhs.GetBlock(1), fiedler_filename);
+        }
     }
 
     MPI_Finalize();

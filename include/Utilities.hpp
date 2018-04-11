@@ -105,6 +105,8 @@ SparseMatrix MakeProcAgg(int num_procs, int num_aggs_global);
 double PowerIterate(MPI_Comm comm, const linalgcpp::Operator& A, VectorView result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
 
+void BroadCast(MPI_Comm comm, SparseMatrix& mat);
+
 } //namespace smoothg
 
 #endif // __UTILITIES_HPP__

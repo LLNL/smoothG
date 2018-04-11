@@ -21,3 +21,4 @@
 #include "Upscale.hpp"
 #include "GraphUpscale.hpp"
 #include "UpscaleOperators.hpp"
+#include "GraphGenerator.hpp"

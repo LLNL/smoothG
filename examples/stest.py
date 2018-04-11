@@ -144,6 +144,22 @@ def make_tests():
           "finest-u-error": 0.19926779054787247,
           "operator-complexity": 1.253927460725393}]
 
+    tests["graph-usegenerator"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "4", "-gg"],
+         {"finest-div-error": 0.11283262603381641,
+          "finest-p-error": 0.1203852548326301,
+          "finest-u-error": 0.16674213482507089,
+          "operator-complexity": 1.2578874211257887}]
+
+    tests["graph-usegenerator-mac"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "4", "-gg"],
+         {"finest-div-error": 0.1070681247529167,
+          "finest-p-error": 0.10863131137013603,
+          "finest-u-error": 0.12848813745253315,
+          "operator-complexity": 1.2578874211257887}]
+
     tests["poweriter"] = \
         [["./poweriter"],
          {"coarse-error": 0.2050307003818391,
@@ -192,6 +208,22 @@ def make_tests():
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
           "operator-complexity": 1.257167428325717}]
+
+    tests["pargraph-usegenerator"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "-t", "1.0", "-m", "4", "-gg"],
+         {"finest-div-error": 0.11283262603381641,
+          "finest-p-error": 0.1203852548326301,
+          "finest-u-error": 0.16674213482507089,
+          "operator-complexity": 1.2578874211257887}]
+
+    tests["pargraph-usegenerator-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "-t", "1.0", "-m", "4", "-gg"],
+         {"finest-div-error": 0.1070681247529167,
+          "finest-p-error": 0.10863131137013603,
+          "finest-u-error": 0.12848813745253315,
+          "operator-complexity": 1.2578874211257887}]
 
     tests["parpoweriter"] = \
         [["mpirun", "-n", num_procs, "./poweriter"],

@@ -707,4 +707,41 @@ double PowerIterate(MPI_Comm comm, const linalgcpp::Operator& A, VectorView resu
     return rayleigh;
 }
 
+void BroadCast(MPI_Comm comm, SparseMatrix& mat)
+{
+    int myid;
+    MPI_Comm_rank(comm, &myid);
+
+    int sizes[3];
+
+    if (myid == 0)
+    {
+        sizes[0] = mat.Rows();
+        sizes[1] = mat.Cols();
+        sizes[2] = mat.nnz();
+    }
+
+    MPI_Bcast(sizes, 3, MPI_INT, 0, comm);
+
+    bool master = (myid == 0);
+
+    std::vector<int> indptr(master ? 0 : sizes[0] + 1);
+    std::vector<int> indices(master ? 0 : sizes[2]);
+    std::vector<double> data(master ? 0 : sizes[2]);
+
+    int* I_ptr = master ? mat.GetIndptr().data() : indptr.data();
+    int* J_ptr = master ? mat.GetIndices().data() : indices.data();
+    double* Data_ptr = master ? mat.GetData().data() : data.data();
+
+    MPI_Bcast(I_ptr, sizes[0] + 1, MPI_INT, 0, comm);
+    MPI_Bcast(J_ptr, sizes[2], MPI_INT, 0, comm);
+    MPI_Bcast(Data_ptr, sizes[2], MPI_DOUBLE, 0, comm);
+
+    if (myid != 0)
+    {
+        mat = SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
+                           sizes[0], sizes[1]);
+    }
+}
+
 } // namespace smoothg

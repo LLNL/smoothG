@@ -29,7 +29,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                  double spect_tol, int max_evects,
                  const std::vector<double>& weight_global)
     : Upscale(comm),
-      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Cols()),
+      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
     Timer timer(Timer::Start::True);

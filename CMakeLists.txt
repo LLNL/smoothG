@@ -56,6 +56,7 @@ add_library(smoothG
     src/GraphCoarsen.cpp
     src/Graph.cpp
     src/GraphEdgeSolver.cpp
+    src/GraphGenerator.cpp
     src/GraphTopology.cpp
     src/GraphUpscale.cpp
     src/MGLSolver.cpp

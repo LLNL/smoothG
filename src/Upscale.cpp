@@ -528,7 +528,6 @@ void Upscale::WriteVector(const VectorView& vect, const std::string& filename, i
         global_local[local_to_global[i]] = vect[i];
     }
 
-
     MPI_Scan(global_local.data(), global_global.data(), global_size,
              MPI_DOUBLE, MPI_SUM, comm_);
 
