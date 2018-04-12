@@ -71,7 +71,6 @@ public:
     const mfem::SparseMatrix& get_Psigma() const;
     const mfem::SparseMatrix& get_Pu() const;
     const std::vector<mfem::DenseMatrix>& get_CM_el() const;
-    //const std::vector<std::unique_ptr<mfem::DenseMatrix>>& get_CM_el() const;
 
     /// Restrict (coarsen) the (block) right-hand side by multiplying by \f$ P_\sigma, P_u \f$
     std::unique_ptr<mfem::BlockVector> restrict_rhs(

@@ -104,11 +104,30 @@ public:
                       edge_d_td)
     {}
 
+    MixedMatrix(std::vector<mfem::DenseMatrix> M_el,
+                std::unique_ptr<mfem::SparseMatrix> elem_edof,
+                std::unique_ptr<mfem::SparseMatrix> D,
+                const mfem::HypreParMatrix& edge_d_td);
+
     /**
        @brief Get a reference to the mass matrix M.
     */
     mfem::SparseMatrix& getWeight() const
     {
+        assert(M_);
+        return *M_;
+    }
+
+    /**
+       @brief Get a reference to the mass matrix M.
+    */
+    mfem::SparseMatrix& getWeight()
+    {
+        assert(M_ || elem_edof_);
+        if (!M_)
+        {
+            AssembleM();
+        }
         return *M_;
     }
 
@@ -292,6 +311,9 @@ public:
 
     void ScaleM(const mfem::Vector& weight);
 
+    static std::unique_ptr<mfem::SparseMatrix> ConstructD(
+            const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
+
 private:
     /**
        Helper routine for the constructors of distributed graph. Note well that
@@ -304,7 +326,10 @@ private:
 
     void GenerateRowStarts();
 
-    std::unique_ptr<mfem::SparseMatrix> M_;
+    void AssembleM(const mfem::Vector& elem_scale) const;
+    void AssembleM() const;
+
+    mutable std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
     std::unique_ptr<mfem::SparseMatrix> W_;
 
@@ -320,6 +345,9 @@ private:
     mutable std::unique_ptr<mfem::Array<HYPRE_Int>> Drow_start_;
     mutable std::unique_ptr<mfem::Array<int>> blockOffsets_;
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
+
+    std::vector<mfem::DenseMatrix> M_el_; // element matrices of M
+    std::unique_ptr<mfem::SparseMatrix> elem_edof_; // element to edge dofs table
 
 }; // class MixedMatrix
 

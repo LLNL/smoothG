@@ -110,6 +110,16 @@ MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
     GenerateRowStarts();
 }
 
+MixedMatrix::MixedMatrix(std::vector<mfem::DenseMatrix> M_el,
+                         std::unique_ptr<mfem::SparseMatrix> elem_edof,
+                         std::unique_ptr<mfem::SparseMatrix> D,
+                         const mfem::HypreParMatrix& edge_d_td)
+    : D_(std::move(D)), edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose()),
+      M_el_(std::move(M_el)), elem_edof_(std::move(elem_edof))
+{
+    GenerateRowStarts();
+}
+
 void MixedMatrix::SetMFromWeightVector(const mfem::Vector& weight)
 {
     const int nedges = weight.Size();
@@ -152,37 +162,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
         (*W_) *= -1.0;
     }
 
-    // Nonzero row of edge_owned means the edge is owned by the local proc
-    mfem::SparseMatrix edge_owned;
-    edge_d_td.GetDiag(edge_owned);
-
-    mfem::SparseMatrix graphDT(smoothg::Transpose(vertex_edge));
-
-    // Change the second entries of each row with two nonzeros to 1
-    // Change the only entry in the row corresponding to a shared edge that
-    // is not owned by the local processor to -1
-    int* graphDT_i = graphDT.GetI();
-    double* graphDT_data = graphDT.GetData();
-
-    for (int j = 0; j < graphDT.Height(); j++)
-    {
-        const int row_size = graphDT.RowSize(j);
-        assert(row_size == 1 || row_size == 2);
-
-        graphDT_data[graphDT_i[j]] = 1.;
-
-        if (row_size == 2)
-        {
-            graphDT_data[graphDT_i[j] + 1] = -1.;
-        }
-        else if (edge_owned.RowSize(j) == 0)
-        {
-            assert(row_size == 1);
-            graphDT_data[graphDT_i[j]] = -1.;
-        }
-    }
-
-    D_ = unique_ptr<mfem::SparseMatrix>(mfem::Transpose(graphDT));
+    D_ = ConstructD(vertex_edge, edge_d_td);
     GenerateRowStarts();
 }
 
@@ -237,6 +217,72 @@ bool MixedMatrix::CheckW() const
     mfem::HypreParMatrix* W = get_pW();
 
     return W && MaxNorm(*W) > zero_tol;
+}
+
+std::unique_ptr<mfem::SparseMatrix> MixedMatrix::ConstructD(
+        const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge)
+{
+    // Nonzero row of edge_owned means the edge is owned by the local proc
+    mfem::SparseMatrix edge_owned;
+    edge_trueedge.GetDiag(edge_owned);
+
+    mfem::SparseMatrix graphDT(smoothg::Transpose(vertex_edge));
+
+    // Change the second entries of each row with two nonzeros to 1
+    // Change the only entry in the row corresponding to a shared edge that
+    // is not owned by the local processor to -1
+    int* graphDT_i = graphDT.GetI();
+    double* graphDT_data = graphDT.GetData();
+
+    for (int j = 0; j < graphDT.Height(); j++)
+    {
+        const int row_size = graphDT.RowSize(j);
+        assert(row_size == 1 || row_size == 2);
+
+        graphDT_data[graphDT_i[j]] = 1.;
+
+        if (row_size == 2)
+        {
+            graphDT_data[graphDT_i[j] + 1] = -1.;
+        }
+        else if (edge_owned.RowSize(j) == 0)
+        {
+            assert(row_size == 1);
+            graphDT_data[graphDT_i[j]] = -1.;
+        }
+    }
+    return unique_ptr<mfem::SparseMatrix>(mfem::Transpose(graphDT));
+}
+
+void MixedMatrix::AssembleM(const mfem::Vector& elem_scale) const
+{
+    const int num_elem = elem_edof_->Height();
+    mfem::Array<int> edofs;
+    assert(D_);
+    M_ = make_unique<mfem::SparseMatrix>(D_->Width());
+    for (int elem = 0; elem < num_elem; elem++)
+    {
+        GetTableRow(*elem_edof_, elem, edofs);
+        const double scale = elem_scale(elem);
+        if (scale == 1.0)
+        {
+            M_->AddSubMatrix(edofs, edofs, M_el_[elem]);
+        }
+        else
+        {
+            mfem::DenseMatrix elem_M = M_el_[elem];
+            elem_M *= scale;
+            M_->AddSubMatrix(edofs, edofs, elem_M);
+        }
+    }
+    M_->Finalize();
+}
+
+void MixedMatrix::AssembleM() const
+{
+    mfem::Vector elem_scale(elem_edof_->Height());
+    elem_scale = 1.0;
+    AssembleM(elem_scale);
 }
 
 } // namespace smoothg
