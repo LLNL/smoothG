@@ -89,8 +89,15 @@ target_include_directories(smoothG
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-add_subdirectory(examples)
+# Astyle
+find_program(ASTYLE_COMMAND astyle HINTS ${ASTYLE_DIR})
+add_custom_target(style
+    ${ASTYLE_COMMAND} --options=smoothg.astylerc src/*.cpp include/*.hpp examples/*.?pp # testcode/*.?pp
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    COMMENT "Formating source code" VERBATIM
+    )
 
+# Installation
 include(GNUInstallDirs)
 set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/libsmoothg)
 
@@ -102,12 +109,14 @@ install(TARGETS smoothG
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
+# Export targets to a script
 install(EXPORT smoothg-targets
     FILE smoothgTargets.cmake
     NAMESPACE smoothg::
     DESTINATION ${INSTALL_CONFIGDIR}
 )
 
+# Create Config files
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/smoothgConfigVersion.cmake
@@ -121,15 +130,19 @@ configure_package_config_file(
     INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
 )
 
+# Install Config files
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/smoothgConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/smoothgConfigVersion.cmake
     DESTINATION ${INSTALL_CONFIGDIR}
 )
 
+# Export from the build tree
 export(EXPORT smoothg-targets
        FILE ${CMAKE_CURRENT_BINARY_DIR}/smoothgTargets.cmake
        NAMESPACE smoothg::
        )
 
 export(PACKAGE smoothG)
+
+add_subdirectory(examples)
