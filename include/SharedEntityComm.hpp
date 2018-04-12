@@ -30,66 +30,66 @@ namespace smoothg
 template <typename T>
 class SharedEntityComm
 {
-    public:
-        SharedEntityComm(const ParMatrix& entity_true_entity);
+public:
+    SharedEntityComm(const ParMatrix& entity_true_entity);
 
-        void ReduceSend(int entity, T mat);
+    void ReduceSend(int entity, T mat);
 
-        bool IsOwnedByMe(int entity) const;
+    bool IsOwnedByMe(int entity) const;
 
-        int GetTrueEntity(int entity) const;
+    int GetTrueEntity(int entity) const;
 
-        std::vector<std::vector<T>> Collect();
+    std::vector<std::vector<T>> Collect();
 
-        void Broadcast(std::vector<T>& mats);
+    void Broadcast(std::vector<T>& mats);
 
-    private:
-        void MakeEntityProc();
+private:
+    void MakeEntityProc();
 
-        void SetSizeSpecifier();
-        std::vector<int> PackSendSize(const T& mat) const;
+    void SetSizeSpecifier();
+    std::vector<int> PackSendSize(const T& mat) const;
 
-        void SendData(const T& mat, int recipient, int tag, MPI_Request& request) const;
-        T ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const;
+    void SendData(const T& mat, int recipient, int tag, MPI_Request& request) const;
+    T ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const;
 
-        void ReducePrepare();
+    void ReducePrepare();
 
-        void BroadcastSizes(std::vector<T>& mats);
-        void BroadcastData(std::vector<T>& mats);
+    void BroadcastSizes(std::vector<T>& mats);
+    void BroadcastData(std::vector<T>& mats);
 
-        const ParMatrix& entity_true_entity_;
-        SparseMatrix entity_diag_T_;
-        SparseMatrix entity_offd_T_;
+    const ParMatrix& entity_true_entity_;
+    SparseMatrix entity_diag_T_;
+    SparseMatrix entity_offd_T_;
 
-        parlinalgcpp::ParCommPkg comm_pkg_;
+    parlinalgcpp::ParCommPkg comm_pkg_;
 
-        MPI_Comm comm_;
-        MPI_Comm myid_;
+    MPI_Comm comm_;
+    MPI_Comm myid_;
 
-        int num_entities_;
-        int size_specifier_;
-        int send_counter_;
+    int num_entities_;
+    int size_specifier_;
+    int send_counter_;
 
-        std::vector<int> entity_master_;
-        std::vector<int> entity_slave_id_;
+    std::vector<int> entity_master_;
+    std::vector<int> entity_slave_id_;
 
-        int num_master_comms_;
-        int num_slave_comms_;
+    int num_master_comms_;
+    int num_slave_comms_;
 
-        linalgcpp::SparseMatrix<int> entity_proc_;
+    linalgcpp::SparseMatrix<int> entity_proc_;
 
-        std::vector<T> send_buffer_;
-        std::vector<std::vector<T>> recv_buffer_;
+    std::vector<T> send_buffer_;
+    std::vector<std::vector<T>> recv_buffer_;
 
-        std::vector<std::vector<int>> send_headers_;
-        std::vector<std::vector<int>> recv_headers_;
+    std::vector<std::vector<int>> send_headers_;
+    std::vector<std::vector<int>> recv_headers_;
 
-        std::vector<MPI_Request> header_requests_;
-        std::vector<MPI_Request> data_requests_;
+    std::vector<MPI_Request> header_requests_;
+    std::vector<MPI_Request> data_requests_;
 
-        bool preparing_to_reduce_;
+    bool preparing_to_reduce_;
 
-        enum { ENTITY_HEADER_TAG, ENTITY_MESSAGE_TAG, };
+    enum { ENTITY_HEADER_TAG, ENTITY_MESSAGE_TAG, };
 };
 
 template <typename T>
@@ -367,7 +367,7 @@ std::vector<std::vector<T>> SharedEntityComm<T>::Collect()
             int column = 1 + received_entities[entity];
 
             recv_buffer_[row][column] = ReceiveData(header, neighbor, ENTITY_MESSAGE_TAG,
-                    data_requests_[num_slave_comms_ + data_receive_counter]);
+                                                    data_requests_[num_slave_comms_ + data_receive_counter]);
 
             received_entities[entity]++;
             data_receive_counter++;
@@ -376,7 +376,7 @@ std::vector<std::vector<T>> SharedEntityComm<T>::Collect()
 
     std::vector<MPI_Status> data_statuses(num_slave_comms_ + num_master_comms_);
     MPI_Waitall(num_slave_comms_ + num_master_comms_,
-            data_requests_.data(), data_statuses.data());
+                data_requests_.data(), data_statuses.data());
 
     preparing_to_reduce_ = false;
 
@@ -431,8 +431,8 @@ void SharedEntityComm<T>::BroadcastSizes(std::vector<T>& mats)
                 send_headers_[send_counter] = PackSendSize(mats[entity]);
 
                 MPI_Isend(send_headers_[send_counter].data(), size_specifier_,
-                        MPI_INT, neighbor, ENTITY_HEADER_TAG, comm_,
-                        &header_requests_[num_slave_comms_ + send_counter]);
+                          MPI_INT, neighbor, ENTITY_HEADER_TAG, comm_,
+                          &header_requests_[num_slave_comms_ + send_counter]);
                 send_counter++;
             }
         }
@@ -479,7 +479,7 @@ void SharedEntityComm<T>::BroadcastData(std::vector<T>& mats)
             if (neighbor != myid_)
             {
                 SendData(mats[entity], neighbor, ENTITY_MESSAGE_TAG,
-                        data_requests_[num_slave_comms_ + send_counter]);
+                         data_requests_[num_slave_comms_ + send_counter]);
                 send_counter++;
             }
         }

@@ -24,7 +24,7 @@ namespace smoothg
 {
 
 GraphCoarsen::GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
-        int max_evects, double spect_tol)
+                           int max_evects, double spect_tol)
     : max_evects_(max_evects), spect_tol_(spect_tol),
       vertex_targets_(gt.agg_ext_edge_.Rows()),
       edge_targets_(gt.face_edge_.Rows()),
@@ -79,7 +79,7 @@ GraphCoarsen& GraphCoarsen::operator=(GraphCoarsen other) noexcept
 
     return *this;
 }
-    
+
 void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept
 {
     std::swap(lhs.max_evects_, rhs.max_evects_);
@@ -98,7 +98,7 @@ void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept
 }
 
 void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
-        const ParMatrix& M_ext_global, const ParMatrix& D_ext_global)
+                                        const ParMatrix& M_ext_global, const ParMatrix& D_ext_global)
 {
     const SparseMatrix& M_ext = M_ext_global.GetDiag();
     const SparseMatrix& D_ext = D_ext_global.GetDiag();
@@ -151,7 +151,7 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
 }
 
 std::vector<std::vector<DenseMatrix>> GraphCoarsen::CollectSigma(const GraphTopology& gt,
-        const SparseMatrix& face_edge)
+                                                                 const SparseMatrix& face_edge)
 {
     SharedEntityComm<DenseMatrix> sec_sigma(gt.face_true_face_);
 
@@ -179,7 +179,7 @@ std::vector<std::vector<DenseMatrix>> GraphCoarsen::CollectSigma(const GraphTopo
                 std::vector<int> edge_dofs_ext = GetExtDofs(gt.agg_ext_edge_, agg);
 
                 DenseMatrix face_restrict = RestrictLocal(agg_ext_sigma_[agg], col_marker_,
-                        edge_dofs_ext, face_dofs);
+                                                          edge_dofs_ext, face_dofs);
 
                 face_sigma.SetCol(col_count, face_restrict);
                 col_count += face_restrict.Cols();
@@ -195,7 +195,7 @@ std::vector<std::vector<DenseMatrix>> GraphCoarsen::CollectSigma(const GraphTopo
 }
 
 std::vector<std::vector<SparseMatrix>> GraphCoarsen::CollectD(const GraphTopology& gt,
-        const SparseMatrix& D_local)
+                                                              const SparseMatrix& D_local)
 {
 
     SharedEntityComm<SparseMatrix> sec_D(gt.face_true_face_);
@@ -212,11 +212,11 @@ std::vector<std::vector<SparseMatrix>> GraphCoarsen::CollectD(const GraphTopolog
         {
             std::vector<int> agg_edges = gt.agg_edge_local_.GetIndices(agg);
             edge_ext_dofs.insert(std::end(edge_ext_dofs), std::begin(agg_edges),
-                                          std::end(agg_edges));
+                                 std::end(agg_edges));
 
             std::vector<int> agg_vertices = gt.agg_vertex_local_.GetIndices(agg);
             vertex_ext_dofs.insert(std::end(vertex_ext_dofs), std::begin(agg_vertices),
-                                          std::end(agg_vertices));
+                                   std::end(agg_vertices));
         }
 
         SparseMatrix D_face = D_local.GetSubMatrix(vertex_ext_dofs, edge_ext_dofs, col_marker_);
@@ -228,7 +228,7 @@ std::vector<std::vector<SparseMatrix>> GraphCoarsen::CollectD(const GraphTopolog
 }
 
 std::vector<std::vector<std::vector<double>>> GraphCoarsen::CollectM(const GraphTopology& gt,
-        const SparseMatrix& M_local)
+                                                                     const SparseMatrix& M_local)
 {
     SharedEntityComm<std::vector<double>> sec_M(gt.face_true_face_);
 
@@ -256,8 +256,8 @@ std::vector<std::vector<std::vector<double>>> GraphCoarsen::CollectM(const Graph
 }
 
 void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
-                                const MixedMatrix& mgl,
-                                const ParMatrix& face_perm_edge)
+                                      const MixedMatrix& mgl,
+                                      const ParMatrix& face_perm_edge)
 {
     const SparseMatrix& face_edge = face_perm_edge.GetDiag();
 
@@ -357,7 +357,8 @@ void GraphCoarsen::ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix&
     }
 }
 
-std::vector<double> GraphCoarsen::Combine(const std::vector<std::vector<double>>& face_M, int num_face_edges) const
+std::vector<double> GraphCoarsen::Combine(const std::vector<std::vector<double>>& face_M,
+                                          int num_face_edges) const
 {
     assert(face_M.size() == 2);
 
@@ -381,7 +382,8 @@ std::vector<double> GraphCoarsen::Combine(const std::vector<std::vector<double>>
     return combined;
 }
 
-SparseMatrix GraphCoarsen::Combine(const std::vector<SparseMatrix>& face_D, int num_face_edges) const
+SparseMatrix GraphCoarsen::Combine(const std::vector<SparseMatrix>& face_D,
+                                   int num_face_edges) const
 {
     assert(face_D.size() == 2);
 
@@ -403,7 +405,7 @@ SparseMatrix GraphCoarsen::Combine(const std::vector<SparseMatrix>& face_D, int 
 
     std::vector<int> indices = face_D[0].GetIndices();
     indices.insert(std::end(indices), std::begin(face_D[1].GetIndices()),
-                  std::end(face_D[1].GetIndices()));
+                   std::end(face_D[1].GetIndices()));
 
     int col_offset = face_D[0].Cols() - num_face_edges;
     int nnz_end = indices.size();
@@ -418,7 +420,7 @@ SparseMatrix GraphCoarsen::Combine(const std::vector<SparseMatrix>& face_D, int 
 
     std::vector<double> data = face_D[0].GetData();
     data.insert(std::end(data), std::begin(face_D[1].GetData()),
-                  std::end(face_D[1].GetData()));
+                std::end(face_D[1].GetData()));
 
     return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
                         rows, cols);
@@ -499,7 +501,7 @@ void GraphCoarsen::BuildAggBubbleDof()
     std::vector<double> data(num_bubbles, 1.0);
 
     agg_bubble_dof_ = SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-                              num_aggs, num_traces + num_bubbles);
+                                   num_aggs, num_traces + num_bubbles);
 }
 
 void GraphCoarsen::BuildPvertex(const GraphTopology& gt)

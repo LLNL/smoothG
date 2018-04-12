@@ -34,55 +34,56 @@ namespace smoothg
 
 class MixedMatrix
 {
-    public:
-        MixedMatrix() = default;
-        MixedMatrix(const Graph& graph, const std::vector<double>& global_weight);
-        MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local, ParMatrix edge_true_edge);
+public:
+    MixedMatrix() = default;
+    MixedMatrix(const Graph& graph, const std::vector<double>& global_weight);
+    MixedMatrix(SparseMatrix M_local, SparseMatrix D_local, SparseMatrix W_local,
+                ParMatrix edge_true_edge);
 
-        ~MixedMatrix() noexcept = default;
+    ~MixedMatrix() noexcept = default;
 
-        MixedMatrix(const MixedMatrix& other) noexcept;
-        MixedMatrix(MixedMatrix&& other) noexcept;
-        MixedMatrix& operator=(MixedMatrix other) noexcept;
+    MixedMatrix(const MixedMatrix& other) noexcept;
+    MixedMatrix(MixedMatrix&& other) noexcept;
+    MixedMatrix& operator=(MixedMatrix other) noexcept;
 
-        friend void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept;
+    friend void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept;
 
-        int Rows() const;
-        int Cols() const;
+    int Rows() const;
+    int Cols() const;
 
-        int GlobalRows() const;
-        int GlobalCols() const;
+    int GlobalRows() const;
+    int GlobalCols() const;
 
-        int NNZ() const;
-        int GlobalNNZ() const;
+    int NNZ() const;
+    int GlobalNNZ() const;
 
-        bool CheckW() const;
+    bool CheckW() const;
 
-        SparseMatrix M_local_;
-        SparseMatrix D_local_;
-        SparseMatrix W_local_;
+    SparseMatrix M_local_;
+    SparseMatrix D_local_;
+    SparseMatrix W_local_;
 
-        ParMatrix M_global_;
-        ParMatrix D_global_;
-        ParMatrix W_global_;
+    ParMatrix M_global_;
+    ParMatrix D_global_;
+    ParMatrix W_global_;
 
-        ParMatrix edge_true_edge_;
+    ParMatrix edge_true_edge_;
 
-        std::vector<int> offsets_;
-        std::vector<int> true_offsets_;
+    std::vector<int> offsets_;
+    std::vector<int> true_offsets_;
 
-        ParMatrix ToPrimal() const;
+    ParMatrix ToPrimal() const;
 
-    private:
-        void Init();
+private:
+    void Init();
 
-        SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
-                        const ParMatrix& edge_edge,
-                        const std::vector<int>& edge_map,
-                        const std::vector<double>& global_weight);
+    SparseMatrix MakeLocalM(const ParMatrix& edge_true_edge,
+                            const ParMatrix& edge_edge,
+                            const std::vector<int>& edge_map,
+                            const std::vector<double>& global_weight);
 
-        SparseMatrix MakeLocalD(const ParMatrix& edge_true_edge,
-                const SparseMatrix& vertex_edge);
+    SparseMatrix MakeLocalD(const ParMatrix& edge_true_edge,
+                            const SparseMatrix& vertex_edge);
 
 
 };

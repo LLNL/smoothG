@@ -58,7 +58,7 @@ using Timer = linalgcpp::Timer;
 int MyId(MPI_Comm comm = MPI_COMM_WORLD);
 
 ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
-                                         const std::vector<int>& edge_map);
+                           const std::vector<int>& edge_map);
 
 SparseMatrix RestrictInterior(const SparseMatrix& mat);
 ParMatrix RestrictInterior(const ParMatrix& mat);
@@ -90,7 +90,8 @@ DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,
 double DivError(MPI_Comm comm, const SparseMatrix& D, const VectorView& numer,
                 const VectorView& denom);
 double CompareError(MPI_Comm comm, const VectorView& numer, const VectorView& denom);
-void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::cout, bool pretty = true);
+void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::cout,
+                bool pretty = true);
 std::vector<double> ComputeErrors(MPI_Comm comm, const SparseMatrix& M,
                                   const SparseMatrix& D,
                                   const BlockVector& upscaled_sol,

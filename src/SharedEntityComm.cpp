@@ -70,34 +70,34 @@ template<>
 std::vector<int>
 SharedEntityComm<Vector>::PackSendSize(const Vector& vect) const
 {
-    return std::vector<int>{static_cast<int>(vect.size())};
+    return std::vector<int> {static_cast<int>(vect.size())};
 }
 
 template<>
 std::vector<int>
 SharedEntityComm<std::vector<double>>::PackSendSize(const std::vector<double>& vect) const
 {
-    return std::vector<int>{static_cast<int>(vect.size())};
+    return std::vector<int> {static_cast<int>(vect.size())};
 }
 
 template<>
 std::vector<int>
 SharedEntityComm<DenseMatrix>::PackSendSize(const DenseMatrix& mat) const
 {
-    return std::vector<int>{mat.Rows(), mat.Cols()};
+    return std::vector<int> {mat.Rows(), mat.Cols()};
 }
 
 template<>
 std::vector<int>
 SharedEntityComm<SparseMatrix>::PackSendSize(const SparseMatrix& mat) const
 {
-    return std::vector<int>{mat.Rows(), mat.Cols(), mat.nnz()};
+    return std::vector<int> {mat.Rows(), mat.Cols(), mat.nnz()};
 }
 
 template<>
 void
 SharedEntityComm<Vector>::SendData(const Vector& vect,
-        int recipient, int tag, MPI_Request& request) const
+                                   int recipient, int tag, MPI_Request& request) const
 {
     MPI_Isend(std::begin(vect), vect.size(), MPI_DOUBLE,
               recipient, tag, comm_, &request);
@@ -106,7 +106,7 @@ SharedEntityComm<Vector>::SendData(const Vector& vect,
 template<>
 void
 SharedEntityComm<std::vector<double>>::SendData(const std::vector<double>& vect,
-        int recipient, int tag, MPI_Request& request) const
+                                                int recipient, int tag, MPI_Request& request) const
 {
     MPI_Isend(vect.data(), vect.size(), MPI_DOUBLE,
               recipient, tag, comm_, &request);
@@ -115,7 +115,7 @@ SharedEntityComm<std::vector<double>>::SendData(const std::vector<double>& vect,
 template<>
 void
 SharedEntityComm<DenseMatrix>::SendData(const DenseMatrix& mat,
-        int recipient, int tag, MPI_Request& request) const
+                                        int recipient, int tag, MPI_Request& request) const
 {
     MPI_Isend(mat.GetData(), mat.Rows() * mat.Cols(), MPI_DOUBLE,
               recipient, tag, comm_, &request);
@@ -124,7 +124,7 @@ SharedEntityComm<DenseMatrix>::SendData(const DenseMatrix& mat,
 template<>
 void
 SharedEntityComm<SparseMatrix>::SendData(const SparseMatrix& mat,
-        int recipient, int tag, MPI_Request& request) const
+                                         int recipient, int tag, MPI_Request& request) const
 {
     MPI_Isend(mat.GetIndptr().data(), mat.Rows() + 1, MPI_INT,
               recipient, tag, comm_, &request);
@@ -135,7 +135,8 @@ SharedEntityComm<SparseMatrix>::SendData(const SparseMatrix& mat,
 }
 
 template<>
-Vector SharedEntityComm<Vector>::ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const
+Vector SharedEntityComm<Vector>::ReceiveData(const std::vector<int>& sizes, int sender, int tag,
+                                             MPI_Request& request) const
 {
     const int size = sizes[0];
 
@@ -149,7 +150,8 @@ Vector SharedEntityComm<Vector>::ReceiveData(const std::vector<int>& sizes, int 
 
 template<>
 std::vector<double>
-SharedEntityComm<std::vector<double>>::ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const
+SharedEntityComm<std::vector<double>>::ReceiveData(const std::vector<int>& sizes, int sender,
+                                                   int tag, MPI_Request& request) const
 {
     const int size = sizes[0];
 
@@ -162,7 +164,8 @@ SharedEntityComm<std::vector<double>>::ReceiveData(const std::vector<int>& sizes
 }
 
 template<>
-DenseMatrix SharedEntityComm<DenseMatrix>::ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const
+DenseMatrix SharedEntityComm<DenseMatrix>::ReceiveData(const std::vector<int>& sizes, int sender,
+                                                       int tag, MPI_Request& request) const
 {
     const int rows = sizes[0];
     const int cols = sizes[1];
@@ -178,7 +181,8 @@ DenseMatrix SharedEntityComm<DenseMatrix>::ReceiveData(const std::vector<int>& s
 }
 
 template<>
-SparseMatrix SharedEntityComm<SparseMatrix>::ReceiveData(const std::vector<int>& sizes, int sender, int tag, MPI_Request& request) const
+SparseMatrix SharedEntityComm<SparseMatrix>::ReceiveData(const std::vector<int>& sizes, int sender,
+                                                         int tag, MPI_Request& request) const
 {
     const int rows = sizes[0];
     const int cols = sizes[1];

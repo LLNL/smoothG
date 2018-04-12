@@ -32,34 +32,34 @@ namespace smoothg
 */
 class GraphEdgeSolver
 {
-    public:
-        GraphEdgeSolver() = default;
-        GraphEdgeSolver(const SparseMatrix& M, const SparseMatrix& D);
-        GraphEdgeSolver(const std::vector<double>& M_data,
+public:
+    GraphEdgeSolver() = default;
+    GraphEdgeSolver(const SparseMatrix& M, const SparseMatrix& D);
+    GraphEdgeSolver(const std::vector<double>& M_data,
                     const SparseMatrix& D);
 
-        ~GraphEdgeSolver() noexcept = default;
+    ~GraphEdgeSolver() noexcept = default;
 
-        GraphEdgeSolver(const GraphEdgeSolver& other) noexcept;
-        GraphEdgeSolver(GraphEdgeSolver&& other) noexcept;
-        GraphEdgeSolver& operator=(GraphEdgeSolver other) noexcept;
+    GraphEdgeSolver(const GraphEdgeSolver& other) noexcept;
+    GraphEdgeSolver(GraphEdgeSolver&& other) noexcept;
+    GraphEdgeSolver& operator=(GraphEdgeSolver other) noexcept;
 
-        friend void swap(GraphEdgeSolver& lhs, GraphEdgeSolver& rhs) noexcept;
+    friend void swap(GraphEdgeSolver& lhs, GraphEdgeSolver& rhs) noexcept;
 
-        Vector Mult(const VectorView& input) const;
-        void Mult(const VectorView& input, VectorView& output) const;
+    Vector Mult(const VectorView& input) const;
+    void Mult(const VectorView& input, VectorView& output) const;
 
-        DenseMatrix Mult(const DenseMatrix& input) const;
-        void Mult(const DenseMatrix& input, DenseMatrix& output) const;
+    DenseMatrix Mult(const DenseMatrix& input) const;
+    void Mult(const DenseMatrix& input, DenseMatrix& output) const;
 
-        void PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const;
-        void PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const;
+    void PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const;
+    void PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const;
 
-    private:
-        SparseMatrix MinvDT_;
-        SparseSolver Ainv_;
+private:
+    SparseMatrix MinvDT_;
+    SparseSolver Ainv_;
 
-        mutable Vector vect_sol_;
+    mutable Vector vect_sol_;
 };
 
 } // namespace smoothg

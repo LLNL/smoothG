@@ -24,10 +24,10 @@ namespace smoothg
 {
 
 GraphUpscale::GraphUpscale(MPI_Comm comm,
-                 const linalgcpp::SparseMatrix<double>& vertex_edge_global,
-                 const std::vector<int>& partitioning_global,
-                 double spect_tol, int max_evects,
-                 const std::vector<double>& weight_global)
+                           const linalgcpp::SparseMatrix<double>& vertex_edge_global,
+                           const std::vector<int>& partitioning_global,
+                           double spect_tol, int max_evects,
+                           const std::vector<double>& weight_global)
     : Upscale(comm),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
       spect_tol_(spect_tol), max_evects_(max_evects)
@@ -41,10 +41,10 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm,
-                 const SparseMatrix& vertex_edge_global,
-                 double coarse_factor,
-                 double spect_tol, int max_evects,
-                 const std::vector<double>& weight_global)
+                           const SparseMatrix& vertex_edge_global,
+                           double coarse_factor,
+                           double spect_tol, int max_evects,
+                           const std::vector<double>& weight_global)
     : Upscale(comm),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
       spect_tol_(spect_tol), max_evects_(max_evects)
@@ -66,8 +66,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 }
 
 void GraphUpscale::Init(const SparseMatrix& vertex_edge,
-              const std::vector<int>& global_partitioning,
-              const std::vector<double>& weight)
+                        const std::vector<int>& global_partitioning,
+                        const std::vector<double>& weight)
 {
     graph_ = Graph(comm_, vertex_edge, global_partitioning);
     mgl_.emplace_back(graph_, weight);

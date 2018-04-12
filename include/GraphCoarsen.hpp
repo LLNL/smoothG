@@ -37,74 +37,75 @@ namespace smoothg
 
 class GraphCoarsen
 {
-    public:
-        GraphCoarsen() = default;
-        GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
-                int max_evects, double spect_tol);
+public:
+    GraphCoarsen() = default;
+    GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
+                 int max_evects, double spect_tol);
 
-        ~GraphCoarsen() noexcept = default;
+    ~GraphCoarsen() noexcept = default;
 
-        GraphCoarsen(const GraphCoarsen& other) noexcept;
-        GraphCoarsen(GraphCoarsen&& other) noexcept;
-        GraphCoarsen& operator=(GraphCoarsen other) noexcept;
+    GraphCoarsen(const GraphCoarsen& other) noexcept;
+    GraphCoarsen(GraphCoarsen&& other) noexcept;
+    GraphCoarsen& operator=(GraphCoarsen other) noexcept;
 
-        friend void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept;
+    friend void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept;
 
-        MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl) const;
+    MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl) const;
 
-        Vector Interpolate(const VectorView& coarse_vect) const;
-        void Interpolate(const VectorView& coarse_vect, VectorView fine_vect) const;
+    Vector Interpolate(const VectorView& coarse_vect) const;
+    void Interpolate(const VectorView& coarse_vect, VectorView fine_vect) const;
 
-        Vector Restrict(const VectorView& fine_vect) const;
-        void Restrict(const VectorView& fine_vect, VectorView coarse_vect) const;
+    Vector Restrict(const VectorView& fine_vect) const;
+    void Restrict(const VectorView& fine_vect, VectorView coarse_vect) const;
 
-        BlockVector Interpolate(const BlockVector& coarse_vect) const;
-        void Interpolate(const BlockVector& coarse_vect, BlockVector& fine_vect) const;
+    BlockVector Interpolate(const BlockVector& coarse_vect) const;
+    void Interpolate(const BlockVector& coarse_vect, BlockVector& fine_vect) const;
 
-        BlockVector Restrict(const BlockVector& fine_vect) const;
-        void Restrict(const BlockVector& fine_vect, BlockVector& coarse_vect) const;
+    BlockVector Restrict(const BlockVector& fine_vect) const;
+    void Restrict(const BlockVector& fine_vect, BlockVector& coarse_vect) const;
 
-    private:
-        template <class T>
-        using Vect2D = std::vector<std::vector<T>>;
+private:
+    template <class T>
+    using Vect2D = std::vector<std::vector<T>>;
 
-        void ComputeVertexTargets(const GraphTopology& gt, const ParMatrix& M_ext, const ParMatrix& D_ext);
-        void ComputeEdgeTargets(const GraphTopology& gt,
-                                const MixedMatrix& mgl,
-                                const ParMatrix& face_edge_perm);
-        void ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local);
+    void ComputeVertexTargets(const GraphTopology& gt, const ParMatrix& M_ext, const ParMatrix& D_ext);
+    void ComputeEdgeTargets(const GraphTopology& gt,
+                            const MixedMatrix& mgl,
+                            const ParMatrix& face_edge_perm);
+    void ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local);
 
 
-        Vect2D<DenseMatrix> CollectSigma(const GraphTopology& gt, const SparseMatrix& face_edge);
-        Vect2D<SparseMatrix> CollectD(const GraphTopology& gt, const SparseMatrix& D_local);
-        Vect2D<std::vector<double>> CollectM(const GraphTopology& gt, const SparseMatrix& M_local);
+    Vect2D<DenseMatrix> CollectSigma(const GraphTopology& gt, const SparseMatrix& face_edge);
+    Vect2D<SparseMatrix> CollectD(const GraphTopology& gt, const SparseMatrix& D_local);
+    Vect2D<std::vector<double>> CollectM(const GraphTopology& gt, const SparseMatrix& M_local);
 
-        std::vector<double> Combine(const std::vector<std::vector<double>>& face_M, int num_face_edges) const;
-        SparseMatrix Combine(const std::vector<SparseMatrix>& face_D, int num_face_edges) const;
+    std::vector<double> Combine(const std::vector<std::vector<double>>& face_M,
+                                int num_face_edges) const;
+    SparseMatrix Combine(const std::vector<SparseMatrix>& face_D, int num_face_edges) const;
 
-        Vector MakeOneNegOne(int size, int split) const;
+    Vector MakeOneNegOne(int size, int split) const;
 
-        int GetSplit(const GraphTopology& gt, int face) const;
+    int GetSplit(const GraphTopology& gt, int face) const;
 
-        void BuildAggBubbleDof();
-        void BuildFaceCoarseDof(const GraphTopology& gt);
-        void BuildPvertex(const GraphTopology& gt);
-        void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
-        ParMatrix BuildEdgeTrueEdge(const GraphTopology& gt) const;
+    void BuildAggBubbleDof();
+    void BuildFaceCoarseDof(const GraphTopology& gt);
+    void BuildPvertex(const GraphTopology& gt);
+    void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
+    ParMatrix BuildEdgeTrueEdge(const GraphTopology& gt) const;
 
-        int max_evects_;
-        double spect_tol_;
+    int max_evects_;
+    double spect_tol_;
 
-        SparseMatrix P_edge_;
-        SparseMatrix P_vertex_;
-        SparseMatrix face_cdof_;
-        SparseMatrix agg_bubble_dof_;
+    SparseMatrix P_edge_;
+    SparseMatrix P_vertex_;
+    SparseMatrix face_cdof_;
+    SparseMatrix agg_bubble_dof_;
 
-        std::vector<DenseMatrix> vertex_targets_;
-        std::vector<DenseMatrix> edge_targets_;
-        std::vector<DenseMatrix> agg_ext_sigma_;
+    std::vector<DenseMatrix> vertex_targets_;
+    std::vector<DenseMatrix> edge_targets_;
+    std::vector<DenseMatrix> agg_ext_sigma_;
 
-        std::vector<int> col_marker_;
+    std::vector<int> col_marker_;
 };
 
 } // namespace smoothg

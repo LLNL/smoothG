@@ -107,7 +107,7 @@ GraphTopology& GraphTopology::operator=(GraphTopology other) noexcept
 
     return *this;
 }
-    
+
 void swap(GraphTopology& lhs, GraphTopology& rhs) noexcept
 {
     swap(lhs.agg_vertex_local_, rhs.agg_vertex_local_);
@@ -163,13 +163,13 @@ SparseMatrix GraphTopology::MakeFaceAggInt(const ParMatrix& agg_agg)
     assert(count == num_faces);
 
     return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-            num_faces, num_aggs);
+                        num_faces, num_aggs);
 }
 
 SparseMatrix GraphTopology::MakeFaceEdge(const ParMatrix& agg_agg,
-        const ParMatrix& edge_ext_agg,
-        const SparseMatrix& agg_edge_ext,
-        const SparseMatrix& face_edge_ext)
+                                         const ParMatrix& edge_ext_agg,
+                                         const SparseMatrix& agg_edge_ext,
+                                         const SparseMatrix& face_edge_ext)
 {
     const auto& agg_agg_diag = agg_agg.GetDiag();
     const auto& agg_agg_offd = agg_agg.GetOffd();
@@ -244,11 +244,11 @@ SparseMatrix GraphTopology::MakeFaceEdge(const ParMatrix& agg_agg,
     std::vector<double> data(indices.size(), 1);
 
     return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-            num_faces, num_edges);
+                        num_faces, num_edges);
 }
 
 SparseMatrix GraphTopology::ExtendFaceAgg(const ParMatrix& agg_agg,
-        const SparseMatrix& face_agg_int)
+                                          const SparseMatrix& face_agg_int)
 {
     const auto& agg_agg_offd = agg_agg.GetOffd();
 
@@ -273,7 +273,7 @@ SparseMatrix GraphTopology::ExtendFaceAgg(const ParMatrix& agg_agg,
     std::vector<double> data(indices.size(), 1);
 
     return SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
-            num_faces, num_aggs);
+                        num_faces, num_aggs);
 }
 
 

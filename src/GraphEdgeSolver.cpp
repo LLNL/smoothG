@@ -29,7 +29,7 @@ GraphEdgeSolver::GraphEdgeSolver(const SparseMatrix& M, const SparseMatrix& D)
 }
 
 GraphEdgeSolver::GraphEdgeSolver(const std::vector<double>& M_data,
-                         const SparseMatrix& D)
+                                 const SparseMatrix& D)
     : MinvDT_(D.Transpose()), vect_sol_(D.Rows(), 0.0)
 {
     MinvDT_.InverseScaleRows(M_data);
@@ -59,7 +59,7 @@ GraphEdgeSolver& GraphEdgeSolver::operator=(GraphEdgeSolver other) noexcept
 
     return *this;
 }
-    
+
 void swap(GraphEdgeSolver& lhs, GraphEdgeSolver& rhs) noexcept
 {
     swap(lhs.MinvDT_, rhs.MinvDT_);
@@ -115,7 +115,8 @@ void GraphEdgeSolver::PartMult(int offset, const DenseMatrix& input, DenseMatrix
     PartMult(offset, input.Cols(), input, output);
 }
 
-void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const
+void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input,
+                               DenseMatrix& output) const
 {
     assert(start >= 0);
     assert(end <= input.Cols());

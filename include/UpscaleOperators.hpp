@@ -104,7 +104,8 @@ private:
 class UpscaleFineSolve : public linalgcpp::Operator
 {
 public:
-    UpscaleFineSolve(const Upscale& A) : linalgcpp::Operator(A.GetFineMatrix().D_local_.Rows()), A_(A)  { }
+    UpscaleFineSolve(const Upscale& A) : linalgcpp::Operator(A.GetFineMatrix().D_local_.Rows()),
+        A_(A)  { }
     void Mult(const VectorView& x, VectorView y) const { A_.SolveFine(x, y); }
 
 private:
@@ -156,7 +157,7 @@ class UpscaleCoarseBlockSolve : public linalgcpp::Operator
 {
 public:
     UpscaleCoarseBlockSolve(const Upscale& A) : linalgcpp::Operator(A.GetCoarseMatrix().Rows()),
-    A_(A), x_(A_.CoarseBlockOffsets()), y_(A_.CoarseBlockOffsets()) { }
+        A_(A), x_(A_.CoarseBlockOffsets()), y_(A_.CoarseBlockOffsets()) { }
 
     void Mult(const VectorView& x, VectorView y) const
     {

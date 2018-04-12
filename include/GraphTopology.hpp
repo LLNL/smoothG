@@ -34,40 +34,40 @@ namespace smoothg
 
 class GraphTopology
 {
-    public:
-        GraphTopology() = default;
-        GraphTopology(MPI_Comm comm, const Graph& graph);
+public:
+    GraphTopology() = default;
+    GraphTopology(MPI_Comm comm, const Graph& graph);
 
-        ~GraphTopology() noexcept = default;
+    ~GraphTopology() noexcept = default;
 
-        GraphTopology(const GraphTopology& other) noexcept;
-        GraphTopology(GraphTopology&& other) noexcept;
-        GraphTopology& operator=(GraphTopology other) noexcept;
+    GraphTopology(const GraphTopology& other) noexcept;
+    GraphTopology(GraphTopology&& other) noexcept;
+    GraphTopology& operator=(GraphTopology other) noexcept;
 
-        friend void swap(GraphTopology& lhs, GraphTopology& rhs) noexcept;
+    friend void swap(GraphTopology& lhs, GraphTopology& rhs) noexcept;
 
-        SparseMatrix agg_vertex_local_;
-        SparseMatrix agg_edge_local_;
-        SparseMatrix face_edge_local_;
-        SparseMatrix face_agg_local_;
-        SparseMatrix agg_face_local_;
+    SparseMatrix agg_vertex_local_;
+    SparseMatrix agg_edge_local_;
+    SparseMatrix face_edge_local_;
+    SparseMatrix face_agg_local_;
+    SparseMatrix agg_face_local_;
 
-        ParMatrix face_face_;
-        ParMatrix face_true_face_;
-        ParMatrix face_edge_;
-        ParMatrix agg_ext_vertex_;
-        ParMatrix agg_ext_edge_;
+    ParMatrix face_face_;
+    ParMatrix face_true_face_;
+    ParMatrix face_edge_;
+    ParMatrix agg_ext_vertex_;
+    ParMatrix agg_ext_edge_;
 
-    private:
-        SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg);
+private:
+    SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg);
 
-        SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
-                const ParMatrix& edge_edge,
-                const SparseMatrix& agg_edge_ext,
-                const SparseMatrix& face_edge_ext);
+    SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,
+                              const ParMatrix& edge_edge,
+                              const SparseMatrix& agg_edge_ext,
+                              const SparseMatrix& face_edge_ext);
 
-        SparseMatrix ExtendFaceAgg(const ParMatrix& agg_agg,
-                const SparseMatrix& face_agg_int);
+    SparseMatrix ExtendFaceAgg(const ParMatrix& agg_agg,
+                               const SparseMatrix& face_agg_int);
 
 };
 

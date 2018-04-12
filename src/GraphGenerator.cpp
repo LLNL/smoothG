@@ -186,7 +186,7 @@ SparseMatrix GraphGenerator::Generate()
 }
 
 SparseMatrix GenerateGraph(MPI_Comm comm, int nvertices, int mean_degree, double beta,
-                                 double seed)
+                           double seed)
 {
     int myid;
     MPI_Comm_rank(comm, &myid);

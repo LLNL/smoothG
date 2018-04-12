@@ -85,7 +85,7 @@ MixedMatrix& MixedMatrix::operator=(MixedMatrix other) noexcept
 
     return *this;
 }
-    
+
 void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
 {
     swap(lhs.M_local_, rhs.M_local_);
@@ -103,9 +103,9 @@ void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
 }
 
 SparseMatrix MixedMatrix::MakeLocalM(const ParMatrix& edge_true_edge,
-                        const ParMatrix& edge_edge,
-                        const std::vector<int>& edge_map,
-                        const std::vector<double>& global_weight)
+                                     const ParMatrix& edge_edge,
+                                     const std::vector<int>& edge_map,
+                                     const std::vector<double>& global_weight)
 {
     int size = edge_map.size();
 
@@ -140,7 +140,7 @@ SparseMatrix MixedMatrix::MakeLocalM(const ParMatrix& edge_true_edge,
 }
 
 SparseMatrix MixedMatrix::MakeLocalD(const ParMatrix& edge_true_edge,
-                          const SparseMatrix& vertex_edge)
+                                     const SparseMatrix& vertex_edge)
 {
     SparseMatrix edge_vertex = vertex_edge.Transpose();
 
@@ -200,13 +200,13 @@ int MixedMatrix::GlobalCols() const
 int MixedMatrix::NNZ() const
 {
     return M_local_.nnz() + (2 * D_local_.nnz())
-         + W_local_.nnz();
+           + W_local_.nnz();
 }
 
 int MixedMatrix::GlobalNNZ() const
 {
     return M_global_.nnz() + (2 * D_global_.nnz())
-         + W_global_.nnz();
+           + W_global_.nnz();
 }
 
 bool MixedMatrix::CheckW() const

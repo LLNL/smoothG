@@ -24,7 +24,7 @@ namespace smoothg
 {
 
 Graph::Graph(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
-          const std::vector<int>& part_global)
+             const std::vector<int>& part_global)
 {
     assert(static_cast<int>(part_global.size()) == vertex_edge_global.Rows());
 
@@ -88,7 +88,7 @@ Graph& Graph::operator=(Graph other) noexcept
 
     return *this;
 }
-    
+
 void swap(Graph& lhs, Graph& rhs) noexcept
 {
     std::swap(lhs.edge_map_, rhs.edge_map_);

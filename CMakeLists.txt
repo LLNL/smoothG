@@ -145,4 +145,6 @@ export(EXPORT smoothg-targets
 
 export(PACKAGE smoothG)
 
+# Sub Directories
 add_subdirectory(examples)
+#add_subdirectory(testcode)

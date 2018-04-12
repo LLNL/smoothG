@@ -34,7 +34,7 @@ int MyId(MPI_Comm comm)
 }
 
 ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
-                                         const std::vector<int>& edge_map)
+                           const std::vector<int>& edge_map)
 {
     int myid;
     int num_procs;
@@ -57,7 +57,7 @@ ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
     int num_tedges_local = tedge_counter[myid + 1];
     int num_edge_diff = num_edges_local - num_tedges_local;
     std::partial_sum(std::begin(tedge_counter), std::end(tedge_counter),
-            std::begin(tedge_counter));
+                     std::begin(tedge_counter));
 
     assert(tedge_counter.back() == static_cast<int>(num_tedges_global));
 
@@ -97,7 +97,7 @@ ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
     {
         int tedge = edge_perm[edge_map[i]];
 
-        if ((tedge>= tedge_begin) && (tedge < tedge_end))
+        if ((tedge >= tedge_begin) && (tedge < tedge_end))
         {
             diag_indices[diag_counter++] = tedge - tedge_begin;
         }
@@ -131,14 +131,14 @@ ParMatrix MakeEdgeTrueEdge(MPI_Comm comm, const SparseMatrix& proc_edge,
     auto starts = parlinalgcpp::GenerateOffsets(comm, {num_edges_local, num_tedges_local});
 
     SparseMatrix diag(std::move(diag_indptr), std::move(diag_indices), std::move(diag_data),
-            num_edges_local, num_tedges_local);
+                      num_edges_local, num_tedges_local);
 
     SparseMatrix offd(std::move(offd_indptr), std::move(offd_indices), std::move(offd_data),
-            num_edges_local, num_edge_diff);
+                      num_edges_local, num_edge_diff);
 
     return ParMatrix(comm, starts[0], starts[1],
-            std::move(diag), std::move(offd),
-            std::move(col_map));
+                     std::move(diag), std::move(offd),
+                     std::move(col_map));
 }
 
 SparseMatrix RestrictInterior(const SparseMatrix& mat)
@@ -210,7 +210,7 @@ ParMatrix RestrictInterior(const ParMatrix& mat)
     indptr[num_rows] = offd_nnz;
 
     int offd_num_cols = std::count_if(std::begin(offd_marker), std::end(offd_marker),
-            [](int i) { return i > 0; });
+    [](int i) { return i > 0; });
 
     std::vector<HYPRE_Int> col_map(offd_num_cols);
     int count = 0;
@@ -248,10 +248,10 @@ ParMatrix RestrictInterior(const ParMatrix& mat)
 
     SparseMatrix diag = RestrictInterior(diag_ext);
     SparseMatrix offd(std::move(indptr), std::move(indices), std::move(data),
-            num_rows, offd_num_cols);
+                      num_rows, offd_num_cols);
 
     return ParMatrix(mat.GetComm(), mat.GetRowStarts(), mat.GetColStarts(),
-            std::move(diag), std::move(offd), std::move(col_map));
+                     std::move(diag), std::move(offd), std::move(col_map));
 }
 
 ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
@@ -290,7 +290,7 @@ ParMatrix MakeEntityTrueEntity(const ParMatrix& entity_entity)
     std::vector<double> select_data(num_true_entities, 1.0);
 
     SparseMatrix select(std::move(select_indptr), std::move(select_indices), std::move(select_data),
-            num_entities, num_true_entities);
+                        num_entities, num_true_entities);
 
     MPI_Comm comm = entity_entity.GetComm();
     auto true_starts = parlinalgcpp::GenerateOffsets(comm, num_true_entities);

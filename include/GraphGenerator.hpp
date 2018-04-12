@@ -96,7 +96,7 @@ private:
 
 /// Generate a vertex edge relationship for a WattsStrogatz random graph
 SparseMatrix GenerateGraph(MPI_Comm comm, int nvertices, int mean_degree, double beta,
-                                 double seed);
+                           double seed);
 
 } // namespace smoothg
 
