@@ -729,7 +729,7 @@ MixedMatrix GraphCoarsen::Coarsen(const GraphTopology& gt, const MixedMatrix& mg
 
 Vector GraphCoarsen::Interpolate(const VectorView& coarse_vect) const
 {
-    return P_vertex_.MultAT(coarse_vect);
+    return P_vertex_.Mult(coarse_vect);
 }
 
 void GraphCoarsen::Interpolate(const VectorView& coarse_vect, VectorView fine_vect) const

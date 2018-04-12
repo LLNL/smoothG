@@ -25,6 +25,9 @@ target_link_libraries(generalgraph smoothG)
 add_executable(poweriter poweriter.cpp)
 target_link_libraries(poweriter smoothG)
 
+add_executable(graphupscale graphupscale.cpp)
+target_link_libraries(graphupscale smoothG)
+
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
     set(SMOOTHG_TEST_PROCS 4)
 endif()
