@@ -26,7 +26,7 @@ namespace smoothg
 FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::SparseMatrix& vertex_edge,
                                    const mfem::Vector& weight,
-                                   const mfem::Array<int>& global_partitioning,
+                                   const mfem::Array<int>& partitioning,
                                    const mfem::HypreParMatrix& edge_d_td,
                                    const mfem::SparseMatrix& edge_boundary_att,
                                    const mfem::Array<int>& ess_attr,
@@ -50,7 +50,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mixed_laplacians_.emplace_back(ve_copy, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, global_partitioning,
+    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
                                                      &edge_boundary_att_);
 
     mbuilder_ = make_unique<CoefficientMBuilder>(*graph_topology);

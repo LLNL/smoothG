@@ -44,7 +44,7 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
+       @param partitioning partition of vertices
        @param weight edge weights. if not provided, set to all ones
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
@@ -57,7 +57,7 @@ public:
     FiniteVolumeUpscale(MPI_Comm comm,
                         const mfem::SparseMatrix& vertex_edge,
                         const mfem::Vector& weight,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
@@ -71,7 +71,7 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
+       @param partitioning partition of vertices
        @param weight edge weights. if not provided, set to all ones
        @param w_block W block matrix
        @param spect_tol spectral tolerance determines how many eigenvectors to
@@ -86,7 +86,7 @@ public:
                         const mfem::SparseMatrix& vertex_edge,
                         const mfem::Vector& weight,
                         const mfem::SparseMatrix& w_block,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
