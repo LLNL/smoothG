@@ -51,6 +51,9 @@ GraphCoarsen::GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
     BuildAggBubbleDof();
     BuildPvertex(gt);
     BuildPedge(gt, mgl);
+
+    agg_cdof_vertex_ = gt.agg_vertex_local_.Mult(P_vertex_);
+    agg_cdof_edge_ = gt.agg_edge_local_.Mult(P_edge_);
 }
 
 GraphCoarsen::GraphCoarsen(const GraphCoarsen& other) noexcept
@@ -60,6 +63,8 @@ GraphCoarsen::GraphCoarsen(const GraphCoarsen& other) noexcept
       P_vertex_(other.P_vertex_),
       face_cdof_(other.face_cdof_),
       agg_bubble_dof_(other.agg_bubble_dof_),
+      agg_cdof_vertex_(other.agg_cdof_vertex_),
+      agg_cdof_edge_(other.agg_cdof_edge_),
       vertex_targets_(other.vertex_targets_),
       edge_targets_(other.edge_targets_),
       agg_ext_sigma_(other.agg_ext_sigma_),
@@ -89,6 +94,8 @@ void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept
     swap(lhs.P_vertex_, rhs.P_vertex_);
     swap(lhs.face_cdof_, rhs.face_cdof_);
     swap(lhs.agg_bubble_dof_, rhs.agg_bubble_dof_);
+    swap(lhs.agg_cdof_vertex_, rhs.agg_cdof_vertex_);
+    swap(lhs.agg_cdof_edge_, rhs.agg_cdof_edge_);
 
     swap(lhs.vertex_targets_, rhs.vertex_targets_);
     swap(lhs.edge_targets_, rhs.edge_targets_);

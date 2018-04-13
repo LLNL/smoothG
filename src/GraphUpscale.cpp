@@ -77,13 +77,27 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
                               max_evects_, spect_tol_);
 
     mgl_.push_back(coarsener_.Coarsen(gt_, GetFineMatrix()));
+
     coarse_solver_ = make_unique<MinresBlockSolver>(GetCoarseMatrix());
-    fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
+
+    //coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(), coarsener_);
+    //HybridSolver test(comm_, GetCoarseMatrix(), coarsener_);
 
     MakeCoarseVectors();
 
     Operator::rows_ = graph_.vertex_edge_local_.Rows();
     Operator::cols_ = graph_.vertex_edge_local_.Rows();
+
+    // TODO(gelever1): Set for now, should be unset and user can determine if they need a fine solver.
+    MakeFineSolver();
+}
+
+void GraphUpscale::MakeFineSolver() const
+{
+    if (!fine_solver_)
+    {
+        fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
+    }
 }
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const

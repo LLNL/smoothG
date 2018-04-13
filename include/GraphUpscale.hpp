@@ -30,6 +30,9 @@
 #include "GraphTopology.hpp"
 #include "SharedEntityComm.hpp"
 
+#include "MinresBlockSolver.hpp"
+#include "HybridSolver.hpp"
+
 namespace smoothg
 {
 

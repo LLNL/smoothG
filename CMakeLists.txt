@@ -59,6 +59,7 @@ add_library(smoothG
     src/GraphGenerator.cpp
     src/GraphTopology.cpp
     src/GraphUpscale.cpp
+    src/HybridSolver.cpp
     src/MGLSolver.cpp
     src/MinresBlockSolver.cpp
     src/MixedMatrix.cpp

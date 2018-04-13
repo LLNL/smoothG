@@ -64,6 +64,11 @@ public:
     BlockVector Restrict(const BlockVector& fine_vect) const;
     void Restrict(const BlockVector& fine_vect, BlockVector& coarse_vect) const;
 
+    const SparseMatrix& GetFaceCDof() const { return face_cdof_; }
+
+    const SparseMatrix& GetAggCDofVertex() const { return agg_cdof_vertex_; }
+    const SparseMatrix& GetAggCDofEdge() const { return agg_cdof_edge_; }
+
 private:
     template <class T>
     using Vect2D = std::vector<std::vector<T>>;
@@ -100,6 +105,9 @@ private:
     SparseMatrix P_vertex_;
     SparseMatrix face_cdof_;
     SparseMatrix agg_bubble_dof_;
+
+    SparseMatrix agg_cdof_vertex_;
+    SparseMatrix agg_cdof_edge_;
 
     std::vector<DenseMatrix> vertex_targets_;
     std::vector<DenseMatrix> edge_targets_;

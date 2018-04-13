@@ -57,6 +57,11 @@ void swap(MGLSolver& lhs, MGLSolver& rhs) noexcept
     std::swap(lhs.timing_, rhs.timing_);
 }
 
+void MGLSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
+{
+    Solve(rhs, sol);
+}
+
 void MGLSolver::Solve(const VectorView& rhs, VectorView sol) const
 {
     rhs_.GetBlock(0) = 0.0;
