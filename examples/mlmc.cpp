@@ -139,6 +139,9 @@ int main(int argc, char* argv[])
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
+    bool hybridization = false;
+    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+                   "--no-hybridization", "Enable hybridization.");
     bool dual_target = false;
     args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
                    "--no-dual-target", "Use dual graph Laplacian in trace generation.");
@@ -271,7 +274,8 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     FiniteVolumeMLMC fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                               edge_boundary_att, ess_attr, spect_tol, max_evects);
+                               edge_boundary_att, ess_attr, spect_tol, max_evects,
+                               hybridization);
 
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();

@@ -193,6 +193,8 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
+    void UpdateAggScaling(const mfem::Vector& agg_weight);
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;
@@ -225,6 +227,8 @@ protected:
 
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();
+
+    void BuildParallelSystemAndSolver();
 
 private:
     MPI_Comm comm_;

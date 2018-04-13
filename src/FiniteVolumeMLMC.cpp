@@ -102,7 +102,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        // do something for hybridization
+        ((HybridSolver&) (*coarse_solver_)).UpdateAggScaling(coeff);
     }
 }
 
@@ -122,7 +122,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, mixed_laplacians_.back(), *coarsener_,
+                             comm_, GetCoarseMatrix(), *coarsener_,
                              *hybrid_builder_,
                              &face_bdratt, &marker, 0, saamge_param_);
     }
@@ -137,7 +137,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         Dref.EliminateCols(marker);
 
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, mixed_laplacians_.back());
+        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 }
 

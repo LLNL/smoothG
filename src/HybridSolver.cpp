@@ -158,8 +158,7 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     AinvDMinvCT_.resize(nAggs_);
     Ainv_f_.resize(nAggs_);
     Ainv_.resize(nAggs_);
-    if (use_spectralAMGe_)
-        Hybrid_el_.resize(nAggs_);
+    Hybrid_el_.resize(nAggs_);
 
     mfem::SparseMatrix edgedof_bdrattr;
     if (face_bdrattr)
@@ -246,9 +245,10 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
 
     // Assemble the hybridized system
     HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
-
     AssembleHybridSystem(M_el, j_multiplier_edgedof);
-    HybridSystem_->Finalize();
+    if (myid_ == 0 && print_level_ > 0)
+        std::cout << "  Timing: Hybridized system built in "
+                  << chrono.RealTime() << "s. \n";
 
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
@@ -268,77 +268,9 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
             else
                 ess_multiplier_dofs_[i] = 0;
         }
-
     }
 
-    HybridSystemElim_ = make_unique<mfem::SparseMatrix>(*HybridSystem_, false);
-    if (ess_multiplier_bc_)
-    {
-        for (int mm = 0; mm < num_multiplier_dofs_; ++mm)
-        {
-            if (ess_multiplier_dofs_[mm])
-            {
-                HybridSystemElim_->EliminateRowCol(mm);
-            }
-        }
-    }
-    else if (!use_w_)
-    {
-        if (myid_ == 0)
-            HybridSystemElim_->EliminateRowCol(0);
-    }
-
-    auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
-                              comm_, multiplier_start_.Last(), multiplier_start_,
-                              HybridSystemElim_.get());
-
-    if (rescale_iter_ == 0 || use_spectralAMGe_)
-    {
-        pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
-    }
-    else
-    {
-        ComputeScaledHybridSystem(*HybridSystem_d);
-    }
-    nnz_ = pHybridSystem_->NNZ();
-
-    if (myid_ == 0 && print_level_ > 0)
-        std::cout << "  Timing: Hybridized system built in "
-                  << chrono.RealTime() << "s. \n";
-
-    chrono.Clear();
-    chrono.Start();
-    if (myid_ == 0 && print_level_ > 0)
-        std::cout << "  Timing: Preconditioner for hybridized system"
-                  " constructed in " << chrono.RealTime() << "s. \n";
-
-    cg_ = make_unique<mfem::CGSolver>(comm_);
-    cg_->SetPrintLevel(print_level_);
-    cg_->SetMaxIter(max_num_iter_);
-    cg_->SetRelTol(rtol_);
-    cg_->SetAbsTol(atol_);
-    cg_->SetOperator(*pHybridSystem_);
-    cg_->iterative_mode = false;
-
-    // HypreBoomerAMG is broken if local size is zero
-    int local_size = pHybridSystem_->Height();
-    int min_size;
-    MPI_Allreduce(&local_size, &min_size, 1, MPI_INT, MPI_MIN, comm_);
-
-    const bool use_prec = min_size > 0;
-    if (use_prec)
-    {
-        if (use_spectralAMGe_)
-        {
-            BuildSpectralAMGePreconditioner();
-        }
-        else
-        {
-            prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
-            ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(0);
-        }
-        cg_->SetPreconditioner(*prec_);
-    }
+    BuildParallelSystemAndSolver();
 
     trueHrhs_.SetSize(multiplier_d_td_->GetNumCols());
     trueMu_.SetSize(trueHrhs_.Size());
@@ -478,10 +410,8 @@ void HybridSolver::AssembleHybridSystem(
         HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier,
                                     tmpHybrid_el);
 
-        // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
-        // only if one wants to construct H1 spectral AMGe preconditioner)
-        if (use_spectralAMGe_)
-            Hybrid_el_[iAgg] = tmpHybrid_el;
+        // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T
+        Hybrid_el_[iAgg] = tmpHybrid_el;
     }
 }
 
@@ -878,6 +808,91 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
         std::cout << "SAAMGE needs to be enabled! \n";
     std::abort();
 #endif
+}
+
+void HybridSolver::BuildParallelSystemAndSolver()
+{
+    HybridSystem_->Finalize();
+    HybridSystemElim_ = make_unique<mfem::SparseMatrix>(*HybridSystem_, false);
+    if (ess_multiplier_bc_)
+    {
+        for (int mm = 0; mm < num_multiplier_dofs_; ++mm)
+        {
+            if (ess_multiplier_dofs_[mm])
+            {
+                HybridSystemElim_->EliminateRowCol(mm);
+            }
+        }
+    }
+    else if (!use_w_)
+    {
+        if (myid_ == 0)
+            HybridSystemElim_->EliminateRowCol(0);
+    }
+
+    auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
+                              comm_, multiplier_start_.Last(), multiplier_start_,
+                              HybridSystemElim_.get());
+
+    if (rescale_iter_ == 0 || use_spectralAMGe_)
+    {
+        pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
+    }
+    else
+    {
+        ComputeScaledHybridSystem(*HybridSystem_d);
+    }
+    nnz_ = pHybridSystem_->NNZ();
+
+    mfem::StopWatch chrono;
+    chrono.Clear();
+    chrono.Start();
+
+    cg_ = make_unique<mfem::CGSolver>(comm_);
+    cg_->SetPrintLevel(print_level_);
+    cg_->SetMaxIter(max_num_iter_);
+    cg_->SetRelTol(rtol_);
+    cg_->SetAbsTol(atol_);
+    cg_->SetOperator(*pHybridSystem_);
+    cg_->iterative_mode = false;
+
+    // HypreBoomerAMG is broken if local size is zero
+    int local_size = pHybridSystem_->Height();
+    int min_size;
+    MPI_Allreduce(&local_size, &min_size, 1, MPI_INT, MPI_MIN, comm_);
+
+    const bool use_prec = min_size > 0;
+    if (use_prec)
+    {
+        if (use_spectralAMGe_)
+        {
+            BuildSpectralAMGePreconditioner();
+        }
+        else
+        {
+            prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
+            ((mfem::HypreBoomerAMG&)*prec_).SetPrintLevel(0);
+        }
+        cg_->SetPreconditioner(*prec_);
+    }
+    if (myid_ == 0 && print_level_ > 0)
+        std::cout << "  Timing: Preconditioner for hybridized system"
+                  " constructed in " << chrono.RealTime() << "s. \n";
+}
+
+void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weight)
+{
+    // TODO: this is not valid when W is nonzero
+    HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
+    mfem::Array<int> local_multiplier;
+    for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
+    {
+        GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
+        mfem::DenseMatrix H_el = Hybrid_el_[iAgg];
+        H_el *= (1.0/agg_weight(iAgg));
+        HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier, H_el);
+    }
+    BuildParallelSystemAndSolver();
 }
 
 void HybridSolver::SetPrintLevel(int print_level)

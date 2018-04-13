@@ -222,9 +222,7 @@ void FiniteVolumeUpscale::MakeFineSolver() const
                     Mref.EliminateRow(mm, set_diag);
                 }
             }
-            mfem::Array<int> mfem_const_broken;
-            mfem_const_broken.MakeRef(marker);
-            Dref.EliminateCols(mfem_const_broken);
+            Dref.EliminateCols(marker);
             if (!w_exists && myid_ == 0)
             {
                 Dref.EliminateRow(0);
