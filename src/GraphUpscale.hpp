@@ -44,7 +44,7 @@ public:
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
        @param global_partitioning partition of global vertices
-       @param weight edge weights. if not provided, set to all ones
+       @param weight edge weights. if not provided, set to an empty vector
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
@@ -69,7 +69,7 @@ public:
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
        @param coarse_factor how coarse to partition the graph
-       @param weight edge weights. if not provided, set to all ones
+       @param weight edge weights. if not provided, set to an empty vector
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
