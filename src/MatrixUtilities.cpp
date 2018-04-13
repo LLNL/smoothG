@@ -1105,4 +1105,22 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
     return unique_ptr<mfem::HypreParMatrix>(out);
 }
 
+void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
+                 mfem::Array<int>& out)
+{
+    out.SetSize(mat.Height(), 0);
+    for (int i = 0; i < mat.Height(); i++)
+    {
+        for (int j = mat.GetI()[i]; j < mat.GetI()[i+1]; j++)
+        {
+            if (vec[mat.GetJ()[j]])
+            {
+                out[i] = 1;
+                break;
+            }
+        }
+    }
+}
+
+
 } // namespace smoothg

@@ -273,10 +273,6 @@ int main(int argc, char* argv[])
     FiniteVolumeMLMC fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
                                edge_boundary_att, ess_attr, spect_tol, max_evects);
 
-    mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
-    marker = 0;
-    sigmafespace.GetEssentialVDofs(ess_attr, marker);
-
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
@@ -296,13 +292,11 @@ int main(int argc, char* argv[])
 
         auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
         fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
-        fvupscale.MakeCoarseSolver();
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
 
         auto fine_coefficient = sampler.GetFineCoefficient(sample);
         fvupscale.RescaleFineCoefficient(fine_coefficient);
-        fvupscale.ForceMakeFineSolver(marker);
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
 

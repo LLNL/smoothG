@@ -95,11 +95,12 @@ public:
                         bool energy_dual = false, bool hybridization = false,
                         const SAAMGeParam* saamge_param = nullptr);
 
-    void MakeFineSolver(const mfem::Array<int>& marker) const;
+    void MakeFineSolver() const;
 
 private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
+    const mfem::Array<int>& ess_attr_;
     //std::vector<double> ess_data;
 };
 

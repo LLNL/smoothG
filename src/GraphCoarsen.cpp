@@ -508,7 +508,10 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
-    CoarseM_ = mbuilder.GetCoarseM(M_v, Pedges, face_cdof);
+    if (mbuilder.NeedsCoarseVertexDofs() == false)
+    {
+        CoarseM_ = mbuilder.GetCoarseM(M_v, Pedges, face_cdof);
+    }
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)

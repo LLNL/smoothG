@@ -79,8 +79,24 @@ public:
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
 
+    /**
+       @brief Set weights on aggregates for assembly of coarse mass matrix.
+
+       The point of this class is to be able to build the coarse mass matrix
+       with different weights, without recoarsening the whole thing.
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+    */
+    virtual void SetCoefficient(const mfem::Vector& agg_weights_inverse);
+
 protected:
     int total_num_traces_;
+
+    /// weights on aggregates
+    mfem::Vector agg_weights_;
 };
 
 /**
@@ -162,8 +178,11 @@ public:
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
-    /// Here returns a null pointer
-    /// @todo change interface so this is optional?
+    void SetAggToEdgeDofsTableReference(const mfem::SparseMatrix& Agg_cdof_edge)
+    {
+        Agg_cdof_edge_ref_.MakeRef(Agg_cdof_edge);
+    }
+
     std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
         const mfem::Vector& fineMdiag,
         const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
@@ -174,6 +193,7 @@ public:
 
 private:
     std::vector<mfem::DenseMatrix> CM_el_;
+    mfem::SparseMatrix Agg_cdof_edge_ref_;
 
     mfem::Array<int> edge_cdof_marker_;
     mfem::Array<int> edge_cdof_marker2_;
@@ -210,19 +230,6 @@ public:
         int total_num_traces, int ncoarse_vertexdofs);
 
     /**
-       @brief Set weights on aggregates for assembly of coarse mass matrix.
-
-       The point of this class is to be able to build the coarse mass matrix
-       with different weights, without recoarsening the whole thing.
-
-       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
-       that is, agg_weights_inverse in the input is like the coefficient in
-       a finite volume problem, agg_weights is the weights on the mass matrix
-       in the mixed form, which is the reciprocal of that.
-    */
-    void SetCoefficient(const mfem::Vector& agg_weights_inverse);
-
-    /**
        @brief Assemble local components, independent of coefficient.
 
        Call this once, call SetCoefficient afterwards many times, each time
@@ -254,9 +261,6 @@ private:
     int total_num_traces_;
     int ncoarse_vertexdofs_;
     mfem::Array<int> coarse_agg_dof_offsets_;
-
-    /// weights on aggregates
-    mfem::Vector agg_weights_;
 
     /// P_F^T M_F P_F
     std::vector<mfem::DenseMatrix> comp_F_F_;

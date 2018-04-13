@@ -37,7 +37,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
-      edge_boundary_att_(edge_boundary_att)
+      edge_boundary_att_(edge_boundary_att),
+      ess_attr_(ess_attr)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -122,7 +123,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       edge_d_td_(edge_d_td),
-      edge_boundary_att_(edge_boundary_att)
+      edge_boundary_att_(edge_boundary_att),
+      ess_attr_(ess_attr)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -192,8 +194,11 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
-void FiniteVolumeUpscale::MakeFineSolver(const mfem::Array<int>& marker) const
+void FiniteVolumeUpscale::MakeFineSolver() const
 {
+    mfem::Array<int> marker;
+    BooleanMult(edge_boundary_att_, ess_attr_, marker);
+
     if (!fine_solver_)
     {
         if (hybridization_) // Hybridization solver

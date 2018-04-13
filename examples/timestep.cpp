@@ -267,10 +267,7 @@ int main(int argc, char* argv[])
 
         if (k == 0)
         {
-            mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
-            marker = 0;
-            sigmafespace.GetEssentialVDofs(ess_attr, marker);
-            fvupscale.MakeFineSolver(marker);
+            fvupscale.MakeFineSolver();
 
             work_rhs = fine_rhs;
             work_u = fine_u;

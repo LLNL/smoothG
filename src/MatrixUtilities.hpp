@@ -397,6 +397,8 @@ double InnerProduct(const mfem::Vector& u, const mfem::Vector& v);
 std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
     const mfem::HypreParMatrix& entity_trueentity_entity);
 
+void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
+                 mfem::Array<int>& out);
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

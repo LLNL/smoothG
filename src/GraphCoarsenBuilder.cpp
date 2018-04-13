@@ -20,6 +20,15 @@
 namespace smoothg
 {
 
+void CoarseMBuilder::SetCoefficient(const mfem::Vector& agg_weight_inverse)
+{
+    agg_weights_.SetSize(agg_weight_inverse.Size());
+    for (int i = 0; i < agg_weights_.Size(); ++i)
+    {
+        agg_weights_[i] = 1.0 / agg_weight_inverse[i];
+    }
+}
+
 void ElementMBuilder::Setup(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
@@ -214,7 +223,27 @@ std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM(
     const mfem::Vector& fineMdiag,
     const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
 {
-    return std::unique_ptr<mfem::SparseMatrix>(nullptr);
+    const int num_Agg = Agg_cdof_edge_ref_.Height();
+    mfem::Array<int> edofs;
+
+    auto CoarseM = make_unique<mfem::SparseMatrix>(Agg_cdof_edge_ref_.Width());
+    for (int Agg = 0; Agg < num_Agg; Agg++)
+    {
+        GetTableRow(Agg_cdof_edge_ref_, Agg, edofs);
+        const double scale = agg_weights_(Agg);
+        if (scale == 1.0)
+        {
+            CoarseM->AddSubMatrix(edofs, edofs, CM_el_[Agg]);
+        }
+        else
+        {
+            mfem::DenseMatrix agg_M = CM_el_[Agg];
+            agg_M *= scale;
+            CoarseM->AddSubMatrix(edofs, edofs, agg_M);
+        }
+    }
+    CoarseM->Finalize();
+    return CoarseM;
 }
 
 std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
@@ -223,15 +252,6 @@ std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
 {
     CoarseM_->Finalize(0);
     return std::move(CoarseM_);
-}
-
-void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weight_inverse)
-{
-    agg_weights_.SetSize(agg_weight_inverse.Size());
-    for (int i = 0; i < agg_weights_.Size(); ++i)
-    {
-        agg_weights_[i] = 1.0 / agg_weight_inverse[i];
-    }
 }
 
 /// this method may be unnecessary, could just use GetTableRow()

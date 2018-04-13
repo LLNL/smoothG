@@ -62,9 +62,39 @@ public:
                      const mfem::HypreParMatrix& edge_d_td,
                      const mfem::SparseMatrix& edge_boundary_att,
                      const mfem::Array<int>& ess_attr,
-                     double spect_tol = 0.001, int max_evects = 4);
+                     double spect_tol = 0.001, int max_evects = 4,
+                     bool dual_target = false, bool scaled_dual = false,
+                     bool energy_dual = false, bool hybridization = false,
+                     const SAAMGeParam* saamge_param = nullptr);
 
-    void MakeFineSolver(const mfem::Array<int>& marker) const;
+    /**
+       @brief Constructor
+
+       @param comm MPI communicator
+       @param vertex_edge relationship between vertices and edge
+       @param partitioning partition of vertices
+       @param M_el vertex-based fine edge weights.
+       @param spect_tol spectral tolerance determines how many eigenvectors to
+                        keep per aggregate
+       @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param trace_method methods for getting edge trace samples
+       @param hybridization use hybridization as solver
+       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
+              coarse hybridized system if saamge_param is not nullptr
+    */
+    FiniteVolumeMLMC(MPI_Comm comm,
+                     const mfem::SparseMatrix& vertex_edge,
+                     const std::vector<mfem::DenseMatrix>& M_el,
+                     const mfem::Array<int>& partitioning,
+                     const mfem::HypreParMatrix& edge_d_td,
+                     const mfem::SparseMatrix& edge_boundary_att,
+                     const mfem::Array<int>& ess_attr,
+                     double spect_tol = 0.001, int max_evects = 4,
+                     bool dual_target = false, bool scaled_dual = false,
+                     bool energy_dual = false, bool hybridization = false,
+                     const SAAMGeParam* saamge_param = nullptr);
+
+    void MakeFineSolver() const;
 
     /// coeff should have the size of the number of *edges* in the
     /// fine graph (not exactly analagous to RescaleCoarseCoefficient)
@@ -76,7 +106,7 @@ public:
 
     /// recreate the fine solver, ie if coefficients have changed
     /// @todo maybe don't have to rebuild whole thing, just M part?
-    void ForceMakeFineSolver(const mfem::Array<int>& marker) const;
+    void ForceMakeFineSolver() const;
 
     void MakeCoarseSolver();
 
@@ -86,7 +116,9 @@ private:
     const mfem::SparseMatrix& edge_boundary_att_;
     const mfem::Array<int>& ess_attr_;
 
-    std::unique_ptr<CoefficientMBuilder> mbuilder_;
+    std::shared_ptr<CoarseMBuilder> mbuilder_;
+    std::shared_ptr<ElementMBuilder> hybrid_builder_;
+    const SAAMGeParam* saamge_param_;
 };
 
 } // namespace smoothg
