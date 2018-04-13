@@ -151,6 +151,9 @@ int main(int argc, char* argv[])
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    bool elem_mass = false;
+    args.AddOption(&elem_mass, "-el-mass", "--element-mass", "-no-el-mass",
+                   "--no-element-mass", "Store M in element matrices format.");
     args.Parse();
     if (!args.Good())
     {
@@ -186,6 +189,7 @@ int main(int argc, char* argv[])
 
     mfem::Array<int> ess_attr;
     mfem::Vector weight;
+    std::vector<mfem::DenseMatrix> M_el;
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
@@ -209,14 +213,25 @@ int main(int argc, char* argv[])
     // Construct "finite volume mass" matrix using mfem
     mfem::RT_FECollection sigmafec(0, nDimensions);
     mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-
     {
         mfem::ParBilinearForm a(&sigmafespace);
         a.AddDomainIntegrator(
             new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-        a.Assemble();
-        a.Finalize();
-        a.SpMat().GetDiag(weight);
+
+        if (elem_mass == false)
+        {
+            a.Assemble();
+            a.Finalize();
+            a.SpMat().GetDiag(weight);
+        }
+        else
+        {
+            M_el.resize(pmesh->GetNE());
+            for (unsigned int i = 0; i < M_el.size(); i++)
+            {
+                a.ComputeElementMatrix(i, M_el[i]);
+            }
+        }
     }
 
     for (int i = 0; i < weight.Size(); ++i)
