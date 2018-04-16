@@ -1111,7 +1111,7 @@ void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
     out.SetSize(mat.Height(), 0);
     for (int i = 0; i < mat.Height(); i++)
     {
-        for (int j = mat.GetI()[i]; j < mat.GetI()[i+1]; j++)
+        for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; j++)
         {
             if (vec[mat.GetJ()[j]])
             {

@@ -56,7 +56,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     if (hybridization_)
     {
         hybrid_builder_ = std::make_shared<ElementMBuilder>();
-        mbuilder_= hybrid_builder_;
+        mbuilder_ = hybrid_builder_;
     }
     else
     {
@@ -95,9 +95,9 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     {
         mbuilder_->SetCoefficient(coeff);
         GetCoarseMatrix().setWeight(
-                    *mbuilder_->GetCoarseM(weight_,
-                                           coarsener_->get_Psigma(),
-                                           coarsener_->construct_face_facedof_table()));
+            *mbuilder_->GetCoarseM(weight_,
+                                   coarsener_->get_Psigma(),
+                                   coarsener_->construct_face_facedof_table()));
         MakeCoarseSolver();
     }
     else

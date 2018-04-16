@@ -312,7 +312,7 @@ public:
     void ScaleM(const mfem::Vector& weight);
 
     static std::unique_ptr<mfem::SparseMatrix> ConstructD(
-            const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
+        const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
 
 private:
     /**

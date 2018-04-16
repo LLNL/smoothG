@@ -220,7 +220,7 @@ bool MixedMatrix::CheckW() const
 }
 
 std::unique_ptr<mfem::SparseMatrix> MixedMatrix::ConstructD(
-        const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge)
+    const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge)
 {
     // Nonzero row of edge_owned means the edge is owned by the local proc
     mfem::SparseMatrix edge_owned;
