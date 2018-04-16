@@ -61,7 +61,6 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
                        mgL_.getD(), mgL_.getW(), *graph_topology_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
-
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
@@ -69,7 +68,6 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
     CoarseM_ = graph_coarsen_->GetCoarseM();
-
     CoarseW_ = graph_coarsen_->GetCoarseW();
 }
 

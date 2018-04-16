@@ -108,9 +108,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 
 void FiniteVolumeMLMC::MakeCoarseSolver()
 {
-    mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
     mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
-
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -120,7 +118,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
     if (hybridization_) // Hybridization solver
     {
-        auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
+        auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm_, GetCoarseMatrix(), *coarsener_,
                              *hybrid_builder_,
@@ -128,6 +126,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     }
     else // L2-H1 block diagonal preconditioner
     {
+        mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data

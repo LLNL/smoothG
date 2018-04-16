@@ -193,7 +193,17 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
-    void UpdateAggScaling(const mfem::Vector& agg_weight);
+    /**
+       @brief Update weights of local M matrices on aggregates
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+
+       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
+    */
+    void UpdateAggScaling(const mfem::Vector& agg_weights_inverse);
 
     ///@name Set solver parameters
     ///@{
@@ -278,6 +288,8 @@ private:
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
+
+    mfem::Vector agg_weights_;
 
     const SAAMGeParam* saamge_param_;
 #if SMOOTHG_USE_SAAMGE

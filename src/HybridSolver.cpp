@@ -604,7 +604,8 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
                   << timing_ << "s. \n";
     }
 
-    num_iterations_ += cg_->GetNumIterations();
+    // TODO: decide to use = or += here (MinresBlockSolver uses +=)
+    num_iterations_ = cg_->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -669,9 +670,10 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
         for (int i = 0; i < nlocal_multiplier; ++i)
             HybridRHS(local_multiplier[i]) -= CMinvDTAinv_f_loc(i);
 
-        // Save the element rhs [M B^T;B 0]^-1[f;g] for solution recovery
+        // Save the element rhs (DMinvDT)^-1 f for solution recovery
         Ainv_f_[iAgg].SetSize(nlocal_vertexdof);
         Ainv_[iAgg].Mult(f_loc, Ainv_f_[iAgg]);
+        Ainv_f_[iAgg] *= agg_weights_(iAgg);
     }
 }
 
@@ -717,6 +719,7 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
             sigma_loc.SetSize(nlocal_edgedof);
             MinvDT_[iAgg].Mult(u_loc, sigma_loc);
             MinvCT_[iAgg].AddMult(mu_loc, sigma_loc);
+            sigma_loc /= agg_weights_(iAgg);
         }
 
         // Save local solution to the global solution vector
@@ -880,16 +883,25 @@ void HybridSolver::BuildParallelSystemAndSolver()
                   " constructed in " << chrono.RealTime() << "s. \n";
 }
 
-void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weight)
+void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weights_inverse)
 {
+    // This is for consistency, could simply work with agg_weight_inverse
+    agg_weights_.SetSize(agg_weights_inverse.Size());
+    for (int i = 0; i < agg_weights_.Size(); ++i)
+    {
+        agg_weights_[i] = 1.0 / agg_weights_inverse[i];
+    }
+
     // TODO: this is not valid when W is nonzero
+    assert(use_w_ == false);
+
     HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
     mfem::Array<int> local_multiplier;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
-        mfem::DenseMatrix H_el = Hybrid_el_[iAgg];
-        H_el *= (1.0/agg_weight(iAgg));
+        mfem::DenseMatrix H_el = Hybrid_el_[iAgg]; // deep copy
+        H_el *= (1.0 / agg_weights_(iAgg));
         HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier, H_el);
     }
     BuildParallelSystemAndSolver();
