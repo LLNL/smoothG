@@ -99,18 +99,14 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
     std::shared_ptr<ElementMBuilder> hybrid_builder_ptr;
-    if (hybridization_)
+    if (!coarse_coefficient)
     {
         hybrid_builder_ptr = std::make_shared<ElementMBuilder>();
         mbuilder_ptr = hybrid_builder_ptr;
     }
-    else if (coarse_coefficient)
-    {
-        mbuilder_ptr = std::make_shared<CoefficientMBuilder>(*graph_topology);
-    }
     else
     {
-        mbuilder_ptr = std::make_shared<AssembleMBuilder>();
+        mbuilder_ptr = std::make_shared<CoefficientMBuilder>(*graph_topology);
     }
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(

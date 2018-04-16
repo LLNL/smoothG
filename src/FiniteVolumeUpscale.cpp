@@ -52,21 +52,11 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
                                                      &edge_boundary_att_);
 
-    std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
-    std::shared_ptr<ElementMBuilder> hybrid_builder_ptr;
-    if (hybridization_)
-    {
-        hybrid_builder_ptr = std::make_shared<ElementMBuilder>();
-        mbuilder_ptr = hybrid_builder_ptr;
-    }
-    else
-    {
-        mbuilder_ptr = std::make_shared<AssembleMBuilder>();
-    }
+    auto mbuilder = std::make_shared<ElementMBuilder>();
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology), spect_tol,
                      max_evects, dual_target, scaled_dual, energy_dual,
-                     *mbuilder_ptr);
+                     *mbuilder);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -84,7 +74,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm, mixed_laplacians_.back(), *coarsener_,
-                             *hybrid_builder_ptr,
+                             *mbuilder,
                              &face_bdratt, &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
@@ -137,20 +127,10 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     auto graph_topology = make_unique<GraphTopology>(
                               ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
 
-    std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
-    std::shared_ptr<ElementMBuilder> hybrid_builder_ptr;
-    if (hybridization_)
-    {
-        hybrid_builder_ptr = std::make_shared<ElementMBuilder>();
-        mbuilder_ptr = hybrid_builder_ptr;
-    }
-    else
-    {
-        mbuilder_ptr = std::make_shared<AssembleMBuilder>();
-    }
+    auto mbuilder = std::make_shared<ElementMBuilder>();
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual, *mbuilder_ptr);
+                     max_evects, dual_target, scaled_dual, energy_dual, *mbuilder);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -168,7 +148,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm, mixed_laplacians_.back(), *coarsener_,
-                             *hybrid_builder_ptr,
+                             *mbuilder,
                              &face_bdratt, &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner

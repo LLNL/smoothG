@@ -100,50 +100,6 @@ protected:
 };
 
 /**
-   @brief Actually assembles global coarse mass matrix.
-
-   Used when build_coarse_relation is false, generally when we are *not*
-   doing hybridization.
-*/
-class AssembleMBuilder : public CoarseMBuilder
-{
-public:
-    AssembleMBuilder() {}
-
-    void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs);
-
-    void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
-
-    void SetTraceBubbleBlock(int l, double value);
-
-    void AddTraceTraceBlockDiag(double value);
-
-    void AddTraceTraceBlock(int l, double value);
-
-    /// Deal with shared dofs for Trace-Trace block
-    void AddTraceAcross(int row, int col, double value);
-
-    void SetBubbleBubbleBlock(int l, int j, double value);
-
-    void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                             const mfem::SparseMatrix& Agg_cdof_edge);
-
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        const mfem::Vector& fineMdiag,
-        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
-
-private:
-    std::unique_ptr<mfem::SparseMatrix> CoarseM_;
-
-    int row_;
-    int bubble_counter_;
-};
-
-/**
    @brief Assembles local (coarse) mass matrices
 
    Used when build_coarse_relation is true, generally when we use

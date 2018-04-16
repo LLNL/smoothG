@@ -52,20 +52,6 @@ void ElementMBuilder::Setup(
     edge_cdof_marker_ = -1;
 }
 
-void AssembleMBuilder::Setup(
-    std::vector<mfem::DenseMatrix>& edge_traces,
-    std::vector<mfem::DenseMatrix>& vertex_target,
-    const mfem::SparseMatrix& Agg_face,
-    int total_num_traces, int ncoarse_vertexdofs)
-{
-    total_num_traces_ = total_num_traces;
-
-    const unsigned int nAggs = vertex_target.size();
-    CoarseM_ = make_unique<mfem::SparseMatrix>(
-                   total_num_traces + ncoarse_vertexdofs - nAggs,
-                   total_num_traces + ncoarse_vertexdofs - nAggs);
-}
-
 void CoefficientMBuilder::Setup(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
@@ -96,12 +82,6 @@ void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubb
     edge_cdof_marker_[row] = cdof_loc;
 }
 
-void AssembleMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
-{
-    row_ = row;
-    bubble_counter_ = bubble_counter;
-}
-
 void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
@@ -109,21 +89,9 @@ void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
     CM_el_loc(cdof_loc_, l) = value;
 }
 
-void AssembleMBuilder::SetTraceBubbleBlock(int l, double value)
-{
-    const int global_col = total_num_traces_ + bubble_counter_ + l;
-    CoarseM_->Set(row_, global_col, value);
-    CoarseM_->Set(global_col, row_, value);
-}
-
 void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 {
     CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
-}
-
-void AssembleMBuilder::AddTraceTraceBlockDiag(double value)
-{
-    CoarseM_->Add(row_, row_, value);
 }
 
 void ElementMBuilder::AddTraceTraceBlock(int l, double value)
@@ -133,25 +101,11 @@ void ElementMBuilder::AddTraceTraceBlock(int l, double value)
     CM_el_loc(cdof_loc_, edge_cdof_marker_[l]) = value;
 }
 
-void AssembleMBuilder::AddTraceTraceBlock(int l, double value)
-{
-    CoarseM_->Add(row_, l, value);
-    CoarseM_->Add(l, row_, value);
-}
-
 void ElementMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
     CM_el_loc(l, j) = value;
     CM_el_loc(j, l) = value;
-}
-
-void AssembleMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
-{
-    const int global_row = total_num_traces_ + bubble_counter_ + l;
-    const int global_col = total_num_traces_ + bubble_counter_ + j;
-    CoarseM_->Set(global_row, global_col, value);
-    CoarseM_->Set(global_col, global_row, value);
 }
 
 void ElementMBuilder::ResetEdgeCdofMarkers(int size)
@@ -189,11 +143,6 @@ void ElementMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix
     }
 }
 
-void AssembleMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                                           const mfem::SparseMatrix& Agg_cdof_edge)
-{
-}
-
 void ElementMBuilder::AddTraceAcross(int row, int col, double value)
 {
     mfem::DenseMatrix& CM_el_loc1(CM_el_[Agg0_]);
@@ -212,11 +161,6 @@ void ElementMBuilder::AddTraceAcross(int row, int col, double value)
         int id1_in_Agg1 = edge_cdof_marker2_[col];
         CM_el_loc2(id0_in_Agg1, id1_in_Agg1) += value / 2.;
     }
-}
-
-void AssembleMBuilder::AddTraceAcross(int row, int col, double value)
-{
-    CoarseM_->Add(row, col, value);
 }
 
 std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM(
@@ -244,14 +188,6 @@ std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM(
     }
     CoarseM->Finalize();
     return CoarseM;
-}
-
-std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
-    const mfem::Vector& fineMdiag,
-    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
-{
-    CoarseM_->Finalize(0);
-    return std::move(CoarseM_);
 }
 
 /// this method may be unnecessary, could just use GetTableRow()
