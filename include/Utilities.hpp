@@ -108,6 +108,12 @@ double PowerIterate(MPI_Comm comm, const linalgcpp::Operator& A, VectorView resu
 
 void BroadCast(MPI_Comm comm, SparseMatrix& mat);
 
+void ExtractSubMatrix(const SparseMatrix& A, const std::vector<int>& rows,
+                      const std::vector<int>& cols, const std::vector<int>& colMapper,
+                      DenseMatrix& A_sub);
+
+void MultScalarVVt(double a, const VectorView& v, DenseMatrix& aVVt);
+
 } //namespace smoothg
 
 #endif // __UTILITIES_HPP__

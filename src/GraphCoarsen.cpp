@@ -147,7 +147,7 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
         }
         else
         {
-            agg_ext_sigma_[agg].Resize(D_sub_T.Rows(), 0);
+            agg_ext_sigma_[agg].SetSize(D_sub_T.Rows(), 0);
         }
 
         DenseMatrix evects_restricted = RestrictLocal(evects, col_marker_,
@@ -285,7 +285,7 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
 
         if (!sec_face.IsOwnedByMe(face))
         {
-            edge_targets_[face].Resize(num_face_edges, 0);
+            edge_targets_[face].SetSize(num_face_edges, 0);
             continue;
         }
 
@@ -606,7 +606,7 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
             std::vector<int> face_fine_dofs = face_edge.GetIndices(face);
 
             SparseMatrix D_transfer = mgl.D_local_.GetSubMatrix(vertex_dofs, face_fine_dofs, col_marker_);
-            D_trace.Resize(D_transfer.Rows(), edge_targets_[face].Cols());
+            D_trace.SetSize(D_transfer.Rows(), edge_targets_[face].Cols());
             D_transfer.Mult(edge_targets_[face], D_trace);
 
             OrthoConstant(D_trace);

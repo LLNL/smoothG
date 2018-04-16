@@ -744,4 +744,54 @@ void BroadCast(MPI_Comm comm, SparseMatrix& mat)
     }
 }
 
+void ExtractSubMatrix(const SparseMatrix& A, const std::vector<int>& rows,
+                      const std::vector<int>& cols, const std::vector<int>& colMapper,
+                      DenseMatrix& A_sub)
+{
+    const int num_row = rows.size();
+    const int num_col = cols.size();
+
+    const auto& A_i = A.GetIndptr();
+    const auto& A_j = A.GetIndices();
+    const auto& A_data = A.GetData();
+
+    A_sub.SetSize(num_row, num_col, 0.0);
+
+    for (int i = 0; i < num_row; ++i)
+    {
+        const int row = rows[i];
+
+        for (int j = A_i[row]; j < A_i[row + 1]; ++j)
+        {
+            const int col = colMapper[A_j[j]];
+
+            if (col >= 0)
+            {
+                A_sub(i, col) = A_data[j];
+            }
+        }
+    }
+}
+
+void MultScalarVVt(double a, const VectorView& v, DenseMatrix& aVVt)
+{
+    int n = v.size();
+    aVVt.SetSize(n, n);
+
+    for (int i = 0; i < n; i++)
+    {
+        double avi = a * v[i];
+
+        for (int j = 0; j < i; j++)
+        {
+            double avivj = avi * v[j];
+
+            aVVt(i, j) = avivj;
+            aVVt(j, i) = avivj;
+        }
+
+        aVVt(i, i) = avi * v[i];
+    }
+}
+
 } // namespace smoothg

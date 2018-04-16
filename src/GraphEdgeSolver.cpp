@@ -99,7 +99,7 @@ void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& output) const
     int rows = MinvDT_.Rows();
     int cols = input.Cols();
 
-    output.Resize(rows, cols);
+    output.SetSize(rows, cols);
 
     for (int i = 0; i < cols; ++i)
     {
@@ -123,7 +123,7 @@ void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input,
 
     int size = end - start;
 
-    output.Resize(MinvDT_.Rows(), size);
+    output.SetSize(MinvDT_.Rows(), size);
 
     for (int i = 0; i < size; ++i)
     {

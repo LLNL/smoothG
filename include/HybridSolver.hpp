@@ -106,7 +106,7 @@ public:
     virtual ~HybridSolver() = default;
 
     /// Wrapper for solving the saddle point system through hybridization
-    void Solve(const BlockVector& Rhs, BlockVector& Sol) const { printf("IMPLEMENT!\n"); }
+    void Solve(const BlockVector& Rhs, BlockVector& Sol) const;
 
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const BlockVector& OriginalRHS, VectorView HybridRHS) const;
@@ -141,10 +141,12 @@ public:
 protected:
 
     SparseMatrix AssembleHybridSystem(
+        const MixedMatrix& mgl,
         const std::vector<DenseMatrix>& M_el,
         const std::vector<int>& j_multiplier_edgedof);
 
     SparseMatrix AssembleHybridSystem(
+        const MixedMatrix& mgl,
         const std::vector<Vector>& M_el,
         const std::vector<int>& j_multiplier_edgedof);
 

@@ -97,6 +97,7 @@ void GraphUpscale::MakeFineSolver() const
     if (!fine_solver_)
     {
         fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
+        //fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
     }
 }
 
