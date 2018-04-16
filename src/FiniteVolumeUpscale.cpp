@@ -155,9 +155,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
-    mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
     mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
-
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -175,6 +173,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     }
     else // L2-H1 block diagonal preconditioner
     {
+        mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data

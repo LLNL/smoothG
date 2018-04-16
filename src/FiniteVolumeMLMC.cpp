@@ -142,31 +142,39 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
 void FiniteVolumeMLMC::ForceMakeFineSolver() const
 {
-    // L2-H1 block diagonal preconditioner
-    mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
-    mfem::SparseMatrix& Dref = GetFineMatrix().getD();
-    const bool w_exists = GetFineMatrix().CheckW();
-
     mfem::Array<int> marker;
     BooleanMult(edge_boundary_att_, ess_attr_, marker);
 
-    for (int mm = 0; mm < marker.Size(); ++mm)
+    if (hybridization_) // Hybridization solver
     {
-        if (marker[mm])
+        fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+                                                 &edge_boundary_att_, &marker);
+    }
+    else // L2-H1 block diagonal preconditioner
+    {
+        mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
+        mfem::SparseMatrix& Dref = GetFineMatrix().getD();
+        const bool w_exists = GetFineMatrix().CheckW();
+
+        for (int mm = 0; mm < marker.Size(); ++mm)
         {
-            //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
+            if (marker[mm])
+            {
+                //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
 
-            const bool set_diag = true;
-            Mref.EliminateRow(mm, set_diag);
+                const bool set_diag = true;
+                Mref.EliminateRow(mm, set_diag);
+            }
         }
-    }
-    Dref.EliminateCols(marker);
-    if (!w_exists && myid_ == 0)
-    {
-        Dref.EliminateRow(0);
+        Dref.EliminateCols(marker);
+        if (!w_exists && myid_ == 0)
+        {
+            Dref.EliminateRow(0);
+        }
+
+        fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
     }
 
-    fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
 }
 
 void FiniteVolumeMLMC::MakeFineSolver() const

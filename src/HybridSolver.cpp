@@ -160,6 +160,9 @@ void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
     Ainv_.resize(nAggs_);
     Hybrid_el_.resize(nAggs_);
 
+    agg_weights_.SetSize(nAggs_);
+    agg_weights_ = 1.0;
+
     mfem::SparseMatrix edgedof_bdrattr;
     if (face_bdrattr)
     {
@@ -596,7 +599,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     cg_->Mult(trueHrhs_, trueMu_);
 
     chrono.Stop();
-    timing_ += chrono.RealTime();
+    timing_ = chrono.RealTime();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -604,7 +607,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
                   << timing_ << "s. \n";
     }
 
-    // TODO: decide to use = or += here (MinresBlockSolver uses +=)
+    // TODO: decide to use = or += here and in timing_ update (MinresBlockSolver uses +=)
     num_iterations_ = cg_->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
