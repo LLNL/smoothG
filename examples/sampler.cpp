@@ -53,7 +53,26 @@ void MetisPart(mfem::Array<int>& partitioning,
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
-// void SavePicture(const mfem::Vector& sol, mfem::ParGridFunction& field,
+void SaveFigure(const mfem::Vector& sol,
+                mfem::ParFiniteElementSpace& fespace,
+                const std::string& name)
+{
+    mfem::ParGridFunction field(&fespace);
+    mfem::ParMesh* pmesh = fespace.GetParMesh();
+    field = sol;
+    {
+        std::stringstream filename;
+        filename << name << ".mesh";
+        std::ofstream out(filename.str().c_str());
+        pmesh->Print(out);
+    }
+    {
+        std::stringstream filename;
+        filename << name << ".gridfunction";
+        std::ofstream out(filename.str().c_str());
+        field.Save(out);
+    }
+}
 
 void Visualize(const mfem::Vector& sol,
                mfem::ParFiniteElementSpace& fespace,
@@ -106,7 +125,8 @@ NormalSampler::NormalSampler(double mean, double stddev, int seed)
 
 double NormalSampler::Sample()
 {
-    return dist_(generator_);
+    double out = dist_(generator_);
+    return out;
 }
 
 int main(int argc, char* argv[])
@@ -165,6 +185,9 @@ int main(int argc, char* argv[])
     int coarsening_factor = 2;
     args.AddOption(&coarsening_factor, "--coarsening-factor", "--coarsening-factor",
                    "Coarsening factor for Cartesian agglomeration");
+    int seed = 0;
+    args.AddOption(&seed, "--seed", "--seed",
+                   "Seed for random number generator.");
 
     args.Parse();
     if (!args.Good())
@@ -266,6 +289,7 @@ int main(int argc, char* argv[])
     double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
         std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 
+    NormalSampler sampler(0.0, 1.0, seed);
     const int num_samples = 1;
     // todo: use coarse mass builder to rescale samples
     for (int sample = 0; sample < num_samples; ++sample)
@@ -273,7 +297,6 @@ int main(int argc, char* argv[])
         // construct white noise right-hand side
         // (cell_volume is supposed to represent fine-grid W_h)
         mfem::Vector rhs_u_fine(ufespace.GetVSize());
-        NormalSampler sampler;
         for (int i=0; i<ufespace.GetVSize(); ++i)
         {
             rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
@@ -315,6 +338,16 @@ int main(int argc, char* argv[])
         {
             Visualize(sol_upscaled.GetBlock(1), ufespace, 1);
             Visualize(sol_fine.GetBlock(1), ufespace, 0);
+        }
+        const bool save_figures = true;
+        if (save_figures)
+        {
+            std::stringstream coarsename;
+            coarsename << "coarse_" << sample;
+            SaveFigure(sol_upscaled.GetBlock(1), ufespace, coarsename.str());
+            std::stringstream finename;
+            finename << "fine_" << sample;
+            SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
         }
     }
 
