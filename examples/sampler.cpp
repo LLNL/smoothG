@@ -53,8 +53,11 @@ void MetisPart(mfem::Array<int>& partitioning,
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
-void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
-               const mfem::ParMesh& pmesh, int tag)
+// void SavePicture(const mfem::Vector& sol, mfem::ParGridFunction& field,
+
+void Visualize(const mfem::Vector& sol,
+               mfem::ParFiniteElementSpace& fespace,
+               int tag)
 {
     char vishost[] = "localhost";
     int  visport   = 19916;
@@ -63,15 +66,17 @@ void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
     vis_v.open(vishost, visport);
     vis_v.precision(8);
 
+    mfem::ParGridFunction field(&fespace);
+    mfem::ParMesh* pmesh = fespace.GetParMesh();
     field = sol;
 
-    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
-    vis_v << "solution\n" << pmesh << field;
+    vis_v << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
+    vis_v << "solution\n" << *pmesh << field;
     vis_v << "window_size 500 800\n";
     vis_v << "window_title 'pressure" << tag << "'\n";
     vis_v << "autoscale values\n";
 
-    if (pmesh.Dimension() == 2)
+    if (pmesh->Dimension() == 2)
     {
         vis_v << "view 0 0\n"; // view from top
         vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
@@ -79,7 +84,7 @@ void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
 
     vis_v << "keys cjl\n";
 
-    MPI_Barrier(pmesh.GetComm());
+    MPI_Barrier(pmesh->GetComm());
 };
 
 class NormalSampler
@@ -154,10 +159,10 @@ int main(int argc, char* argv[])
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
-    double kappa = 0.1;
+    double kappa = 0.001;
     args.AddOption(&kappa, "--kappa", "--kappa",
                    "Correlation length for Gaussian samples.");
-    int coarsening_factor = 5;
+    int coarsening_factor = 2;
     args.AddOption(&coarsening_factor, "--coarsening-factor", "--coarsening-factor",
                    "Coarsening factor for Cartesian agglomeration");
 
@@ -261,53 +266,56 @@ int main(int argc, char* argv[])
     double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
         std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 
-    // construct white noise right-hand side
-    // (cell_volume is supposed to represent fine-grid W_h)
-    mfem::Vector rhs_u_fine(ufespace.GetVSize());
-    NormalSampler sampler;
-    for (int i=0; i<ufespace.GetVSize(); ++i)
+    const int num_samples = 1;
+    // todo: use coarse mass builder to rescale samples
+    for (int sample = 0; sample < num_samples; ++sample)
     {
-        rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
-    }
+        // construct white noise right-hand side
+        // (cell_volume is supposed to represent fine-grid W_h)
+        mfem::Vector rhs_u_fine(ufespace.GetVSize());
+        NormalSampler sampler;
+        for (int i=0; i<ufespace.GetVSize(); ++i)
+        {
+            rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
+        }
 
-    // Create Upscaler and Solve
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
-                                  partitioning, *edge_d_td, edge_boundary_att,
-                                  ess_attr, spect_tol, max_evects, dual_target,
-                                  scaled_dual, energy_dual, hybridization);
+        // Create Upscaler and Solve
+        FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
+                                      partitioning, *edge_d_td, edge_boundary_att,
+                                      ess_attr, spect_tol, max_evects, dual_target,
+                                      scaled_dual, energy_dual, hybridization);
 
-    mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
-    marker = 0;
-    sigmafespace.GetEssentialVDofs(ess_attr, marker);
-    fvupscale.MakeFineSolver(marker);
+        mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
+        marker = 0;
+        sigmafespace.GetEssentialVDofs(ess_attr, marker);
+        fvupscale.MakeFineSolver(marker);
 
-    fvupscale.PrintInfo();
-    fvupscale.ShowSetupTime();
+        fvupscale.PrintInfo();
+        fvupscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
-    rhs_fine.GetBlock(0) = 0.0;
-    rhs_fine.GetBlock(1) = rhs_u_fine;
+        mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
+        rhs_fine.GetBlock(0) = 0.0;
+        rhs_fine.GetBlock(1) = rhs_u_fine;
 
-    auto sol_upscaled = fvupscale.Solve(rhs_fine);
-    fvupscale.ShowCoarseSolveInfo();
+        auto sol_upscaled = fvupscale.Solve(rhs_fine);
+        fvupscale.ShowCoarseSolveInfo();
 
-    auto sol_fine = fvupscale.SolveFine(rhs_fine);
-    fvupscale.ShowFineSolveInfo();
+        auto sol_fine = fvupscale.SolveFine(rhs_fine);
+        fvupscale.ShowFineSolveInfo();
 
-    auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
+        auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 
-    if (myid == 0)
-    {
-        ShowErrors(error_info);
-    }
+        if (myid == 0)
+        {
+            ShowErrors(error_info);
+        }
 
-    // Visualize the solution
-    if (visualization)
-    {
-        mfem::ParGridFunction field(&ufespace);
-
-        Visualize(sol_upscaled.GetBlock(1), field, *pmesh, 1);
-        Visualize(sol_fine.GetBlock(1), field, *pmesh, 0);
+        // Visualize the solution
+        if (visualization)
+        {
+            Visualize(sol_upscaled.GetBlock(1), ufespace, 1);
+            Visualize(sol_fine.GetBlock(1), ufespace, 0);
+        }
     }
 
     return EXIT_SUCCESS;
