@@ -99,7 +99,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
     std::shared_ptr<ElementMBuilder> hybrid_builder_ptr;
-    if (!coarse_coefficient)
+    if (!coarse_coefficient || hybridization_)
     {
         hybrid_builder_ptr = std::make_shared<ElementMBuilder>();
         mbuilder_ptr = hybrid_builder_ptr;
