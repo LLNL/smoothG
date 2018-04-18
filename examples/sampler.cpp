@@ -302,9 +302,16 @@ int main(int argc, char* argv[])
     mean_fine = 0.0;
     mfem::Vector mean_upscaled(ufespace.GetVSize());
     mean_upscaled = 0.0;
+    mfem::Vector m2_fine(ufespace.GetVSize());
+    m2_fine = 0.0;
+    mfem::Vector m2_upscaled(ufespace.GetVSize());
+    m2_upscaled = 0.0;
+
     // todo: use coarse mass builder to rescale samples
     for (int sample = 0; sample < num_samples; ++sample)
     {
+        double count = static_cast<double>(sample) + 1.0;
+
         // construct white noise right-hand side
         // (cell_volume is supposed to represent fine-grid W_h)
         mfem::Vector rhs_u_fine(ufespace.GetVSize());
@@ -333,11 +340,23 @@ int main(int argc, char* argv[])
 
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
-        mean_upscaled += sol_upscaled.GetBlock(1);
+        for (int i=0; i<mean_upscaled.Size(); ++i)
+        {
+            const double delta = (sol_upscaled.GetBlock(1)(i) - mean_upscaled(i));
+            mean_upscaled(i) += delta / count;
+            const double delta2 = (sol_upscaled.GetBlock(1)(i) - mean_upscaled(i));
+            m2_upscaled(i) += delta * delta2;
+        }
 
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
-        mean_fine += sol_fine.GetBlock(1);
+        for (int i=0; i<mean_fine.Size(); ++i)
+        {
+            const double delta = (sol_fine.GetBlock(1)(i) - mean_fine(i));
+            mean_fine(i) += delta / count;
+            const double delta2 = (sol_fine.GetBlock(1)(i) - mean_fine(i));
+            m2_fine(i) += delta * delta2;
+        }
 
         auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 
@@ -356,14 +375,19 @@ int main(int argc, char* argv[])
             SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
         }
     }
-    double mean_scale = 1.0 / static_cast<double>(num_samples);
-    mean_fine *= mean_scale;
-    mean_upscaled *= mean_scale;
+    double count = static_cast<double>(num_samples);
+    if (count > 1.1)
+    {
+        m2_upscaled *= (1.0 / (count - 1.0));
+        m2_fine *= (1.0 / (count - 1.0));
+    }
 
     if (visualization)
     {
         Visualize(mean_upscaled, ufespace, 1);
         Visualize(mean_fine, ufespace, 0);
+        Visualize(m2_upscaled, ufespace, 11);
+        Visualize(m2_fine, ufespace, 10);
     }
     if (save_statistics)
     {
@@ -373,6 +397,12 @@ int main(int argc, char* argv[])
         std::stringstream finename;
         finename << "fine_mean";
         SaveFigure(mean_fine, ufespace, finename.str());
+        std::stringstream coarsenamev;
+        coarsenamev << "coarse_variance";
+        SaveFigure(mean_upscaled, ufespace, coarsenamev.str());
+        std::stringstream finenamev;
+        finenamev << "fine_variance";
+        SaveFigure(mean_fine, ufespace, finenamev.str());
     }
 
     return EXIT_SUCCESS;
