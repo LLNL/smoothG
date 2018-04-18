@@ -307,6 +307,11 @@ int main(int argc, char* argv[])
     mfem::Vector m2_upscaled(ufespace.GetVSize());
     m2_upscaled = 0.0;
 
+    int total_coarse_iterations = 0;
+    int total_fine_iterations = 0;
+    double total_coarse_time = 0.0;
+    double total_fine_time = 0.0;
+
     // todo: use coarse mass builder to rescale samples
     for (int sample = 0; sample < num_samples; ++sample)
     {
@@ -331,15 +336,18 @@ int main(int argc, char* argv[])
         sigmafespace.GetEssentialVDofs(ess_attr, marker);
         fvupscale.MakeFineSolver(marker);
 
-        fvupscale.PrintInfo();
-        fvupscale.ShowSetupTime();
+        // fvupscale.PrintInfo();
+        // fvupscale.ShowSetupTime();
 
         mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
         rhs_fine.GetBlock(0) = 0.0;
         rhs_fine.GetBlock(1) = rhs_u_fine;
 
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
-        fvupscale.ShowCoarseSolveInfo();
+        int coarse_iterations = fvupscale.GetCoarseSolveIters();
+        total_coarse_iterations += coarse_iterations;
+        double coarse_time = fvupscale.GetCoarseSolveTime();
+        total_coarse_time += coarse_time;
         for (int i=0; i<mean_upscaled.Size(); ++i)
         {
             const double delta = (sol_upscaled.GetBlock(1)(i) - mean_upscaled(i));
@@ -349,7 +357,10 @@ int main(int argc, char* argv[])
         }
 
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
-        fvupscale.ShowFineSolveInfo();
+        int fine_iterations = fvupscale.GetFineSolveIters();
+        total_fine_iterations += fine_iterations;
+        double fine_time = fvupscale.GetFineSolveTime();
+        total_fine_time += fine_time;
         for (int i=0; i<mean_fine.Size(); ++i)
         {
             const double delta = (sol_fine.GetBlock(1)(i) - mean_fine(i));
@@ -359,11 +370,7 @@ int main(int argc, char* argv[])
         }
 
         auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
-
-        if (myid == 0)
-        {
-            ShowErrors(error_info);
-        }
+        double finest_p_error = error_info[0];
 
         if (save_samples)
         {
@@ -373,6 +380,13 @@ int main(int argc, char* argv[])
             std::stringstream finename;
             finename << "fine_" << sample;
             SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
+        }
+
+        if (myid == 0)
+        {
+            std::cout << "  Sample " << sample << ": (fine: its: " << fine_iterations
+                      << ", time: " << fine_time << ") (coarse: its: " << coarse_iterations
+                      << ", time: " << coarse_time << ") p_error: " << finest_p_error << std::endl;
         }
     }
     double count = static_cast<double>(num_samples);
