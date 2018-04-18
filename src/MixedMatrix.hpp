@@ -107,6 +107,7 @@ public:
 
     MixedMatrix(std::unique_ptr<CoarseMBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
+                std::unique_ptr<mfem::SparseMatrix> W,
                 const mfem::HypreParMatrix& edge_d_td);
 
     /**
@@ -133,6 +134,15 @@ public:
             M_ = mbuilder_->GetAssembledM();
         }
         return *M_;
+    }
+
+    /**
+       @brief Get a reference to the mass matrix M.
+    */
+    const MBuilder& GetMBuilder() const
+    {
+        assert(mbuilder_);
+        return *mbuilder_;
     }
 
     /**

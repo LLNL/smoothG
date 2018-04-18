@@ -53,20 +53,10 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
                                                      &edge_boundary_att_);
 
-    if (hybridization_)
-    {
-        hybrid_builder_ = std::make_shared<ElementMBuilder>();
-        mbuilder_ = hybrid_builder_;
-    }
-    else
-    {
-        mbuilder_ = std::make_shared<CoefficientMBuilder>(*graph_topology);
-    }
-
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     *mbuilder_);
+                     !hybridization_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -97,8 +87,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     if (!hybridization_)
     {
-        mbuilder_->SetCoefficient(coeff);
-        GetCoarseMatrix().setWeight(*mbuilder_->GetAssembledM());
+        GetFineMatrix().UpdateM(coeff);
         MakeCoarseSolver();
     }
     else
@@ -122,7 +111,6 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
         auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm_, GetCoarseMatrix(), *coarsener_,
-                             *hybrid_builder_,
                              &face_bdratt, &marker, 0, saamge_param_);
     }
     else // L2-H1 block diagonal preconditioner

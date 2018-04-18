@@ -97,22 +97,10 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
 
-    std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
-    std::shared_ptr<ElementMBuilder> hybrid_builder_ptr;
-    if (!coarse_coefficient || hybridization_)
-    {
-        hybrid_builder_ptr = std::make_shared<ElementMBuilder>();
-        mbuilder_ptr = hybrid_builder_ptr;
-    }
-    else
-    {
-        mbuilder_ptr = std::make_shared<CoefficientMBuilder>(*graph_topology);
-    }
-
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     *mbuilder_ptr);
+                     !hybridization_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -120,7 +108,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     if (hybridization_)
     {
         coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_, *hybrid_builder_ptr,
+                             comm_, GetCoarseMatrix(), *coarsener_,
                              nullptr, nullptr, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner

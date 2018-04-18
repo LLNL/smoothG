@@ -420,14 +420,13 @@ FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMa
     for (int Agg = 0; Agg < nAggs; Agg++)
     {
         GetTableRow(vertex_edge_, Agg, edofs);
-        mfem::Vector Agg_edge_weight;
-        edge_weight.GetSubVector(edofs, Agg_edge_weight);
         mfem::Vector& agg_M = M_el_[Agg];
-        agg_M.SetSize(Agg_edge_weight.Size());
+        agg_M.SetSize(edofs.Size());
         for (int i = 0; i < agg_M.Size(); i++)
         {
-            const double ratio = (edge_vertex.RowSize(edofs[i]) > 1) ? 0.5 : 1.0;
-            agg_M[i] = ratio / Agg_edge_weight[i];
+            const int edof = edofs[i];
+            const double ratio = (edge_vertex.RowSize(edof) > 1) ? 0.5 : 1.0;
+            agg_M[i] = ratio / edge_weight[edof];
         }
     }
 }

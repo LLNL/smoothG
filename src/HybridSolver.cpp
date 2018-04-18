@@ -88,17 +88,14 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(D_);
     const mfem::SparseMatrix edge_edgedof;
 
-    std::vector<mfem::Vector> M_el;
-    BuildFineLevelLocalMassMatrix(D_, mgL.getWeight(), M_el);
-
-    Init(edge_edgedof, M_el, mgL.get_edge_d_td(),
-         face_bdrattr, ess_edge_dofs);
+    auto& mbuilder = static_cast<const FineMBuilder&>(mgL.GetMBuilder());
+    Init(edge_edgedof, mbuilder.GetElementMatrices(),
+         mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const Mixed_GL_Coarsener& mgLc,
-                           const ElementMBuilder& mbuilder,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
@@ -119,8 +116,9 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
     Agg_edgedof_.MakeRef(mgLc.construct_Agg_cedgedof_table());
 
-    Init(face_edgedof, mbuilder.GetElementMatrices(), mgL.get_edge_d_td(),
-         face_bdrattr, ess_edge_dofs);
+    auto& mbuilder = static_cast<const ElementMBuilder&>(mgL.GetMBuilder());
+    Init(face_edgedof, mbuilder.GetElementMatrices(),
+         mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::~HybridSolver()
