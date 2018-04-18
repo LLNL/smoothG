@@ -389,12 +389,18 @@ int main(int argc, char* argv[])
                       << ", time: " << coarse_time << ") p_error: " << finest_p_error << std::endl;
         }
     }
+
     double count = static_cast<double>(num_samples);
     if (count > 1.1)
     {
         m2_upscaled *= (1.0 / (count - 1.0));
         m2_fine *= (1.0 / (count - 1.0));
     }
+
+    serialize["fine-mean-mean"] = picojson::value(mean_fine.Sum() / static_cast<double>(mean_fine.Size()));
+    serialize["coarse-mean-mean"] = picojson::value(mean_upscaled.Sum() / static_cast<double>(mean_upscaled.Size()));
+    serialize["fine-variance-mean"] = picojson::value(m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
+    serialize["coarse-variance-mean"] = picojson::value(m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
 
     if (visualization)
     {
@@ -418,6 +424,9 @@ int main(int argc, char* argv[])
         finenamev << "fine_variance";
         SaveFigure(mean_fine, ufespace, finenamev.str());
     }
+
+    if (myid == 0)
+        std::cout << picojson::value(serialize).serialize(true) << std::endl;
 
     return EXIT_SUCCESS;
 }
