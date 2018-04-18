@@ -188,6 +188,14 @@ int main(int argc, char* argv[])
     int num_samples = 1;
     args.AddOption(&num_samples, "--num-samples", "--num-samples",
                    "Number of samples to take.");
+    bool save_samples = false;
+    args.AddOption(&save_samples, "--save-samples", "--save-samples",
+                   "--no-save-samples", "--no-save-samples",
+                   "Save images of each sample.");
+    bool save_statistics = true;
+    args.AddOption(&save_statistics, "--save-statistics", "--save-statistics",
+                   "--no-save-statistics", "--no-save-statistics",
+                   "Save images of mean and variance.");
 
     args.Parse();
     if (!args.Good())
@@ -338,8 +346,7 @@ int main(int argc, char* argv[])
             ShowErrors(error_info);
         }
 
-        const bool save_figures = false;
-        if (save_figures)
+        if (save_samples)
         {
             std::stringstream coarsename;
             coarsename << "coarse_" << sample;
@@ -358,8 +365,7 @@ int main(int argc, char* argv[])
         Visualize(mean_upscaled, ufespace, 1);
         Visualize(mean_fine, ufespace, 0);
     }
-    const bool save_figures = true;
-    if (save_figures)
+    if (save_statistics)
     {
         std::stringstream coarsename;
         coarsename << "coarse_mean";
