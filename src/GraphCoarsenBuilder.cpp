@@ -258,8 +258,10 @@ mfem::DenseMatrix CoefficientMBuilder::RTDP(const mfem::DenseMatrix& R,
                                             const mfem::DenseMatrix& P)
 {
     mfem::DenseMatrix out(R.Width(), P.Width());
-    if (R.Width() == 0 || P.Width() == 0)
+    // MFEM w/ lapack breaks when these are 0
+    if (!R.Width() || !R.Height() || !P.Height() || !P.Width())
     {
+        out = 0.0;
         return out;
     }
     mfem::DenseMatrix Rt;
