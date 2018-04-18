@@ -397,10 +397,20 @@ int main(int argc, char* argv[])
         m2_fine *= (1.0 / (count - 1.0));
     }
 
-    serialize["fine-mean-mean"] = picojson::value(mean_fine.Sum() / static_cast<double>(mean_fine.Size()));
-    serialize["coarse-mean-mean"] = picojson::value(mean_upscaled.Sum() / static_cast<double>(mean_upscaled.Size()));
-    serialize["fine-variance-mean"] = picojson::value(m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
-    serialize["coarse-variance-mean"] = picojson::value(m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
+    serialize["total-coarse-iterations"] = picojson::value((double) total_coarse_iterations);
+    serialize["total-fine-iterations"] = picojson::value((double) total_fine_iterations);
+    serialize["fine-mean-mean"] = picojson::value(
+        mean_fine.Sum() / static_cast<double>(mean_fine.Size()));
+    serialize["fine-mean-typical"] = picojson::value(
+        mean_fine[mean_fine.Size() / 2]);
+    serialize["coarse-mean-mean"] = picojson::value(
+        mean_upscaled.Sum() / static_cast<double>(mean_upscaled.Size()));
+    serialize["coarse-mean-typical"] = picojson::value(
+        mean_upscaled[mean_upscaled.Size() / 2]);
+    serialize["fine-variance-mean"] = picojson::value(
+        m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
+    serialize["coarse-variance-mean"] = picojson::value(
+        m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
 
     if (visualization)
     {
