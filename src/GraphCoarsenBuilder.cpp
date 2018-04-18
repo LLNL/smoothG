@@ -409,38 +409,38 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetAssembledM()
     return std::move(CoarseM);
 }
 
-FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& vertex_edge)
-    : vertex_edge_(vertex_edge)
+FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& Agg_edgedof)
+    : Agg_edgedof_(Agg_edgedof)
 {
-    const mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge_);
-    const int nAggs = vertex_edge_.Height();
+    const mfem::SparseMatrix edgedof_Agg = smoothg::Transpose(Agg_edgedof);
+    const int nAggs = Agg_edgedof_.Height();
     M_el_.resize(nAggs);
 
     mfem::Array<int> edofs;
     for (int Agg = 0; Agg < nAggs; Agg++)
     {
-        GetTableRow(vertex_edge_, Agg, edofs);
+        GetTableRow(Agg_edgedof, Agg, edofs);
         mfem::Vector& agg_M = M_el_[Agg];
         agg_M.SetSize(edofs.Size());
         for (int i = 0; i < agg_M.Size(); i++)
         {
             const int edof = edofs[i];
-            const double ratio = (edge_vertex.RowSize(edof) > 1) ? 0.5 : 1.0;
+            const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
             agg_M[i] = ratio / edge_weight[edof];
         }
     }
 }
 
 FineMBuilder::FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
-                           const mfem::SparseMatrix& vertex_edge)
-    : vertex_edge_(vertex_edge)
+                           const mfem::SparseMatrix& Agg_edgedof)
+    : Agg_edgedof_(Agg_edgedof)
 {
-    const int nAggs = vertex_edge_.Height();
+    const int nAggs = Agg_edgedof_.Height();
     M_el_.resize(nAggs);
 
     for (int Agg = 0; Agg < nAggs; Agg++)
     {
-        mfem::Vector& Agg_edge_weight = M_el_[Agg];
+        const mfem::Vector& Agg_edge_weight = local_edge_weight[Agg];
         mfem::Vector& agg_M = M_el_[Agg];
         agg_M.SetSize(Agg_edge_weight.Size());
         for (int i = 0; i < agg_M.Size(); i++)
@@ -454,10 +454,10 @@ FineMBuilder::FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
 std::unique_ptr<mfem::SparseMatrix> FineMBuilder::GetAssembledM()
 {
     mfem::Array<int> edofs;
-    auto M = make_unique<mfem::SparseMatrix>(vertex_edge_.Width());
-    for (int Agg = 0; Agg < vertex_edge_.Height(); Agg++)
+    auto M = make_unique<mfem::SparseMatrix>(Agg_edgedof_.Width());
+    for (int Agg = 0; Agg < Agg_edgedof_.Height(); Agg++)
     {
-        GetTableRow(vertex_edge_, Agg, edofs);
+        GetTableRow(Agg_edgedof_, Agg, edofs);
         const mfem::Vector& agg_M = M_el_[Agg];
 
         // Assume unit weight if agg_weights_ is empty

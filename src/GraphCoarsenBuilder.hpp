@@ -238,15 +238,15 @@ private:
 class FineMBuilder : public MBuilder
 {
 public:
-    FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& vertex_edge);
+    FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& Agg_edgedof);
     FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
-                 const mfem::SparseMatrix& vertex_edge);
+                 const mfem::SparseMatrix& Agg_edgedof);
 
     virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM();
     const std::vector<mfem::Vector>& GetElementMatrices() const { return M_el_; }
 private:
     std::vector<mfem::Vector> M_el_;
-    const mfem::SparseMatrix& vertex_edge_;
+    const mfem::SparseMatrix& Agg_edgedof_;
 };
 
 /**

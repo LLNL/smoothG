@@ -107,6 +107,7 @@ class HybridSolver : public MixedLaplacianSolver
 {
 public:
     /// Construct local mass matrix for the fine level edge space
+    /// @deprecated element matrices are available in MixedMatrix
     static void BuildFineLevelLocalMassMatrix(
         const mfem::SparseMatrix& vertex_edge,
         const mfem::SparseMatrix& M,
@@ -115,8 +116,6 @@ public:
 public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
-
-
 
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the fine level
