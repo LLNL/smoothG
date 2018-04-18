@@ -362,6 +362,7 @@ public:
     static void SetMeshSizes(double hx, double hy, double hz);
     static void Set2DSlice(SliceOrientation o, int npos );
 
+    static void BlankPermeability();
     static void ReadPermeabilityFile(const std::string& fileName);
     static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
 

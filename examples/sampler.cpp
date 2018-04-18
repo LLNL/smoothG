@@ -19,7 +19,7 @@
    @brief Try to do scalable hierarchical sampling with finite volumes
 
    See Osborn, Vassilevski, and Villa, A multilevel, hierarchical sampling technique for
-   spatially correlated random fields.
+   spatially correlated random fields, SISC 39 (2017) pp. S543-S562.
 
    A simple way to run the example:
 
@@ -27,8 +27,8 @@
 
    I like the following runs:
 
-   examples/sampler --perm ~/spe10/spe_perm.dat --visualization --kappa 0.001 --coarsening-factor 3
-   examples/sampler --perm ~/spe10/spe_perm.dat --visualization --kappa 0.001 --coarsening-factor 2
+   examples/sampler --visualization --kappa 0.001 --coarsening-factor 3
+   examples/sampler --visualization --kappa 0.001 --coarsening-factor 2
 */
 
 #include <fstream>
@@ -142,9 +142,6 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
-                   "SPE10 permeability file data.");
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
                    "Dimension of the physical space.");
@@ -188,6 +185,9 @@ int main(int argc, char* argv[])
     int seed = 0;
     args.AddOption(&seed, "--seed", "--seed",
                    "Seed for random number generator.");
+    int num_samples = 1;
+    args.AddOption(&num_samples, "--num-samples", "--num-samples",
+                   "Number of samples to take.");
 
     args.Parse();
     if (!args.Good())
@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
     mfem::Vector weight;
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+    SPE10Problem spe10problem(NULL, nDimensions, spe10_scale, slice,
                               metis_agglomeration, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
@@ -290,7 +290,10 @@ int main(int argc, char* argv[])
         std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 
     NormalSampler sampler(0.0, 1.0, seed);
-    const int num_samples = 1;
+    mfem::Vector mean_fine(ufespace.GetVSize());
+    mean_fine = 0.0;
+    mfem::Vector mean_upscaled(ufespace.GetVSize());
+    mean_upscaled = 0.0;
     // todo: use coarse mass builder to rescale samples
     for (int sample = 0; sample < num_samples; ++sample)
     {
@@ -322,9 +325,11 @@ int main(int argc, char* argv[])
 
         auto sol_upscaled = fvupscale.Solve(rhs_fine);
         fvupscale.ShowCoarseSolveInfo();
+        mean_upscaled += sol_upscaled.GetBlock(1);
 
         auto sol_fine = fvupscale.SolveFine(rhs_fine);
         fvupscale.ShowFineSolveInfo();
+        mean_fine += sol_fine.GetBlock(1);
 
         auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 
@@ -333,13 +338,7 @@ int main(int argc, char* argv[])
             ShowErrors(error_info);
         }
 
-        // Visualize the solution
-        if (visualization)
-        {
-            Visualize(sol_upscaled.GetBlock(1), ufespace, 1);
-            Visualize(sol_fine.GetBlock(1), ufespace, 0);
-        }
-        const bool save_figures = true;
+        const bool save_figures = false;
         if (save_figures)
         {
             std::stringstream coarsename;
@@ -349,6 +348,25 @@ int main(int argc, char* argv[])
             finename << "fine_" << sample;
             SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
         }
+    }
+    double mean_scale = 1.0 / static_cast<double>(num_samples);
+    mean_fine *= mean_scale;
+    mean_upscaled *= mean_scale;
+
+    if (visualization)
+    {
+        Visualize(mean_upscaled, ufespace, 1);
+        Visualize(mean_fine, ufespace, 0);
+    }
+    const bool save_figures = true;
+    if (save_figures)
+    {
+        std::stringstream coarsename;
+        coarsename << "coarse_mean";
+        SaveFigure(mean_upscaled, ufespace, coarsename.str());
+        std::stringstream finename;
+        finename << "fine_mean";
+        SaveFigure(mean_fine, ufespace, finename.str());
     }
 
     return EXIT_SUCCESS;

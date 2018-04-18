@@ -168,7 +168,14 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     IPF::SetNumberCells(N[0], N[1], N[2]);
     IPF::SetMeshSizes(h(0), h(1), h(2));
-    IPF::ReadPermeabilityFile(permFile, MPI_COMM_WORLD);
+    if (permFile == NULL)
+    {
+        IPF::BlankPermeability();
+    }
+    else
+    {
+        IPF::ReadPermeabilityFile(permFile, MPI_COMM_WORLD);
+    }
 
     if (nDimensions == 2)
         IPF::Set2DSlice(IPF::XY, slice);

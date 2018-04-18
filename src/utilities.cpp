@@ -833,6 +833,15 @@ void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
     npos = npos_;
 }
 
+void InversePermeabilityFunction::BlankPermeability()
+{
+    inversePermeability = new double[3 * Nx * Ny * Nz];
+    for (int i=0; i < 3 * Nx * Ny * Nz; ++i)
+    {
+        inversePermeability[i] = 1.0;
+    }
+}
+
 void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName)
 {
     std::ifstream permfile(fileName.c_str());
@@ -943,7 +952,6 @@ void InversePermeabilityFunction::InversePermeability(const mfem::Vector& x,
 
     if (orientation == NONE)
         val[2] = inversePermeability[Ny * Nx * k + Nx * j + i + 2 * Nx * Ny * Nz];
-
 }
 
 double InversePermeabilityFunction::InvNorm2(const mfem::Vector& x)
