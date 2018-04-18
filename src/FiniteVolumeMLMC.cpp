@@ -47,7 +47,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(ve_copy, weight, edge_d_td_,
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
@@ -82,11 +82,15 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 /// this implementation is sloppy
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
-    mfem::Vector temp(coeff);
-    for (int i = 0; i < coeff.Size(); ++i)
-        temp(i) = coeff(i) * weight_(i);
-    GetFineMatrix().SetMFromWeightVector(temp);
-    ForceMakeFineSolver();
+    if (!hybridization_)
+    {
+        GetFineMatrix().UpdateM(coeff);
+        ForceMakeFineSolver();
+    }
+    else
+    {
+        ((HybridSolver&) (*fine_solver_)).UpdateAggScaling(coeff);
+    }
 }
 
 void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
@@ -94,10 +98,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     if (!hybridization_)
     {
         mbuilder_->SetCoefficient(coeff);
-        GetCoarseMatrix().setWeight(
-            *mbuilder_->GetCoarseM(weight_,
-                                   coarsener_->get_Psigma(),
-                                   coarsener_->construct_face_facedof_table()));
+        GetCoarseMatrix().setWeight(*mbuilder_->GetAssembledM());
         MakeCoarseSolver();
     }
     else

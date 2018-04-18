@@ -461,10 +461,10 @@ void GraphCoarsen::BuildPEdges(
 
     Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
 
-    auto mbuilder_ptr = dynamic_cast<ElementMBuilder*>(&mbuilder);
-    if (mbuilder_ptr)
+    auto elem_mbuilder_ptr = dynamic_cast<ElementMBuilder*>(&mbuilder);
+    if (elem_mbuilder_ptr)
     {
-        mbuilder_ptr->SetAggToEdgeDofsTableReference(*Agg_cdof_edge_);
+        elem_mbuilder_ptr->SetAggToEdgeDofsTableReference(*Agg_cdof_edge_);
     }
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
@@ -514,11 +514,14 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
+    auto coef_mbuilder_ptr = dynamic_cast<CoefficientMBuilder*>(&mbuilder);
+    if (coef_mbuilder_ptr)
+    {
+        coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_cdof);
+    }
+
     // TODO: only compute CoarseM_ when solver is not hybridization
-    mfem::Vector agg_weights_inverse(nAggs);
-    agg_weights_inverse = 1.0;
-    mbuilder.SetCoefficient(agg_weights_inverse);
-    CoarseM_ = mbuilder.GetCoarseM(M_v, Pedges, face_cdof);
+    CoarseM_ = mbuilder.GetAssembledM();
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)

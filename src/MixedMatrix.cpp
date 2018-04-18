@@ -110,12 +110,11 @@ MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
     GenerateRowStarts();
 }
 
-MixedMatrix::MixedMatrix(std::vector<mfem::DenseMatrix> M_el,
-                         std::unique_ptr<mfem::SparseMatrix> elem_edof,
+MixedMatrix::MixedMatrix(std::unique_ptr<CoarseMBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          const mfem::HypreParMatrix& edge_d_td)
     : D_(std::move(D)), edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose()),
-      M_el_(std::move(M_el)), elem_edof_(std::move(elem_edof))
+      mbuilder_(std::move(mbuilder))
 {
     GenerateRowStarts();
 }
@@ -146,6 +145,13 @@ void MixedMatrix::ScaleM(const mfem::Vector& weight)
     M_->ScaleRows(weight);
 }
 
+void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
+{
+    assert(mbuilder_);
+    mbuilder_->SetCoefficient(agg_weights_inverse);
+    M_ = mbuilder_->GetAssembledM();
+}
+
 /// @todo better documentation of the 1/-1 issue, make it optional?
 void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
                        const mfem::Vector& weight,
@@ -154,7 +160,8 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
     const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
     const int nvertices = vertex_edge.Height();
 
-    SetMFromWeightVector(weight);
+//    SetMFromWeightVector(weight);
+    mbuilder_ = make_unique<FineMBuilder>(weight, vertex_edge);
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
     {
@@ -252,37 +259,6 @@ std::unique_ptr<mfem::SparseMatrix> MixedMatrix::ConstructD(
         }
     }
     return unique_ptr<mfem::SparseMatrix>(mfem::Transpose(graphDT));
-}
-
-void MixedMatrix::AssembleM(const mfem::Vector& elem_scale) const
-{
-    const int num_elem = elem_edof_->Height();
-    mfem::Array<int> edofs;
-    assert(D_);
-    M_ = make_unique<mfem::SparseMatrix>(D_->Width());
-    for (int elem = 0; elem < num_elem; elem++)
-    {
-        GetTableRow(*elem_edof_, elem, edofs);
-        const double scale = elem_scale(elem);
-        if (scale == 1.0)
-        {
-            M_->AddSubMatrix(edofs, edofs, M_el_[elem]);
-        }
-        else
-        {
-            mfem::DenseMatrix elem_M = M_el_[elem];
-            elem_M *= scale;
-            M_->AddSubMatrix(edofs, edofs, elem_M);
-        }
-    }
-    M_->Finalize();
-}
-
-void MixedMatrix::AssembleM() const
-{
-    mfem::Vector elem_scale(elem_edof_->Height());
-    elem_scale = 1.0;
-    AssembleM(elem_scale);
 }
 
 } // namespace smoothg

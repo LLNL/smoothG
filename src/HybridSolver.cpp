@@ -551,8 +551,7 @@ void HybridSolver::AssembleHybridSystem(
 
         // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T (this is needed
         // only if one wants to construct H1 spectral AMGe preconditioner)
-        if (use_spectralAMGe_)
-            Hybrid_el_[iAgg] = tmpHybrid_el;
+        Hybrid_el_[iAgg] = tmpHybrid_el;
     }
 }
 

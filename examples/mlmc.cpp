@@ -279,14 +279,15 @@ int main(int argc, char* argv[])
 
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
+    fvupscale.MakeFineSolver();
 
     mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
-    const int num_fine_edges = vertex_edge.Width();
+    const int num_fine_vertices = vertex_edge.Height();
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
-    SimpleSampler sampler(num_fine_edges, num_aggs);
+    SimpleSampler sampler(num_fine_vertices, num_aggs);
 
     const int num_samples = 3;
     for (int sample = 0; sample < num_samples; ++sample)

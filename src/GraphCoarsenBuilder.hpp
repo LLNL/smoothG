@@ -28,6 +28,33 @@
 namespace smoothg
 {
 
+class MBuilder
+{
+public:
+    virtual ~MBuilder() {}
+
+    /**
+       @brief Get the assembled M for the local processor
+     */
+    virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM() = 0;
+
+    /**
+       @brief Set weights on aggregates for assembly of mass matrix.
+
+       The point of this class is to be able to build the mass matrix M
+       with different weights, without recoarsening the whole thing.
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+    */
+    void SetCoefficient(const mfem::Vector& agg_weights_inverse);
+protected:
+    /// weights on aggregates (on fine level, aggregate = vertex)
+    mfem::Vector agg_weights_;
+};
+
 /**
    @brief Abstract base class to help building the coarse mass matrix in
    GraphCoarsen::BuildPEdges()
@@ -42,11 +69,9 @@ namespace smoothg
    where \f$ T \f$ signifies trace extension degrees of freedom, and
    \f$ B \f$ signifies bubble degrees of freedom on the coarse graph.
 */
-class CoarseMBuilder
+class CoarseMBuilder : public MBuilder
 {
 public:
-    virtual ~CoarseMBuilder() {}
-
     /// this is arguably poor design, most implementations of this interface
     /// do not need all these arguments
     virtual void Setup(
@@ -73,30 +98,12 @@ public:
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                                      const mfem::SparseMatrix& Agg_cdof_edge) {}
 
-    virtual std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        const mfem::Vector& fineMdiag,
-        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof) = 0;
+    virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM() = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
 
-    /**
-       @brief Set weights on aggregates for assembly of coarse mass matrix.
-
-       The point of this class is to be able to build the coarse mass matrix
-       with different weights, without recoarsening the whole thing.
-
-       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
-       that is, agg_weights_inverse in the input is like the coefficient in
-       a finite volume problem, agg_weights is the weights on the mass matrix
-       in the mixed form, which is the reciprocal of that.
-    */
-    virtual void SetCoefficient(const mfem::Vector& agg_weights_inverse);
-
 protected:
     int total_num_traces_;
-
-    /// weights on aggregates
-    mfem::Vector agg_weights_;
 };
 
 /**
@@ -139,9 +146,7 @@ public:
         Agg_cdof_edge_ref_.MakeRef(Agg_cdof_edge);
     }
 
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        const mfem::Vector& fineMdiag,
-        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
+    std::unique_ptr<mfem::SparseMatrix> GetAssembledM();
 
     bool NeedsCoarseVertexDofs() { return true; }
 
@@ -196,9 +201,7 @@ public:
                          const mfem::SparseMatrix& Pedges,
                          const mfem::SparseMatrix& face_cdof);
 
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM(
-        const mfem::Vector& fineMdiag,
-        const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof);
+    std::unique_ptr<mfem::SparseMatrix> GetAssembledM();
 
 private:
     /// @todo remove this (GetTableRowCopy is the same thing?)
@@ -218,6 +221,8 @@ private:
     int ncoarse_vertexdofs_;
     mfem::Array<int> coarse_agg_dof_offsets_;
 
+    mfem::SparseMatrix face_cdof_ref_;
+
     /// P_F^T M_F P_F
     std::vector<mfem::DenseMatrix> comp_F_F_;
     /// P_{E(A),F}^T M_{E(A)} P_{E(A),F'}
@@ -228,6 +233,20 @@ private:
     std::vector<mfem::DenseMatrix> comp_E_E_;
 
     bool components_built_;
+};
+
+class FineMBuilder : public MBuilder
+{
+public:
+    FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& vertex_edge);
+    FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
+                 const mfem::SparseMatrix& vertex_edge);
+
+    virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM();
+    const std::vector<mfem::Vector>& GetElementMatrices() const { return M_el_; }
+private:
+    std::vector<mfem::Vector> M_el_;
+    const mfem::SparseMatrix& vertex_edge_;
 };
 
 /**

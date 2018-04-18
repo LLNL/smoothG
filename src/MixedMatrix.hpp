@@ -24,6 +24,7 @@
 #include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
+#include "GraphCoarsenBuilder.hpp"
 
 namespace smoothg
 {
@@ -104,8 +105,7 @@ public:
                       edge_d_td)
     {}
 
-    MixedMatrix(std::vector<mfem::DenseMatrix> M_el,
-                std::unique_ptr<mfem::SparseMatrix> elem_edof,
+    MixedMatrix(std::unique_ptr<CoarseMBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 const mfem::HypreParMatrix& edge_d_td);
 
@@ -114,7 +114,11 @@ public:
     */
     mfem::SparseMatrix& getWeight() const
     {
-        assert(M_);
+        assert(M_ || mbuilder_);
+        if (!M_)
+        {
+            M_ = mbuilder_->GetAssembledM();
+        }
         return *M_;
     }
 
@@ -123,10 +127,10 @@ public:
     */
     mfem::SparseMatrix& getWeight()
     {
-        assert(M_ || elem_edof_);
+        assert(M_ || mbuilder_);
         if (!M_)
         {
-            AssembleM();
+            M_ = mbuilder_->GetAssembledM();
         }
         return *M_;
     }
@@ -311,6 +315,16 @@ public:
 
     void ScaleM(const mfem::Vector& weight);
 
+    /**
+       @brief Update mass matrix M based on new agg weight.
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+    */
+    void UpdateM(const mfem::Vector& agg_weights_inverse);
+
     static std::unique_ptr<mfem::SparseMatrix> ConstructD(
         const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
 
@@ -325,9 +339,6 @@ private:
               const mfem::SparseMatrix& w_block);
 
     void GenerateRowStarts();
-
-    void AssembleM(const mfem::Vector& elem_scale) const;
-    void AssembleM() const;
 
     mutable std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
@@ -346,9 +357,7 @@ private:
     mutable std::unique_ptr<mfem::Array<int>> blockOffsets_;
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
 
-    std::vector<mfem::DenseMatrix> M_el_; // element matrices of M
-    std::unique_ptr<mfem::SparseMatrix> elem_edof_; // element to edge dofs table
-
+    std::unique_ptr<MBuilder> mbuilder_;
 }; // class MixedMatrix
 
 } // namespace smoothg
