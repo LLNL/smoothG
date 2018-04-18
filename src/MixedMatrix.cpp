@@ -161,7 +161,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
     const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
     const int nvertices = vertex_edge.Height();
 
-//    SetMFromWeightVector(weight);
+    //    SetMFromWeightVector(weight);
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
     {
