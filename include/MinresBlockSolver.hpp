@@ -58,29 +58,32 @@ namespace smoothg
 class MinresBlockSolver : public MGLSolver
 {
 public:
-    /**
-       @brief Constructor from individual M and D matrices.
-
-       @param comm communicator on which to construct parallel MINRES solver
-       @param M weighting matrix for graph edges
-       @param D describes vertex-edge relation
-       @param use_W use the W block
-    */
+    /** @brief Default Constructor */
     MinresBlockSolver() = default;
-    //MinresBlockSolver(ParMatrix M, ParMatrix D);
-    //MinresBlockSolver(ParMatrix M, ParMatrix D, ParMatrix W, bool use_W = false);
+
+    /** @brief Constructor from a mixed matrix
+        @param mgl mixed matrix information
+    */
     MinresBlockSolver(const MixedMatrix& mgl);
 
+    /** @brief Copy Constructor */
     MinresBlockSolver(const MinresBlockSolver& other) noexcept;
+
+    /** @brief Move Constructor */
     MinresBlockSolver(MinresBlockSolver&& other) noexcept;
+
+    /** @brief Assignment Operator */
     MinresBlockSolver& operator=(MinresBlockSolver other) noexcept;
 
+    /** @brief Swap two solvers */
     friend void swap(MinresBlockSolver& lhs, MinresBlockSolver& rhs) noexcept;
 
+    /** @brief Default Destructor */
     ~MinresBlockSolver() noexcept = default;
 
-    /**
-       @brief Use block-preconditioned MINRES to solve the problem.
+    /** @brief Use block-preconditioned MINRES to solve the problem.
+        @param rhs Right hand side
+        @param sol Solution
     */
     void Solve(const BlockVector& rhs, BlockVector& sol) const override;
 

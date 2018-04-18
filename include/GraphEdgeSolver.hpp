@@ -15,7 +15,7 @@
 
 /** @file
 
-    @brief GraphCoarsen class
+    @brief GraphEdgeSolver class
 */
 
 #ifndef __GRAPHSOLVER_HPP__
@@ -28,32 +28,121 @@ namespace smoothg
 {
 
 /**
-   @brief Graph Solver
+   @brief Solver for local saddle point problems, see the formula below.
+
+   This routine solves local saddle point problems of the form
+   \f[
+     \left( \begin{array}{cc}
+       M&  D^T \\
+       D&
+     \end{array} \right)
+     \left( \begin{array}{c}
+       \sigma \\ u
+     \end{array} \right)
+     =
+     \left( \begin{array}{c}
+       0 \\ -g
+     \end{array} \right)
+   \f]
+
+   This local solver is called when computing PV vectors, bubbles, and trace
+   extensions.
+
+   We construct the matrix \f$ A = D M^{-1} D^T \f$, eliminate the zeroth
+   degree of freedom to ensure it is solvable. LU factorization of \f$ A \f$
+   is computed and stored for potential multiple solves.
 */
 class GraphEdgeSolver
 {
 public:
+    /** @brief Default Constructor */
     GraphEdgeSolver() = default;
+
+    /**
+       @brief Constructor of the local saddle point solver.
+
+       @param M matrix \f$ M \f$ in the formula in the class description
+       @param D matrix \f$ D \f$ in the formula in the class description
+    */
     GraphEdgeSolver(const SparseMatrix& M, const SparseMatrix& D);
+
+    /**
+       @brief Constructor of the local saddle point solver.
+
+       @param M matrix data for \f$ M \f$ in the formula in the class description
+       @param D matrix \f$ D \f$ in the formula in the class description
+
+    */
     GraphEdgeSolver(const std::vector<double>& M_data,
                     const SparseMatrix& D);
 
+    /** @brief Default Destructor */
     ~GraphEdgeSolver() noexcept = default;
 
+    /** @brief Copy Constructor */
     GraphEdgeSolver(const GraphEdgeSolver& other) noexcept;
+
+    /** @brief Move Constructor */
     GraphEdgeSolver(GraphEdgeSolver&& other) noexcept;
+
+    /** @brief Assignment Operator */
     GraphEdgeSolver& operator=(GraphEdgeSolver other) noexcept;
 
+    /** @brief Swap two solvers */
     friend void swap(GraphEdgeSolver& lhs, GraphEdgeSolver& rhs) noexcept;
 
-    Vector Mult(const VectorView& input) const;
-    void Mult(const VectorView& input, VectorView& output) const;
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
 
-    DenseMatrix Mult(const DenseMatrix& input) const;
-    void Mult(const DenseMatrix& input, DenseMatrix& output) const;
+       @param rhs \f$ g \f$ in the formula above
+       @returns sol_sigma \f$ \sigma \f$ in the formula above
+    */
+    Vector Mult(const VectorView& rhs) const;
 
-    void PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const;
-    void PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const;
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+
+       @param rhs \f$ g \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+    */
+    void Mult(const VectorView& rhs, VectorView& sol_sigma) const;
+
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+
+       @param rhs \f$ g \f$ in the formula above
+       @returns sol_sigma \f$ \sigma \f$ in the formula above
+    */
+    DenseMatrix Mult(const DenseMatrix& rhs) const;
+
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+
+       @param rhs \f$ g \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+    */
+    void Mult(const DenseMatrix& rhs, DenseMatrix& sol_sigma) const;
+
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+              Offsets the right hand side by set amount.
+
+       @param offset which vector to start with in rhs
+       @param rhs \f$ g \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+    */
+    void PartMult(int offset, const DenseMatrix& rhs, DenseMatrix& sol_sigma) const;
+
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+              Considers only part of the right hand side
+
+       @param start start of vectors in rhs
+       @param end end of vectors in rhs
+       @param rhs \f$ g \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+    */
+    void PartMult(int start, int end, const DenseMatrix& rhs, DenseMatrix& sol_sigma) const;
 
 private:
     SparseMatrix MinvDT_;
