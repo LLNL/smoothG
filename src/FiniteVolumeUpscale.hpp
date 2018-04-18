@@ -44,8 +44,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param partitioning partition of vertices
        @param weight edge weights.
+       @param partitioning partition of vertices
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
@@ -71,8 +71,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param partitioning partition of vertices
        @param weight edge weights.
+       @param partitioning partition of vertices
        @param w_block W block matrix
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate

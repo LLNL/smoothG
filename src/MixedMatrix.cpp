@@ -110,7 +110,7 @@ MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
     GenerateRowStarts();
 }
 
-MixedMatrix::MixedMatrix(std::unique_ptr<CoarseMBuilder> mbuilder,
+MixedMatrix::MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,
                          const mfem::HypreParMatrix& edge_d_td)

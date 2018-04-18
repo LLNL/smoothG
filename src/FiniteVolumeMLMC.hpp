@@ -45,8 +45,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param partitioning partition of vertices
        @param weight fine edge weights.
+       @param partitioning partition of vertices
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
@@ -72,8 +72,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param partitioning partition of vertices
        @param M_el vertex-based fine edge weights.
+       @param partitioning partition of vertices
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
@@ -84,7 +84,7 @@ public:
     */
     FiniteVolumeMLMC(MPI_Comm comm,
                      const mfem::SparseMatrix& vertex_edge,
-                     const std::vector<mfem::DenseMatrix>& M_el,
+                     const std::vector<mfem::Vector>& M_el,
                      const mfem::Array<int>& partitioning,
                      const mfem::HypreParMatrix& edge_d_td,
                      const mfem::SparseMatrix& edge_boundary_att,
@@ -116,8 +116,6 @@ private:
     const mfem::SparseMatrix& edge_boundary_att_;
     const mfem::Array<int>& ess_attr_;
 
-    std::shared_ptr<CoarseMBuilder> mbuilder_;
-    std::shared_ptr<ElementMBuilder> hybrid_builder_;
     const SAAMGeParam* saamge_param_;
 };
 

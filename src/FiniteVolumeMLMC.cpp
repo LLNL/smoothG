@@ -69,6 +69,54 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
+FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
+                                   const mfem::SparseMatrix& vertex_edge,
+                                   const std::vector<mfem::Vector>& M_el,
+                                   const mfem::Array<int>& partitioning,
+                                   const mfem::HypreParMatrix& edge_d_td,
+                                   const mfem::SparseMatrix& edge_boundary_att,
+                                   const mfem::Array<int>& ess_attr,
+                                   double spect_tol, int max_evects,
+                                   bool dual_target, bool scaled_dual,
+                                   bool energy_dual, bool hybridization,
+                                   const SAAMGeParam* saamge_param)
+    :
+    Upscale(comm, vertex_edge.Height(), hybridization),
+    weight_(M_el[0]),
+    edge_d_td_(edge_d_td),
+    edge_boundary_att_(edge_boundary_att),
+    ess_attr_(ess_attr),
+    saamge_param_(saamge_param)
+{
+    mfem::StopWatch chrono;
+    chrono.Start();
+
+    // Hypre may modify the original vertex_edge, which we seek to avoid
+    mfem::SparseMatrix ve_copy(vertex_edge);
+
+    auto D = MixedMatrix::ConstructD(vertex_edge, edge_d_td_);
+    auto fine_mbuilder = make_unique<FineMBuilder>(M_el, *D);
+    mixed_laplacians_.emplace_back(std::move(fine_mbuilder), std::move(D), nullptr, edge_d_td_);
+
+    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
+                                                     &edge_boundary_att_);
+
+    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
+                     mixed_laplacians_[0], std::move(graph_topology),
+                     spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
+                     !hybridization_);
+    coarsener_->construct_coarse_subspace();
+
+    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+
+    MakeCoarseSolver();
+
+    MakeCoarseVectors();
+
+    chrono.Stop();
+    setup_time_ += chrono.RealTime();
+}
+
 /// this implementation is sloppy
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
