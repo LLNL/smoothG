@@ -384,9 +384,12 @@ int main(int argc, char* argv[])
 
         if (myid == 0)
         {
-            std::cout << "  Sample " << sample << ": (fine: its: " << fine_iterations
-                      << ", time: " << fine_time << ") (coarse: its: " << coarse_iterations
-                      << ", time: " << coarse_time << ") p_error: " << finest_p_error << std::endl;
+            std::cout << "  Sample " << sample << ":" << std::endl;
+            std::cout << "    fine: iterations: " << fine_iterations
+                      << ", time: " << fine_time << std::endl;
+            std::cout << "    coarse: iterations: " << coarse_iterations
+                      << ", time: " << coarse_time << std::endl;
+            std::cout << "    p_error: " << finest_p_error << std::endl;
         }
     }
 
@@ -397,14 +400,16 @@ int main(int argc, char* argv[])
         m2_fine *= (1.0 / (count - 1.0));
     }
 
+    // we should maybe bean the absolute values (ie, l1-norm)
+
     serialize["total-coarse-iterations"] = picojson::value((double) total_coarse_iterations);
     serialize["total-fine-iterations"] = picojson::value((double) total_fine_iterations);
-    serialize["fine-mean-mean"] = picojson::value(
-        mean_fine.Sum() / static_cast<double>(mean_fine.Size()));
     serialize["fine-mean-typical"] = picojson::value(
         mean_fine[mean_fine.Size() / 2]);
-    serialize["coarse-mean-mean"] = picojson::value(
-        mean_upscaled.Sum() / static_cast<double>(mean_upscaled.Size()));
+    serialize["fine-mean-l1"] = picojson::value(
+        mean_fine.Norml1() / static_cast<double>(mean_fine.Size()));
+    serialize["coarse-mean-l1"] = picojson::value(
+        mean_upscaled.Norml1() / static_cast<double>(mean_upscaled.Size()));
     serialize["coarse-mean-typical"] = picojson::value(
         mean_upscaled[mean_upscaled.Size() / 2]);
     serialize["fine-variance-mean"] = picojson::value(
