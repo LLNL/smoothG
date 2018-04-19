@@ -46,7 +46,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(ve_copy, weight, edge_d_td_,
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
@@ -120,7 +120,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(ve_copy, weight, w_block, edge_d_td_,
+    mixed_laplacians_.emplace_back(vertex_edge, weight, w_block, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
     auto graph_topology = make_unique<GraphTopology>(

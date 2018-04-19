@@ -72,7 +72,7 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param M_el vertex-based fine edge weights.
+       @param local_weight vertex-based fine edge weights.
        @param partitioning partition of vertices
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
@@ -84,7 +84,7 @@ public:
     */
     FiniteVolumeMLMC(MPI_Comm comm,
                      const mfem::SparseMatrix& vertex_edge,
-                     const std::vector<mfem::Vector>& M_el,
+                     const std::vector<mfem::Vector>& local_weight,
                      const mfem::Array<int>& partitioning,
                      const mfem::HypreParMatrix& edge_d_td,
                      const mfem::SparseMatrix& edge_boundary_att,

@@ -85,10 +85,11 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     mfem::SparseMatrix tmp = SparseIdentity(nvertices);
     Agg_vertexdof_.Swap(tmp);
 
-    Agg_edgedof_.MakeRef(D_);
     const mfem::SparseMatrix edge_edgedof;
 
     auto& mbuilder = static_cast<const FineMBuilder&>(mgL.GetMBuilder());
+    Agg_edgedof_.MakeRef(mbuilder.GetAggEdgeDofTable());
+
     Init(edge_edgedof, mbuilder.GetElementMatrices(),
          mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
@@ -114,9 +115,10 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
 
     Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
-    Agg_edgedof_.MakeRef(mgLc.construct_Agg_cedgedof_table());
 
     auto& mbuilder = static_cast<const ElementMBuilder&>(mgL.GetMBuilder());
+    Agg_edgedof_.MakeRef(mbuilder.GetAggEdgeDofTable());
+
     Init(face_edgedof, mbuilder.GetElementMatrices(),
          mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }

@@ -71,7 +71,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
 FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::SparseMatrix& vertex_edge,
-                                   const std::vector<mfem::Vector>& M_el,
+                                   const std::vector<mfem::Vector>& local_weight,
                                    const mfem::Array<int>& partitioning,
                                    const mfem::HypreParMatrix& edge_d_td,
                                    const mfem::SparseMatrix& edge_boundary_att,
@@ -82,7 +82,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const SAAMGeParam* saamge_param)
     :
     Upscale(comm, vertex_edge.Height(), hybridization),
-    weight_(M_el[0]),
+    weight_(local_weight[0]),
     edge_d_td_(edge_d_td),
     edge_boundary_att_(edge_boundary_att),
     ess_attr_(ess_attr),
@@ -95,7 +95,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::SparseMatrix ve_copy(vertex_edge);
 
     auto D = MixedMatrix::ConstructD(vertex_edge, edge_d_td_);
-    auto fine_mbuilder = make_unique<FineMBuilder>(M_el, *D);
+    auto fine_mbuilder = make_unique<FineMBuilder>(local_weight, vertex_edge);
     mixed_laplacians_.emplace_back(std::move(fine_mbuilder), std::move(D), nullptr, edge_d_td_);
 
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
@@ -135,7 +135,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     if (!hybridization_)
     {
-        GetFineMatrix().UpdateM(coeff);
+        GetCoarseMatrix().UpdateM(coeff);
         MakeCoarseSolver();
     }
     else

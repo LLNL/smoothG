@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
 
     mfem::Array<int> ess_attr;
     mfem::Vector weight;
-    std::vector<mfem::DenseMatrix> M_el;
+    std::vector<mfem::Vector> local_weight;
     mfem::Vector rhs_u_fine;
 
     // Setting up finite volume discretization problem
@@ -229,10 +229,17 @@ int main(int argc, char* argv[])
         }
         else
         {
-            M_el.resize(pmesh->GetNE());
-            for (unsigned int i = 0; i < M_el.size(); i++)
+            local_weight.resize(pmesh->GetNE());
+            mfem::DenseMatrix M_el_i;
+            for (unsigned int i = 0; i < local_weight.size(); i++)
             {
-                a.ComputeElementMatrix(i, M_el[i]);
+                a.ComputeElementMatrix(i, M_el_i);
+                mfem::Vector& local_weight_i = local_weight[i];
+                local_weight_i.SetSize(M_el_i.Height());
+                for (int j = 0; j < local_weight_i.Size(); j++)
+                {
+                    local_weight_i[j] = 1.0 / M_el_i(j, j);
+                }
             }
         }
     }
@@ -273,15 +280,27 @@ int main(int argc, char* argv[])
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
     // Create Upscaler and Solve
-    FiniteVolumeMLMC fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                               edge_boundary_att, ess_attr, spect_tol, max_evects,
-                               dual_target, scaled_dual, energy_dual, hybridization);
+    unique_ptr<FiniteVolumeMLMC> fvupscale;
+    if (elem_mass == false)
+    {
+        fvupscale = make_unique<FiniteVolumeMLMC>(
+                        comm, vertex_edge, weight, partitioning, *edge_d_td,
+                        edge_boundary_att, ess_attr, spect_tol, max_evects,
+                        dual_target, scaled_dual, energy_dual, hybridization);
+    }
+    else
+    {
+        fvupscale = make_unique<FiniteVolumeMLMC>(
+                        comm, vertex_edge, local_weight, partitioning, *edge_d_td,
+                        edge_boundary_att, ess_attr, spect_tol, max_evects,
+                        dual_target, scaled_dual, energy_dual, hybridization);
+    }
 
-    fvupscale.PrintInfo();
-    fvupscale.ShowSetupTime();
-    fvupscale.MakeFineSolver();
+    fvupscale->PrintInfo();
+    fvupscale->ShowSetupTime();
+    fvupscale->MakeFineSolver();
 
-    mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
+    mfem::BlockVector rhs_fine(fvupscale->GetFineBlockVector());
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
@@ -296,16 +315,16 @@ int main(int argc, char* argv[])
             std::cout << "---\nSample " << sample << "\n---" << std::endl;
 
         auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
-        fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
-        auto sol_upscaled = fvupscale.Solve(rhs_fine);
-        fvupscale.ShowCoarseSolveInfo();
+        fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
+        auto sol_upscaled = fvupscale->Solve(rhs_fine);
+        fvupscale->ShowCoarseSolveInfo();
 
         auto fine_coefficient = sampler.GetFineCoefficient(sample);
-        fvupscale.RescaleFineCoefficient(fine_coefficient);
-        auto sol_fine = fvupscale.SolveFine(rhs_fine);
-        fvupscale.ShowFineSolveInfo();
+        fvupscale->RescaleFineCoefficient(fine_coefficient);
+        auto sol_fine = fvupscale->SolveFine(rhs_fine);
+        fvupscale->ShowFineSolveInfo();
 
-        auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
+        auto error_info = fvupscale->ComputeErrors(sol_upscaled, sol_fine);
 
         if (myid == 0)
         {
