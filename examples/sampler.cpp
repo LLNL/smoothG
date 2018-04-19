@@ -109,7 +109,7 @@ void Visualize(const mfem::Vector& sol,
 class NormalSampler
 {
 public:
-    NormalSampler(double mean=0.0, double stddev=1.0, int seed=0);
+    NormalSampler(double mean = 0.0, double stddev = 1.0, int seed = 0);
     double Sample();
 private:
     std::mt19937 generator_;
@@ -295,7 +295,7 @@ int main(int argc, char* argv[])
         nu_parameter = 0.5;
     double ddim = static_cast<double>(nDimensions);
     double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
-        std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+                      std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 
     NormalSampler sampler(0.0, 1.0, seed);
     mfem::Vector mean_fine(ufespace.GetVSize());
@@ -320,7 +320,7 @@ int main(int argc, char* argv[])
         // construct white noise right-hand side
         // (cell_volume is supposed to represent fine-grid W_h)
         mfem::Vector rhs_u_fine(ufespace.GetVSize());
-        for (int i=0; i<ufespace.GetVSize(); ++i)
+        for (int i = 0; i < ufespace.GetVSize(); ++i)
         {
             rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
         }
@@ -348,7 +348,7 @@ int main(int argc, char* argv[])
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale.GetCoarseSolveTime();
         total_coarse_time += coarse_time;
-        for (int i=0; i<mean_upscaled.Size(); ++i)
+        for (int i = 0; i < mean_upscaled.Size(); ++i)
         {
             const double delta = (sol_upscaled.GetBlock(1)(i) - mean_upscaled(i));
             mean_upscaled(i) += delta / count;
@@ -361,7 +361,7 @@ int main(int argc, char* argv[])
         total_fine_iterations += fine_iterations;
         double fine_time = fvupscale.GetFineSolveTime();
         total_fine_time += fine_time;
-        for (int i=0; i<mean_fine.Size(); ++i)
+        for (int i = 0; i < mean_fine.Size(); ++i)
         {
             const double delta = (sol_fine.GetBlock(1)(i) - mean_fine(i));
             mean_fine(i) += delta / count;
@@ -400,22 +400,20 @@ int main(int argc, char* argv[])
         m2_fine *= (1.0 / (count - 1.0));
     }
 
-    // we should maybe bean the absolute values (ie, l1-norm)
-
     serialize["total-coarse-iterations"] = picojson::value((double) total_coarse_iterations);
     serialize["total-fine-iterations"] = picojson::value((double) total_fine_iterations);
     serialize["fine-mean-typical"] = picojson::value(
-        mean_fine[mean_fine.Size() / 2]);
+                                         mean_fine[mean_fine.Size() / 2]);
     serialize["fine-mean-l1"] = picojson::value(
-        mean_fine.Norml1() / static_cast<double>(mean_fine.Size()));
+                                    mean_fine.Norml1() / static_cast<double>(mean_fine.Size()));
     serialize["coarse-mean-l1"] = picojson::value(
-        mean_upscaled.Norml1() / static_cast<double>(mean_upscaled.Size()));
+                                      mean_upscaled.Norml1() / static_cast<double>(mean_upscaled.Size()));
     serialize["coarse-mean-typical"] = picojson::value(
-        mean_upscaled[mean_upscaled.Size() / 2]);
+                                           mean_upscaled[mean_upscaled.Size() / 2]);
     serialize["fine-variance-mean"] = picojson::value(
-        m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
+                                          m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
     serialize["coarse-variance-mean"] = picojson::value(
-        m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
+                                            m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
 
     if (visualization)
     {
@@ -441,7 +439,7 @@ int main(int argc, char* argv[])
     }
 
     if (myid == 0)
-        std::cout << picojson::value(serialize).serialize(true) << std::endl;
+        std::cout << picojson::value(serialize).serialize() << std::endl;
 
     return EXIT_SUCCESS;
 }

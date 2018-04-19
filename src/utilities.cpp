@@ -836,7 +836,7 @@ void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
 void InversePermeabilityFunction::BlankPermeability()
 {
     inversePermeability = new double[3 * Nx * Ny * Nz];
-    for (int i=0; i < 3 * Nx * Ny * Nz; ++i)
+    for (int i = 0; i < 3 * Nx * Ny * Nz; ++i)
     {
         inversePermeability[i] = 1.0;
     }

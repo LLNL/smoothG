@@ -551,6 +551,12 @@ def make_tests():
           "--isolate", "0"],
          {"operator-complexity": 1.2736672633273667}]
 
+    tests["sampler"] = \
+        [["./sampler",
+          "--kappa", "0.01",
+          "--num-samples", "2"],
+         {"fine-mean-l1": 0.54961180496539375}]
+
     if "tux" in platform.node():
         tests["veigenvector"] = \
             [[memorycheck_command, "--leak-check=full",
