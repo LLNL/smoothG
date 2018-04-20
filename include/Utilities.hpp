@@ -261,18 +261,6 @@ SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<Den
 */
 SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseMatrix& B);
 
-/** @todo(gelever1) Move into GraphCoarsen*/
-DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,
-                          std::vector<int>& global_marker,
-                          const std::vector<int>& ext_indices,
-                          const std::vector<int>& local_indices);
-
-/** @todo(gelever1) Move into GraphCoarsen*/
-std::vector<int> GetExtDofs(const ParMatrix& mat_ext, int row);
-
-/** @todo(gelever1) Move into GraphCoarsen*/
-ParMatrix MakeExtPermutation(const ParMatrix& parmat);
-
 } //namespace smoothg
 
 #endif // __UTILITIES_HPP__

@@ -52,6 +52,7 @@ public:
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param hybridization use hybridization as solver
        @param weight edge weights. if not provided, set to all ones
     */
     GraphUpscale(MPI_Comm comm,
@@ -69,6 +70,7 @@ public:
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param hybridization use hybridization as solver
        @param weight edge weights. if not provided, set to all ones
     */
     GraphUpscale(MPI_Comm comm,

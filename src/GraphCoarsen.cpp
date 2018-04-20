@@ -905,6 +905,67 @@ std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl, const 
     return M_el;
 }
 
+DenseMatrix GraphCoarsen::RestrictLocal(const DenseMatrix& ext_mat,
+                          std::vector<int>& global_marker,
+                          const std::vector<int>& ext_indices,
+                          const std::vector<int>& local_indices) const
+{
+    SetMarker(global_marker, ext_indices);
+
+    int local_size = local_indices.size();
+
+    std::vector<int> row_map(local_size);
+
+    for (int i = 0; i < local_size; ++i)
+    {
+        assert(global_marker[local_indices[i]] >= 0);
+        row_map[i] = global_marker[local_indices[i]];
+    }
+
+    ClearMarker(global_marker, ext_indices);
+
+    return ext_mat.GetRow(row_map);
+}
+
+std::vector<int> GraphCoarsen::GetExtDofs(const ParMatrix& mat_ext, int row) const
+{
+    const auto& diag = mat_ext.GetDiag();
+    const auto& offd = mat_ext.GetOffd();
+
+    auto diag_dofs = diag.GetIndices(row);
+    auto offd_dofs = offd.GetIndices(row);
+
+    int diag_size = diag.Cols();
+
+    for (auto i : offd_dofs)
+    {
+        diag_dofs.push_back(i + diag_size);
+    }
+
+    return diag_dofs;
+}
+
+ParMatrix GraphCoarsen::MakeExtPermutation(const ParMatrix& parmat) const
+{
+    MPI_Comm comm = parmat.GetComm();
+
+    const auto& diag = parmat.GetDiag();
+    const auto& offd = parmat.GetOffd();
+    const auto& colmap = parmat.GetColMap();
+
+    int num_diag = diag.Cols();
+    int num_offd = offd.Cols();
+    int num_ext = num_diag + num_offd;
+
+    const auto& mat_starts = parmat.GetColStarts();
+    auto ext_starts = parlinalgcpp::GenerateOffsets(comm, num_ext);
+
+    SparseMatrix perm_diag = SparseIdentity(num_ext, num_diag);
+    SparseMatrix perm_offd = SparseIdentity(num_ext, num_offd, num_diag);
+
+    return ParMatrix(comm, ext_starts, mat_starts, std::move(perm_diag), std::move(perm_offd), colmap);
+}
+
 MixedMatrix GraphCoarsen::Coarsen(const GraphTopology& gt, const MixedMatrix& mgl,
                                   bool hybridization) const
 {

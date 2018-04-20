@@ -176,6 +176,15 @@ private:
     SparseMatrix BuildCoarseD(const GraphTopology& gt) const;
     std::vector<DenseMatrix> BuildElemM(const MixedMatrix& mgl, const GraphTopology& gt) const;
 
+    DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,
+                              std::vector<int>& global_marker,
+                              const std::vector<int>& ext_indices,
+                              const std::vector<int>& local_indices) const;
+
+    std::vector<int> GetExtDofs(const ParMatrix& mat_ext, int row) const;
+
+    ParMatrix MakeExtPermutation(const ParMatrix& parmat) const;
+
     int max_evects_;
     double spect_tol_;
 
