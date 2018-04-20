@@ -115,6 +115,8 @@ void MultScalarVVt(double a, const VectorView& v, DenseMatrix& aVVt);
 
 SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<DenseMatrix>& elems);
 
+SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseMatrix& B);
+
 } //namespace smoothg
 
 #endif // __UTILITIES_HPP__

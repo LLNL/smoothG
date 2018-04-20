@@ -22,6 +22,7 @@
 #define __GRAPHCOARSEN_HPP__
 
 #include "Utilities.hpp"
+#include "LocalEigenSolver.hpp"
 #include "MixedMatrix.hpp"
 #include "SharedEntityComm.hpp"
 #include "GraphTopology.hpp"

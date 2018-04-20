@@ -811,4 +811,35 @@ SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<Den
     return coo.ToSparse();
 }
 
+//TODO(gelever1): Define this inplace in linalgcpp
+SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseMatrix& B)
+{
+    assert(A.Rows() == B.Rows());
+    assert(A.Cols() == B.Cols());
+
+    CooMatrix coo(A.Rows(), A.Cols());
+
+    auto add_mat = [&coo](double scale, const SparseMatrix& mat)
+    {
+        const auto& indptr = mat.GetIndptr();
+        const auto& indices = mat.GetIndices();
+        const auto& data = mat.GetData();
+
+        int rows = mat.Rows();
+
+        for (int i = 0; i < rows; ++i)
+        {
+            for (int j = indptr[i]; j < indptr[i + 1]; ++j)
+            {
+                coo.Add(i, indices[j], scale * data[j]);
+            }
+        }
+    };
+
+    add_mat(alpha, A);
+    add_mat(beta, B);
+
+    return coo.ToSparse();
+}
+
 } // namespace smoothg

@@ -124,8 +124,8 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
 
     int num_aggs = gt.agg_ext_edge_.Rows();
 
-    linalgcpp::EigenSolver eigen;
-    linalgcpp::EigenPair eigen_pair;
+    DenseMatrix evects;
+    LocalEigenSolver eigs(max_evects_, spect_tol_);
 
     for (int agg = 0; agg < num_aggs; ++agg)
     {
@@ -147,10 +147,7 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
 
         SparseMatrix DMinvDT = D_sub.Mult(D_sub_T);
 
-        eigen.Solve(DMinvDT, spect_tol_, max_evects_, eigen_pair);
-
-        // auto& evals = eigen_pair.first; // TODO(gelever1): verify correct
-        auto& evects = eigen_pair.second;
+        eigs.Compute(DMinvDT, evects);
 
         if (evects.Cols() > 1)
         {
