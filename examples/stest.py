@@ -32,6 +32,8 @@ import json
 
 spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@PROJECT_SOURCE_DIR@/graphdata"
+
+test_tol = float("@SMOOTHG_TEST_TOL@")
 num_procs = "@SMOOTHG_TEST_PROCS@"
 
 
@@ -63,12 +65,10 @@ def run_test(command, expected={}, verbose=False):
 
     output = json_parse_lines(stdout.splitlines())
 
-    err_tol = 1e-2
-
     for key, expected_val in expected.items():
         test_val = output[key]
 
-        if abs(float(expected_val) - float(test_val)) > err_tol:
+        if abs(float(expected_val) - float(test_val)) > test_tol:
             return False
 
     return True
