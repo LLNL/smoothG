@@ -16,6 +16,6 @@
 #ifndef __SMOOTHG_CONFIG_H
 #define __SMOOTHG_CONFIG_H
 
-#define SMOOTHG_USE_ARPACK @smoothG_USE_ARPACK@
+#cmakedefine01 SMOOTHG_USE_ARPACK
 
 #endif

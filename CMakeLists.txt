@@ -47,10 +47,17 @@ cmake_minimum_required(VERSION 3.5)
 project(smoothG VERSION 1.0 LANGUAGES CXX)
 enable_testing()
 
+option(SMOOTHG_USE_ARPACK "Should ARPACK be enabled?" NO)
+
 find_package(linalgcpp REQUIRED)
 find_package(parlinalgcpp REQUIRED)
 find_package(partition REQUIRED)
 find_package(sparsesolve REQUIRED)
+
+if (SMOOTHG_USE_ARPACK)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+    find_package(ARPACK REQUIRED)
+endif()
 
 add_library(smoothG
     src/GraphCoarsen.cpp
@@ -82,12 +89,14 @@ target_link_libraries(smoothG
         partition::partition
         sparsesolve::sparsesolve
         linalgcpp::linalgcpp
+        $<$<BOOL:${SMOOTHG_USE_ARPACK}>:Arpack::Arpack>
 )
 
 target_include_directories(smoothG
     PUBLIC
 		$<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
 )
 
 # Astyle
@@ -130,6 +139,11 @@ configure_package_config_file(
     ${CMAKE_CURRENT_BINARY_DIR}/smoothgConfig.cmake
     INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
 )
+
+configure_file(
+  "${PROJECT_SOURCE_DIR}/smoothG_config.h.in"
+  "${PROJECT_BINARY_DIR}/smoothG_config.h"
+  )
 
 # Install Config files
 install(FILES
