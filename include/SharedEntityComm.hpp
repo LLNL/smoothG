@@ -14,6 +14,27 @@
  ***********************************************************************EHEADER*/
 
 /** @file
+
+    @brief A class to manage shared entity communication
+
+    This implements a kind of general reduction algorithm, beyond what you
+    can do with matrix-matrix multiplies or MPI_Reduce. In particular, for the
+    spectral method we want to do reduction where the operation is some kind of
+    SVD, which requires something more complicated.
+
+    The complicated logic on the Reduce side is because we are leaving the actual
+    reduce operation to the user, so you can think of it more as a "collect"
+    operation onto the master, where the user is responsible to do what is
+    necessary.
+
+    This is "fairly" generic but not completely, if you want to use for a
+    datatype other than mfem::DenseMatrix or mfem::Vector you need to implement:
+    SetSizeSpecifer(), PackSizes(), SendData(), ReceiveData(), and CopyData()
+    routines yourself.
+
+    Significant improvements to handling the "tags" argument to honor the
+    MPI_TAG_UB constraint are due to Alex Druinsky from Lawrence Berkeley
+    (adruinksy@lbl.gov).
 */
 
 #ifndef __SHAREDENTITYCOMM_HPP__
@@ -27,20 +48,60 @@
 namespace smoothg
 {
 
+/**
+   @brief Handles sharing information across processors, where that information
+   belongs to entities that are also shared across processors.
+*/
 template <typename T>
 class SharedEntityComm
 {
 public:
+    /** @brief Constructor given the entity true entity relationship
+
+        @param entity_true_entity global entity true entity relationship
+        This has more rows than columns, each row has
+        exactly one nonzero. The number of nonzeros in a column tells
+        you how many processors share the entity, and the partitions they
+        are in tell you which processors it is on.
+    */
     SharedEntityComm(const ParMatrix& entity_true_entity);
 
+    /** @brief Sends mat from entity to whichever processor
+        owns the corresponding true entity.
+
+        Should be called even if you are the owner.
+        Does not do anything (from user perspective) until Collect() is called
+
+        @param entity entity which is sending this information
+        @param mat matrix to send
+    */
     void ReduceSend(int entity, T mat);
 
+
+    /** @brief Determines if this entity is local
+        @param entity entity to check
+        @returns true if entity is local
+    */
     bool IsOwnedByMe(int entity) const;
 
+    /** @brief Given entity in local numbering, return the global entity number
+        @param entity local entity
+        @returns global entity
+    */
     int GetTrueEntity(int entity) const;
 
+    /** @brief Collects all data sent by ReduceSend
+        @returns collection collected data arrays
+        T[number of local entities][number of processors who share entity, including yourself]
+    */
     std::vector<std::vector<T>> Collect();
 
+    /** @brief Broadcasts matrix from master to slave.
+
+        @param mats should be size num_entities. The array entries where this
+        processor is master should be filled with the appropriate matrix,
+        all others will be overwritten.
+    */
     void Broadcast(std::vector<T>& mats);
 
 private:

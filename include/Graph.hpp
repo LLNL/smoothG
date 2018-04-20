@@ -27,28 +27,54 @@ namespace smoothg
 {
 
 /**
-   @brief Container for graph information
+    @brief Container for topological information for the coarsening
+
+    Extract the local submatrix of the global vertex to edge relation table
+    Each vertex belongs to one and only one processor, while some edges are
+    shared by two processors, indicated by the edge to true edge relationship
 */
 
 struct Graph
 {
+    /** @brief Default Constructor */
     Graph() = default;
+
+    /**
+       @brief Distribute a graph to the communicator.
+
+       Generally we read a global graph on one processor, and then distribute
+       it. This constructor handles that process.
+
+       @param comm the communicator over which to distribute the graph
+       @param vertex_edge_global describes the entire global graph, unsigned
+       @param part_global partition of the global vertices
+    */
     Graph(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
           const std::vector<int>& part_global);
 
+    /** @brief Default Destructor */
     ~Graph() noexcept = default;
 
+    /** @brief Copy Constructor */
     Graph(const Graph& other) noexcept;
+
+    /** @brief Move Constructor */
     Graph(Graph&& other) noexcept;
+
+    /** @brief Assignment Operator */
     Graph& operator=(Graph other) noexcept;
 
+    /** @brief Swap two graphs */
     friend void swap(Graph& lhs, Graph& rhs) noexcept;
 
-    // ParGraph Stuff
+    // Local to global maps
     std::vector<int> edge_map_;
     std::vector<int> vertex_map_;
+
+    // Local partition of vertices
     std::vector<int> part_local_;
 
+    // Graph relationships
     SparseMatrix vertex_edge_local_;
     ParMatrix edge_true_edge_;
     ParMatrix edge_edge_;

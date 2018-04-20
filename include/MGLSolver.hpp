@@ -34,25 +34,43 @@ namespace smoothg
 class MGLSolver : public linalgcpp::Operator
 {
 public:
+    /** @brief Default Constructor */
     MGLSolver() = default;
+
+    /** @brief Constructor settting offsets for block vectors
+        @param offsets block vector offsets
+    */
     MGLSolver(const std::vector<int>& offsets);
 
+    /** @brief Copy Constructor */
     MGLSolver(const MGLSolver& other) noexcept;
 
+    /** @brief Swap two solvers */
     friend void swap(MGLSolver& lhs, MGLSolver& rhs) noexcept;
 
+    /** @brief Default Destructor */
     virtual ~MGLSolver() = default;
 
     /**
-       Solve the graph Laplacian problem
+       @brief Solve the graph Laplacian problem in mixed form
 
        The BlockVectors here are in "dof" numbering, rather than "truedof" numbering.
        That is, dofs on processor boundaries are *repeated* in the vectors that
        come into and go out of this method.
+
+       @param rhs Right hand side
+       @param sol Solution
     */
     virtual void Solve(const BlockVector& rhs, BlockVector& sol) const = 0;
     virtual void Mult(const BlockVector& rhs, BlockVector& sol) const;
 
+    /**
+       @brief Solve the graph Laplacian problem as primal.
+              Only vertex data is used, edge vectors are not considered.
+
+       @param rhs Right hand side
+       @param sol Solution
+    */
     virtual void Solve(const VectorView& rhs, VectorView sol) const;
     virtual void Mult(const VectorView& rhs, VectorView sol) const;
 

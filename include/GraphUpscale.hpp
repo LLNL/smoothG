@@ -37,7 +37,7 @@ namespace smoothg
 {
 
 /**
-   @brief Use upscaling as operator.
+   @brief Use upscaling as operator
 */
 
 class GraphUpscale : public Upscale
@@ -49,10 +49,10 @@ public:
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
        @param global_partitioning partition of global vertices
-       @param weight edge weights. if not provided, set to all ones
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param weight edge weights. if not provided, set to all ones
     */
     GraphUpscale(MPI_Comm comm,
                  const SparseMatrix& vertex_edge_global,
@@ -66,10 +66,10 @@ public:
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
        @param coarse_factor how coarse to partition the graph
-       @param weight edge weights. if not provided, set to all ones
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
+       @param weight edge weights. if not provided, set to all ones
     */
     GraphUpscale(MPI_Comm comm,
                  const SparseMatrix& vertex_edge_global,
