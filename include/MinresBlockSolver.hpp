@@ -96,10 +96,6 @@ public:
     ///@}
 
 protected:
-    MPI_Comm comm_;
-    int myid_;
-
-    bool use_W_;
 
     ParMatrix M_;
     ParMatrix D_;
@@ -107,6 +103,9 @@ protected:
     ParMatrix W_;
 
     ParMatrix edge_true_edge_;
+
+    MPI_Comm comm_;
+    int myid_;
 
 private:
     linalgcpp::BlockOperator op_;
@@ -119,6 +118,8 @@ private:
 
     mutable BlockVector true_rhs_;
     mutable BlockVector true_sol_;
+
+    bool use_w_;
 };
 
 /**

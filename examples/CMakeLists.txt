@@ -38,11 +38,13 @@ configure_file(
 
 add_test(samplegraph1 python stest.py samplegraph1)
 add_test(samplegraph4 python stest.py samplegraph4)
+add_test(graph-hybridization python stest.py graph-hybridization)
 add_test(poweriter python stest.py poweriter)
 add_test(graph-weight python stest.py graph-weight)
 
 add_test(parsamplegraph1 python stest.py parsamplegraph1)
 add_test(parsamplegraph4 python stest.py parsamplegraph4)
+add_test(pargraph-hybridization python stest.py pargraph-hybridization)
 add_test(parpoweriter python stest.py parpoweriter)
 
 if (APPLE)

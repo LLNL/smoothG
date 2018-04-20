@@ -28,7 +28,7 @@ MixedMatrix::MixedMatrix(const Graph& graph, const std::vector<double>& global_w
 {
     M_local_ = MakeLocalM(edge_true_edge_, graph.edge_edge_, graph.edge_map_, global_weight);
     D_local_ = MakeLocalD(edge_true_edge_, graph.vertex_edge_local_);
-    W_local_ = SparseMatrix(std::vector<double>(D_local_.Rows(), 0.0));
+    //W_local_ = SparseMatrix(std::vector<double>(D_local_.Rows(), 0.0));
 
     Init();
 }
@@ -49,15 +49,22 @@ void MixedMatrix::Init()
     std::vector<HYPRE_Int>& vertex_starts = starts[0];
     std::vector<HYPRE_Int>& edge_starts = starts[1];
 
-    ParMatrix M_d(comm, edge_starts, M_local_);
     ParMatrix D_d(comm, vertex_starts, edge_starts, D_local_);
-
-    M_global_ = parlinalgcpp::RAP(M_d, edge_true_edge_);
     D_global_ = D_d.Mult(edge_true_edge_);
-    W_global_ = ParMatrix(comm, vertex_starts, W_local_);
 
-    offsets_ = {0, M_local_.Rows(), M_local_.Rows() + D_local_.Rows()};
-    true_offsets_ = {0, M_global_.Rows(), M_global_.Rows() + D_global_.Rows()};
+    if (M_local_.Rows() == D_local_.Cols())
+    {
+        ParMatrix M_d(comm, edge_starts, M_local_);
+        M_global_ = parlinalgcpp::RAP(M_d, edge_true_edge_);
+    }
+
+    if (W_local_.Rows() == D_local_.Rows())
+    {
+        W_global_ = ParMatrix(comm, vertex_starts, W_local_);
+    }
+
+    offsets_ = {0, D_local_.Cols(), D_local_.Cols() + D_local_.Rows()};
+    true_offsets_ = {0, D_global_.Cols(), D_global_.Cols() + D_global_.Rows()};
 }
 
 MixedMatrix::MixedMatrix(const MixedMatrix& other) noexcept
@@ -211,9 +218,14 @@ int MixedMatrix::GlobalNNZ() const
 
 bool MixedMatrix::CheckW() const
 {
+    int local_size = W_global_.Rows();
+    int global_size;
+
+    MPI_Allreduce(&local_size, &global_size, 1, MPI_INT, MPI_MAX, D_global_.GetComm());
+
     const double zero_tol = 1e-6;
 
-    return W_global_.MaxNorm() > zero_tol;
+    return global_size > 0 && W_global_.MaxNorm() > zero_tol;
 }
 
 ParMatrix MixedMatrix::ToPrimal() const

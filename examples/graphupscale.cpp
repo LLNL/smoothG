@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
         std::vector<int> global_part = Partition(vertex_vertex, num_partitions);
 
         GraphUpscale upscale(comm, vertex_edge, global_part,
-                             spect_tol, max_evects);
+                             spect_tol, max_evects, hybridization);
 
         Vector rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
         Vector sol = upscale.Solve(rhs_u_fine);
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
     // vertex_edge and coarse factor
     {
         GraphUpscale upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects);
+                             spect_tol, max_evects, hybridization);
 
         Vector rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
         Vector sol = upscale.Solve(rhs_u_fine);
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
     // Using coarse space
     {
         GraphUpscale upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects);
+                             spect_tol, max_evects, hybridization);
 
         // Start at Fine Level
         Vector rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
     // Comparing Error; essentially generalgraph.cpp
     {
         GraphUpscale upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects);
+                             spect_tol, max_evects, hybridization);
 
         BlockVector fine_rhs = upscale.ReadVertexBlockVector(rhs_filename);
 
@@ -134,17 +134,14 @@ int main(int argc, char* argv[])
     }
 
     // Compare hybridization vs Minres solvers
-    /*
     {
         bool use_hybridization = true;
 
         GraphUpscale hb_upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects, dual_target,
-                             scaled_dual, energy_dual, use_hybridization);
+                             spect_tol, max_evects, use_hybridization);
 
         GraphUpscale minres_upscale(comm, vertex_edge, coarse_factor,
-                                    spect_tol, max_evects, dual_target,
-                                    scaled_dual, energy_dual, !use_hybridization);
+                                    spect_tol, max_evects, !use_hybridization);
 
         Vector rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 
@@ -161,7 +158,6 @@ int main(int argc, char* argv[])
             std::cout.precision(3);
         }
     }
-    */
 
     MPI_Finalize();
 

@@ -27,26 +27,39 @@ namespace smoothg
 MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
     : MGLSolver(mgl.offsets_), M_(mgl.M_global_), D_(mgl.D_global_), W_(mgl.W_global_),
       edge_true_edge_(mgl.edge_true_edge_),
+      comm_(M_.GetComm()), myid_(M_.GetMyId()),
       op_(mgl.true_offsets_), prec_(mgl.true_offsets_),
-      true_rhs_(mgl.true_offsets_), true_sol_(mgl.true_offsets_)
+      true_rhs_(mgl.true_offsets_), true_sol_(mgl.true_offsets_),
+      use_w_(mgl.CheckW())
 {
-    CooMatrix elim_dof(D_.Rows(), D_.Rows());
-
-    if (M_.GetMyId() == 0)
+    if (!use_w_ && myid_ == 0)
     {
         D_.EliminateRow(0);
-        elim_dof.Add(0, 0, 1.0);
     }
 
     DT_ = D_.Transpose();
-
-    SparseMatrix W = elim_dof.ToSparse();
-    W_ = ParMatrix(D_.GetComm(), D_.GetRowStarts(), std::move(W));
 
     SparseMatrix M_diag(M_.GetDiag().GetDiag());
     ParMatrix MinvDT = DT_;
     MinvDT.InverseScaleRows(M_diag);
     ParMatrix schur_block = D_.Mult(MinvDT);
+
+    if (!use_w_)
+    {
+        CooMatrix elim_dof(D_.Rows(), D_.Rows());
+
+        if (M_.GetMyId() == 0)
+        {
+            elim_dof.Add(0, 0, 1.0);
+        }
+
+        SparseMatrix W = elim_dof.ToSparse();
+        W_ = ParMatrix(D_.GetComm(), D_.GetRowStarts(), std::move(W));
+    }
+    else
+    {
+        schur_block = parlinalgcpp::ParSub(schur_block, W_);
+    }
 
     M_prec_ = parlinalgcpp::ParDiagScale(M_);
     schur_prec_ = parlinalgcpp::BoomerAMG(std::move(schur_block));
@@ -108,6 +121,11 @@ void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
     true_sol_ = 0.0;
 
+    if (!use_w_ && myid_ == 0)
+    {
+        true_rhs_[0] = 0.0;
+    }
+
     pminres_.Mult(true_rhs_, true_sol_);
     num_iterations_ += pminres_.GetNumIterations();
 
@@ -150,7 +168,6 @@ void MinresBlockSolver::SetAbsTol(double atol)
 
     pminres_.SetAbsTol(atol);
 }
-
 
 } // namespace smoothg
 

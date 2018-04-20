@@ -50,7 +50,8 @@ public:
 
     friend void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept;
 
-    MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl) const;
+    MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl,
+                        bool hybridization) const;
 
     Vector Interpolate(const VectorView& coarse_vect) const;
     void Interpolate(const VectorView& coarse_vect, VectorView fine_vect) const;
@@ -65,9 +66,9 @@ public:
     void Restrict(const BlockVector& fine_vect, BlockVector& coarse_vect) const;
 
     const SparseMatrix& GetFaceCDof() const { return face_cdof_; }
-
     const SparseMatrix& GetAggCDofVertex() const { return agg_cdof_vertex_; }
     const SparseMatrix& GetAggCDofEdge() const { return agg_cdof_edge_; }
+    const std::vector<DenseMatrix>& GetMelem() const { return M_elem_; }
 
 private:
     template <class T>
@@ -96,7 +97,13 @@ private:
     void BuildFaceCoarseDof(const GraphTopology& gt);
     void BuildPvertex(const GraphTopology& gt);
     void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
+    void BuildAggCDofVertex(const GraphTopology& gt);
+    void BuildAggCDofEdge(const GraphTopology& gt);
+
     ParMatrix BuildEdgeTrueEdge(const GraphTopology& gt) const;
+
+    SparseMatrix BuildCoarseD(const GraphTopology& gt) const;
+    std::vector<DenseMatrix> BuildElemM(const MixedMatrix& mgl, const GraphTopology& gt) const;
 
     int max_evects_;
     double spect_tol_;
@@ -113,7 +120,14 @@ private:
     std::vector<DenseMatrix> edge_targets_;
     std::vector<DenseMatrix> agg_ext_sigma_;
 
-    std::vector<int> col_marker_;
+    mutable std::vector<int> col_marker_;
+
+    std::vector<DenseMatrix> B_potential_;
+
+    std::vector<std::vector<double>> D_trace_sum_;
+    std::vector<std::vector<DenseMatrix>> D_trace_;
+    std::vector<std::vector<DenseMatrix>> F_potential_;
+    mutable std::vector<DenseMatrix> M_elem_;
 };
 
 } // namespace smoothg

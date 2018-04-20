@@ -47,13 +47,17 @@ public:
     friend void swap(GraphEdgeSolver& lhs, GraphEdgeSolver& rhs) noexcept;
 
     Vector Mult(const VectorView& input) const;
-    void Mult(const VectorView& input, VectorView& output) const;
+    void Mult(const VectorView& input, VectorView output) const;
+    void Mult(const VectorView& input, VectorView sigma_sol, VectorView u_sol) const;
 
     DenseMatrix Mult(const DenseMatrix& input) const;
     void Mult(const DenseMatrix& input, DenseMatrix& output) const;
+    void Mult(const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const;
 
-    void PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const;
-    void PartMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const;
+    void OffsetMult(int offset, const DenseMatrix& input, DenseMatrix& output) const;
+    void OffsetMult(int offset, const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const;
+    void OffsetMult(int start, int end, const DenseMatrix& input, DenseMatrix& output) const;
+    void OffsetMult(int start, int end, const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const;
 
 private:
     SparseMatrix MinvDT_;

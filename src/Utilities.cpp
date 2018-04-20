@@ -794,4 +794,21 @@ void MultScalarVVt(double a, const VectorView& v, DenseMatrix& aVVt)
     }
 }
 
+SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<DenseMatrix>& elems)
+{
+    int num_elem = elem_dof.Rows();
+    int num_dof = elem_dof.Cols();
+
+    CooMatrix coo(num_dof);
+
+    for (int i = 0; i < num_elem; ++i)
+    {
+        std::vector<int> dofs = elem_dof.GetIndices(i);
+
+        coo.Add(dofs, dofs, elems[i]);
+    }
+
+    return coo.ToSparse();
+}
+
 } // namespace smoothg

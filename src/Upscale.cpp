@@ -23,8 +23,11 @@
 namespace smoothg
 {
 
-Upscale::Upscale(MPI_Comm comm)
-    : comm_(comm), setup_time_(0.0)
+Upscale::Upscale(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
+        bool hybridization)
+    : comm_(comm),
+      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
+      hybridization_(hybridization)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
@@ -68,7 +71,6 @@ void Upscale::Solve(const BlockVector& x, BlockVector& y) const
     rhs_coarse_.GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(rhs_coarse_, sol_coarse_);
-
     coarsener_.Interpolate(sol_coarse_, y);
 
     Orthogonalize(y);

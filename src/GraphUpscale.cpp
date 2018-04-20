@@ -26,10 +26,9 @@ namespace smoothg
 GraphUpscale::GraphUpscale(MPI_Comm comm,
                            const linalgcpp::SparseMatrix<double>& vertex_edge_global,
                            const std::vector<int>& partitioning_global,
-                           double spect_tol, int max_evects,
+                           double spect_tol, int max_evects, bool hybridization,
                            const std::vector<double>& weight_global)
-    : Upscale(comm),
-      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
+    : Upscale(comm, vertex_edge_global, hybridization),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
     Timer timer(Timer::Start::True);
@@ -43,10 +42,9 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 GraphUpscale::GraphUpscale(MPI_Comm comm,
                            const SparseMatrix& vertex_edge_global,
                            double coarse_factor,
-                           double spect_tol, int max_evects,
+                           double spect_tol, int max_evects, bool hybridization,
                            const std::vector<double>& weight_global)
-    : Upscale(comm),
-      global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
+    : Upscale(comm, vertex_edge_global, hybridization),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
     Timer timer(Timer::Start::True);
@@ -76,12 +74,16 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
     coarsener_ = GraphCoarsen(GetFineMatrix(), gt_,
                               max_evects_, spect_tol_);
 
-    mgl_.push_back(coarsener_.Coarsen(gt_, GetFineMatrix()));
+    mgl_.push_back(coarsener_.Coarsen(gt_, GetFineMatrix(), hybridization_));
 
-    coarse_solver_ = make_unique<MinresBlockSolver>(GetCoarseMatrix());
-
-    //coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(), coarsener_);
-    //HybridSolver test(comm_, GetCoarseMatrix(), coarsener_);
+    if (hybridization_)
+    {
+        coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(), coarsener_);
+    }
+    else
+    {
+        coarse_solver_ = make_unique<MinresBlockSolver>(GetCoarseMatrix());
+    }
 
     MakeCoarseVectors();
 
@@ -96,8 +98,14 @@ void GraphUpscale::MakeFineSolver() const
 {
     if (!fine_solver_)
     {
-        fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
-        //fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
+        if (hybridization_)
+        {
+            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
+        }
+        else
+        {
+            fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
+        }
     }
 }
 

@@ -39,7 +39,6 @@ std::unique_ptr<T> make_unique(Ts&& ... params)
 {
     return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
 }
-
 #endif
 
 namespace smoothg
@@ -113,6 +112,8 @@ void ExtractSubMatrix(const SparseMatrix& A, const std::vector<int>& rows,
                       DenseMatrix& A_sub);
 
 void MultScalarVVt(double a, const VectorView& v, DenseMatrix& aVVt);
+
+SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<DenseMatrix>& elems);
 
 } //namespace smoothg
 

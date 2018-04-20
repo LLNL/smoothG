@@ -76,7 +76,7 @@ Vector GraphEdgeSolver::Mult(const VectorView& input) const
     return vect;
 }
 
-void GraphEdgeSolver::Mult(const VectorView& input, VectorView& output) const
+void GraphEdgeSolver::Mult(const VectorView& input, VectorView output) const
 {
     Vector elim_input(input);
     elim_input[0] = 0.0;
@@ -84,6 +84,18 @@ void GraphEdgeSolver::Mult(const VectorView& input, VectorView& output) const
     Ainv_.Mult(elim_input, vect_sol_);
     SubAvg(vect_sol_);
     MinvDT_.Mult(vect_sol_, output);
+}
+
+void GraphEdgeSolver::Mult(const VectorView& input, VectorView sigma_sol, VectorView u_sol) const
+{
+    assert(u_sol.size() == Ainv_.Rows());
+
+    Vector elim_input(input);
+    elim_input[0] = 0.0;
+
+    Ainv_.Mult(elim_input, u_sol);
+    SubAvg(u_sol);
+    MinvDT_.Mult(u_sol, sigma_sol);
 }
 
 DenseMatrix GraphEdgeSolver::Mult(const DenseMatrix& input) const
@@ -110,12 +122,35 @@ void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& output) const
     }
 }
 
-void GraphEdgeSolver::PartMult(int offset, const DenseMatrix& input, DenseMatrix& output) const
+void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
 {
-    PartMult(offset, input.Cols(), input, output);
+    int rows = MinvDT_.Rows();
+    int cols = input.Cols();
+
+    sigma_sol.SetSize(rows, cols);
+    u_sol.SetSize(MinvDT_.Cols(), cols);
+
+    for (int i = 0; i < cols; ++i)
+    {
+        const VectorView& in_col = input.GetColView(i);
+        VectorView sigma_col = sigma_sol.GetColView(i);
+        VectorView u_col = u_sol.GetColView(i);
+
+        Mult(in_col, sigma_col, u_col);
+    }
 }
 
-void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input,
+void GraphEdgeSolver::OffsetMult(int offset, const DenseMatrix& input, DenseMatrix& output) const
+{
+    OffsetMult(offset, input.Cols(), input, output);
+}
+
+void GraphEdgeSolver::OffsetMult(int offset, const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
+{
+    OffsetMult(offset, input.Cols(), input, sigma_sol, u_sol);
+}
+
+void GraphEdgeSolver::OffsetMult(int start, int end, const DenseMatrix& input,
                                DenseMatrix& output) const
 {
     assert(start >= 0);
@@ -131,6 +166,27 @@ void GraphEdgeSolver::PartMult(int start, int end, const DenseMatrix& input,
         VectorView out_col = output.GetColView(i);
 
         Mult(in_col, out_col);
+    }
+}
+
+void GraphEdgeSolver::OffsetMult(int start, int end, const DenseMatrix& input,
+                               DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
+{
+    assert(start >= 0);
+    assert(end <= input.Cols());
+
+    int size = end - start;
+
+    sigma_sol.SetSize(MinvDT_.Rows(), size);
+    u_sol.SetSize(MinvDT_.Cols(), size);
+
+    for (int i = 0; i < size; ++i)
+    {
+        const VectorView& in_col = input.GetColView(i + start);
+        VectorView sigma_col = sigma_sol.GetColView(i);
+        VectorView u_col = u_sol.GetColView(i);
+
+        Mult(in_col, sigma_col, u_col);
     }
 }
 

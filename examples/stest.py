@@ -144,6 +144,14 @@ def make_tests():
           "finest-u-error": 0.19926779054787247,
           "operator-complexity": 1.253927460725393}]
 
+    tests["graph-hybridization"] = \
+        [["./generalgraph",
+          "-t", "1.0", "-m", "4", "-hb"],
+         {"finest-div-error": 0.12051328492652449,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.013984620448976}]
+
     tests["graph-usegenerator"] = \
         [["./generalgraph",
           "-t", "1.0", "-m", "4", "-gg"],
@@ -208,6 +216,14 @@ def make_tests():
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
           "operator-complexity": 1.257167428325717}]
+
+    tests["pargraph-hybridization"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "-t", "1.0", "-m", "4", "-hb"],
+         {"finest-div-error": 0.12051328492652449,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.013984620448976}]
 
     tests["pargraph-usegenerator"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",

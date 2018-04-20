@@ -43,10 +43,11 @@ int main(int argc, char* argv[])
     double coarse_factor = 80;
     int max_evects = 4;
     double spect_tol = 1.0;
+    bool hybridization = true;
 
     // Solve Parameters
     int max_iter = 800;
-    double solve_tol = 1e-12;
+    double solve_tol = 1e-8;
     bool verbose = false;
     int seed = 1;
 
@@ -60,7 +61,7 @@ int main(int argc, char* argv[])
     {
         // Upscaler
         GraphUpscale upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects);
+                             spect_tol, max_evects, hybridization);
 
         // Wrapper for solving on the fine level, no upscaling
         UpscaleFineSolve fine_solver(upscale);

@@ -113,7 +113,7 @@ HybridSolver::HybridSolver(MPI_Comm comm, const MixedMatrix& mgl,
 
     multiplier_d_td_ = MakeEntityTrueEntity(multiplier_d_td_d);
 
-    std::vector<DenseMatrix> M_el; // = coarsener.GetCoarseMelem(); , by reference
+    const std::vector<DenseMatrix>& M_el = coarsener.GetMelem();
     SparseMatrix local_hybrid = AssembleHybridSystem(mgl, M_el, j_multiplier_edgedof);
 
     InitSolver(std::move(local_hybrid));
@@ -131,10 +131,29 @@ void HybridSolver::InitSolver(SparseMatrix local_hybrid)
     pHybridSystem_ = parlinalgcpp::RAP(hybrid_d, multiplier_d_td_);
     nnz_ = pHybridSystem_.nnz();
 
-    // TODO(gelever1): check if BoomerAMG is still borken w/ local size zero
-    prec_ = parlinalgcpp::BoomerAMG(pHybridSystem_);
-    cg_ = linalgcpp::PCGSolver(pHybridSystem_, prec_, max_num_iter_, rtol_,
+    cg_ = linalgcpp::PCGSolver(pHybridSystem_, max_num_iter_, rtol_,
                                atol_, print_level_, parlinalgcpp::ParMult);
+
+    // HypreBoomerAMG is broken if local size is zero
+    int local_size = pHybridSystem_.Rows();
+    int min_size;
+    MPI_Allreduce(&local_size, &min_size, 1, MPI_INT, MPI_MIN, comm_);
+
+    const bool use_prec = min_size > 0;
+    if (use_prec)
+    {
+        prec_ = parlinalgcpp::BoomerAMG(pHybridSystem_);
+        cg_.SetPreconditioner(prec_);
+    }
+    else
+    {
+        if (myid_ == 0)
+        {
+            // TODO(gelever1): create SMOOTHG_Warn or something of the sort
+            // to make warnings optional
+            printf("Warning: Not using preconditioner for Hybrid Solver!\n");
+        }
+    }
 
     trueHrhs_ = Vector(multiplier_d_td_.Cols());
     trueMu_ = Vector(trueHrhs_.size());
@@ -254,6 +273,9 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         MinvCT_i.SetSize(nlocal_edgedof, nlocal_multiplier);
         MinvDT_i.SetSize(nlocal_edgedof, nlocal_vertexdof);
         AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
+        hybrid_elem.SetSize(nlocal_multiplier, nlocal_multiplier);
+        Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
+        DMinvCT.SetSize(nlocal_vertexdof, nlocal_multiplier);
 
         Mloc_solver.Mult(DlocT, MinvDT_i);
         Mloc_solver.Mult(ClocT, MinvCT_i);
@@ -281,7 +303,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         hybrid_system.Add(local_multiplier, hybrid_elem);
     }
 
-    return SparseMatrix(num_multiplier_dofs_);
+    return hybrid_system.ToSparse();
 }
 
 SparseMatrix HybridSolver::AssembleHybridSystem(
@@ -431,6 +453,7 @@ void HybridSolver::Solve(const BlockVector& Rhs, BlockVector& Sol) const
     // solve the parallel global hybridized system
     Timer timer(Timer::Start::True);
 
+    trueMu_ = 0.0;
     cg_.Mult(trueHrhs_, trueMu_);
 
     timer.Click();
