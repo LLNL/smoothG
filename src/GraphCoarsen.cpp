@@ -162,7 +162,8 @@ void GraphCoarsen::ComputeVertexTargets(const GraphTopology& gt,
         DenseMatrix evects_restricted = RestrictLocal(evects, col_marker_,
                                                       vertex_dofs_ext, vertex_dofs_local);
 
-        vertex_targets_[agg] = smoothg::Orthogonalize(evects_restricted);
+        VectorView first_vect = evects_restricted.GetColView(0);
+        vertex_targets_[agg] = smoothg::Orthogonalize(evects_restricted, first_vect, 1, max_evects_);
     }
 }
 
@@ -324,7 +325,7 @@ void GraphCoarsen::ComputeEdgeTargets(const GraphTopology& gt,
         Vector pv_sol = solver.Mult(one_neg_one);
         VectorView pv_sigma(pv_sol.begin(), num_face_edges);
 
-        edge_targets_[face] = Orthogonalize(collected_sigma, pv_sigma, max_evects_);
+        edge_targets_[face] = Orthogonalize(collected_sigma, pv_sigma, 0, max_evects_);
     }
 
     sec_face.Broadcast(edge_targets_);
@@ -839,7 +840,6 @@ std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl, const 
         M_el[agg].SetSize(num_bubbles + num_traces);
         M_el[agg] = 0.0;
 
-
         if (num_bubbles > 0)
         {
             int total_cols = vertex_targets_[agg].Cols();
@@ -856,9 +856,6 @@ std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl, const 
         M_el[agg].SetSubMatrix(num_bubbles, 0, DTT_B);
         M_el[agg].SetSubMatrixTranspose(0, num_bubbles, DTT_B);
     }
-
-    std::vector<int> marker_0(agg_bubble_dof_.Cols(), -1);
-    std::vector<int> marker_1(agg_bubble_dof_.Cols(), -1);
 
     Vector M_data(mgl.M_local_.GetData());
     Vector M_local;

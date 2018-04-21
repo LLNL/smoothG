@@ -119,8 +119,14 @@ void SetMarker(std::vector<int>& marker, const std::vector<int>& indices);
 */
 void ClearMarker(std::vector<int>& marker, const std::vector<int>& indices);
 
-DenseMatrix Orthogonalize(DenseMatrix& mat, int max_keep = -1);
-DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect, int max_keep = -1);
+/** @brief Orthogonalize a matrix by a vector
+
+    @param mat matrix to orthogonalize
+    @param vect vector to orthogonalize against
+    @param offset offset into mat
+    @param max_keep maximum number of vectors to keep
+*/
+DenseMatrix Orthogonalize(DenseMatrix& mat, VectorView vect, int offset, int max_keep);
 
 /** @brief Orthogonalize all column vectors in the matrix from the constant vector.
     This is equivalent to shifting the vector so it has zero mean.

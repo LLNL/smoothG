@@ -356,59 +356,44 @@ void ClearMarker(std::vector<int>& marker, const std::vector<int>& indices)
     }
 }
 
-DenseMatrix Orthogonalize(DenseMatrix& mat, int max_keep)
-{
-    VectorView vect = mat.GetColView(0);
-
-    return Orthogonalize(mat, vect, max_keep);
-}
-
-DenseMatrix Orthogonalize(DenseMatrix& mat, const VectorView& vect_view, int max_keep)
+DenseMatrix Orthogonalize(DenseMatrix& mat, VectorView vect_view, int offset, int max_keep)
 {
     assert(mat.Rows() == vect_view.size());
 
     // If the view is of mat, deflate will destroy it,
     // so copy is needed
+    Normalize(vect_view);
     Vector vect(vect_view);
-    Normalize(vect);
 
-    if (mat.Rows() == 0 || mat.Cols() == 0)
+	int sz = 0;
+
+    if (mat.Cols() > offset) // 0 or 1
     {
-        DenseMatrix out(mat.Rows(), 1);
-        out.SetCol(0, vect);
+        Deflate(mat, vect);
+        auto singular_values = mat.SVD();
+        int num_values = singular_values.size();
 
-        return out;
+        if (singular_values[0] > 1e-8)
+        {
+            double zero_tol = 1e-8 * singular_values[0];
+            for (; sz < num_values; ++sz)
+            {
+                if (singular_values[sz] < zero_tol)
+                {
+                    break;
+                }
+            }
+        }
     }
 
-    Deflate(mat, vect);
-
-    auto singular_values = mat.SVD();
-
-    const double tol = singular_values.front() * 1e-8;
-    int keep = 0;
-
-    if (max_keep < 0)
-    {
-        max_keep = mat.Cols();
-    }
-
-    max_keep -= 1;
-
-    while (keep < max_keep && singular_values[keep] > tol)
-    {
-        keep++;
-    }
-
-    DenseMatrix out(mat.Rows(), keep + 1);
-
-    out = -1.0;
+    sz = std::min(max_keep - 1, sz);
+    DenseMatrix out(mat.Rows(), sz + 1);
 
     out.SetCol(0, vect);
 
-    for (int i = 0; i < keep; ++i)
+    for (int i = 0; i < sz; ++i)
     {
-        auto col = mat.GetColView(i);
-        out.SetCol(i + 1, col);
+        out.SetCol(i + 1, mat.GetColView(i));
     }
 
     return out;
