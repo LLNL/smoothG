@@ -11,24 +11,12 @@ matrix:
       compiler: gcc
       addons:
         apt:
-          # sources:
-            # - ubuntu-toolchain-r-test
           packages:
-            # GCC 4.9
-            # - g++-4.9
-            # MPICH
-            #- mpich
-            #- libmpich-dev
-            # Other
             - liblapack-dev
             - libblas-dev
             - doxygen
             - valgrind
             - gfortran
-            # OpenMPI
-            #- gfortran
-            #- openmpi-bin
-            #- libopenmpi-dev
       env: DEBUG=YES
            MPI=YES
       cache:
@@ -167,15 +155,20 @@ script:
      CPPFLAGS="";
      SKIP_TEST_DIRS="";
 
-
    # Configure the library
    - mkdir build;
    - cd build;
-   - CC=gcc CXX=g++ cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" -DMETIS_DIR="/home/travis/build/LLNL/metis-install" -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=DEBUG -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" ..;
+   - |
+       CC=mpicc CXX=mpic++ cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" \
+       -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" \
+       -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" \
+       -DMETIS_DIR="/home/travis/build/LLNL/metis-install" \
+       -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=Debug \
+       -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" \
+       -DSMOOTHG_TEST_PROCS=2 -DSMOOTHG_TEST_TOL="1e-2" ..;
 
    # Build the library
    - make -j3
 
    # Run tests
-   - cd testcode;
    - env CTEST_OUTPUT_ON_FAILURE=1 make test;

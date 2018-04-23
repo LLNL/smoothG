@@ -38,6 +38,13 @@ add_executable(mlmc mlmc.cpp)
 target_link_libraries(mlmc smoothg ${TPL_LIBRARIES})
 
 # add tests
+if (NOT DEFINED SMOOTHG_TEST_PROCS)
+    set(SMOOTHG_TEST_PROCS 4)
+endif()
+if (NOT DEFINED SMOOTHG_TEST_TOL)
+    set(SMOOTHG_TEST_TOL 1e-4)
+endif()
+
 configure_file(
   "${PROJECT_SOURCE_DIR}/examples/stest.py"
   "${PROJECT_BINARY_DIR}/examples/stest.py" @ONLY)
