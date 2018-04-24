@@ -106,27 +106,148 @@ void Visualize(const mfem::Vector& sol,
     MPI_Barrier(pmesh->GetComm());
 };
 
-class NormalSampler
+/// scalar normal distribution
+class NormalDistribution
 {
 public:
-    NormalSampler(double mean = 0.0, double stddev = 1.0, int seed = 0);
+    NormalDistribution(double mean = 0.0, double stddev = 1.0, int seed = 0);
     double Sample();
 private:
     std::mt19937 generator_;
     std::normal_distribution<double> dist_;
 };
 
-NormalSampler::NormalSampler(double mean, double stddev, int seed)
+NormalDistribution::NormalDistribution(double mean, double stddev, int seed)
     :
     generator_(seed),
     dist_(mean, stddev)
 {
 }
 
-double NormalSampler::Sample()
+double NormalDistribution::Sample()
 {
     double out = dist_(generator_);
     return out;
+}
+
+/**
+   For now we return the log of the permeability field,
+   at some point this class (or its caller?) should
+   exponentiate.
+*/
+class PDESampler
+{
+public:
+    /**
+       @todo cell_volume should be potentially spatially-varying
+    */
+    PDESampler(const FiniteVolumeUpscale& fvupscale,
+               int fine_vector_size, int dimension, double cell_volume,
+               double kappa, int seed);
+    ~PDESampler();
+
+    /// Draw white noise on fine level
+    void Sample();
+
+    /// Draw white noise on coarse level
+    void CoarseSample();
+
+    /// Solve PDE with white-noise RHS to find fine coefficient
+    mfem::Vector& GetFineCoefficient();
+
+    /// Solve PDE with white-noise RHS to find coarse coeffiicent
+    mfem::Vector& GetCoarseCoefficient();
+
+private:
+    enum State
+    {
+        NO_SAMPLE,
+        FINE_SAMPLE,
+        COARSE_SAMPLE
+    };
+
+    const FiniteVolumeUpscale& fvupscale_;
+    NormalDistribution normal_distribution_;
+    int fine_vector_size_;
+    double cell_volume_;
+    double scalar_g_;
+    State current_state_;
+
+    /// this lives in the pressure / vertex space
+    mfem::Vector rhs_fine_;
+};
+
+PDESampler::PDESampler(const FiniteVolumeUpscale& fvupscale,
+                       int fine_vector_size, int dimension, double cell_volume,
+                       double kappa, int seed)
+    :
+    fvupscale_(fvupscale),
+    normal_distribution_(0.0, 1.0, seed),
+    fine_vector_size_(fine_vector_size),
+    cell_volume_(cell_volume),
+    current_state_(NO_SAMPLE)
+{
+    double nu_parameter;
+    if (dimension == 2)
+        nu_parameter = 1.0;
+    else
+        nu_parameter = 0.5;
+    double ddim = static_cast<double>(dimension);
+    scalar_g_ = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
+        std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+}
+
+PDESampler::~PDESampler()
+{
+}
+
+/// @todo cell_volume should be variable rather than constant
+void PDESampler::Sample()
+{
+    current_state_ = FINE_SAMPLE;
+
+    // construct white noise right-hand side
+    // (cell_volume is supposed to represent fine-grid W_h)
+    rhs_fine_.SetSize(fine_vector_size_);
+    for (int i = 0; i < fine_vector_size_; ++i)
+    {
+        rhs_fine_(i) = scalar_g_ * std::sqrt(cell_volume_) *
+            normal_distribution_.Sample();
+    }
+}
+
+void PDESampler::CoarseSample()
+{
+    current_state_ = COARSE_SAMPLE;
+    MFEM_ASSERT(false, "Not implemented!");
+}
+
+mfem::Vector& PDESampler::GetFineCoefficient()
+{
+    MFEM_ASSERT(current_state_ == FINE_SAMPLE,
+                "PDESampler object in wrong state (call Sample() first)!");
+
+    mfem::BlockVector rhs_fine_block(fvupscale_.GetFineBlockVector());
+    rhs_fine_block.GetBlock(0) = 0.0;
+    rhs_fine_block.GetBlock(1) = rhs_fine_;
+
+    return fvupscale_.Solve(rhs_fine_block).GetBlock(1);
+}
+
+mfem::Vector& PDESampler::GetCoarseCoefficient()
+{
+    MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
+                current_state_ == COARSE_SAMPLE,
+                "PDESampler object in wrong state (call Sample() first)!");
+
+    MFEM_ASSERT(current_state_ == FINE_SAMPLE,
+                "Not implemented!");
+
+    mfem::BlockVector rhs_fine_block(fvupscale_.GetFineBlockVector());
+    rhs_fine_block.GetBlock(0) = 0.0;
+    rhs_fine_block.GetBlock(1) = rhs_fine_;
+
+    return fvupscale_.SolveFine(rhs_fine_block).GetBlock(1);
 }
 
 int main(int argc, char* argv[])
@@ -288,16 +409,6 @@ int main(int argc, char* argv[])
     const double cell_volume = spe10problem.CellVolume(nDimensions);
     W_block *= cell_volume * kappa * kappa;
 
-    double nu_parameter;
-    if (nDimensions == 2)
-        nu_parameter = 1.0;
-    else
-        nu_parameter = 0.5;
-    double ddim = static_cast<double>(nDimensions);
-    double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
-                      std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
-
-    NormalSampler sampler(0.0, 1.0, seed);
     mfem::Vector mean_fine(ufespace.GetVSize());
     mean_fine = 0.0;
     mfem::Vector mean_upscaled(ufespace.GetVSize());
@@ -325,46 +436,37 @@ int main(int argc, char* argv[])
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
+    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
+                          kappa, seed + myid);
 
     for (int sample = 0; sample < num_samples; ++sample)
     {
         double count = static_cast<double>(sample) + 1.0;
+        pdesampler.Sample();
 
-        // construct white noise right-hand side
-        // (cell_volume is supposed to represent fine-grid W_h)
-        mfem::Vector rhs_u_fine(ufespace.GetVSize());
-        for (int i = 0; i < ufespace.GetVSize(); ++i)
-        {
-            rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
-        }
-
-        mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
-        rhs_fine.GetBlock(0) = 0.0;
-        rhs_fine.GetBlock(1) = rhs_u_fine;
-
-        auto sol_upscaled = fvupscale.Solve(rhs_fine);
+        auto sol_upscaled = pdesampler.GetCoarseCoefficient();
         int coarse_iterations = fvupscale.GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale.GetCoarseSolveTime();
         total_coarse_time += coarse_time;
         for (int i = 0; i < mean_upscaled.Size(); ++i)
         {
-            const double delta = (sol_upscaled.GetBlock(1)(i) - mean_upscaled(i));
+            const double delta = (sol_upscaled(i) - mean_upscaled(i));
             mean_upscaled(i) += delta / count;
-            const double delta2 = (sol_upscaled.GetBlock(1)(i) - mean_upscaled(i));
+            const double delta2 = (sol_upscaled(i) - mean_upscaled(i));
             m2_upscaled(i) += delta * delta2;
         }
 
-        auto sol_fine = fvupscale.SolveFine(rhs_fine);
+        auto sol_fine = pdesampler.GetFineCoefficient();
         int fine_iterations = fvupscale.GetFineSolveIters();
         total_fine_iterations += fine_iterations;
         double fine_time = fvupscale.GetFineSolveTime();
         total_fine_time += fine_time;
         for (int i = 0; i < mean_fine.Size(); ++i)
         {
-            const double delta = (sol_fine.GetBlock(1)(i) - mean_fine(i));
+            const double delta = (sol_fine(i) - mean_fine(i));
             mean_fine(i) += delta / count;
-            const double delta2 = (sol_fine.GetBlock(1)(i) - mean_fine(i));
+            const double delta2 = (sol_fine(i) - mean_fine(i));
             m2_fine(i) += delta * delta2;
         }
 
@@ -375,10 +477,10 @@ int main(int argc, char* argv[])
         {
             std::stringstream coarsename;
             coarsename << "coarse_" << sample;
-            SaveFigure(sol_upscaled.GetBlock(1), ufespace, coarsename.str());
+            SaveFigure(sol_upscaled, ufespace, coarsename.str());
             std::stringstream finename;
             finename << "fine_" << sample;
-            SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
+            SaveFigure(sol_fine, ufespace, finename.str());
         }
 
         if (myid == 0)
