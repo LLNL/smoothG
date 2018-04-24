@@ -33,6 +33,8 @@ import json
 spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@PROJECT_SOURCE_DIR@/graphdata"
 
+memorycheck_command = "@MEMORYCHECK_COMMAND@"
+
 test_tol = float("@SMOOTHG_TEST_TOL@")
 num_procs = "@SMOOTHG_TEST_PROCS@"
 
@@ -365,7 +367,27 @@ def make_tests():
     #      {"operator-complexity": 1.2736672633273667}]
 
     if "tux" in platform.node():
-        pass
+        tests["veigenvector"] = \
+            [["mpirun", "-n", num_procs,
+              memorycheck_command, "--leak-check=full",
+              "./generalgraph",
+              "-g", graph_data + "/fe_vertex_edge.txt",
+              "-w", graph_data + "/fe_weight_0.txt",
+              "-p", graph_data + "/fe_part.txt",
+              "-f", graph_data + "/fe_rhs.txt",
+              "-t", "1.0", "-m", "1"]]
+
+        tests["vgraph-small-usegenerator"] = \
+            [[memorycheck_command, "--leak-check=full",
+              "./generalgraph",
+              "-nv", "20", "-md", "4", "-t", "1.0",
+              "-m", "1", "-gg"]]
+
+        tests["vgraph-small-usegenerator-hb"] = \
+            [[memorycheck_command, "--leak-check=full",
+              "./generalgraph",
+              "-nv", "20", "-md", "4", "-t", "1.0",
+              "-m", "1", "-gg", "-hb"]]
 
     return tests
 

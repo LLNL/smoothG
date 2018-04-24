@@ -27,7 +27,7 @@ Upscale::Upscale(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
                  bool hybridization)
     : comm_(comm),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
-      hybridization_(hybridization)
+      hybridization_(hybridization), setup_time_(0)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);

@@ -70,5 +70,8 @@ else()
   add_test(pargraph-metis python stest.py pargraph-metis)
 endif()
 
-#add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
+add_test(veigenvector python stest.py veigenvector)
+add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
+add_test(vgraph-small-usegenerator-hb python stest.py vgraph-small-usegenerator-hb)
+
 #add_test(isolate_coarsen python stest.py isolate-coarsen)
