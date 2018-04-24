@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(NULL, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, coarseningFactor);
+                              metis_agglomeration, 2.0, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
