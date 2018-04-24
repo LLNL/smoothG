@@ -17,19 +17,19 @@
 # add executables
 #add_executable(lineargraph lineargraph.cpp)
 #target_link_libraries(lineargraph smoothg ${TPL_LIBRARIES})
-#
+
 #add_executable(tinygraphsolver tinygraphsolver.cpp)
 #target_link_libraries(tinygraphsolver smoothg ${TPL_LIBRARIES})
-#
+
 #add_executable(partinygraph partinygraph.cpp)
 #target_link_libraries(partinygraph smoothg ${TPL_LIBRARIES})
-#
-#add_executable(eigen eigen.cpp)
-#target_link_libraries(eigen smoothg ${TPL_LIBRARIES})
-#
-#add_executable(test_MetisGraphPartitioner test_MetisGraphPartitioner.cpp)
-#target_link_libraries(test_MetisGraphPartitioner smoothg ${TPL_LIBRARIES})
-#
+
+add_executable(eigen eigen.cpp)
+target_link_libraries(eigen smoothG)
+
+add_executable(test_MetisGraphPartitioner test_MetisGraphPartitioner.cpp)
+target_link_libraries(test_MetisGraphPartitioner smoothG)
+
 #add_executable(test_IsolatePartitioner test_IsolatePartitioner.cpp)
 #target_link_libraries(test_IsolatePartitioner smoothg ${TPL_LIBRARIES})
 
@@ -40,26 +40,27 @@ target_link_libraries(wattsstrogatz smoothG)
 # add_test(lineargraph lineargraph)
 # add_test(lineargraph64 lineargraph --size 64)
 # add_valgrind_test(vlineargraph lineargraph)
-# 
+
 # add_test(tinygraphsolver tinygraphsolver)
 # add_test(tinygraphsolver_w tinygraphsolver -w)
 # add_test(tinygraphsolver_m tinygraphsolver -m)
 # add_test(tinygraphsolver_wm tinygraphsolver -w -m)
-# 
+
 # add_valgrind_test(vtinygraph tinygraphsolver)
 # add_valgrind_test(vtinygraph_w tinygraphsolver -w)
 # add_valgrind_test(vtinygraph_m tinygraphsolver -m)
 # add_valgrind_test(vtinygraph_wm tinygraphsolver -w -m)
-# 
+
 # add_test(partinygraph mpirun -np 2 ./partinygraph)
 # add_test(partinygraph_w mpirun -np 2 ./partinygraph -w)
 # add_test(partinygraph_m mpirun -np 2 ./partinygraph -m)
 # add_test(partinygraph_wm mpirun -np 2 ./partinygraph -w -m)
-# 
-# add_test(eigen eigen)
-# add_valgrind_test(veigen eigen)
-# 
-# add_test(test_MetisGraphPartitioner test_MetisGraphPartitioner)
+
+add_test(eigen eigen)
+add_valgrind_test(veigen eigen)
+
+add_test(test_MetisGraphPartitioner test_MetisGraphPartitioner)
+add_valgrind_test(vtest_MetisGraphPartitioner test_MetisGraphPartitioner)
 # add_test(test_IsolatePartitioner test_IsolatePartitioner)
 # add_valgrind_test(vtest_IsolatePartitioner test_IsolatePartitioner)
 
