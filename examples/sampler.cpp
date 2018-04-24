@@ -190,6 +190,11 @@ PDESampler::PDESampler(const FiniteVolumeUpscale& fvupscale,
     cell_volume_(cell_volume),
     current_state_(NO_SAMPLE)
 {
+    rhs_fine_.SetSize(fine_vector_size_);
+    coefficient_fine_.SetSize(fine_vector_size_);
+    rhs_coarse_ = fvupscale_.GetCoarseVector();
+    coefficient_coarse_ = fvupscale_.GetCoarseVector();
+
     double nu_parameter;
     if (dimension == 2)
         nu_parameter = 1.0;
@@ -211,7 +216,6 @@ void PDESampler::Sample()
 
     // construct white noise right-hand side
     // (cell_volume is supposed to represent fine-grid W_h)
-    rhs_fine_.SetSize(fine_vector_size_);
     for (int i = 0; i < fine_vector_size_; ++i)
     {
         rhs_fine_(i) = scalar_g_ * std::sqrt(cell_volume_) *
@@ -230,7 +234,7 @@ mfem::Vector& PDESampler::GetFineCoefficient()
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
                 "PDESampler object in wrong state (call Sample() first)!");
 
-    coefficient_fine_ = fvupscale_.SolveFine(rhs_fine_);
+    fvupscale_.SolveFine(rhs_fine_, coefficient_fine_);
     return coefficient_fine_;
 }
 
@@ -241,8 +245,9 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
                 "PDESampler object in wrong state (call Sample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
-        rhs_coarse_ = fvupscale_.Restrict(rhs_fine_);
-    coefficient_coarse_ = fvupscale_.SolveCoarse(rhs_coarse_);
+        fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
+    fvupscale_.SolveCoarse(rhs_coarse_, coefficient_coarse_);
+    coefficient_coarse_ *= -1.0; // ??
     return coefficient_coarse_;
 }
 
@@ -442,6 +447,7 @@ int main(int argc, char* argv[])
 
         auto sol_coarse = pdesampler.GetCoarseCoefficient();
         auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
+        fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
         int coarse_iterations = fvupscale.GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale.GetCoarseSolveTime();
