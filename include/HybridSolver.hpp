@@ -78,7 +78,7 @@ class HybridSolver : public MGLSolver
 {
 public:
     /// Construct local mass matrix for the fine level edge space
-    static std::vector<Vector>
+    static std::vector<std::vector<double>>
     BuildFineLevelLocalMassMatrix(const SparseMatrix& vertex_edge,
                                   const SparseMatrix& M);
 
@@ -147,7 +147,7 @@ protected:
 
     SparseMatrix AssembleHybridSystem(
         const MixedMatrix& mgl,
-        const std::vector<Vector>& M_el,
+        const std::vector<std::vector<double>>& M_el,
         const std::vector<int>& j_multiplier_edgedof);
 
     SparseMatrix MakeEdgeDofMultiplier(const MixedMatrix& mgl,

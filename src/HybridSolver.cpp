@@ -24,13 +24,13 @@
 namespace smoothg
 {
 
-std::vector<Vector>
+std::vector<std::vector<double>>
 HybridSolver::BuildFineLevelLocalMassMatrix(const SparseMatrix& vertex_edge,
                                             const SparseMatrix& M)
 {
     const int num_vertices = vertex_edge.Rows();
 
-    std::vector<Vector> M_el(num_vertices);
+    std::vector<std::vector<double>> M_el(num_vertices);
 
     SparseMatrix edge_vertex = vertex_edge.Transpose();
 
@@ -42,7 +42,7 @@ HybridSolver::BuildFineLevelLocalMassMatrix(const SparseMatrix& vertex_edge,
 
         int num_dofs = edge_dofs.size();
 
-        M_el[i] = Vector(num_dofs);
+        M_el[i].resize(num_dofs);
 
         for (int j = 0; j < num_dofs; ++j)
         {
@@ -76,7 +76,7 @@ HybridSolver::HybridSolver(MPI_Comm comm, const MixedMatrix& mgl)
     Ainv_f_(num_aggs_),
     use_w_(mgl.CheckW())
 {
-    std::vector<Vector> M_el = BuildFineLevelLocalMassMatrix(mgl.D_local_, mgl.M_local_);
+    auto M_el = BuildFineLevelLocalMassMatrix(mgl.D_local_, mgl.M_local_);
     std::vector<int> j_multiplier_edgedof(num_edge_dofs_);
     std::iota(std::begin(j_multiplier_edgedof), std::end(j_multiplier_edgedof), 0);
 
@@ -312,7 +312,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
 
 SparseMatrix HybridSolver::AssembleHybridSystem(
     const MixedMatrix& mgl,
-    const std::vector<Vector>& M_el,
+    const std::vector<std::vector<double>>& M_el,
     const std::vector<int>& j_multiplier_edgedof)
 {
     const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
@@ -365,7 +365,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         std::vector<int> Cloc_j(nlocal_multiplier);
         std::vector<double> Cloc_data(nlocal_multiplier);
 
-        const Vector& M_diag(M_el[agg]);
+        const auto& M_diag(M_el[agg]);
         Vector CMinvCT(nlocal_multiplier);
 
         for (int i = 0; i < nlocal_multiplier; ++i)
