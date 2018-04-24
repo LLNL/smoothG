@@ -42,19 +42,9 @@ public:
        @param nvertices number of vertices of the graph to be generated
        @param mean_degree average vertex degree of the generated graph
        @param beta probability of rewiring
+       @param seed seed for the random number engine if positive, else random seed
     */
-    GraphGenerator(int nvertices, int mean_degree, double beta);
-
-    /**
-       @brief Constructor of a random graph generator.
-
-       @param nvertices number of vertices of the graph to be generated
-       @param mean_degree average vertex degree of the generated graph
-       @param beta probability of rewiring
-       @param seed seed for the random number engine
-    */
-    GraphGenerator(int nvertices, int mean_degree, double beta, unsigned int seed);
-
+    GraphGenerator(int nvertices, int mean_degree, double beta, int seed = -1);
 
     /**
         @brief Generate a random graph based on the Watts-Strogatz model
@@ -94,9 +84,16 @@ private:
 }; // class GraphGenerator
 
 
-/// Generate a vertex edge relationship for a WattsStrogatz random graph
+/** @brief Generate a vertex edge relationship for a WattsStrogatz random graph
+
+     @param nvertices number of vertices of the graph to be generated
+     @param mean_degree average vertex degree of the generated graph
+     @param beta probability of rewiring
+     @param seed if non negative, seed for the random number engine.
+            else random seed
+*/
 SparseMatrix GenerateGraph(MPI_Comm comm, int nvertices, int mean_degree, double beta,
-                           double seed);
+                           int seed);
 
 } // namespace smoothg
 

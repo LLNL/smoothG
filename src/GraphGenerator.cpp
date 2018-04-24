@@ -25,32 +25,13 @@
 namespace smoothg
 {
 
-GraphGenerator::GraphGenerator(int nvertices, int mean_degree, double beta)
+GraphGenerator::GraphGenerator(int nvertices, int mean_degree, double beta, int seed)
     :
     nvertices_(nvertices),
     mean_degree_(mean_degree),
     beta_(beta),
     nedges_(nvertices_ * mean_degree_ / 2),
-    gen_(rd_()),
-    rand_double_0_1_(0, 1)
-{
-    // beta is probability
-    assert((beta_ >= 0.0) && (beta_ <= 1.0));
-
-    // The Watts-Strogatz model assumes mean_degree to be an even number
-    assert((mean_degree_ % 2) == 0);
-
-    // vertex degree cannot be greater than number of vertices -1
-    assert(mean_degree_ < nvertices_);
-}
-
-GraphGenerator::GraphGenerator(int nvertices, int mean_degree, double beta, unsigned int seed)
-    :
-    nvertices_(nvertices),
-    mean_degree_(mean_degree),
-    beta_(beta),
-    nedges_(nvertices_ * mean_degree_ / 2),
-    gen_(seed),
+    gen_(seed < 0 ? rd_() : seed),
     rand_double_0_1_(0, 1)
 {
     // beta is probability
@@ -186,7 +167,7 @@ SparseMatrix GraphGenerator::Generate()
 }
 
 SparseMatrix GenerateGraph(MPI_Comm comm, int nvertices, int mean_degree, double beta,
-                           double seed)
+                           int seed)
 {
     int myid;
     MPI_Comm_rank(comm, &myid);

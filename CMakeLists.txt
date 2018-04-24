@@ -108,6 +108,15 @@ add_custom_target(style
     COMMENT "Formating source code" VERBATIM
     )
 
+# Valgrind
+find_program(MEMORYCHECK_COMMAND valgrind)
+set(MEMORYCHECK_COMMAND_OPTIONS "")
+list(APPEND MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full")
+list(APPEND MEMORYCHECK_COMMAND_OPTIONS "--error-exitcode=1")
+function(add_valgrind_test name binary)
+  add_test(${name} ${MEMORYCHECK_COMMAND} ${MEMORYCHECK_COMMAND_OPTIONS} ./${binary})
+endfunction(add_valgrind_test)
+
 # Installation
 include(GNUInstallDirs)
 set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/libsmoothg)
@@ -163,4 +172,4 @@ export(PACKAGE smoothG)
 
 # Sub Directories
 add_subdirectory(examples)
-#add_subdirectory(testcode)
+add_subdirectory(testcode)
