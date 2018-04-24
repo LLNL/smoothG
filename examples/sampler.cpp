@@ -173,8 +173,11 @@ private:
     double scalar_g_;
     State current_state_;
 
-    /// this lives in the pressure / vertex space
+    /// all these vectors live in the pressure / vertex space
     mfem::Vector rhs_fine_;
+    mfem::Vector rhs_coarse_;
+    mfem::Vector coefficient_fine_;
+    mfem::Vector coefficient_coarse_;
 };
 
 PDESampler::PDESampler(const FiniteVolumeUpscale& fvupscale,
@@ -227,11 +230,8 @@ mfem::Vector& PDESampler::GetFineCoefficient()
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
                 "PDESampler object in wrong state (call Sample() first)!");
 
-    mfem::BlockVector rhs_fine_block(fvupscale_.GetFineBlockVector());
-    rhs_fine_block.GetBlock(0) = 0.0;
-    rhs_fine_block.GetBlock(1) = rhs_fine_;
-
-    return fvupscale_.Solve(rhs_fine_block).GetBlock(1);
+    coefficient_fine_ = fvupscale_.SolveFine(rhs_fine_);
+    return coefficient_fine_;
 }
 
 mfem::Vector& PDESampler::GetCoarseCoefficient()
@@ -240,14 +240,10 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
                 current_state_ == COARSE_SAMPLE,
                 "PDESampler object in wrong state (call Sample() first)!");
 
-    MFEM_ASSERT(current_state_ == FINE_SAMPLE,
-                "Not implemented!");
-
-    mfem::BlockVector rhs_fine_block(fvupscale_.GetFineBlockVector());
-    rhs_fine_block.GetBlock(0) = 0.0;
-    rhs_fine_block.GetBlock(1) = rhs_fine_;
-
-    return fvupscale_.SolveFine(rhs_fine_block).GetBlock(1);
+    if (current_state_ == FINE_SAMPLE)
+        rhs_coarse_ = fvupscale_.Restrict(rhs_fine_);
+    coefficient_coarse_ = fvupscale_.SolveCoarse(rhs_coarse_);
+    return coefficient_coarse_;
 }
 
 int main(int argc, char* argv[])
@@ -444,7 +440,8 @@ int main(int argc, char* argv[])
         double count = static_cast<double>(sample) + 1.0;
         pdesampler.Sample();
 
-        auto sol_upscaled = pdesampler.GetCoarseCoefficient();
+        auto sol_coarse = pdesampler.GetCoarseCoefficient();
+        auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
         int coarse_iterations = fvupscale.GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale.GetCoarseSolveTime();
@@ -470,8 +467,9 @@ int main(int argc, char* argv[])
             m2_fine(i) += delta * delta2;
         }
 
-        auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
-        double finest_p_error = error_info[0];
+        // auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
+        double finest_p_error = CompareError(comm, sol_upscaled, sol_fine);
+        // double finest_p_error = error_info[0];
 
         if (save_samples)
         {
