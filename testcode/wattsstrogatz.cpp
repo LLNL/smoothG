@@ -28,11 +28,10 @@ using namespace smoothg;
 int main(int argc, char* argv[])
 {
     // initialize MPI
-    int num_procs, myid;
-    MPI_Init(&argc, &argv);
-    MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Comm_size(comm, &num_procs);
-    MPI_Comm_rank(comm, &myid);
+    MpiSession mpi_info(argc, argv);
+    MPI_Comm comm = mpi_info.comm_;
+    int myid = mpi_info.myid_;
+    int num_procs = mpi_info.num_procs_;
 
     // program options from command line
     linalgcpp::ArgParser arg_parser(argc, argv);
@@ -51,7 +50,6 @@ int main(int argc, char* argv[])
         ParPrint(myid, arg_parser.ShowHelp());
         ParPrint(myid, arg_parser.ShowErrors());
 
-        MPI_Finalize();
         return EXIT_FAILURE;
     }
 
@@ -118,8 +116,6 @@ int main(int argc, char* argv[])
         std::cout << "Expect: " << nvertices * mean_degree / 2 << "\n";
         std::cout << "Actual: " << vertex_edge.Cols() << "\n";
     }
-
-    MPI_Finalize();
 
     return failures;
 }

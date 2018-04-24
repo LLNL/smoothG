@@ -267,6 +267,32 @@ SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<Den
 */
 SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseMatrix& B);
 
+
+/** @brief Handles mpi initialization and finalization */
+struct MpiSession
+{
+    /** @brief Constructor
+
+        @param argc argc from command line
+        @param argv argv from command line
+        @param comm MPI Communicator to use
+    */
+    MpiSession(int argc, char** argv, MPI_Comm comm = MPI_COMM_WORLD)
+        : comm_(comm)
+    {
+        MPI_Init(&argc, &argv);
+        MPI_Comm_size(comm_, &num_procs_);
+        MPI_Comm_rank(comm_, &myid_);
+    }
+
+    /** @brief Destructor */
+    ~MpiSession() { MPI_Finalize(); }
+
+    MPI_Comm comm_;
+    int num_procs_;
+    int myid_;
+};
+
 } //namespace smoothg
 
 #endif // __UTILITIES_HPP__

@@ -34,10 +34,10 @@ using parlinalgcpp::ParL2Norm;
 int main(int argc, char* argv[])
 {
     // Initialize MPI
-    int myid;
-    MPI_Init(&argc, &argv);
-    MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Comm_rank(comm, &myid);
+    MpiSession mpi_info(argc, argv);
+    MPI_Comm comm = mpi_info.comm_;
+    int myid = mpi_info.myid_;
+    int num_procs = mpi_info.num_procs_;
 
     // Setup Parameters
     double coarse_factor = 80;
@@ -58,65 +58,61 @@ int main(int argc, char* argv[])
     SparseMatrix vertex_edge = ReadCSR(ve_filename);
 
     // Power Iteration With Upscale Operators
+    // Upscaler
+    GraphUpscale upscale(comm, vertex_edge, coarse_factor,
+                         spect_tol, max_evects, hybridization);
+
+    // Wrapper for solving on the fine level, no upscaling
+    UpscaleFineSolve fine_solver(upscale);
+
+    upscale.PrintInfo();
+
+    // Read and normalize true Fiedler vector
+    Vector true_sol = upscale.ReadVertexVector(rhs_filename);
+    true_sol /= ParL2Norm(comm, true_sol);
+
+    // Power Iteration for each Operator
+    std::map<const Operator*, std::string> op_to_name;
+    op_to_name[&upscale] = "coarse";
+    op_to_name[&fine_solver] = "fine";
+
+    std::map<std::string, double> error_info;
+
+    for (const auto& op_pair : op_to_name)
     {
-        // Upscaler
-        GraphUpscale upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects, hybridization);
+        auto& op = op_pair.first;
+        auto& name = op_pair.second;
 
-        // Wrapper for solving on the fine level, no upscaling
-        UpscaleFineSolve fine_solver(upscale);
+        // Power Iteration
+        Vector result(op->Rows());
+        result.Randomize(seed);
 
-        upscale.PrintInfo();
+        double eval = PowerIterate(comm, *op, result, max_iter, solve_tol, verbose);
 
-        // Read and normalize true Fiedler vector
-        Vector true_sol = upscale.ReadVertexVector(rhs_filename);
-        true_sol /= ParL2Norm(comm, true_sol);
+        // Normalize
+        result /= ParL2Norm(comm, result);
+        upscale.Orthogonalize(result);
 
-        // Power Iteration for each Operator
-        std::map<const Operator*, std::string> op_to_name;
-        op_to_name[&upscale] = "coarse";
-        op_to_name[&fine_solver] = "fine";
-
-        std::map<std::string, double> error_info;
-
-        for (const auto& op_pair : op_to_name)
+        // Match Signs
+        double true_sign = true_sol[0] / std::fabs(true_sol[0]);
+        double result_sign = result[0] / std::fabs(result[0]);
+        if (std::fabs(true_sign - result_sign) > 1e-8)
         {
-            auto& op = op_pair.first;
-            auto& name = op_pair.second;
-
-            // Power Iteration
-            Vector result(op->Rows());
-            result.Randomize(seed);
-
-            double eval = PowerIterate(comm, *op, result, max_iter, solve_tol, verbose);
-
-            // Normalize
-            result /= ParL2Norm(comm, result);
-            upscale.Orthogonalize(result);
-
-            // Match Signs
-            double true_sign = true_sol[0] / std::fabs(true_sol[0]);
-            double result_sign = result[0] / std::fabs(result[0]);
-            if (std::fabs(true_sign - result_sign) > 1e-8)
-            {
-                result *= -1.0;
-            }
-
-            // Compute Error
-            double error = CompareError(comm, result, true_sol);
-            error_info[name + "-eval"] = eval;
-            error_info[name + "-error"] = error;
+            result *= -1.0;
         }
 
-        if (myid == 0)
-        {
-            std::cout << "\nResults:\n";
-            std::cout << "---------------------\n";
-            PrintJSON(error_info);
-        }
+        // Compute Error
+        double error = CompareError(comm, result, true_sol);
+        error_info[name + "-eval"] = eval;
+        error_info[name + "-error"] = error;
     }
 
-    MPI_Finalize();
+    if (myid == 0)
+    {
+        std::cout << "\nResults:\n";
+        std::cout << "---------------------\n";
+        PrintJSON(error_info);
+    }
 
     return EXIT_SUCCESS;
 }

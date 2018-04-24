@@ -132,7 +132,11 @@ void HybridSolver::InitSolver(SparseMatrix local_hybrid)
     nnz_ = pHybridSystem_.nnz();
 
     cg_ = linalgcpp::PCGSolver(pHybridSystem_, max_num_iter_, rtol_,
-                               atol_, print_level_, parlinalgcpp::ParMult);
+                               atol_, 0, parlinalgcpp::ParMult);
+    if (myid_ == 0)
+    {
+        SetPrintLevel(print_level_);
+    }
 
     // HypreBoomerAMG is broken if local size is zero
     int local_size = pHybridSystem_.Rows();
@@ -593,7 +597,10 @@ void HybridSolver::SetPrintLevel(int print_level)
 {
     MGLSolver::SetPrintLevel(print_level);
 
-    cg_.SetVerbose(print_level_);
+    if (myid_ == 0)
+    {
+        cg_.SetVerbose(print_level_);
+    }
 }
 
 void HybridSolver::SetMaxIter(int max_num_iter)
@@ -605,7 +612,7 @@ void HybridSolver::SetMaxIter(int max_num_iter)
 
 void HybridSolver::SetRelTol(double rtol)
 {
-    MGLSolver::SetMaxIter(rtol);
+    MGLSolver::SetRelTol(rtol);
 
     cg_.SetRelTol(rtol_);
 }

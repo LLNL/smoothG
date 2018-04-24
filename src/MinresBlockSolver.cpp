@@ -73,7 +73,12 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
     prec_.SetBlock(1, 1, schur_prec_);
 
     pminres_ = linalgcpp::PMINRESSolver(op_, prec_, max_num_iter_, rtol_,
-                                        atol_, print_level_, parlinalgcpp::ParMult);
+                                        atol_, 0, parlinalgcpp::ParMult);
+
+    if (myid_ == 0)
+    {
+        SetPrintLevel(print_level_);
+    }
 
     nnz_ = M_.nnz() + DT_.nnz() + D_.nnz() + W_.nnz();
 }
@@ -145,7 +150,10 @@ void MinresBlockSolver::SetPrintLevel(int print_level)
 {
     MGLSolver::SetPrintLevel(print_level);
 
-    pminres_.SetVerbose(print_level_);
+    if (myid_ == 0)
+    {
+        pminres_.SetVerbose(print_level_);
+    }
 }
 
 void MinresBlockSolver::SetMaxIter(int max_num_iter)

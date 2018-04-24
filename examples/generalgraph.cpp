@@ -40,11 +40,10 @@ Vector ComputeFiedlerVector(const MixedMatrix& mgl);
 int main(int argc, char* argv[])
 {
     // Initialize MPI
-    int num_procs, myid;
-    MPI_Init(&argc, &argv);
-    MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Comm_size(comm, &num_procs);
-    MPI_Comm_rank(comm, &myid);
+    MpiSession mpi_info(argc, argv);
+    MPI_Comm comm = mpi_info.comm_;
+    int myid = mpi_info.myid_;
+    int num_procs = mpi_info.num_procs_;
 
     // program options from command line
     std::string graph_filename = "../../graphdata/vertex_edge_sample.txt";
@@ -142,49 +141,46 @@ int main(int argc, char* argv[])
     /// [Load the edge weights]
 
     // Set up GraphUpscale
+    /// [Upscale]
+    GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
+                         spect_tol, max_evects, hybridization, weight);
+
+    upscale.PrintInfo();
+    upscale.ShowSetupTime();
+    /// [Upscale]
+
+    /// [Right Hand Side]
+    BlockVector fine_rhs = upscale.GetFineBlockVector();
+    fine_rhs.GetBlock(0) = 0.0;
+
+    if (generate_graph || generate_fiedler)
     {
-        /// [Upscale]
-        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, hybridization, weight);
-
-        upscale.PrintInfo();
-        upscale.ShowSetupTime();
-        /// [Upscale]
-
-        /// [Right Hand Side]
-        BlockVector fine_rhs = upscale.GetFineBlockVector();
-        fine_rhs.GetBlock(0) = 0.0;
-
-        if (generate_graph || generate_fiedler)
-        {
-            fine_rhs.GetBlock(1) = ComputeFiedlerVector(upscale.GetFineMatrix());
-        }
-        else
-        {
-            fine_rhs.GetBlock(1) = upscale.ReadVertexVector(fiedler_filename);
-        }
-
-        /// [Right Hand Side]
-
-        /// [Solve]
-        BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        upscale.ShowCoarseSolveInfo();
-
-        BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        upscale.ShowFineSolveInfo();
-        /// [Solve]
-
-        /// [Check Error]
-        upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
-
-        if (save_fiedler)
-        {
-            upscale.WriteVertexVector(fine_rhs.GetBlock(1), fiedler_filename);
-        }
+        fine_rhs.GetBlock(1) = ComputeFiedlerVector(upscale.GetFineMatrix());
+    }
+    else
+    {
+        fine_rhs.GetBlock(1) = upscale.ReadVertexVector(fiedler_filename);
     }
 
-    MPI_Finalize();
+    /// [Right Hand Side]
+
+    /// [Solve]
+    BlockVector upscaled_sol = upscale.Solve(fine_rhs);
+    upscale.ShowCoarseSolveInfo();
+
+    BlockVector fine_sol = upscale.SolveFine(fine_rhs);
+    upscale.ShowFineSolveInfo();
+    /// [Solve]
+
+    /// [Check Error]
+    upscale.ShowErrors(upscaled_sol, fine_sol);
+    /// [Check Error]
+
+    if (save_fiedler)
+    {
+        upscale.WriteVertexVector(fine_rhs.GetBlock(1), fiedler_filename);
+    }
+
     return 0;
 }
 

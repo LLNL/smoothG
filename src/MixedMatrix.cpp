@@ -23,12 +23,13 @@
 namespace smoothg
 {
 
-MixedMatrix::MixedMatrix(const Graph& graph, const std::vector<double>& global_weight)
+MixedMatrix::MixedMatrix(const Graph& graph, const std::vector<double>& global_weight,
+                         const SparseMatrix& W_global)
     : edge_true_edge_(graph.edge_true_edge_)
 {
     M_local_ = MakeLocalM(edge_true_edge_, graph.edge_edge_, graph.edge_map_, global_weight);
     D_local_ = MakeLocalD(edge_true_edge_, graph.vertex_edge_local_);
-    //W_local_ = SparseMatrix(std::vector<double>(D_local_.Rows(), 0.0));
+    W_local_ = MakeLocalW(graph, W_global);
 
     Init();
 }
@@ -178,9 +179,26 @@ SparseMatrix MixedMatrix::MakeLocalD(const ParMatrix& edge_true_edge,
         }
     }
 
-    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data), num_edges, num_vertices);
+    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data),
+                    num_edges, num_vertices);
 
     return DT.Transpose();
+}
+
+SparseMatrix MixedMatrix::MakeLocalW(const Graph& graph,
+                                     const SparseMatrix& W_global)
+{
+    const auto& vertices = graph.vertex_map_;
+
+    SparseMatrix W_local;
+
+    if (W_global.Rows() > 0)
+    {
+        W_local = W_global.GetSubMatrix(vertices, vertices);
+        W_local *= -1.0;
+    }
+
+    return W_local;
 }
 
 

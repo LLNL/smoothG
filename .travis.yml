@@ -11,6 +11,7 @@ matrix:
           packages:
             - liblapack-dev
             - libblas-dev
+            - valgrind
       cache:
         directories:
           - $TRAVIS_BUILD_DIR/../metis-install
