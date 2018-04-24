@@ -312,7 +312,20 @@ int main(int argc, char* argv[])
     double total_coarse_time = 0.0;
     double total_fine_time = 0.0;
 
-    // todo: use coarse mass builder to rescale samples
+    // Create Upscaler
+    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
+                                  partitioning, *edge_d_td, edge_boundary_att,
+                                  ess_attr, spect_tol, max_evects, dual_target,
+                                  scaled_dual, energy_dual, hybridization);
+
+    mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
+    marker = 0;
+    sigmafespace.GetEssentialVDofs(ess_attr, marker);
+    fvupscale.MakeFineSolver(marker);
+    fvupscale.PrintInfo();
+    fvupscale.ShowSetupTime();
+
+
     for (int sample = 0; sample < num_samples; ++sample)
     {
         double count = static_cast<double>(sample) + 1.0;
@@ -324,20 +337,6 @@ int main(int argc, char* argv[])
         {
             rhs_u_fine(i) = scalar_g * std::sqrt(cell_volume) * sampler.Sample();
         }
-
-        // Create Upscaler and Solve
-        FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
-                                      partitioning, *edge_d_td, edge_boundary_att,
-                                      ess_attr, spect_tol, max_evects, dual_target,
-                                      scaled_dual, energy_dual, hybridization);
-
-        mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
-        marker = 0;
-        sigmafespace.GetEssentialVDofs(ess_attr, marker);
-        fvupscale.MakeFineSolver(marker);
-
-        // fvupscale.PrintInfo();
-        // fvupscale.ShowSetupTime();
 
         mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
         rhs_fine.GetBlock(0) = 0.0;
