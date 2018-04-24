@@ -24,7 +24,7 @@ namespace smoothg
 {
 
 Upscale::Upscale(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
-        bool hybridization)
+                 bool hybridization)
     : comm_(comm),
       global_edges_(vertex_edge_global.Cols()), global_vertices_(vertex_edge_global.Rows()),
       hybridization_(hybridization)

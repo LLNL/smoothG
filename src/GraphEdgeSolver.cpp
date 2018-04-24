@@ -122,7 +122,8 @@ void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& output) const
     }
 }
 
-void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
+void GraphEdgeSolver::Mult(const DenseMatrix& input, DenseMatrix& sigma_sol,
+                           DenseMatrix& u_sol) const
 {
     int rows = MinvDT_.Rows();
     int cols = input.Cols();
@@ -145,13 +146,14 @@ void GraphEdgeSolver::OffsetMult(int offset, const DenseMatrix& input, DenseMatr
     OffsetMult(offset, input.Cols(), input, output);
 }
 
-void GraphEdgeSolver::OffsetMult(int offset, const DenseMatrix& input, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
+void GraphEdgeSolver::OffsetMult(int offset, const DenseMatrix& input, DenseMatrix& sigma_sol,
+                                 DenseMatrix& u_sol) const
 {
     OffsetMult(offset, input.Cols(), input, sigma_sol, u_sol);
 }
 
 void GraphEdgeSolver::OffsetMult(int start, int end, const DenseMatrix& input,
-                               DenseMatrix& output) const
+                                 DenseMatrix& output) const
 {
     assert(start >= 0);
     assert(end <= input.Cols());
@@ -170,7 +172,7 @@ void GraphEdgeSolver::OffsetMult(int start, int end, const DenseMatrix& input,
 }
 
 void GraphEdgeSolver::OffsetMult(int start, int end, const DenseMatrix& input,
-                               DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
+                                 DenseMatrix& sigma_sol, DenseMatrix& u_sol) const
 {
     assert(start >= 0);
     assert(end <= input.Cols());

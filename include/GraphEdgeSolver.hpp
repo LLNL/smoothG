@@ -166,7 +166,8 @@ public:
        @param sigma_sol \f$ \sigma \f$ in the formula above
        @param u_sol \f$ \u \f$ in the formula above
     */
-    void OffsetMult(int offset, const DenseMatrix& rhs, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const;
+    void OffsetMult(int offset, const DenseMatrix& rhs, DenseMatrix& sigma_sol,
+                    DenseMatrix& u_sol) const;
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
@@ -189,7 +190,8 @@ public:
        @param sigma_sol \f$ \sigma \f$ in the formula above
        @param u_sol \f$ \u \f$ in the formula above
     */
-    void OffsetMult(int start, int end, const DenseMatrix& rhs, DenseMatrix& sigma_sol, DenseMatrix& u_sol) const;
+    void OffsetMult(int start, int end, const DenseMatrix& rhs, DenseMatrix& sigma_sol,
+                    DenseMatrix& u_sol) const;
 
 private:
     SparseMatrix MinvDT_;

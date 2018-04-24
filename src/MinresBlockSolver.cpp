@@ -48,7 +48,7 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
     {
         CooMatrix elim_dof(D_.Rows(), D_.Rows());
 
-        if (M_.GetMyId() == 0)
+        if (myid_ == 0)
         {
             elim_dof.Add(0, 0, 1.0);
         }

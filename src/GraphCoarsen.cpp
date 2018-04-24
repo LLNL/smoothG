@@ -817,7 +817,8 @@ SparseMatrix GraphCoarsen::BuildCoarseD(const GraphTopology& gt) const
     return D_coarse.ToSparse();
 }
 
-std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl, const GraphTopology& gt) const
+std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl,
+                                                  const GraphTopology& gt) const
 {
     int num_aggs = gt.agg_ext_edge_.Rows();
     int num_faces = gt.face_edge_local_.Rows();
@@ -903,9 +904,9 @@ std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl, const 
 }
 
 DenseMatrix GraphCoarsen::RestrictLocal(const DenseMatrix& ext_mat,
-                          std::vector<int>& global_marker,
-                          const std::vector<int>& ext_indices,
-                          const std::vector<int>& local_indices) const
+                                        std::vector<int>& global_marker,
+                                        const std::vector<int>& ext_indices,
+                                        const std::vector<int>& local_indices) const
 {
     SetMarker(global_marker, ext_indices);
 

@@ -179,9 +179,9 @@ SparseMatrix HybridSolver::MakeEdgeDofMultiplier(const MixedMatrix& mgl,
 }
 
 SparseMatrix HybridSolver::AssembleHybridSystem(
-        const MixedMatrix& mgl,
-        const std::vector<DenseMatrix>& M_el,
-        const std::vector<int>& j_multiplier_edgedof)
+    const MixedMatrix& mgl,
+    const std::vector<DenseMatrix>& M_el,
+    const std::vector<int>& j_multiplier_edgedof)
 {
     const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
 
@@ -307,9 +307,9 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
 }
 
 SparseMatrix HybridSolver::AssembleHybridSystem(
-        const MixedMatrix& mgl,
-        const std::vector<Vector>& M_el,
-        const std::vector<int>& j_multiplier_edgedof)
+    const MixedMatrix& mgl,
+    const std::vector<Vector>& M_el,
+    const std::vector<int>& j_multiplier_edgedof)
 {
     const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
 
@@ -444,7 +444,7 @@ void HybridSolver::Solve(const BlockVector& Rhs, BlockVector& Sol) const
 
     if (!use_w_ && myid_ == 0)
     {
-            Hrhs_[0] = 0.0;
+        Hrhs_[0] = 0.0;
     }
 
     // assemble true right hand side

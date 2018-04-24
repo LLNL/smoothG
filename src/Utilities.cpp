@@ -365,7 +365,7 @@ DenseMatrix Orthogonalize(DenseMatrix& mat, VectorView vect_view, int offset, in
     Normalize(vect_view);
     Vector vect(vect_view);
 
-	int sz = 0;
+    int sz = 0;
 
     if (mat.Cols() > offset) // 0 or 1
     {

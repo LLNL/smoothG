@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
         bool use_hybridization = true;
 
         GraphUpscale hb_upscale(comm, vertex_edge, coarse_factor,
-                             spect_tol, max_evects, use_hybridization);
+                                spect_tol, max_evects, use_hybridization);
 
         GraphUpscale minres_upscale(comm, vertex_edge, coarse_factor,
                                     spect_tol, max_evects, !use_hybridization);
