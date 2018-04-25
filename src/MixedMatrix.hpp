@@ -137,7 +137,7 @@ public:
     }
 
     /**
-       @brief Get a reference to the mass matrix M.
+       @brief Get a reference to the mass matrix M builder.
     */
     const MBuilder& GetMBuilder() const
     {

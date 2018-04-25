@@ -40,7 +40,7 @@ public:
     virtual ~MBuilder() {}
 
     /**
-       @brief Get the assembled M for the local processor
+       @brief Build the assembled M for the local processor
      */
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const = 0;
 

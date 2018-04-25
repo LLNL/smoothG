@@ -236,6 +236,7 @@ protected:
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();
 
+    // Assemble parallel hybridized system and build a solver for it
     void BuildParallelSystemAndSolver();
 
 private:
