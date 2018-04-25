@@ -72,38 +72,47 @@ public:
                 const mfem::HypreParMatrix& edge_d_td);
 
     /**
-       @brief Get a reference to the mass matrix M.
+       @brief Get a const reference to the mass matrix M.
     */
-    mfem::SparseMatrix& getWeight() const
+    const mfem::SparseMatrix& getWeight() const
     {
-        assert(M_ || mbuilder_);
-        if (!M_)
-        {
-            M_ = mbuilder_->BuildAssembledM();
-        }
+        assert(M_);
         return *M_;
     }
 
     /**
        @brief Get a reference to the mass matrix M.
+
+       @todo non-const version of getWeight() and getD() are for elimination
+             in the case when MinresBlockSolver is used. Since the solver makes
+             a copy of these matrices, the non-const version can be removed
+             if the elimination step is moved inside the solver
     */
     mfem::SparseMatrix& getWeight()
     {
         assert(M_ || mbuilder_);
-        if (!M_)
-        {
-            M_ = mbuilder_->BuildAssembledM();
-        }
         return *M_;
     }
 
     /**
-       @brief Get a reference to the mass matrix M builder.
+       @brief Get a const reference to the mass matrix M builder.
     */
     const MBuilder& GetMBuilder() const
     {
         assert(mbuilder_);
         return *mbuilder_;
+    }
+
+    /**
+       @brief assemble the mass matrix M.
+    */
+    void BuildM()
+    {
+        if (!M_)
+        {
+            assert(mbuilder_);
+            M_ = mbuilder_->BuildAssembledM();
+        }
     }
 
     /**
@@ -118,17 +127,25 @@ public:
     }
 
     /**
-       @brief Get a reference to the edge_vertex matrix D.
+       @brief Get a const reference to the edge_vertex matrix D.
     */
-    mfem::SparseMatrix& getD() const
+    const mfem::SparseMatrix& getD() const
     {
         return *D_;
     }
 
     /**
-       @brief Get a reference to the matrix W.
+       @brief Get a reference to the edge_vertex matrix D.
     */
-    mfem::SparseMatrix* getW() const
+    mfem::SparseMatrix& getD()
+    {
+        return *D_;
+    }
+
+    /**
+       @brief Get a const reference to the matrix W.
+    */
+    const mfem::SparseMatrix* getW() const
     {
         return W_.get();
     }
@@ -311,7 +328,7 @@ private:
 
     void GenerateRowStarts();
 
-    mutable std::unique_ptr<mfem::SparseMatrix> M_;
+    std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
     std::unique_ptr<mfem::SparseMatrix> W_;
 

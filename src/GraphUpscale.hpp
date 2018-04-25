@@ -113,7 +113,7 @@ public:
     void WriteEdgeVector(const mfem::Vector& vect, const std::string& filename) const;
 
     // Create Fine Level Solver
-    void MakeFineSolver() const;
+    void MakeFineSolver();
 
 private:
     void Init(const mfem::SparseMatrix& vertex_edge,

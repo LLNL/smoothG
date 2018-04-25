@@ -78,6 +78,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     }
     else // L2-H1 block diagonal preconditioner
     {
+        GetCoarseMatrix().BuildM();
         mfem::SparseMatrix& Mref = GetCoarseMatrix().getWeight();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
@@ -151,7 +152,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
+        GetCoarseMatrix().BuildM();
+        mfem::SparseMatrix& Mref = GetCoarseMatrix().getWeight();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -170,7 +172,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
-void FiniteVolumeUpscale::MakeFineSolver() const
+void FiniteVolumeUpscale::MakeFineSolver()
 {
     mfem::Array<int> marker;
     BooleanMult(edge_boundary_att_, ess_attr_, marker);

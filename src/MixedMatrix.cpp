@@ -142,6 +142,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
 
     //    SetMFromWeightVector(weight);
     mbuilder_ = make_unique<FineMBuilder>(weight, vertex_edge);
+    M_ = mbuilder_->BuildAssembledM();
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
     {

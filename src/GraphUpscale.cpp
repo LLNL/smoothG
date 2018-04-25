@@ -112,6 +112,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     }
     else // L2-H1 block diagonal preconditioner
     {
+        GetCoarseMatrix().BuildM();
         coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 
@@ -124,7 +125,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     MakeFineSolver();
 }
 
-void GraphUpscale::MakeFineSolver() const
+void GraphUpscale::MakeFineSolver()
 {
     if (!fine_solver_)
     {

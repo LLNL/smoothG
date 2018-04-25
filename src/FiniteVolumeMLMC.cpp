@@ -163,7 +163,8 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
+        GetCoarseMatrix().BuildM();
+        mfem::SparseMatrix& Mref = GetCoarseMatrix().getWeight();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -177,7 +178,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     }
 }
 
-void FiniteVolumeMLMC::ForceMakeFineSolver() const
+void FiniteVolumeMLMC::ForceMakeFineSolver()
 {
     mfem::Array<int> marker;
     BooleanMult(edge_boundary_att_, ess_attr_, marker);
@@ -214,7 +215,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver() const
 
 }
 
-void FiniteVolumeMLMC::MakeFineSolver() const
+void FiniteVolumeMLMC::MakeFineSolver()
 {
     if (!fine_solver_)
     {

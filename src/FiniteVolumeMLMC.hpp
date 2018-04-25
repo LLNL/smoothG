@@ -94,7 +94,7 @@ public:
                      bool energy_dual = false, bool hybridization = false,
                      const SAAMGeParam* saamge_param = nullptr);
 
-    void MakeFineSolver() const;
+    void MakeFineSolver();
 
     /// coeff should have the size of the number of *edges* in the
     /// fine graph (not exactly analagous to RescaleCoarseCoefficient)
@@ -106,7 +106,7 @@ public:
 
     /// recreate the fine solver, ie if coefficients have changed
     /// @todo maybe don't have to rebuild whole thing, just M part?
-    void ForceMakeFineSolver() const;
+    void ForceMakeFineSolver();
 
     void MakeCoarseSolver();
 

@@ -159,7 +159,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
         hD_.reset(edge_d_td.LeftDiagMult(D_, D_row_start));
         hDt_.reset(hD_->Transpose());
 
-        mfem::SparseMatrix* W = mgL.getW();
+        const mfem::SparseMatrix* W = mgL.getW();
         assert(W);
         mfem::SparseMatrix W_copy(*W);
 

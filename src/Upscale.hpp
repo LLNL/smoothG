@@ -206,7 +206,7 @@ protected:
     std::unique_ptr<mfem::BlockVector> sol_coarse_;
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+    std::unique_ptr<MixedLaplacianSolver> fine_solver_;
 
 private:
     void SetOperator(const mfem::Operator& op) {};

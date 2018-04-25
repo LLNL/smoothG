@@ -95,7 +95,7 @@ public:
                         bool energy_dual = false, bool hybridization = false,
                         const SAAMGeParam* saamge_param = nullptr);
 
-    void MakeFineSolver() const;
+    void MakeFineSolver();
 
 private:
     const mfem::HypreParMatrix& edge_d_td_;
