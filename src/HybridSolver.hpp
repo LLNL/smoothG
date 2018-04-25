@@ -106,14 +106,6 @@ struct SAAMGeParam
 class HybridSolver : public MixedLaplacianSolver
 {
 public:
-    /// Construct local mass matrix for the fine level edge space
-    /// @deprecated element matrices are available in MixedMatrix
-    static void BuildFineLevelLocalMassMatrix(
-        const mfem::SparseMatrix& vertex_edge,
-        const mfem::SparseMatrix& M,
-        std::vector<mfem::Vector>& M_el);
-
-public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
 

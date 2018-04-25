@@ -29,38 +29,6 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-void HybridSolver::BuildFineLevelLocalMassMatrix(
-    const mfem::SparseMatrix& vertex_edge,
-    const mfem::SparseMatrix& M,
-    std::vector<mfem::Vector>& M_el)
-{
-    const int nvertices = vertex_edge.Height();
-    M_el.resize(nvertices);
-
-    mfem::SparseMatrix edge_vertex(smoothg::Transpose(vertex_edge));
-    mfem::Array<int> local_edgedof;
-
-    const mfem::Vector M_data(M.GetData(), M.Height());
-    for (int i = 0; i < nvertices; i++)
-    {
-        GetTableRow(vertex_edge, i, local_edgedof);
-        const int nlocal_edgedof = local_edgedof.Size();
-
-        mfem::Vector& Mloc(M_el[i]);
-        Mloc.SetSize(nlocal_edgedof);
-
-        for (int j = 0; j < nlocal_edgedof; j++)
-        {
-            const int edgedof = local_edgedof[j];
-
-            if (edge_vertex.RowSize(edgedof) == 2)
-                Mloc(j) = M_data[edgedof] / 2;
-            else
-                Mloc(j) = M_data[edgedof];
-        }
-    }
-}
-
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
