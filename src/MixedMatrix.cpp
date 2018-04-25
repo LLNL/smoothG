@@ -89,27 +89,6 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 {
 }
 
-MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         const mfem::HypreParMatrix& edge_d_td)
-    : MixedMatrix(vertex_edge, mfem::Vector(vertex_edge.Width()) = 1.0, edge_d_td,
-                  DistributeWeight::True)
-{
-
-}
-MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
-                         std::unique_ptr<mfem::SparseMatrix> D,
-                         std::unique_ptr<mfem::SparseMatrix> W,
-                         const mfem::HypreParMatrix& edge_d_td)
-    :
-    M_(std::move(M)),
-    D_(std::move(D)),
-    W_(std::move(W)),
-    edge_d_td_(&edge_d_td),
-    edge_td_d_(edge_d_td_->Transpose())
-{
-    GenerateRowStarts();
-}
-
 MixedMatrix::MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,

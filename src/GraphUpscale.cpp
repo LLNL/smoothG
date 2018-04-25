@@ -83,17 +83,16 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
 
+    mfem::Vector local_weight(vertex_edge.Width());
     if (global_weight.Size() == vertex_edge_global.Width())
     {
-        mfem::Vector local_weight(vertex_edge.Width());
         global_weight.GetSubVector(pgraph_->GetEdgeLocalToGlobalMap(), local_weight);
-
-        mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
     }
     else
     {
-        mixed_laplacians_.emplace_back(vertex_edge, *edge_e_te_);
+        local_weight = 1.0;
     }
+    mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
 
     auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
 

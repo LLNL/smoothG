@@ -66,45 +66,6 @@ public:
                 const mfem::HypreParMatrix& edge_d_td,
                 DistributeWeight dist_weight = DistributeWeight::True);
 
-    /// build with weights all equal to 1
-    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    /**
-        @brief Create a MixedMatrix directly from M and D matrices.
-
-        Takes ownership of the M and D unique pointers.
-    */
-    MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
-                std::unique_ptr<mfem::SparseMatrix> D,
-                const mfem::HypreParMatrix& edge_d_td)
-        : MixedMatrix(std::move(M), std::move(D), nullptr, edge_d_td)
-    {}
-
-    /**
-        @brief Create a MixedMatrix directly from M and D matrices.
-
-        Takes ownership of the M and D unique pointers.
-    */
-    MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
-                std::unique_ptr<mfem::SparseMatrix> D,
-                std::unique_ptr<mfem::SparseMatrix> W,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    /**
-       @brief Construct a coarse mixed graph Laplacian from a finer one and some projections
-
-       Essentially computes an RAP triple product for the coarsening.
-    */
-    MixedMatrix(const MixedMatrix& fine_mgL,
-                const mfem::SparseMatrix& Pu,
-                const mfem::SparseMatrix& Pp,
-                const mfem::HypreParMatrix& edge_d_td)
-        : MixedMatrix(std::unique_ptr<mfem::SparseMatrix>(RAP(Pu, fine_mgL.getWeight(), Pu)),
-                      std::unique_ptr<mfem::SparseMatrix>(RAP(Pp, fine_mgL.getD(), Pu)),
-                      edge_d_td)
-    {}
-
     MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,

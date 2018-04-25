@@ -55,7 +55,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     const mfem::SparseMatrix edge_edgedof;
 
-    auto mbuilder = dynamic_cast<const FineMBuilder *>(&(mgL.GetMBuilder()));
+    auto mbuilder = dynamic_cast<const FineMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
     {
         std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
@@ -89,7 +89,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
 
-    auto mbuilder = dynamic_cast<const ElementMBuilder *>(&(mgL.GetMBuilder()));
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
     {
         std::cout << "HybridSolver requires coarse level M builder to be ElementMBuilder!\n";
