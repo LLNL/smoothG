@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
     MixedMatrix mgl(graph, weight, W_block);
 
     MinresBlockSolver minres(mgl);
-    HybridSolver hb(comm, mgl);
+    HybridSolver hb(mgl);
 
     // TODO(gelever1): square tolerances in PCG and remove this
     hb.SetRelTol(1e-32);
@@ -198,7 +198,7 @@ int main(int argc, char* argv[])
             if (error > equality_tolerance)
             {
                 some_solver_fails = true;
-                printf("Failed:!\n");
+                std::cout << name << " Failed!\n";
             }
 
         }

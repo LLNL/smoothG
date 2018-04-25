@@ -78,7 +78,7 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
 
     if (hybridization_)
     {
-        coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(), coarsener_);
+        coarse_solver_ = make_unique<HybridSolver>(GetCoarseMatrix(), coarsener_);
     }
     else
     {
@@ -100,7 +100,7 @@ void GraphUpscale::MakeFineSolver() const
     {
         if (hybridization_)
         {
-            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
+            fine_solver_ = make_unique<HybridSolver>(GetFineMatrix());
         }
         else
         {

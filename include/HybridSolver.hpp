@@ -86,21 +86,17 @@ public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
 
-       @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the fine level
     */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgL);
+    HybridSolver(const MixedMatrix& mgL);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
 
-       @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the coarse level
        @param mgLc Mixed graph Laplacian Coarsener from fine to coarse level
     */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgl,
+    HybridSolver(const MixedMatrix& mgl,
                  const GraphCoarsen& coarsener);
 
     virtual ~HybridSolver() = default;

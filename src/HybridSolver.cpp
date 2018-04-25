@@ -61,9 +61,9 @@ HybridSolver::BuildFineLevelLocalMassMatrix(const SparseMatrix& vertex_edge,
 }
 
 
-HybridSolver::HybridSolver(MPI_Comm comm, const MixedMatrix& mgl)
+HybridSolver::HybridSolver(const MixedMatrix& mgl)
     :
-    MGLSolver(mgl.offsets_), comm_(comm), myid_(mgl.D_global_.GetMyId()),
+    MGLSolver(mgl.offsets_), comm_(mgl.D_global_.GetComm()), myid_(mgl.D_global_.GetMyId()),
     agg_vertexdof_(SparseIdentity(mgl.D_local_.Rows())),
     agg_edgedof_(mgl.D_local_),
     agg_multiplier_(agg_edgedof_),
@@ -86,10 +86,10 @@ HybridSolver::HybridSolver(MPI_Comm comm, const MixedMatrix& mgl)
 }
 
 
-HybridSolver::HybridSolver(MPI_Comm comm, const MixedMatrix& mgl,
+HybridSolver::HybridSolver(const MixedMatrix& mgl,
                            const GraphCoarsen& coarsener)
     :
-    MGLSolver(mgl.offsets_), comm_(comm), myid_(mgl.D_global_.GetMyId()),
+    MGLSolver(mgl.offsets_), comm_(mgl.D_global_.GetComm()), myid_(mgl.D_global_.GetMyId()),
     agg_vertexdof_(coarsener.GetAggCDofVertex()),
     agg_edgedof_(coarsener.GetAggCDofEdge()),
     num_aggs_(agg_edgedof_.Rows()),
