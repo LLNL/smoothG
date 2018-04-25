@@ -150,7 +150,7 @@ void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
 {
     assert(mbuilder_);
     mbuilder_->SetCoefficient(agg_weights_inverse);
-    M_ = mbuilder_->GetAssembledM();
+    M_ = mbuilder_->BuildAssembledM();
 }
 
 /// @todo better documentation of the 1/-1 issue, make it optional?

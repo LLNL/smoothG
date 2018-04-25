@@ -118,7 +118,7 @@ public:
         assert(M_ || mbuilder_);
         if (!M_)
         {
-            M_ = mbuilder_->GetAssembledM();
+            M_ = mbuilder_->BuildAssembledM();
         }
         return *M_;
     }
@@ -131,7 +131,7 @@ public:
         assert(M_ || mbuilder_);
         if (!M_)
         {
-            M_ = mbuilder_->GetAssembledM();
+            M_ = mbuilder_->BuildAssembledM();
         }
         return *M_;
     }
