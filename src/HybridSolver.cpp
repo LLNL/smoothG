@@ -55,10 +55,15 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     const mfem::SparseMatrix edge_edgedof;
 
-    auto& mbuilder = static_cast<const FineMBuilder&>(mgL.GetMBuilder());
-    Agg_edgedof_.MakeRef(mbuilder.GetAggEdgeDofTable());
+    auto mbuilder = dynamic_cast<const FineMBuilder *>(&(mgL.GetMBuilder()));
+    if (!mbuilder)
+    {
+        std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
+        std::abort();
+    }
+    Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
-    Init(edge_edgedof, mbuilder.GetElementMatrices(),
+    Init(edge_edgedof, mbuilder->GetElementMatrices(),
          mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
 
@@ -84,10 +89,16 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
 
-    auto& mbuilder = static_cast<const ElementMBuilder&>(mgL.GetMBuilder());
-    Agg_edgedof_.MakeRef(mbuilder.GetAggEdgeDofTable());
+    auto mbuilder = dynamic_cast<const ElementMBuilder *>(&(mgL.GetMBuilder()));
+    if (!mbuilder)
+    {
+        std::cout << "HybridSolver requires coarse level M builder to be ElementMBuilder!\n";
+        std::abort();
+    }
 
-    Init(face_edgedof, mbuilder.GetElementMatrices(),
+    Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
+
+    Init(face_edgedof, mbuilder->GetElementMatrices(),
          mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
 }
 
