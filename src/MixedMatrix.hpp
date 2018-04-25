@@ -74,7 +74,7 @@ public:
     /**
        @brief Get a const reference to the mass matrix M.
     */
-    const mfem::SparseMatrix& getWeight() const
+    const mfem::SparseMatrix& GetM() const
     {
         assert(M_);
         return *M_;
@@ -83,12 +83,12 @@ public:
     /**
        @brief Get a reference to the mass matrix M.
 
-       @todo non-const version of getWeight() and getD() are for elimination
+       @todo non-const version of GetM() and getD() are for elimination
              in the case when MinresBlockSolver is used. Since the solver makes
              a copy of these matrices, the non-const version can be removed
              if the elimination step is moved inside the solver
     */
-    mfem::SparseMatrix& getWeight()
+    mfem::SparseMatrix& GetM()
     {
         assert(M_ || mbuilder_);
         return *M_;
@@ -104,7 +104,7 @@ public:
     }
 
     /**
-       @brief assemble the mass matrix M.
+       @brief Assemble the mass matrix M.
     */
     void BuildM()
     {

@@ -133,7 +133,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
     use_W_(mgL.CheckW()),
     operator_(mgL.get_blockTrueOffsets()),
     prec_(mgL.get_blockTrueOffsets()),
-    M_(mgL.getWeight()),
+    M_(mgL.GetM()),
     D_(mgL.getD())
 {
     MPI_Comm_rank(comm_, &myid_);

@@ -435,7 +435,7 @@ void Upscale::SetAbsTol(double atol)
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,
                                            const mfem::BlockVector& fine_sol) const
 {
-    const mfem::SparseMatrix& M = GetFineMatrix().getWeight();
+    const mfem::SparseMatrix& M = GetFineMatrix().GetM();
     const mfem::SparseMatrix& D = GetFineMatrix().getD();
 
     auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);

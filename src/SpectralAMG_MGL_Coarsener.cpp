@@ -57,7 +57,7 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LMGST localtargets(spectral_tol_, max_evecs_per_agg_, dual_target_,
-                       scaled_dual_, energy_dual_, mgL_.getWeight(),
+                       scaled_dual_, energy_dual_, mgL_.GetM(),
                        mgL_.getD(), mgL_.getW(), *graph_topology_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 

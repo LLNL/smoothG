@@ -126,7 +126,7 @@ void UpscalingStatistics::ComputeErrorSquare(
             mgL[0].getD().Mult(sigma_h, dsigma_h);
 
             sigma_weighted_l2_error_square_(k, j)
-                = mgL[0].getWeight().InnerProduct(sigma_h, sigma_h);
+                = mgL[0].GetM().InnerProduct(sigma_h, sigma_h);
             Dsigma_l2_error_square_(k, j) = dsigma_h * dsigma_h;
             u_l2_error_square_(k, j) = u_h * u_h;
         }
@@ -137,7 +137,7 @@ void UpscalingStatistics::ComputeErrorSquare(
             subtract(u_H, u_h, u_diff);
 
             sigma_weighted_l2_error_square_(k, j)
-                = mgL[j].getWeight().InnerProduct(sigma_diff, sigma_diff);
+                = mgL[j].GetM().InnerProduct(sigma_diff, sigma_diff);
             Dsigma_l2_error_square_(k, j) = dsigma_diff * dsigma_diff;
             u_l2_error_square_(k, j) = u_diff * u_diff;
         }

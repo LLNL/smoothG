@@ -164,7 +164,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     else // L2-H1 block diagonal preconditioner
     {
         GetCoarseMatrix().BuildM();
-        mfem::SparseMatrix& Mref = GetCoarseMatrix().getWeight();
+        mfem::SparseMatrix& Mref = GetCoarseMatrix().GetM();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -190,7 +190,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
+        mfem::SparseMatrix& Mref = GetFineMatrix().GetM();
         mfem::SparseMatrix& Dref = GetFineMatrix().getD();
         const bool w_exists = GetFineMatrix().CheckW();
 
