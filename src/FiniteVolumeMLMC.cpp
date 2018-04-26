@@ -33,12 +33,14 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    double spect_tol, int max_evects,
                                    bool dual_target, bool scaled_dual,
                                    bool energy_dual, bool hybridization,
+                                   bool coarse_components,
                                    const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       weight_(weight),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
       ess_attr_(ess_attr),
+      coarse_components_(coarse_components),
       saamge_param_(saamge_param)
 {
     mfem::StopWatch chrono;
@@ -56,7 +58,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     !hybridization_);
+                     coarse_components_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -79,6 +81,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    double spect_tol, int max_evects,
                                    bool dual_target, bool scaled_dual,
                                    bool energy_dual, bool hybridization,
+                                   bool coarse_components,
                                    const SAAMGeParam* saamge_param)
     :
     Upscale(comm, vertex_edge.Height(), hybridization),
@@ -86,6 +89,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     edge_d_td_(edge_d_td),
     edge_boundary_att_(edge_boundary_att),
     ess_attr_(ess_attr),
+    coarse_components_(coarse_components),
     saamge_param_(saamge_param)
 {
     mfem::StopWatch chrono;
@@ -104,7 +108,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     !hybridization_);
+                     coarse_components_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -156,6 +160,9 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
     if (hybridization_) // Hybridization solver
     {
+        // coarse_components method does not store element matrices
+        assert(!coarse_components_);
+
         auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm_, GetCoarseMatrix(), *coarsener_,

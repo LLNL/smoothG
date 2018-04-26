@@ -134,7 +134,7 @@ int main(int argc, char* argv[])
     }
 
     assert(num_partitions >= num_procs);
-
+    bool coarse_components = (coarse_coefficient && !hybridization);
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix vertex_edge_global;
@@ -186,7 +186,7 @@ int main(int argc, char* argv[])
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
                              spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, coarse_coefficient, weight);
+                             energy_dual, hybridization, coarse_components, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
