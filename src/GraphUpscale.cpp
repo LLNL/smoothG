@@ -28,19 +28,19 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
                            const mfem::Array<int>& global_partitioning,
                            double spect_tol, int max_evects,
                            bool dual_target, bool scaled_dual, bool energy_dual,
-                           bool hybridization, bool coarse_coefficient,
+                           bool hybridization, bool coarse_components,
                            const mfem::Vector& global_weight, const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
     Init(vertex_edge_global, global_partitioning, global_weight, spect_tol,
-         max_evects, dual_target, scaled_dual, energy_dual, coarse_coefficient, saamge_param);
+         max_evects, dual_target, scaled_dual, energy_dual, coarse_components, saamge_param);
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
                            int coarse_factor, double spect_tol, int max_evects,
                            bool dual_target, bool scaled_dual, bool energy_dual,
-                           bool hybridization, bool coarse_coefficient,
+                           bool hybridization, bool coarse_components,
                            const mfem::Vector& weight,
                            const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
@@ -54,9 +54,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     mfem::Array<int> global_partitioning;
     PartitionAAT(vertex_edge_global, global_partitioning, coarse_factor);
 
-    Init(vertex_edge_global, global_partitioning, weight, spect_tol,
-         max_evects, dual_target, scaled_dual, energy_dual, coarse_coefficient,
-         saamge_param);
+    Init(vertex_edge_global, global_partitioning, weight, spect_tol, max_evects,
+         dual_target, scaled_dual, energy_dual, coarse_components, saamge_param);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -67,7 +66,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
                         const mfem::Vector& global_weight,
                         double spect_tol, int max_evects,
                         bool dual_target, bool scaled_dual, bool energy_dual,
-                        bool coarse_coefficient,
+                        bool coarse_components,
                         const SAAMGeParam* saamge_param)
 {
     mfem::StopWatch chrono;
@@ -83,52 +82,39 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
 
+    mfem::Vector local_weight(vertex_edge.Width());
     if (global_weight.Size() == vertex_edge_global.Width())
     {
-        mfem::Vector local_weight(vertex_edge.Width());
         global_weight.GetSubVector(pgraph_->GetEdgeLocalToGlobalMap(), local_weight);
-
-        mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
     }
     else
     {
-        mixed_laplacians_.emplace_back(vertex_edge, *edge_e_te_);
+        local_weight = 1.0;
     }
+    mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
 
     auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
-
-    std::shared_ptr<CoarseMBuilder> mbuilder_ptr;
-    std::shared_ptr<ElementMBuilder> hybrid_builder_ptr;
-    if (hybridization_)
-    {
-        hybrid_builder_ptr = std::make_shared<ElementMBuilder>();
-        mbuilder_ptr = hybrid_builder_ptr;
-    }
-    else if (coarse_coefficient)
-    {
-        mbuilder_ptr = std::make_shared<CoefficientMBuilder>(*graph_topology);
-    }
-    else
-    {
-        mbuilder_ptr = std::make_shared<AssembleMBuilder>();
-    }
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     *mbuilder_ptr);
+                     coarse_components);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
     if (hybridization_)
     {
+        // coarse_components method does not store element matrices
+        assert(!coarse_components);
+
         coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_, *hybrid_builder_ptr,
+                             comm_, GetCoarseMatrix(), *coarsener_,
                              nullptr, nullptr, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
+        GetCoarseMatrix().BuildM();
         coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 
@@ -141,7 +127,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     MakeFineSolver();
 }
 
-void GraphUpscale::MakeFineSolver() const
+void GraphUpscale::MakeFineSolver()
 {
     if (!fine_solver_)
     {

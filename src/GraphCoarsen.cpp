@@ -461,6 +461,12 @@ void GraphCoarsen::BuildPEdges(
 
     Agg_cdof_edge_ = agg_dof_builder.GetAgg_cdof_edge(nAggs, total_num_traces + bubble_counter);
 
+    auto elem_mbuilder_ptr = dynamic_cast<ElementMBuilder*>(&mbuilder);
+    if (elem_mbuilder_ptr)
+    {
+        elem_mbuilder_ptr->SetAggToEdgeDofsTableReference(*Agg_cdof_edge_);
+    }
+
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
     // next line assume M_proc_ is diagonal
     mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width()), Mloc_v;
@@ -508,7 +514,11 @@ void GraphCoarsen::BuildPEdges(
                                  nedges, total_num_traces + bubble_counter);
     Pedges.Swap(newPedges);
 
-    CoarseM_ = mbuilder.GetCoarseM(M_v, Pedges, face_cdof);
+    auto coef_mbuilder_ptr = dynamic_cast<CoefficientMBuilder*>(&mbuilder);
+    if (coef_mbuilder_ptr)
+    {
+        coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_cdof);
+    }
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)

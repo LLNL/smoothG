@@ -201,10 +201,7 @@ int main(int argc, char* argv[])
                                   edge_boundary_att, ess_attr, spect_tol, max_evects,
                                   dual_target, scaled_dual, energy_dual, hybridization);
 
-    mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
-    marker = 0;
-    sigmafespace.GetEssentialVDofs(ess_attr, marker);
-    fvupscale.MakeFineSolver(marker);
+    fvupscale.MakeFineSolver();
 
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
@@ -218,7 +215,6 @@ int main(int argc, char* argv[])
 
     auto sol_fine = fvupscale.SolveFine(rhs_fine);
     fvupscale.ShowFineSolveInfo();
-
 
     auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 

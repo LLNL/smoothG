@@ -84,7 +84,7 @@ public:
     */
     GraphCoarsen(const MixedMatrix& mgL,
                  const GraphTopology& graph_topology)
-        : GraphCoarsen( mgL.getWeight(), mgL.getD(), mgL.getW(), graph_topology)
+        : GraphCoarsen( mgL.GetM(), mgL.GetD(), mgL.GetW(), graph_topology)
     { }
 
     /**

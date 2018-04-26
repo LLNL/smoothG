@@ -230,6 +230,17 @@ def make_tests():
           "finest-u-error": 0.38079825403520218,
           "operator-complexity": 1.016509834901651}]
 
+    tests["samplegraph1-coeff-hb"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-coefficient",
+          "--hybridization"],
+         {"finest-div-error": 0.37918423747873353,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.000874038778061}]
+
     tests["parsamplegraph1-coeff"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
@@ -239,6 +250,17 @@ def make_tests():
           "finest-p-error": 0.38013398274257243,
           "finest-u-error": 0.38079825403520218,
           "operator-complexity": 1.016509834901651}]
+
+    tests["parsamplegraph1-coeff-hb"] = \
+        [["mpirun", "-n", "4", "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-coefficient",
+          "--hybridization"],
+         {"finest-div-error": 0.37918423727222522,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.000874038778061}]
 
     tests["graph-metis"] = \
         [["./generalgraph",
@@ -278,6 +300,17 @@ def make_tests():
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
           "operator-complexity": 1.2578874211257887}]
+
+    tests["samplegraph4-coeff-hb"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4",
+          "--coarse-coefficient",
+          "--hybridization"],
+         {"finest-div-error": 0.12043046187567592,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.013984620448976}]
 
     tests["graph-hybridization"] = \
         [["./generalgraph",

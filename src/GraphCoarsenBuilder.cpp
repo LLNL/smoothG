@@ -20,6 +20,15 @@
 namespace smoothg
 {
 
+void MBuilder::SetCoefficient(const mfem::Vector& agg_weight_inverse)
+{
+    agg_weights_.SetSize(agg_weight_inverse.Size());
+    for (int i = 0; i < agg_weights_.Size(); ++i)
+    {
+        agg_weights_[i] = 1.0 / agg_weight_inverse[i];
+    }
+}
+
 void ElementMBuilder::Setup(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
@@ -41,20 +50,6 @@ void ElementMBuilder::Setup(
     }
     edge_cdof_marker_.SetSize(total_num_traces + ncoarse_vertexdofs - nAggs);
     edge_cdof_marker_ = -1;
-}
-
-void AssembleMBuilder::Setup(
-    std::vector<mfem::DenseMatrix>& edge_traces,
-    std::vector<mfem::DenseMatrix>& vertex_target,
-    const mfem::SparseMatrix& Agg_face,
-    int total_num_traces, int ncoarse_vertexdofs)
-{
-    total_num_traces_ = total_num_traces;
-
-    const unsigned int nAggs = vertex_target.size();
-    CoarseM_ = make_unique<mfem::SparseMatrix>(
-                   total_num_traces + ncoarse_vertexdofs - nAggs,
-                   total_num_traces + ncoarse_vertexdofs - nAggs);
 }
 
 void CoefficientMBuilder::Setup(
@@ -87,12 +82,6 @@ void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubb
     edge_cdof_marker_[row] = cdof_loc;
 }
 
-void AssembleMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
-{
-    row_ = row;
-    bubble_counter_ = bubble_counter;
-}
-
 void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
@@ -100,21 +89,9 @@ void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
     CM_el_loc(cdof_loc_, l) = value;
 }
 
-void AssembleMBuilder::SetTraceBubbleBlock(int l, double value)
-{
-    const int global_col = total_num_traces_ + bubble_counter_ + l;
-    CoarseM_->Set(row_, global_col, value);
-    CoarseM_->Set(global_col, row_, value);
-}
-
 void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 {
     CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
-}
-
-void AssembleMBuilder::AddTraceTraceBlockDiag(double value)
-{
-    CoarseM_->Add(row_, row_, value);
 }
 
 void ElementMBuilder::AddTraceTraceBlock(int l, double value)
@@ -124,25 +101,11 @@ void ElementMBuilder::AddTraceTraceBlock(int l, double value)
     CM_el_loc(cdof_loc_, edge_cdof_marker_[l]) = value;
 }
 
-void AssembleMBuilder::AddTraceTraceBlock(int l, double value)
-{
-    CoarseM_->Add(row_, l, value);
-    CoarseM_->Add(l, row_, value);
-}
-
 void ElementMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
 {
     mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
     CM_el_loc(l, j) = value;
     CM_el_loc(j, l) = value;
-}
-
-void AssembleMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
-{
-    const int global_row = total_num_traces_ + bubble_counter_ + l;
-    const int global_col = total_num_traces_ + bubble_counter_ + j;
-    CoarseM_->Set(global_row, global_col, value);
-    CoarseM_->Set(global_col, global_row, value);
 }
 
 void ElementMBuilder::ResetEdgeCdofMarkers(int size)
@@ -180,11 +143,6 @@ void ElementMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix
     }
 }
 
-void AssembleMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                                           const mfem::SparseMatrix& Agg_cdof_edge)
-{
-}
-
 void ElementMBuilder::AddTraceAcross(int row, int col, double value)
 {
     mfem::DenseMatrix& CM_el_loc1(CM_el_[Agg0_]);
@@ -205,33 +163,27 @@ void ElementMBuilder::AddTraceAcross(int row, int col, double value)
     }
 }
 
-void AssembleMBuilder::AddTraceAcross(int row, int col, double value)
+std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::BuildAssembledM() const
 {
-    CoarseM_->Add(row, col, value);
-}
-
-std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetCoarseM(
-    const mfem::Vector& fineMdiag,
-    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
-{
-    return std::unique_ptr<mfem::SparseMatrix>(nullptr);
-}
-
-std::unique_ptr<mfem::SparseMatrix> AssembleMBuilder::GetCoarseM(
-    const mfem::Vector& fineMdiag,
-    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
-{
-    CoarseM_->Finalize(0);
-    return std::move(CoarseM_);
-}
-
-void CoefficientMBuilder::SetCoefficient(const mfem::Vector& agg_weight_inverse)
-{
-    agg_weights_.SetSize(agg_weight_inverse.Size());
-    for (int i = 0; i < agg_weights_.Size(); ++i)
+    mfem::Array<int> edofs;
+    auto CoarseM = make_unique<mfem::SparseMatrix>(Agg_cdof_edge_ref_.Width());
+    for (int Agg = 0; Agg < Agg_cdof_edge_ref_.Height(); Agg++)
     {
-        agg_weights_[i] = 1.0 / agg_weight_inverse[i];
+        GetTableRow(Agg_cdof_edge_ref_, Agg, edofs);
+        const double scale = (agg_weights_.Size() > 0) ? agg_weights_(Agg) : 1.0;
+        if (scale == 1.0)
+        {
+            CoarseM->AddSubMatrix(edofs, edofs, CM_el_[Agg]);
+        }
+        else
+        {
+            mfem::DenseMatrix agg_M = CM_el_[Agg];
+            agg_M *= scale;
+            CoarseM->AddSubMatrix(edofs, edofs, agg_M);
+        }
     }
+    CoarseM->Finalize();
+    return CoarseM;
 }
 
 /// this method may be unnecessary, could just use GetTableRow()
@@ -279,6 +231,8 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     // in future MFEM releases when SparseMatrix::GetSubMatrix is const-correct,
     // the next line will no longer be necessary
     mfem::SparseMatrix& Pedges_noconst = const_cast<mfem::SparseMatrix&>(Pedges);
+
+    face_cdof_ref_.MakeRef(face_cdof);
 
     // F_F block
     const int num_faces = topology_.Agg_face_.Width();
@@ -364,16 +318,8 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
 
 /// this shares a lot of code with BuildComponents, but I'm not sure it makes
 /// sense to combine them in any way.
-std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
-    const mfem::Vector& fineMdiag,
-    const mfem::SparseMatrix& Pedges, const mfem::SparseMatrix& face_cdof)
+std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM() const
 {
-    // build the components, if necessary
-    if (!components_built_)
-    {
-        BuildComponents(fineMdiag, Pedges, face_cdof);
-    }
-
     const int num_aggs = topology_.Agg_face_.Height();
     const int num_faces = topology_.Agg_face_.Width();
 
@@ -401,7 +347,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
             face_weight = 2.0 / (1.0 / agg_weights_[neighbor_aggs[0]] +
                                  1.0 / agg_weights_[neighbor_aggs[1]]);
         }
-        GetCoarseFaceDofs(face_cdof, face, coarse_face_dofs);
+        GetCoarseFaceDofs(face_cdof_ref_, face, coarse_face_dofs);
         AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_face_dofs,
                            comp_F_F_[face], face_weight);
     }
@@ -418,11 +364,11 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
         for (int f = 0; f < local_faces.Size(); ++f)
         {
             int face = local_faces[f];
-            GetCoarseFaceDofs(face_cdof, face, coarse_face_dofs);
+            GetCoarseFaceDofs(face_cdof_ref_, face, coarse_face_dofs);
             for (int fprime = f; fprime < local_faces.Size(); ++fprime)
             {
                 int faceprime = local_faces[fprime];
-                GetCoarseFaceDofs(face_cdof, faceprime, coarse_face_dofs_prime);
+                GetCoarseFaceDofs(face_cdof_ref_, faceprime, coarse_face_dofs_prime);
                 AddScaledSubMatrix(*CoarseM, coarse_face_dofs,
                                    coarse_face_dofs_prime, comp_EF_EF_[counter],
                                    agg_weight);
@@ -451,7 +397,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
         for (int af = 0; af < local_faces.Size(); ++af)
         {
             int face = local_faces[af];
-            GetCoarseFaceDofs(face_cdof, face, coarse_face_dofs);
+            GetCoarseFaceDofs(face_cdof_ref_, face, coarse_face_dofs);
             AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_agg_dofs,
                                comp_EF_E_[counter], agg_weight);
             mfem::DenseMatrix E_EF(comp_EF_E_[counter], 't');
@@ -463,6 +409,79 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetCoarseM(
 
     CoarseM->Finalize(0);
     return std::move(CoarseM);
+}
+
+FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& Agg_edgedof)
+    : Agg_edgedof_(Agg_edgedof)
+{
+    const mfem::SparseMatrix edgedof_Agg = smoothg::Transpose(Agg_edgedof);
+    const int nAggs = Agg_edgedof_.Height();
+    M_el_.resize(nAggs);
+
+    mfem::Array<int> edofs;
+    for (int Agg = 0; Agg < nAggs; Agg++)
+    {
+        GetTableRow(Agg_edgedof, Agg, edofs);
+        mfem::Vector& agg_M = M_el_[Agg];
+        agg_M.SetSize(edofs.Size());
+        for (int i = 0; i < agg_M.Size(); i++)
+        {
+            const int edof = edofs[i];
+            const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
+            agg_M[i] = ratio / edge_weight[edof];
+        }
+    }
+}
+
+FineMBuilder::FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
+                           const mfem::SparseMatrix& Agg_edgedof)
+    : Agg_edgedof_(Agg_edgedof)
+{
+    const int nAggs = Agg_edgedof_.Height();
+    M_el_.resize(nAggs);
+
+    for (int Agg = 0; Agg < nAggs; Agg++)
+    {
+        const mfem::Vector& Agg_edge_weight = local_edge_weight[Agg];
+        mfem::Vector& agg_M = M_el_[Agg];
+        agg_M.SetSize(Agg_edge_weight.Size());
+        for (int i = 0; i < agg_M.Size(); i++)
+        {
+            agg_M[i] = 1.0 / Agg_edge_weight[i];
+        }
+    }
+}
+
+// TODO: the implementation is similar to ElementMBuilder, may combine the two
+std::unique_ptr<mfem::SparseMatrix> FineMBuilder::BuildAssembledM() const
+{
+    mfem::Array<int> edofs;
+    auto M = make_unique<mfem::SparseMatrix>(Agg_edgedof_.Width());
+    for (int Agg = 0; Agg < Agg_edgedof_.Height(); Agg++)
+    {
+        GetTableRow(Agg_edgedof_, Agg, edofs);
+        const mfem::Vector& agg_M = M_el_[Agg];
+
+        // Assume unit weight if agg_weights_ is empty
+        const double scale = (agg_weights_.Size() > 0) ? agg_weights_(Agg) : 1.0;
+        if (scale == 1.0)
+        {
+            for (int i = 0; i < agg_M.Size(); i++)
+            {
+                M->Add(edofs[i], edofs[i], agg_M[i]);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < agg_M.Size(); i++)
+            {
+                const double M_ii = agg_M[i] * scale;
+                M->Add(edofs[i], edofs[i], M_ii);
+            }
+        }
+    }
+    M->Finalize();
+    return M;
 }
 
 Agg_cdof_edge_Builder::Agg_cdof_edge_Builder(std::vector<mfem::DenseMatrix>& edge_traces,

@@ -37,7 +37,7 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                                                      bool dual_target,
                                                      bool scaled_dual,
                                                      bool energy_dual,
-                                                     CoarseMBuilder& coarse_m_builder)
+                                                     bool coarse_components)
     : Mixed_GL_Coarsener(mgL, std::move(gt)),
       is_hybridization_used_(false),
       spectral_tol_(spectral_tol),
@@ -45,7 +45,7 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
       dual_target_(dual_target),
       scaled_dual_(scaled_dual),
       energy_dual_(energy_dual),
-      coarse_m_builder_(coarse_m_builder)
+      coarse_components_(coarse_components)
 {
 }
 
@@ -57,19 +57,25 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LMGST localtargets(spectral_tol_, max_evecs_per_agg_, dual_target_,
-                       scaled_dual_, energy_dual_, mgL_.getWeight(),
-                       mgL_.getD(), mgL_.getW(), *graph_topology_);
+                       scaled_dual_, energy_dual_, mgL_.GetM(),
+                       mgL_.GetD(), mgL_.GetW(), *graph_topology_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
+    if (coarse_components_)
+    {
+        coarse_m_builder_ = make_unique<CoefficientMBuilder>(*graph_topology_);
+    }
+    else
+    {
+        coarse_m_builder_ = make_unique<ElementMBuilder>();
+    }
 
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
-                                       coarse_m_builder_);
+                                       *coarse_m_builder_);
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
-    CoarseM_ = graph_coarsen_->GetCoarseM();
-
     CoarseW_ = graph_coarsen_->GetCoarseW();
 }
 

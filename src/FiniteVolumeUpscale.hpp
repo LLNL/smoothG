@@ -44,8 +44,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
-       @param weight edge weights. if not provided, set to all ones
+       @param weight edge weights.
+       @param partitioning partition of vertices
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
@@ -57,7 +57,7 @@ public:
     FiniteVolumeUpscale(MPI_Comm comm,
                         const mfem::SparseMatrix& vertex_edge,
                         const mfem::Vector& weight,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
@@ -71,8 +71,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
-       @param weight edge weights. if not provided, set to all ones
+       @param weight edge weights.
+       @param partitioning partition of vertices
        @param w_block W block matrix
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
@@ -86,7 +86,7 @@ public:
                         const mfem::SparseMatrix& vertex_edge,
                         const mfem::Vector& weight,
                         const mfem::SparseMatrix& w_block,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
@@ -95,11 +95,12 @@ public:
                         bool energy_dual = false, bool hybridization = false,
                         const SAAMGeParam* saamge_param = nullptr);
 
-    void MakeFineSolver(const mfem::Array<int>& marker) const;
+    void MakeFineSolver();
 
 private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
+    const mfem::Array<int>& ess_attr_;
     //std::vector<double> ess_data;
 };
 

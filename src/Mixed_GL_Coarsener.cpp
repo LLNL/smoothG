@@ -40,12 +40,6 @@ const mfem::SparseMatrix& Mixed_GL_Coarsener::get_Psigma() const
     return Psigma_;
 }
 
-const std::vector<mfem::DenseMatrix>& Mixed_GL_Coarsener::get_CM_el() const
-{
-    check_subspace_construction_("CM_el");
-    return CM_el_;
-}
-
 std::unique_ptr<mfem::BlockVector> Mixed_GL_Coarsener::restrict_rhs(
     const mfem::BlockVector& rhs) const
 {
@@ -102,7 +96,7 @@ const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_face_facedof_table() con
 
 MixedMatrix Mixed_GL_Coarsener::GetCoarse()
 {
-    return MixedMatrix(GetCoarseM(), GetCoarseD(), GetCoarseW(), get_face_dof_truedof_table());
+    return MixedMatrix(GetCoarseMBuilder(), GetCoarseD(), GetCoarseW(), get_face_dof_truedof_table());
 }
 
 const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() const

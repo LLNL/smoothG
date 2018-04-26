@@ -106,17 +106,8 @@ struct SAAMGeParam
 class HybridSolver : public MixedLaplacianSolver
 {
 public:
-    /// Construct local mass matrix for the fine level edge space
-    static void BuildFineLevelLocalMassMatrix(
-        const mfem::SparseMatrix& vertex_edge,
-        const mfem::SparseMatrix& M,
-        std::vector<mfem::Vector>& M_el);
-
-public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
-
-
 
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the fine level
@@ -152,7 +143,6 @@ public:
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const Mixed_GL_Coarsener& mgLc,
-                 const ElementMBuilder& mbuilder,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
@@ -193,6 +183,18 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
+    /**
+       @brief Update weights of local M matrices on aggregates
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+
+       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
+    */
+    void UpdateAggScaling(const mfem::Vector& agg_weights_inverse);
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;
@@ -225,6 +227,9 @@ protected:
 
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();
+
+    // Assemble parallel hybridized system and build a solver for it
+    void BuildParallelSystemAndSolver();
 
 private:
     MPI_Comm comm_;
@@ -274,6 +279,8 @@ private:
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
+
+    mfem::Vector agg_weights_;
 
     const SAAMGeParam* saamge_param_;
 #if SMOOTHG_USE_SAAMGE
