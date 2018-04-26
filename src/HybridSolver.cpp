@@ -182,12 +182,10 @@ SparseMatrix HybridSolver::MakeEdgeDofMultiplier(const MixedMatrix& mgl,
                         num_edge_dofs_, num_multiplier_dofs_);
 }
 
-SparseMatrix HybridSolver::MakeLocalC(
-        int agg,
-        const MixedMatrix& mgl,
-        const std::vector<int>& j_multiplier_edgedof,
-        std::vector<int>& edge_map,
-        std::vector<bool>& edge_marker) const
+SparseMatrix HybridSolver::MakeLocalC(int agg, const MixedMatrix& mgl,
+                                      const std::vector<int>& j_multiplier_edgedof,
+                                      std::vector<int>& edge_map,
+                                      std::vector<bool>& edge_marker) const
 {
     const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
 
@@ -213,7 +211,7 @@ SparseMatrix HybridSolver::MakeLocalC(
         Cloc_j[i] = edgedof_local_id;
 
         if (edgedof_IsOwned.RowSize(edgedof_global_id) &&
-                edge_marker[edgedof_global_id])
+            edge_marker[edgedof_global_id])
         {
             edge_marker[edgedof_global_id] = false;
             Cloc_data[i] = 1.;

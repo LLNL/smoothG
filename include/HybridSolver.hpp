@@ -146,9 +146,9 @@ private:
                                        const GraphCoarsen& coarsener) const;
 
     SparseMatrix MakeLocalC(int agg, const MixedMatrix& mgl,
-            const std::vector<int>& j_multiplier_edgedof,
-            std::vector<int>& edge_map,
-            std::vector<bool>& edge_marker) const;
+                            const std::vector<int>& j_multiplier_edgedof,
+                            std::vector<int>& edge_map,
+                            std::vector<bool>& edge_marker) const;
 
     void InitSolver(SparseMatrix local_hybrid);
 
