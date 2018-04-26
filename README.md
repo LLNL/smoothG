@@ -1,4 +1,4 @@
-smoothG               {#mainpage}
+smoothG [![Build Status](https://travis-ci.org/gelever/smoothG.svg?branch=no-mfem)](https://travis-ci.org/gelever/smoothG)
 =================
 
 <!-- BHEADER ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -16,13 +16,13 @@ smoothG               {#mainpage}
  +
  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ EHEADER -->
 
-![](smoothg_logo.png)
+!["smoothG logo](doc/smoothg_logo.png)
 
 Mixed graph-Laplacian upscaling and solvers.
 
-For installation instructions, see [INSTALL.md](@ref INSTALL)
+For installation instructions, see [INSTALL.md](INSTALL.md).
 
-For a tutorial walkthrough of the example code, see [EXAMPLE.md](@ref EXAMPLE)
+For a tutorial walkthrough of the example code, see [EXAMPLE.md](doc/EXAMPLE.md).
 
 This project is intended to take a graph and build a smaller (upscaled)
 graph that is representative of the original in some way. We represent
@@ -41,3 +41,8 @@ This code has contributions from:
 - Stephan Gelever (gelever1@llnl.gov)
 - Chak Shing Lee (cslee@llnl.gov)
 - Colin Ponce (ponce11@llnl.gov)
+
+Copyright (c) 2018, Lawrence Livermore National Security, LLC.
+This work was performed under the auspices of the U.S. Department of Energy by
+Lawrence Livermore National Laboratory under Contract DE-AC52-07NA27344.
+LLNL-CODE-745247.
