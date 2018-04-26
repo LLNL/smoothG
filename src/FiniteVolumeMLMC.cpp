@@ -131,7 +131,9 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        ((HybridSolver&) (*fine_solver_)).UpdateAggScaling(coeff);
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(fine_solver_.get());
+        assert(hybrid_solver);
+        hybrid_solver->UpdateAggScaling(coeff);
     }
 }
 
@@ -144,7 +146,9 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        ((HybridSolver&) (*coarse_solver_)).UpdateAggScaling(coeff);
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(coarse_solver_.get());
+        assert(hybrid_solver);
+        hybrid_solver->UpdateAggScaling(coeff);
     }
 }
 
