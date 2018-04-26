@@ -38,21 +38,28 @@ double NormalDistribution::Sample()
 
 SimpleSampler::SimpleSampler(int fine_size, int coarse_size)
     :
-    fine_size_(fine_size), coarse_size_(coarse_size)
+    fine_size_(fine_size), coarse_size_(coarse_size), sample_(-1)
 {
     fine_.SetSize(fine_size_);
     coarse_.SetSize(coarse_size_);
 }
 
-mfem::Vector& SimpleSampler::GetFineCoefficient(int sample)
+void SimpleSampler::NewSample()
 {
-    fine_ = (1.0 + sample);
+    sample_++;
+}
+
+mfem::Vector& SimpleSampler::GetFineCoefficient()
+{
+    MFEM_ASSERT(sample_ >= 0, "SimpleSampler in wrong state (call NewSample() first)!");
+    fine_ = (1.0 + sample_);
     return fine_;
 }
 
-mfem::Vector& SimpleSampler::GetCoarseCoefficient(int sample)
+mfem::Vector& SimpleSampler::GetCoarseCoefficient()
 {
-    coarse_ = (1.0 + sample);
+    MFEM_ASSERT(sample_ >= 0, "SimpleSampler in wrong state (call NewSample() first)!");
+    coarse_ = (1.0 + sample_);
     return coarse_;
 }
 
@@ -86,7 +93,7 @@ LogPDESampler::~LogPDESampler()
 }
 
 /// @todo cell_volume should be variable rather than constant
-void LogPDESampler::Sample()
+void LogPDESampler::NewSample()
 {
     current_state_ = FINE_SAMPLE;
 
@@ -99,7 +106,7 @@ void LogPDESampler::Sample()
     }
 }
 
-void LogPDESampler::CoarseSample()
+void LogPDESampler::NewCoarseSample()
 {
     current_state_ = COARSE_SAMPLE;
     MFEM_ASSERT(false, "Not implemented!");
@@ -108,7 +115,7 @@ void LogPDESampler::CoarseSample()
 mfem::Vector& LogPDESampler::GetFineCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
-                "LogPDESampler object in wrong state (call Sample() first)!");
+                "LogPDESampler object in wrong state (call NewSample() first)!");
 
     fvupscale_.SolveFine(rhs_fine_, coefficient_fine_);
     return coefficient_fine_;
@@ -118,7 +125,7 @@ mfem::Vector& LogPDESampler::GetCoarseCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
                 current_state_ == COARSE_SAMPLE,
-                "LogPDESampler object in wrong state (call Sample() first)!");
+                "LogPDESampler object in wrong state (call NewSample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
         fvupscale_.Restrict(rhs_fine_, rhs_coarse_);

@@ -299,7 +299,7 @@ int main(int argc, char* argv[])
     for (int sample = 0; sample < num_samples; ++sample)
     {
         double count = static_cast<double>(sample) + 1.0;
-        pdesampler.Sample();
+        pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficient();
         auto sol_upscaled = fvupscale.Interpolate(sol_coarse);

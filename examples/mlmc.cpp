@@ -286,12 +286,14 @@ int main(int argc, char* argv[])
         if (myid == 0)
             std::cout << "---\nSample " << sample << "\n---" << std::endl;
 
-        auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
-        fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
+        sampler.NewSample();
+
+        auto coarse_coefficient = sampler.GetCoarseCoefficient();
+        fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = fvupscale->Solve(rhs_fine);
         fvupscale->ShowCoarseSolveInfo();
 
-        auto fine_coefficient = sampler.GetFineCoefficient(sample);
+        auto fine_coefficient = sampler.GetFineCoefficient();
         fvupscale->RescaleFineCoefficient(fine_coefficient);
         auto sol_fine = fvupscale->SolveFine(rhs_fine);
         fvupscale->ShowFineSolveInfo();

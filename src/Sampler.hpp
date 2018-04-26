@@ -40,21 +40,49 @@ private:
 };
 
 /**
+   Abstract class for drawing permeability samples.
+
+   @todo should this be called TwoLevelSampler?
+*/
+class Sampler
+{
+public:
+    virtual ~Sampler() {}
+
+    /**
+       Pick a new sample; after calling this, GetFineCoefficient()
+       and GetCoarseCoefficient will return (versions of) the same
+       coefficient.
+    */
+    virtual void NewSample() {}
+
+    /// return current sample realized on fine mesh
+    virtual mfem::Vector& GetFineCoefficient() = 0;
+
+    /// return current sample realized on coarse mesh
+    virtual mfem::Vector& GetCoarseCoefficient() = 0;
+};
+
+/**
    Simply returns a constant coefficient, for testing some
    sampling and Monte Carlo stuff.
 */
-class SimpleSampler
+class SimpleSampler : public Sampler
 {
 public:
     SimpleSampler(int fine_size, int coarse_size);
 
-    mfem::Vector& GetFineCoefficient(int sample);
+    void NewSample();
 
-    mfem::Vector& GetCoarseCoefficient(int sample);
+    mfem::Vector& GetFineCoefficient();
+
+    mfem::Vector& GetCoarseCoefficient();
 
 private:
     int fine_size_;
     int coarse_size_;
+
+    int sample_;
 
     mfem::Vector fine_;
     mfem::Vector coarse_;
@@ -77,10 +105,10 @@ public:
     ~LogPDESampler();
 
     /// Draw white noise on fine level
-    void Sample();
+    void NewSample();
 
     /// Draw white noise on coarse level
-    void CoarseSample();
+    void NewCoarseSample();
 
     /// Solve PDE with white-noise RHS to find fine coefficient
     mfem::Vector& GetFineCoefficient();
