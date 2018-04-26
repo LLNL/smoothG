@@ -280,6 +280,7 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
     const int num_fine_vertices = vertex_edge.Height();
+    const int num_fine_edges = vertex_edge.Width();
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
     unique_ptr<TwoLevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
@@ -310,7 +311,7 @@ int main(int argc, char* argv[])
         sampler->NewSample();
 
         auto coarse_coefficient = sampler->GetCoarseCoefficient();
-        fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
+        fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = fvupscale->Solve(rhs_fine);
         fvupscale->ShowCoarseSolveInfo();
 
