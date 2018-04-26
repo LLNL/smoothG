@@ -184,6 +184,11 @@ int main(int argc, char* argv[])
 
         double error = CompareError(comm, sol.GetBlock(1), local_truesol);
 
+        if (error > equality_tolerance)
+        {
+            some_solver_fails = true;
+        }
+
         if (myid == 0)
         {
             int iter = solver->GetNumIterations();
@@ -194,13 +199,6 @@ int main(int argc, char* argv[])
             std::cout << name << " converged in " << iter << " iterations.\n";
             std::cout << "Error norm: " << error << "\n";
             sol.GetBlock(1).Print("Sol:");
-
-            if (error > equality_tolerance)
-            {
-                some_solver_fails = true;
-                std::cout << name << " Failed!\n";
-            }
-
         }
     }
 

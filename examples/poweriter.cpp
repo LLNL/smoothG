@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     double coarse_factor = 80;
     int max_evects = 4;
     double spect_tol = 1.0;
-    bool hybridization = true;
+    bool hybridization = false;
 
     // Solve Parameters
     int max_iter = 800;
