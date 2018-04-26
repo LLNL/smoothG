@@ -202,7 +202,7 @@ PDESampler::PDESampler(const FiniteVolumeUpscale& fvupscale,
         nu_parameter = 0.5;
     double ddim = static_cast<double>(dimension);
     scalar_g_ = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
-        std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+                std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 }
 
 PDESampler::~PDESampler()
@@ -219,7 +219,7 @@ void PDESampler::Sample()
     for (int i = 0; i < fine_vector_size_; ++i)
     {
         rhs_fine_(i) = scalar_g_ * std::sqrt(cell_volume_) *
-            normal_distribution_.Sample();
+                       normal_distribution_.Sample();
     }
 }
 

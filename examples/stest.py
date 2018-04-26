@@ -361,6 +361,11 @@ def make_tests():
           "finest-u-error": 0.14767829457535478,
           "operator-complexity": 1.1666666666666667}]
 
+    tests["mlmc-sanity"] = \
+        [["./mlmc",
+          "--perm", spe10_perm_file],
+         {"finest-p-error": 0.10754186878360708}]
+
     tests["timestep"] = \
         [["./timestep",
           "--total-time", "100.0",
