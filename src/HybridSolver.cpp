@@ -854,8 +854,9 @@ void HybridSolver::BuildParallelSystemAndSolver()
         }
         else
         {
-            prec_ = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
-            static_cast<mfem::HypreBoomerAMG&>(*prec_).SetPrintLevel(0);
+            auto temp_prec = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
+            temp_prec->SetPrintLevel(0);
+            prec_ = std::move(temp_prec);
         }
         cg_->SetPreconditioner(*prec_);
     }
