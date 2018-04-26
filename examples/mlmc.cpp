@@ -226,12 +226,16 @@ int main(int argc, char* argv[])
             a.Assemble();
             a.Finalize();
             a.SpMat().GetDiag(weight);
+            for (int i = 0; i < weight.Size(); ++i)
+            {
+                weight[i] = 1.0 / weight[i];
+            }
         }
         else
         {
             local_weight.resize(pmesh->GetNE());
             mfem::DenseMatrix M_el_i;
-            for (unsigned int i = 0; i < local_weight.size(); i++)
+            for (int i = 0; i < pmesh->GetNE(); i++)
             {
                 a.ComputeElementMatrix(i, M_el_i);
                 mfem::Vector& local_weight_i = local_weight[i];
@@ -242,11 +246,6 @@ int main(int argc, char* argv[])
                 }
             }
         }
-    }
-
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        weight[i] = 1.0 / weight[i];
     }
 
     mfem::L2_FECollection ufec(0, nDimensions);
