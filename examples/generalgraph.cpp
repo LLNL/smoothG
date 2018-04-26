@@ -250,9 +250,9 @@ void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, in
 
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 {
-    auto& pM = mixed_laplacian.get_pM();
-    auto& pD = mixed_laplacian.get_pD();
-    auto* pW = mixed_laplacian.get_pW();
+    auto& pM = mixed_laplacian.GetParallelM();
+    auto& pD = mixed_laplacian.GetParallelD();
+    auto* pW = mixed_laplacian.GetParallelW();
 
     unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
 

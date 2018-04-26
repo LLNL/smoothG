@@ -120,7 +120,7 @@ public:
 
        Useful for rescaling coefficients without re-coarsening.
     */
-    void setWeight(mfem::SparseMatrix& M_in)
+    void SetM(mfem::SparseMatrix& M_in)
     {
         M_ = make_unique<mfem::SparseMatrix>();
         M_->Swap(M_in);
@@ -129,7 +129,7 @@ public:
     /**
        @brief Get a const reference to the edge_vertex matrix D.
     */
-    const mfem::SparseMatrix& getD() const
+    const mfem::SparseMatrix& GetD() const
     {
         return *D_;
     }
@@ -137,7 +137,7 @@ public:
     /**
        @brief Get a reference to the edge_vertex matrix D.
     */
-    mfem::SparseMatrix& getD()
+    mfem::SparseMatrix& GetD()
     {
         return *D_;
     }
@@ -145,7 +145,7 @@ public:
     /**
        @brief Get a const reference to the matrix W.
     */
-    const mfem::SparseMatrix* getW() const
+    const mfem::SparseMatrix* GetW() const
     {
         return W_.get();
     }
@@ -153,7 +153,7 @@ public:
     /**
        Set the matrix W.
     */
-    void setW(mfem::SparseMatrix W_in)
+    void SetW(mfem::SparseMatrix W_in)
     {
         W_ = make_unique<mfem::SparseMatrix>();
         W_->Swap(W_in);
@@ -161,21 +161,21 @@ public:
 
     /** Get the number of vertex dofs in this matrix.
      */
-    int get_num_vertex_dofs() const
+    int GetNumVertexDofs() const
     {
         return D_->Height();
     }
 
     /** Get the number of edge dofs in this matrix.
      */
-    int get_num_edge_dofs() const
+    int GetNumEdgeDofs() const
     {
         return D_->Width();
     }
 
     /** Get the total number of dofs in this matrix.
      */
-    int get_num_total_dofs() const
+    int GetNumTotalDofs() const
     {
         return D_->Width() + D_->Height();
     }
@@ -199,11 +199,11 @@ public:
         int total = 0;
 
         if (M_)
-            total += get_pM().NNZ();
+            total += GetParallelM().NNZ();
         if (D_)
-            total += 2 * get_pD().NNZ();
+            total += 2 * GetParallelD().NNZ();
         if (W_)
-            total += get_pW()->NNZ();
+            total += GetParallelW()->NNZ();
 
         return total;
     }
@@ -216,7 +216,7 @@ public:
      * MixedMatrix must stay alive as long as this BlockVector is
      * alive or there will be undefined behavior.
      */
-    std::unique_ptr<mfem::BlockVector> subvecs_to_blockvector(
+    std::unique_ptr<mfem::BlockVector> SubVectorsToBlockVector(
         const mfem::Vector& vec_u, const mfem::Vector& vec_p) const;
 
     /** @brief Get the Array of offsets representing the block structure of
@@ -227,25 +227,25 @@ public:
         starting index of the second block, and the third element is
         the total number of rows in the matrix.
     */
-    mfem::Array<int>& get_blockoffsets() const;
-    mfem::Array<int>& get_blockTrueOffsets() const;
+    mfem::Array<int>& GetBlockOffsets() const;
+    mfem::Array<int>& GetBlockTrueOffsets() const;
 
     /// return edge dof_truedof relation
-    const mfem::HypreParMatrix& get_edge_d_td() const
+    const mfem::HypreParMatrix& GetEdgeDofToTrueDof() const
     {
         assert(edge_d_td_);
         return *edge_d_td_;
     }
 
     /// return edge dof_truedof relation
-    const mfem::HypreParMatrix& get_edge_td_d() const
+    const mfem::HypreParMatrix& GetEdgeTrueDofToDof() const
     {
         assert(edge_td_d_);
         return *edge_td_d_;
     }
 
-    /// return the row starts (parallel partitioning) of \f$ D \f$
-    mfem::Array<HYPRE_Int>& get_Drow_start() const
+    /// return the row starts (parallel row partitioning) of \f$ D \f$
+    mfem::Array<HYPRE_Int>& GetDrowStart() const
     {
         if (!Drow_start_)
             Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
@@ -253,8 +253,8 @@ public:
         return *Drow_start_;
     }
 
-    /// get the edge weight matrix
-    mfem::HypreParMatrix& get_pM(bool recompute = false) const
+    /// get the parallel edge mass matrix
+    mfem::HypreParMatrix& GetParallelM(bool recompute = false) const
     {
         if (!pM_ || recompute)
         {
@@ -271,8 +271,8 @@ public:
         return *pM_;
     }
 
-    /// get the signed vertex_edge (divergence) matrix
-    mfem::HypreParMatrix& get_pD(bool recompute = false) const
+    /// get the parallel signed vertex_edge (divergence) matrix
+    mfem::HypreParMatrix& GetParallelD(bool recompute = false) const
     {
         if (!pD_ || recompute)
         {
@@ -284,8 +284,8 @@ public:
         return *pD_;
     }
 
-    /// get the W matrix
-    mfem::HypreParMatrix* get_pW() const
+    /// get the parallel W matrix
+    mfem::HypreParMatrix* GetParallelW() const
     {
         if (W_ && !pW_)
         {

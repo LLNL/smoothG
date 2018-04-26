@@ -127,21 +127,21 @@ MinresBlockSolver::MinresBlockSolver(
 
 MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
     :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    MixedLaplacianSolver(mgL.GetBlockOffsets()),
     minres_(comm),
     comm_(comm),
     use_W_(mgL.CheckW()),
-    operator_(mgL.get_blockTrueOffsets()),
-    prec_(mgL.get_blockTrueOffsets()),
+    operator_(mgL.GetBlockTrueOffsets()),
+    prec_(mgL.GetBlockTrueOffsets()),
     M_(mgL.GetM()),
-    D_(mgL.getD())
+    D_(mgL.GetD())
 {
     MPI_Comm_rank(comm_, &myid_);
 
-    mfem::Array<int>& D_row_start(mgL.get_Drow_start());
+    mfem::Array<int>& D_row_start(mgL.GetDrowStart());
 
-    const mfem::HypreParMatrix& edge_d_td(mgL.get_edge_d_td());
-    const mfem::HypreParMatrix& edge_td_d(mgL.get_edge_td_d());
+    const mfem::HypreParMatrix& edge_d_td(mgL.GetEdgeDofToTrueDof());
+    const mfem::HypreParMatrix& edge_td_d(mgL.GetEdgeTrueDofToDof());
 
     mfem::HypreParMatrix M(comm, edge_d_td.M(),
                            edge_d_td.GetRowStarts(), &M_);
@@ -159,7 +159,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
         hD_.reset(edge_d_td.LeftDiagMult(D_, D_row_start));
         hDt_.reset(hD_->Transpose());
 
-        const mfem::SparseMatrix* W = mgL.getW();
+        const mfem::SparseMatrix* W = mgL.GetW();
         assert(W);
         mfem::SparseMatrix W_copy(*W);
 
@@ -244,8 +244,8 @@ MinresBlockSolverFalse::MinresBlockSolverFalse(
     :
     MinresBlockSolver(comm, mgL),
     mixed_matrix_(mgL),
-    true_rhs_(mgL.get_blockTrueOffsets()),
-    true_sol_(mgL.get_blockTrueOffsets())
+    true_rhs_(mgL.GetBlockTrueOffsets()),
+    true_sol_(mgL.GetBlockTrueOffsets())
 {
 }
 
@@ -260,7 +260,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     chrono.Clear();
     chrono.Start();
 
-    const mfem::HypreParMatrix& edgedof_d_td = mixed_matrix_.get_edge_d_td();
+    const mfem::HypreParMatrix& edgedof_d_td = mixed_matrix_.GetEdgeDofToTrueDof();
 
     edgedof_d_td.MultTranspose(rhs.GetBlock(0), true_rhs_.GetBlock(0));
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);

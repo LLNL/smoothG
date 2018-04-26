@@ -36,10 +36,10 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    MixedLaplacianSolver(mgL.GetBlockOffsets()),
     comm_(comm),
-    D_(mgL.getD()),
-    W_(mgL.getW()),
+    D_(mgL.GetD()),
+    W_(mgL.GetW()),
     use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
@@ -64,7 +64,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
     Init(edge_edgedof, mbuilder->GetElementMatrices(),
-         mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+         mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
@@ -75,10 +75,10 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    MixedLaplacianSolver(mgL.GetBlockOffsets()),
     comm_(comm),
-    D_(mgL.getD()),
-    W_(mgL.getW()),
+    D_(mgL.GetD()),
+    W_(mgL.GetW()),
     use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
@@ -99,7 +99,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
     Init(face_edgedof, mbuilder->GetElementMatrices(),
-         mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+         mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::~HybridSolver()

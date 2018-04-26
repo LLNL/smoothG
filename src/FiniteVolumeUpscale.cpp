@@ -61,7 +61,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
-    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
+    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -135,7 +135,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
-    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
+    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -187,7 +187,7 @@ void FiniteVolumeUpscale::MakeFineSolver()
         else // L2-H1 block diagonal preconditioner
         {
             mfem::SparseMatrix& Mref = GetFineMatrix().GetM();
-            mfem::SparseMatrix& Dref = GetFineMatrix().getD();
+            mfem::SparseMatrix& Dref = GetFineMatrix().GetD();
             const bool w_exists = GetFineMatrix().CheckW();
 
             for (int mm = 0; mm < marker.Size(); ++mm)

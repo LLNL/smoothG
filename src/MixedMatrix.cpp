@@ -162,17 +162,16 @@ void MixedMatrix::GenerateRowStarts()
     GenerateOffsets(comm, nvertices, *Drow_start_);
 }
 
-unique_ptr<mfem::BlockVector> MixedMatrix::subvecs_to_blockvector(
+unique_ptr<mfem::BlockVector> MixedMatrix::SubVectorsToBlockVector(
     const mfem::Vector& vec_u, const mfem::Vector& vec_p) const
 {
-    auto blockvec = make_unique<mfem::BlockVector>(get_blockoffsets());
+    auto blockvec = make_unique<mfem::BlockVector>(GetBlockOffsets());
     blockvec->GetBlock(0) = vec_u;
     blockvec->GetBlock(1) = vec_p;
     return blockvec;
 }
 
-// overload to be available when parallel = false
-mfem::Array<int>& MixedMatrix::get_blockoffsets() const
+mfem::Array<int>& MixedMatrix::GetBlockOffsets() const
 {
     if (!blockOffsets_)
     {
@@ -185,7 +184,7 @@ mfem::Array<int>& MixedMatrix::get_blockoffsets() const
     return *blockOffsets_;
 }
 
-mfem::Array<int>& MixedMatrix::get_blockTrueOffsets() const
+mfem::Array<int>& MixedMatrix::GetBlockTrueOffsets() const
 {
     if (!blockTrueOffsets_)
     {
@@ -202,7 +201,7 @@ bool MixedMatrix::CheckW() const
 {
     const double zero_tol = 1e-6;
 
-    mfem::HypreParMatrix* W = get_pW();
+    mfem::HypreParMatrix* W = GetParallelW();
 
     return W && MaxNorm(*W) > zero_tol;
 }

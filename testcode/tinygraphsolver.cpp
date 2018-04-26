@@ -134,8 +134,8 @@ int main(int argc, char* argv[])
 
     MixedMatrix mixed_graph_laplacian(vertex_edge, weight, w, edge_d_td);
 
-    mfem::Array<int>& blockOffsets(mixed_graph_laplacian.get_blockoffsets());
-    mfem::BlockVector rhs = *mixed_graph_laplacian.subvecs_to_blockvector(rhs_u_fine, rhs_p_fine);
+    mfem::Array<int>& blockOffsets(mixed_graph_laplacian.GetBlockOffsets());
+    mfem::BlockVector rhs = *mixed_graph_laplacian.SubVectorsToBlockVector(rhs_u_fine, rhs_p_fine);
     mfem::BlockVector sol(blockOffsets);
 
     // setup solvers
