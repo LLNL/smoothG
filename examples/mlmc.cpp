@@ -130,6 +130,9 @@ int main(int argc, char* argv[])
     bool coarse_components = true;
     args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
                    "--no-coarse-components", "Store trace, bubble components of coarse M.");
+    const char* sampler_type = "simple";
+    args.AddOption(&sampler_type, "--sampler-type", "--sampler-type",
+                   "Which sampler to use for coefficient: simple, pde");
     args.Parse();
     if (!args.Good())
     {
@@ -278,7 +281,25 @@ int main(int argc, char* argv[])
 
     const int num_fine_vertices = vertex_edge.Height();
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
-    SimpleSampler sampler(num_fine_vertices, num_aggs);
+    unique_ptr<TwoLevelSampler> sampler;
+    if (std::string(sampler_type) == "simple")
+    {
+        sampler = make_unique<SimpleSampler>(num_fine_vertices, num_aggs);
+    }
+    else if (std::string(sampler_type) == "pde")
+    {
+        const double kappa = 0.01;
+        const int seed = 1;
+        sampler = make_unique<LogPDESampler>(*fvupscale, num_fine_edges, nDimensions,
+                                             spe10problem.CellVolume(nDimensions), kappa, seed);
+    }
+    else
+    {
+        if (myid == 0)
+            std::cerr << "Unrecognized sampler: " << sampler_type << "!" << std::endl;
+        MPI_Finalize();
+        return 1;
+    }
 
     const int num_samples = 3;
     for (int sample = 0; sample < num_samples; ++sample)
@@ -286,14 +307,14 @@ int main(int argc, char* argv[])
         if (myid == 0)
             std::cout << "---\nSample " << sample << "\n---" << std::endl;
 
-        sampler.NewSample();
+        sampler->NewSample();
 
-        auto coarse_coefficient = sampler.GetCoarseCoefficient();
+        auto coarse_coefficient = sampler->GetCoarseCoefficient();
         fvupscale.RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = fvupscale->Solve(rhs_fine);
         fvupscale->ShowCoarseSolveInfo();
 
-        auto fine_coefficient = sampler.GetFineCoefficient();
+        auto fine_coefficient = sampler->GetFineCoefficient();
         fvupscale->RescaleFineCoefficient(fine_coefficient);
         auto sol_fine = fvupscale->SolveFine(rhs_fine);
         fvupscale->ShowFineSolveInfo();

@@ -63,7 +63,7 @@ mfem::Vector& SimpleSampler::GetCoarseCoefficient()
     return coarse_;
 }
 
-LogPDESampler::LogPDESampler(const FiniteVolumeUpscale& fvupscale,
+LogPDESampler::LogPDESampler(const Upscale& fvupscale,
                              int fine_vector_size, int dimension, double cell_volume,
                              double kappa, int seed)
     :

@@ -41,13 +41,11 @@ private:
 
 /**
    Abstract class for drawing permeability samples.
-
-   @todo should this be called TwoLevelSampler?
 */
-class Sampler
+class TwoLevelSampler
 {
 public:
-    virtual ~Sampler() {}
+    virtual ~TwoLevelSampler() {}
 
     /**
        Pick a new sample; after calling this, GetFineCoefficient()
@@ -67,7 +65,7 @@ public:
    Simply returns a constant coefficient, for testing some
    sampling and Monte Carlo stuff.
 */
-class SimpleSampler : public Sampler
+class SimpleSampler : public TwoLevelSampler
 {
 public:
     SimpleSampler(int fine_size, int coarse_size);
@@ -93,13 +91,13 @@ private:
    at some point this class (or its caller?) should
    exponentiate.
 */
-class LogPDESampler
+class LogPDESampler : public TwoLevelSampler
 {
 public:
     /**
        @todo cell_volume should be potentially spatially-varying
     */
-    LogPDESampler(const FiniteVolumeUpscale& fvupscale,
+    LogPDESampler(const Upscale& upscale,
                   int fine_vector_size, int dimension, double cell_volume,
                   double kappa, int seed);
     ~LogPDESampler();
@@ -124,7 +122,7 @@ private:
         COARSE_SAMPLE
     };
 
-    const FiniteVolumeUpscale& fvupscale_;
+    const Upscale& fvupscale_;
     NormalDistribution normal_distribution_;
     int fine_vector_size_;
     double cell_volume_;
