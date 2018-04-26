@@ -134,24 +134,24 @@ public:
     virtual void SetAbsTol(double atol) override;
     ///@}
 
-protected:
+private:
 
+    template <typename T>
     SparseMatrix AssembleHybridSystem(
         const MixedMatrix& mgl,
-        const std::vector<DenseMatrix>& M_el,
-        const std::vector<int>& j_multiplier_edgedof);
-
-    SparseMatrix AssembleHybridSystem(
-        const MixedMatrix& mgl,
-        const std::vector<std::vector<double>>& M_el,
+        const std::vector<T>& M_el,
         const std::vector<int>& j_multiplier_edgedof);
 
     SparseMatrix MakeEdgeDofMultiplier(const MixedMatrix& mgl,
                                        const GraphCoarsen& coarsener) const;
 
+    SparseMatrix MakeLocalC(int agg, const MixedMatrix& mgl,
+            const std::vector<int>& j_multiplier_edgedof,
+            std::vector<int>& edge_map,
+            std::vector<bool>& edge_marker) const;
+
     void InitSolver(SparseMatrix local_hybrid);
 
-private:
     MPI_Comm comm_;
     int myid_;
 

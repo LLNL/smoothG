@@ -182,22 +182,106 @@ SparseMatrix HybridSolver::MakeEdgeDofMultiplier(const MixedMatrix& mgl,
                         num_edge_dofs_, num_multiplier_dofs_);
 }
 
-SparseMatrix HybridSolver::AssembleHybridSystem(
-    const MixedMatrix& mgl,
-    const std::vector<DenseMatrix>& M_el,
-    const std::vector<int>& j_multiplier_edgedof)
+SparseMatrix HybridSolver::MakeLocalC(
+        int agg,
+        const MixedMatrix& mgl,
+        const std::vector<int>& j_multiplier_edgedof,
+        std::vector<int>& edge_map,
+        std::vector<bool>& edge_marker) const
 {
     const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
 
+    std::vector<int> local_edgedof = agg_edgedof_.GetIndices(agg);
+    std::vector<int> local_multiplier = agg_multiplier_.GetIndices(agg);
+
+    const int nlocal_edgedof = local_edgedof.size();
+    const int nlocal_multiplier = local_multiplier.size();
+
+    SetMarker(edge_map, local_edgedof);
+
+    std::vector<int> Cloc_i(nlocal_multiplier + 1);
+    std::iota(std::begin(Cloc_i), std::end(Cloc_i), 0);
+
+    std::vector<int> Cloc_j(nlocal_multiplier);
+    std::vector<double> Cloc_data(nlocal_multiplier);
+
+    for (int i = 0; i < nlocal_multiplier; ++i)
+    {
+        const int edgedof_global_id = j_multiplier_edgedof[local_multiplier[i]];
+        const int edgedof_local_id = edge_map[edgedof_global_id];
+
+        Cloc_j[i] = edgedof_local_id;
+
+        if (edgedof_IsOwned.RowSize(edgedof_global_id) &&
+                edge_marker[edgedof_global_id])
+        {
+            edge_marker[edgedof_global_id] = false;
+            Cloc_data[i] = 1.;
+        }
+        else
+        {
+            Cloc_data[i] = -1.;
+        }
+    }
+
+    ClearMarker(edge_map, local_edgedof);
+
+    return SparseMatrix(std::move(Cloc_i), std::move(Cloc_j), std::move(Cloc_data),
+                        nlocal_multiplier, nlocal_edgedof);
+}
+
+/// Helper function for assembly
+void InvertLocal(const std::vector<double>& elem, std::vector<double>& inverse)
+{
+    int size = elem.size();
+
+    inverse.resize(size);
+
+    for (int i = 0; i < size; ++i)
+    {
+        assert(elem[i] != 0.0);
+
+        inverse[i] = 1.0 / elem[i];
+    }
+}
+
+/// Helper function for assembly
+void InvertLocal(const DenseMatrix& elem, DenseMatrix& inverse)
+{
+    elem.Invert(inverse);
+}
+
+/// Helper function for assembly
+void MultLocal(const std::vector<double>& Minv, const SparseMatrix& DCloc, DenseMatrix& MinvDCT)
+{
+    auto DCT = DCloc.Transpose();
+    DCT.ScaleRows(Minv);
+
+    DCT.ToDense(MinvDCT);
+}
+
+/// Helper function for assembly
+void MultLocal(const DenseMatrix& Minv, const SparseMatrix& DCloc, DenseMatrix& MinvDCT)
+{
+    MinvDCT.SetSize(Minv.Cols(), DCloc.Rows());
+
+    DCloc.MultCT(Minv, MinvDCT);
+}
+
+template <typename T>
+SparseMatrix HybridSolver::AssembleHybridSystem(
+    const MixedMatrix& mgl,
+    const std::vector<T>& M_el,
+    const std::vector<int>& j_multiplier_edgedof)
+{
     const int map_size = std::max(num_edge_dofs_, agg_vertexdof_.Cols());
     std::vector<int> edge_map(map_size, -1);
     std::vector<bool> edge_marker(num_edge_dofs_, true);
 
+    T Mloc_solver;
+
     DenseMatrix Aloc;
-    DenseMatrix DlocT;
-    DenseMatrix Mloc_solver;
-    DenseMatrix ClocT;
-    DenseMatrix CMinvDT;
+    DenseMatrix Wloc;
     DenseMatrix CMDADMC;
     DenseMatrix DMinvCT;
     DenseMatrix hybrid_elem;
@@ -212,54 +296,12 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         std::vector<int> local_multiplier = agg_multiplier_.GetIndices(agg);
 
         const int nlocal_vertexdof = local_vertexdof.size();
-        const int nlocal_edgedof = local_edgedof.size();
         const int nlocal_multiplier = local_multiplier.size();
 
-        auto Dloc = mgl.D_local_.GetSubMatrix(local_vertexdof, local_edgedof,
-                                              edge_map);
+        SparseMatrix Dloc = mgl.D_local_.GetSubMatrix(local_vertexdof, local_edgedof,
+                                                      edge_map);
 
-        Dloc.Transpose().ToDense(DlocT);
-
-        // Build the edge dof global to local map which will be used
-        // later for mapping local multiplier dof to local edge dof
-        SetMarker(edge_map, local_edgedof);
-
-        // Construct the constraint matrix C which enforces the continuity of
-        // the broken edge space
-        ClocT.SetSize(nlocal_edgedof, nlocal_multiplier);
-        ClocT = 0.0;
-
-        std::vector<int> Cloc_i(nlocal_multiplier + 1);
-        std::iota(std::begin(Cloc_i), std::end(Cloc_i), 0);
-
-        std::vector<int> Cloc_j(nlocal_multiplier);
-        std::vector<double> Cloc_data(nlocal_multiplier);
-
-        for (int i = 0; i < nlocal_multiplier; ++i)
-        {
-            const int edgedof_global_id = j_multiplier_edgedof[local_multiplier[i]];
-            const int edgedof_local_id = edge_map[edgedof_global_id];
-
-            Cloc_j[i] = edgedof_local_id;
-
-            if (edgedof_IsOwned.RowSize(edgedof_global_id) &&
-                edge_marker[edgedof_global_id])
-            {
-                edge_marker[edgedof_global_id] = false;
-                ClocT(edgedof_local_id, i) = 1.;
-                Cloc_data[i] = 1.;
-            }
-            else
-            {
-                ClocT(edgedof_local_id, i) = -1.;
-                Cloc_data[i] = -1.;
-            }
-        }
-
-        SparseMatrix Cloc(std::move(Cloc_i), std::move(Cloc_j), std::move(Cloc_data),
-                          nlocal_multiplier, nlocal_edgedof);
-
-        ClearMarker(edge_map, local_edgedof);
+        SparseMatrix Cloc = MakeLocalC(agg, mgl, j_multiplier_edgedof, edge_map, edge_marker);
 
         // Compute:
         //      CMinvCT = Cloc * MinvCT
@@ -268,171 +310,42 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         //      CMinvDTAinvDMinvCT = CMinvDT * AinvDMinvCT_
         //      hybrid_elem = CMinvCT - CMinvDTAinvDMinvCT
 
-        M_el[agg].Invert(Mloc_solver);
+        InvertLocal(M_el[agg], Mloc_solver);
+
         DenseMatrix& MinvCT_i(MinvCT_[agg]);
         DenseMatrix& MinvDT_i(MinvDT_[agg]);
         DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[agg]);
         DenseMatrix& Ainv_i(Ainv_[agg]);
 
-        MinvCT_i.SetSize(nlocal_edgedof, nlocal_multiplier);
-        MinvDT_i.SetSize(nlocal_edgedof, nlocal_vertexdof);
         AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
         hybrid_elem.SetSize(nlocal_multiplier, nlocal_multiplier);
         Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
         DMinvCT.SetSize(nlocal_vertexdof, nlocal_multiplier);
 
-        Mloc_solver.Mult(DlocT, MinvDT_i);
-        Mloc_solver.Mult(ClocT, MinvCT_i);
+        MultLocal(Mloc_solver, Dloc, MinvDT_i);
+        MultLocal(Mloc_solver, Cloc, MinvCT_i);
+
         Cloc.Mult(MinvCT_i, hybrid_elem);
         Dloc.Mult(MinvDT_i, Aloc);
         Dloc.Mult(MinvCT_i, DMinvCT);
 
         if (use_w_)
         {
-            Aloc -= mgl.W_local_.GetSubMatrix(local_vertexdof, local_vertexdof, edge_map).ToDense();
+            auto Wloc_tmp = mgl.W_local_.GetSubMatrix(local_vertexdof, local_vertexdof, edge_map);
+            Wloc_tmp.ToDense(Wloc);
+
+            Aloc -= Wloc;
         }
 
-        Aloc.Invert(Ainv_i);
-        Ainv_i.Mult(DMinvCT, AinvDMinvCT_i);
-        DMinvCT.Transpose(CMinvDT);
+        InvertLocal(Aloc, Ainv_i);
 
-        if (CMinvDT.Rows() > 0 && CMinvDT.Rows() > 0)
+        Ainv_i.Mult(DMinvCT, AinvDMinvCT_i);
+
+        if (DMinvCT.Rows() > 0 && DMinvCT.Rows() > 0)
         {
             CMDADMC.SetSize(nlocal_multiplier, nlocal_multiplier);
-            CMinvDT.Mult(AinvDMinvCT_i, CMDADMC);
+            AinvDMinvCT_i.MultAT(DMinvCT, CMDADMC);
             hybrid_elem -= CMDADMC;
-        }
-
-        // Add contribution of the element matrix to the golbal system
-        hybrid_system.Add(local_multiplier, hybrid_elem);
-    }
-
-    return hybrid_system.ToSparse();
-}
-
-SparseMatrix HybridSolver::AssembleHybridSystem(
-    const MixedMatrix& mgl,
-    const std::vector<std::vector<double>>& M_el,
-    const std::vector<int>& j_multiplier_edgedof)
-{
-    const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
-
-    const int map_size = std::max(num_edge_dofs_, agg_vertexdof_.Cols());
-    std::vector<int> edge_map(map_size, -1);
-    std::vector<bool> edge_marker(num_edge_dofs_, true);
-
-    DenseMatrix Aloc;
-    DenseMatrix Dloc;
-    DenseMatrix CMinvDT;
-    DenseMatrix hybrid_elem;
-
-    CooMatrix hybrid_system(num_multiplier_dofs_);
-
-    for (int agg = 0; agg < num_aggs_; ++agg)
-    {
-        // Extracting the size and global numbering of local dof
-        std::vector<int> local_vertexdof = agg_vertexdof_.GetIndices(agg);
-        std::vector<int> local_edgedof = agg_edgedof_.GetIndices(agg);
-        std::vector<int> local_multiplier = agg_multiplier_.GetIndices(agg);
-
-        const int nlocal_vertexdof = local_vertexdof.size();
-        const int nlocal_edgedof = local_edgedof.size();
-        const int nlocal_multiplier = local_multiplier.size();
-
-        // Build the edge dof global to local map which will be used
-        // later for mapping local multiplier dof to local edge dof
-        SetMarker(edge_map, local_edgedof);
-
-        // Extract MinvDT as a dense submatrix of D^T
-        ExtractSubMatrix(mgl.D_local_, local_vertexdof, local_edgedof,
-                         edge_map, Dloc);
-
-        DenseMatrix& MinvCT_i(MinvCT_[agg]);
-        DenseMatrix& MinvDT_i(MinvDT_[agg]);
-        DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[agg]);
-        DenseMatrix& Ainv_i(Ainv_[agg]);
-
-        MinvDT_i = Dloc.Transpose();
-        MinvCT_i.SetSize(nlocal_edgedof, nlocal_multiplier);
-        AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
-        Ainv_i.SetSize(nlocal_vertexdof, nlocal_vertexdof);
-
-        // Construct the constraint matrix C which enforces the continuity of
-        // the broken edge space
-        std::vector<int> Cloc_i(nlocal_multiplier + 1);
-        std::iota(std::begin(Cloc_i), std::end(Cloc_i), 0);
-
-        std::vector<int> Cloc_j(nlocal_multiplier);
-        std::vector<double> Cloc_data(nlocal_multiplier);
-
-        const auto& M_diag(M_el[agg]);
-        Vector CMinvCT(nlocal_multiplier);
-
-        for (int i = 0; i < nlocal_multiplier; ++i)
-        {
-            const int edgedof_global_id = j_multiplier_edgedof[local_multiplier[i]];
-            const int edgedof_local_id = edge_map[edgedof_global_id];
-
-            Cloc_j[i] = edgedof_local_id;
-            CMinvCT[i] = 1.0 / M_diag[edgedof_local_id];
-
-            if (edgedof_IsOwned.RowSize(edgedof_global_id) &&
-                edge_marker[edgedof_global_id])
-            {
-                edge_marker[edgedof_global_id] = false;
-                MinvCT_i(edgedof_local_id, i) = 1.0 / M_diag[edgedof_local_id];
-                Cloc_data[i] = 1.;
-            }
-            else
-            {
-                MinvCT_i(edgedof_local_id, i) = -1.0 / M_diag[edgedof_local_id];
-                Cloc_data[i] = -1.;
-            }
-        }
-
-        SparseMatrix Cloc(std::move(Cloc_i), std::move(Cloc_j), std::move(Cloc_data),
-                          nlocal_multiplier, nlocal_edgedof);
-
-        ClearMarker(edge_map, local_edgedof);
-
-        MinvDT_i.InverseScaleRows(M_diag);
-
-        Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
-
-        if (Dloc.Rows() > 0 && Dloc.Cols() > 0)
-        {
-            Dloc.Mult(MinvDT_i, Aloc);
-        }
-        else
-        {
-            Aloc = 0.0;
-        }
-
-        // Compute CMinvDT  = Cloc * MinvDT
-        VectorView column_in = MinvDT_i.GetColView(0);
-        Vector CMinvDT = Cloc.Mult(column_in);
-
-        if (use_w_)
-        {
-            Aloc -= mgl.W_local_.GetSubMatrix(local_vertexdof, local_vertexdof, edge_map).ToDense();
-        }
-
-        // Compute the LU factorization of Aloc and Ainv_ * DMinvCT
-        const double A00_inv = 1.0 / Aloc(0, 0);
-        Ainv_i(0, 0) = A00_inv;
-
-        for (int j = 0; j < nlocal_multiplier; ++j)
-        {
-            AinvDMinvCT_i(0, j) = CMinvDT[j] * A00_inv;
-        }
-
-        // Compute -CMinvDTAinvDMinvCT = -CMinvDT * Ainv_ * DMinvCT
-        MultScalarVVt(-A00_inv, CMinvDT, hybrid_elem);
-
-        // Hybrid_el_ = CMinvCT - CMinvDTAinvDMinvCT
-        for (int j = 0; j < nlocal_multiplier; ++j)
-        {
-            hybrid_elem(j, j) += CMinvCT[j];
         }
 
         // Add contribution of the element matrix to the golbal system

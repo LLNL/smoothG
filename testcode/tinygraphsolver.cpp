@@ -97,13 +97,6 @@ int main(int argc, char* argv[])
     Graph graph(comm, vertex_edge, partition);
     MixedMatrix mgl(graph, weight, W_block);
 
-    MinresBlockSolver minres(mgl);
-    HybridSolver hb(mgl);
-
-    // TODO(gelever1): square tolerances in PCG and remove this
-    hb.SetRelTol(1e-32);
-    hb.SetAbsTol(1e-32);
-
     BlockVector sol(mgl.offsets_);
     BlockVector rhs(mgl.offsets_);
     rhs.GetBlock(0) = 0.0;
@@ -160,6 +153,9 @@ int main(int argc, char* argv[])
     {
         local_truesol[i] = global_truesol[i + (myid * 3)];
     }
+
+    MinresBlockSolver minres(mgl);
+    HybridSolver hb(mgl);
 
     std::map<MGLSolver*, std::string> solver_to_name;
     solver_to_name[&minres] = "Minres + block preconditioner";

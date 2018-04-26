@@ -225,7 +225,6 @@ void SharedEntityComm<T>::MakeEntityProc()
 
     for (int entity = 0; entity < num_entities_; ++entity)
     {
-        int diag_size = ete_diag.RowSize(entity);
         int offd_size = ete_offd.RowSize(entity);
 
         entity_master_[entity] = myid_;
@@ -233,7 +232,7 @@ void SharedEntityComm<T>::MakeEntityProc()
 
         if (offd_size == 0)
         {
-            assert(diag_size == 1);
+            assert(ete_diag.RowSize(entity) == 1);
 
             int true_entity = ete_diag_indices[ete_diag_indptr[entity]];
 
@@ -247,7 +246,7 @@ void SharedEntityComm<T>::MakeEntityProc()
         }
         else
         {
-            assert(diag_size == 0 && offd_size == 1);
+            assert(ete_diag.RowSize(entity) == 0 && offd_size == 1);
 
             int shared_entity = ete_offd_indices[ete_offd_indptr[entity]];
 

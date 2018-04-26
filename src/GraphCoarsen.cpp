@@ -829,6 +829,8 @@ std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl,
     DenseMatrix h_D_trace;
     DenseMatrix bub_block;
     DenseMatrix ortho_vects;
+    DenseMatrix DTT_F;
+    DenseMatrix DTT_B;
 
     for (int agg = 0; agg < num_aggs; ++agg)
     {
@@ -850,8 +852,8 @@ std::vector<DenseMatrix> GraphCoarsen::BuildElemM(const MixedMatrix& mgl,
             M_el[agg].SetSubMatrix(0, 0, bub_block);
         }
 
-        DenseMatrix DTT_F = h_D_trace.MultAT(h_F_potential);
-        DenseMatrix DTT_B = h_D_trace.MultAT(B_potential_[agg]);
+        h_D_trace.MultAT(h_F_potential, DTT_F);
+        h_D_trace.MultAT(B_potential_[agg], DTT_B);
 
         M_el[agg].SetSubMatrix(num_bubbles, num_bubbles, DTT_F);
         M_el[agg].SetSubMatrix(num_bubbles, 0, DTT_B);
