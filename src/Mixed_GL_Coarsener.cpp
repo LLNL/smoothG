@@ -40,12 +40,6 @@ const mfem::SparseMatrix& Mixed_GL_Coarsener::get_Psigma() const
     return Psigma_;
 }
 
-const std::vector<mfem::DenseMatrix>& Mixed_GL_Coarsener::get_CM_el() const
-{
-    check_subspace_construction_("CM_el");
-    return CM_el_;
-}
-
 std::unique_ptr<mfem::BlockVector> Mixed_GL_Coarsener::restrict_rhs(
     const mfem::BlockVector& rhs) const
 {
