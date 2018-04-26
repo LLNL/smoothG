@@ -17,5 +17,12 @@
 # Builds all external libraries, Metis, SuiteSparse, MPICH, and Hypre
 # into the extern directory
 
-if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR={PWD}/extern; fi
+if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR=${PWD}/extern; fi
 mkdir -p ${INSTALL_DIR}
+
+export PATH=$INSTALL_DIR/mpich/bin:$PATH
+INSTALL_DIR=$INSTALL_DIR sh config/build_scripts/build_mpich.sh
+INSTALL_DIR=$INSTALL_DIR sh config/build_scripts/build_metis.sh
+INSTALL_DIR=$INSTALL_DIR sh config/build_scripts/build_suitesparse.sh
+INSTALL_DIR=$INSTALL_DIR sh config/build_scripts/build_hypre.sh
+INSTALL_DIR=$INSTALL_DIR sh config/build_scripts/build_linalg.sh
