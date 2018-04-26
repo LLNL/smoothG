@@ -560,7 +560,8 @@ def make_tests():
         [["./sampler",
           "--kappa", "0.01",
           "--num-samples", "2"],
-         {"fine-mean-l1": 0.54961180496539375}]
+         {"fine-mean-l1": 0.54961180496539375,
+          "max-p-error": 0.39696741537314961}]
 
     if "tux" in platform.node():
         tests["veigenvector"] = \

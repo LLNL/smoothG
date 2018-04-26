@@ -440,6 +440,7 @@ int main(int argc, char* argv[])
     PDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
                           kappa, seed + myid);
 
+    double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)
     {
         double count = static_cast<double>(sample) + 1.0;
@@ -473,9 +474,8 @@ int main(int argc, char* argv[])
             m2_fine(i) += delta * delta2;
         }
 
-        // auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
         double finest_p_error = CompareError(comm, sol_upscaled, sol_fine);
-        // double finest_p_error = error_info[0];
+        max_p_error = (max_p_error > finest_p_error) ? max_p_error : finest_p_error;
 
         if (save_samples)
         {
@@ -519,6 +519,7 @@ int main(int argc, char* argv[])
                                           m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
     serialize["coarse-variance-mean"] = picojson::value(
                                             m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
+    serialize["max-p-error"] = picojson::value(max_p_error);
 
     if (visualization)
     {
