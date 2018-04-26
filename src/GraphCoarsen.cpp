@@ -519,9 +519,6 @@ void GraphCoarsen::BuildPEdges(
     {
         coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_cdof);
     }
-
-    // TODO: only compute CoarseM_ when solver is not hybridization
-    CoarseM_ = mbuilder.GetAssembledM();
 }
 
 void GraphCoarsen::BuildW(const mfem::SparseMatrix& Pvertices)

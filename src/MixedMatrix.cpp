@@ -89,27 +89,6 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 {
 }
 
-MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         const mfem::HypreParMatrix& edge_d_td)
-    : MixedMatrix(vertex_edge, mfem::Vector(vertex_edge.Width()) = 1.0, edge_d_td,
-                  DistributeWeight::True)
-{
-
-}
-MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
-                         std::unique_ptr<mfem::SparseMatrix> D,
-                         std::unique_ptr<mfem::SparseMatrix> W,
-                         const mfem::HypreParMatrix& edge_d_td)
-    :
-    M_(std::move(M)),
-    D_(std::move(D)),
-    W_(std::move(W)),
-    edge_d_td_(&edge_d_td),
-    edge_td_d_(edge_d_td_->Transpose())
-{
-    GenerateRowStarts();
-}
-
 MixedMatrix::MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,
@@ -150,7 +129,7 @@ void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
 {
     assert(mbuilder_);
     mbuilder_->SetCoefficient(agg_weights_inverse);
-    M_ = mbuilder_->GetAssembledM();
+    M_ = mbuilder_->BuildAssembledM();
 }
 
 /// @todo better documentation of the 1/-1 issue, make it optional?
@@ -163,6 +142,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
 
     //    SetMFromWeightVector(weight);
     mbuilder_ = make_unique<FineMBuilder>(weight, vertex_edge);
+    M_ = mbuilder_->BuildAssembledM();
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
     {
@@ -182,17 +162,16 @@ void MixedMatrix::GenerateRowStarts()
     GenerateOffsets(comm, nvertices, *Drow_start_);
 }
 
-unique_ptr<mfem::BlockVector> MixedMatrix::subvecs_to_blockvector(
+unique_ptr<mfem::BlockVector> MixedMatrix::SubVectorsToBlockVector(
     const mfem::Vector& vec_u, const mfem::Vector& vec_p) const
 {
-    auto blockvec = make_unique<mfem::BlockVector>(get_blockoffsets());
+    auto blockvec = make_unique<mfem::BlockVector>(GetBlockOffsets());
     blockvec->GetBlock(0) = vec_u;
     blockvec->GetBlock(1) = vec_p;
     return blockvec;
 }
 
-// overload to be available when parallel = false
-mfem::Array<int>& MixedMatrix::get_blockoffsets() const
+mfem::Array<int>& MixedMatrix::GetBlockOffsets() const
 {
     if (!blockOffsets_)
     {
@@ -205,7 +184,7 @@ mfem::Array<int>& MixedMatrix::get_blockoffsets() const
     return *blockOffsets_;
 }
 
-mfem::Array<int>& MixedMatrix::get_blockTrueOffsets() const
+mfem::Array<int>& MixedMatrix::GetBlockTrueOffsets() const
 {
     if (!blockTrueOffsets_)
     {
@@ -222,7 +201,7 @@ bool MixedMatrix::CheckW() const
 {
     const double zero_tol = 1e-6;
 
-    mfem::HypreParMatrix* W = get_pW();
+    mfem::HypreParMatrix* W = GetParallelW();
 
     return W && MaxNorm(*W) > zero_tol;
 }

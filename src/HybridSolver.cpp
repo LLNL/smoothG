@@ -29,38 +29,6 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-void HybridSolver::BuildFineLevelLocalMassMatrix(
-    const mfem::SparseMatrix& vertex_edge,
-    const mfem::SparseMatrix& M,
-    std::vector<mfem::Vector>& M_el)
-{
-    const int nvertices = vertex_edge.Height();
-    M_el.resize(nvertices);
-
-    mfem::SparseMatrix edge_vertex(smoothg::Transpose(vertex_edge));
-    mfem::Array<int> local_edgedof;
-
-    const mfem::Vector M_data(M.GetData(), M.Height());
-    for (int i = 0; i < nvertices; i++)
-    {
-        GetTableRow(vertex_edge, i, local_edgedof);
-        const int nlocal_edgedof = local_edgedof.Size();
-
-        mfem::Vector& Mloc(M_el[i]);
-        Mloc.SetSize(nlocal_edgedof);
-
-        for (int j = 0; j < nlocal_edgedof; j++)
-        {
-            const int edgedof = local_edgedof[j];
-
-            if (edge_vertex.RowSize(edgedof) == 2)
-                Mloc(j) = M_data[edgedof] / 2;
-            else
-                Mloc(j) = M_data[edgedof];
-        }
-    }
-}
-
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
@@ -68,10 +36,10 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    MixedLaplacianSolver(mgL.GetBlockOffsets()),
     comm_(comm),
-    D_(mgL.getD()),
-    W_(mgL.getW()),
+    D_(mgL.GetD()),
+    W_(mgL.GetW()),
     use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
@@ -87,11 +55,16 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     const mfem::SparseMatrix edge_edgedof;
 
-    auto& mbuilder = static_cast<const FineMBuilder&>(mgL.GetMBuilder());
-    Agg_edgedof_.MakeRef(mbuilder.GetAggEdgeDofTable());
+    auto mbuilder = dynamic_cast<const FineMBuilder*>(&(mgL.GetMBuilder()));
+    if (!mbuilder)
+    {
+        std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
+        std::abort();
+    }
+    Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
-    Init(edge_edgedof, mbuilder.GetElementMatrices(),
-         mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+    Init(edge_edgedof, mbuilder->GetElementMatrices(),
+         mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
@@ -102,10 +75,10 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    MixedLaplacianSolver(mgL.GetBlockOffsets()),
     comm_(comm),
-    D_(mgL.getD()),
-    W_(mgL.getW()),
+    D_(mgL.GetD()),
+    W_(mgL.GetW()),
     use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
@@ -116,11 +89,17 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
 
-    auto& mbuilder = static_cast<const ElementMBuilder&>(mgL.GetMBuilder());
-    Agg_edgedof_.MakeRef(mbuilder.GetAggEdgeDofTable());
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
+    if (!mbuilder)
+    {
+        std::cout << "HybridSolver requires coarse level M builder to be ElementMBuilder!\n";
+        std::abort();
+    }
 
-    Init(face_edgedof, mbuilder.GetElementMatrices(),
-         mgL.get_edge_d_td(), face_bdrattr, ess_edge_dofs);
+    Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
+
+    Init(face_edgedof, mbuilder->GetElementMatrices(),
+         mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::~HybridSolver()

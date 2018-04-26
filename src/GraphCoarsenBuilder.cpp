@@ -163,7 +163,7 @@ void ElementMBuilder::AddTraceAcross(int row, int col, double value)
     }
 }
 
-std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::GetAssembledM() const
+std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::BuildAssembledM() const
 {
     mfem::Array<int> edofs;
     auto CoarseM = make_unique<mfem::SparseMatrix>(Agg_cdof_edge_ref_.Width());
@@ -318,7 +318,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
 
 /// this shares a lot of code with BuildComponents, but I'm not sure it makes
 /// sense to combine them in any way.
-std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::GetAssembledM() const
+std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM() const
 {
     const int num_aggs = topology_.Agg_face_.Height();
     const int num_faces = topology_.Agg_face_.Width();
@@ -453,7 +453,7 @@ FineMBuilder::FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
 }
 
 // TODO: the implementation is similar to ElementMBuilder, may combine the two
-std::unique_ptr<mfem::SparseMatrix> FineMBuilder::GetAssembledM() const
+std::unique_ptr<mfem::SparseMatrix> FineMBuilder::BuildAssembledM() const
 {
     mfem::Array<int> edofs;
     auto M = make_unique<mfem::SparseMatrix>(Agg_edgedof_.Width());

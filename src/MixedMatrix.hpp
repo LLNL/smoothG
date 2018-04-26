@@ -66,78 +66,36 @@ public:
                 const mfem::HypreParMatrix& edge_d_td,
                 DistributeWeight dist_weight = DistributeWeight::True);
 
-    /// build with weights all equal to 1
-    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    /**
-        @brief Create a MixedMatrix directly from M and D matrices.
-
-        Takes ownership of the M and D unique pointers.
-    */
-    MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
-                std::unique_ptr<mfem::SparseMatrix> D,
-                const mfem::HypreParMatrix& edge_d_td)
-        : MixedMatrix(std::move(M), std::move(D), nullptr, edge_d_td)
-    {}
-
-    /**
-        @brief Create a MixedMatrix directly from M and D matrices.
-
-        Takes ownership of the M and D unique pointers.
-    */
-    MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
-                std::unique_ptr<mfem::SparseMatrix> D,
-                std::unique_ptr<mfem::SparseMatrix> W,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    /**
-       @brief Construct a coarse mixed graph Laplacian from a finer one and some projections
-
-       Essentially computes an RAP triple product for the coarsening.
-    */
-    MixedMatrix(const MixedMatrix& fine_mgL,
-                const mfem::SparseMatrix& Pu,
-                const mfem::SparseMatrix& Pp,
-                const mfem::HypreParMatrix& edge_d_td)
-        : MixedMatrix(std::unique_ptr<mfem::SparseMatrix>(RAP(Pu, fine_mgL.getWeight(), Pu)),
-                      std::unique_ptr<mfem::SparseMatrix>(RAP(Pp, fine_mgL.getD(), Pu)),
-                      edge_d_td)
-    {}
-
     MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
                 const mfem::HypreParMatrix& edge_d_td);
 
     /**
-       @brief Get a reference to the mass matrix M.
+       @brief Get a const reference to the mass matrix M.
     */
-    mfem::SparseMatrix& getWeight() const
+    const mfem::SparseMatrix& GetM() const
     {
-        assert(M_ || mbuilder_);
-        if (!M_)
-        {
-            M_ = mbuilder_->GetAssembledM();
-        }
+        assert(M_);
         return *M_;
     }
 
     /**
        @brief Get a reference to the mass matrix M.
+
+       @todo non-const version of GetM() and getD() are for elimination
+             in the case when MinresBlockSolver is used. Since the solver makes
+             a copy of these matrices, the non-const version can be removed
+             if the elimination step is moved inside the solver
     */
-    mfem::SparseMatrix& getWeight()
+    mfem::SparseMatrix& GetM()
     {
         assert(M_ || mbuilder_);
-        if (!M_)
-        {
-            M_ = mbuilder_->GetAssembledM();
-        }
         return *M_;
     }
 
     /**
-       @brief Get a reference to the mass matrix M.
+       @brief Get a const reference to the mass matrix M builder.
     */
     const MBuilder& GetMBuilder() const
     {
@@ -146,28 +104,48 @@ public:
     }
 
     /**
+       @brief Assemble the mass matrix M.
+    */
+    void BuildM()
+    {
+        if (!M_)
+        {
+            assert(mbuilder_);
+            M_ = mbuilder_->BuildAssembledM();
+        }
+    }
+
+    /**
        @brief Set (or reset) the mass matrix M.
 
        Useful for rescaling coefficients without re-coarsening.
     */
-    void setWeight(mfem::SparseMatrix& M_in)
+    void SetM(mfem::SparseMatrix& M_in)
     {
         M_ = make_unique<mfem::SparseMatrix>();
         M_->Swap(M_in);
     }
 
     /**
-       @brief Get a reference to the edge_vertex matrix D.
+       @brief Get a const reference to the edge_vertex matrix D.
     */
-    mfem::SparseMatrix& getD() const
+    const mfem::SparseMatrix& GetD() const
     {
         return *D_;
     }
 
     /**
-       @brief Get a reference to the matrix W.
+       @brief Get a reference to the edge_vertex matrix D.
     */
-    mfem::SparseMatrix* getW() const
+    mfem::SparseMatrix& GetD()
+    {
+        return *D_;
+    }
+
+    /**
+       @brief Get a const reference to the matrix W.
+    */
+    const mfem::SparseMatrix* GetW() const
     {
         return W_.get();
     }
@@ -175,7 +153,7 @@ public:
     /**
        Set the matrix W.
     */
-    void setW(mfem::SparseMatrix W_in)
+    void SetW(mfem::SparseMatrix W_in)
     {
         W_ = make_unique<mfem::SparseMatrix>();
         W_->Swap(W_in);
@@ -183,21 +161,21 @@ public:
 
     /** Get the number of vertex dofs in this matrix.
      */
-    int get_num_vertex_dofs() const
+    int GetNumVertexDofs() const
     {
         return D_->Height();
     }
 
     /** Get the number of edge dofs in this matrix.
      */
-    int get_num_edge_dofs() const
+    int GetNumEdgeDofs() const
     {
         return D_->Width();
     }
 
     /** Get the total number of dofs in this matrix.
      */
-    int get_num_total_dofs() const
+    int GetNumTotalDofs() const
     {
         return D_->Width() + D_->Height();
     }
@@ -221,11 +199,11 @@ public:
         int total = 0;
 
         if (M_)
-            total += get_pM().NNZ();
+            total += GetParallelM().NNZ();
         if (D_)
-            total += 2 * get_pD().NNZ();
+            total += 2 * GetParallelD().NNZ();
         if (W_)
-            total += get_pW()->NNZ();
+            total += GetParallelW()->NNZ();
 
         return total;
     }
@@ -238,7 +216,7 @@ public:
      * MixedMatrix must stay alive as long as this BlockVector is
      * alive or there will be undefined behavior.
      */
-    std::unique_ptr<mfem::BlockVector> subvecs_to_blockvector(
+    std::unique_ptr<mfem::BlockVector> SubVectorsToBlockVector(
         const mfem::Vector& vec_u, const mfem::Vector& vec_p) const;
 
     /** @brief Get the Array of offsets representing the block structure of
@@ -249,25 +227,25 @@ public:
         starting index of the second block, and the third element is
         the total number of rows in the matrix.
     */
-    mfem::Array<int>& get_blockoffsets() const;
-    mfem::Array<int>& get_blockTrueOffsets() const;
+    mfem::Array<int>& GetBlockOffsets() const;
+    mfem::Array<int>& GetBlockTrueOffsets() const;
 
     /// return edge dof_truedof relation
-    const mfem::HypreParMatrix& get_edge_d_td() const
+    const mfem::HypreParMatrix& GetEdgeDofToTrueDof() const
     {
         assert(edge_d_td_);
         return *edge_d_td_;
     }
 
     /// return edge dof_truedof relation
-    const mfem::HypreParMatrix& get_edge_td_d() const
+    const mfem::HypreParMatrix& GetEdgeTrueDofToDof() const
     {
         assert(edge_td_d_);
         return *edge_td_d_;
     }
 
-    /// return the row starts (parallel partitioning) of \f$ D \f$
-    mfem::Array<HYPRE_Int>& get_Drow_start() const
+    /// return the row starts (parallel row partitioning) of \f$ D \f$
+    mfem::Array<HYPRE_Int>& GetDrowStart() const
     {
         if (!Drow_start_)
             Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
@@ -275,8 +253,8 @@ public:
         return *Drow_start_;
     }
 
-    /// get the edge weight matrix
-    mfem::HypreParMatrix& get_pM(bool recompute = false) const
+    /// get the parallel edge mass matrix
+    mfem::HypreParMatrix& GetParallelM(bool recompute = false) const
     {
         if (!pM_ || recompute)
         {
@@ -293,8 +271,8 @@ public:
         return *pM_;
     }
 
-    /// get the signed vertex_edge (divergence) matrix
-    mfem::HypreParMatrix& get_pD(bool recompute = false) const
+    /// get the parallel signed vertex_edge (divergence) matrix
+    mfem::HypreParMatrix& GetParallelD(bool recompute = false) const
     {
         if (!pD_ || recompute)
         {
@@ -306,8 +284,8 @@ public:
         return *pD_;
     }
 
-    /// get the W matrix
-    mfem::HypreParMatrix* get_pW() const
+    /// get the parallel W matrix
+    mfem::HypreParMatrix* GetParallelW() const
     {
         if (W_ && !pW_)
         {
@@ -350,7 +328,7 @@ private:
 
     void GenerateRowStarts();
 
-    mutable std::unique_ptr<mfem::SparseMatrix> M_;
+    std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
     std::unique_ptr<mfem::SparseMatrix> W_;
 

@@ -33,12 +33,14 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    double spect_tol, int max_evects,
                                    bool dual_target, bool scaled_dual,
                                    bool energy_dual, bool hybridization,
+                                   bool coarse_components,
                                    const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge.Height(), hybridization),
       weight_(weight),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
       ess_attr_(ess_attr),
+      coarse_components_(coarse_components),
       saamge_param_(saamge_param)
 {
     mfem::StopWatch chrono;
@@ -56,7 +58,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     !hybridization_);
+                     coarse_components_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -79,6 +81,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    double spect_tol, int max_evects,
                                    bool dual_target, bool scaled_dual,
                                    bool energy_dual, bool hybridization,
+                                   bool coarse_components,
                                    const SAAMGeParam* saamge_param)
     :
     Upscale(comm, vertex_edge.Height(), hybridization),
@@ -86,6 +89,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     edge_d_td_(edge_d_td),
     edge_boundary_att_(edge_boundary_att),
     ess_attr_(ess_attr),
+    coarse_components_(coarse_components),
     saamge_param_(saamge_param)
 {
     mfem::StopWatch chrono;
@@ -104,7 +108,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-                     !hybridization_);
+                     coarse_components_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -146,7 +150,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 
 void FiniteVolumeMLMC::MakeCoarseSolver()
 {
-    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
+    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -156,6 +160,9 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
     if (hybridization_) // Hybridization solver
     {
+        // coarse_components method does not store element matrices
+        assert(!coarse_components_);
+
         auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm_, GetCoarseMatrix(), *coarsener_,
@@ -163,7 +170,8 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
+        GetCoarseMatrix().BuildM();
+        mfem::SparseMatrix& Mref = GetCoarseMatrix().GetM();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -177,7 +185,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     }
 }
 
-void FiniteVolumeMLMC::ForceMakeFineSolver() const
+void FiniteVolumeMLMC::ForceMakeFineSolver()
 {
     mfem::Array<int> marker;
     BooleanMult(edge_boundary_att_, ess_attr_, marker);
@@ -189,8 +197,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver() const
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
-        mfem::SparseMatrix& Dref = GetFineMatrix().getD();
+        mfem::SparseMatrix& Mref = GetFineMatrix().GetM();
+        mfem::SparseMatrix& Dref = GetFineMatrix().GetD();
         const bool w_exists = GetFineMatrix().CheckW();
 
         for (int mm = 0; mm < marker.Size(); ++mm)
@@ -214,7 +222,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver() const
 
 }
 
-void FiniteVolumeMLMC::MakeFineSolver() const
+void FiniteVolumeMLMC::MakeFineSolver()
 {
     if (!fine_solver_)
     {

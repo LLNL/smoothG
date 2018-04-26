@@ -54,9 +54,8 @@ public:
               (guarantees approximation property in edge energy norm)
        @param is_hybridization_used whether to prepare the coarse space to use the
               HybridSolver
-       @param coarse_coefficient whether to construct coarse mass matrix in a way
-              so the coefficients (edge weights) can be rescaled after coarsening
-              (this documentation needs to be updated)
+       @param coarse_components whether to store different components of coarse M
+              based on trace extensions and bubbles (for construction of coarse M)
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                               std::unique_ptr<GraphTopology> gt,
@@ -65,7 +64,7 @@ public:
                               bool dual_target,
                               bool scaled_dual,
                               bool energy_dual,
-                              bool coarse_coefficient);
+                              bool coarse_components);
 
 private:
     /**
@@ -80,7 +79,7 @@ private:
     bool dual_target_;
     bool scaled_dual_;
     bool energy_dual_;
-    bool coarse_coefficient_;
+    bool coarse_components_;
 
 }; // SpectralAMG_MGL_Coarsener
 

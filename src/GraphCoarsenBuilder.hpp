@@ -28,15 +28,21 @@
 namespace smoothg
 {
 
+/**
+   @brief Abstract base class to build the mass matrix M
+
+   The main functionality of this class is to build the assembled M based on
+   components of M and aggregate weight.
+*/
 class MBuilder
 {
 public:
     virtual ~MBuilder() {}
 
     /**
-       @brief Get the assembled M for the local processor
+       @brief Build the assembled M for the local processor
      */
-    virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM() const = 0;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const = 0;
 
     /**
        @brief Set weights on aggregates for assembly of mass matrix.
@@ -98,7 +104,7 @@ public:
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                                      const mfem::SparseMatrix& Agg_cdof_edge) {}
 
-    virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM() const = 0;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
 
@@ -146,7 +152,7 @@ public:
         Agg_cdof_edge_ref_.MakeRef(Agg_cdof_edge);
     }
 
-    std::unique_ptr<mfem::SparseMatrix> GetAssembledM() const;
+    std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
 
     bool NeedsCoarseVertexDofs() { return true; }
 
@@ -203,7 +209,7 @@ public:
                          const mfem::SparseMatrix& Pedges,
                          const mfem::SparseMatrix& face_cdof);
 
-    std::unique_ptr<mfem::SparseMatrix> GetAssembledM() const;
+    std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
 
 private:
     /// @todo remove this (GetTableRowCopy is the same thing?)
@@ -244,7 +250,7 @@ public:
     FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
                  const mfem::SparseMatrix& Agg_edgedof);
 
-    virtual std::unique_ptr<mfem::SparseMatrix> GetAssembledM() const;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
     const std::vector<mfem::Vector>& GetElementMatrices() const { return M_el_; }
     const mfem::SparseMatrix& GetAggEdgeDofTable() const { return Agg_edgedof_; }
 private:

@@ -397,6 +397,11 @@ double InnerProduct(const mfem::Vector& u, const mfem::Vector& v);
 std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
     const mfem::HypreParMatrix& entity_trueentity_entity);
 
+/**
+   @brief out = bool(mat) * bool(vec)
+   Compute mat * vec, with entries of mat and vec treated as boolean.
+   For mat, entries in the matrix graph are treated as 1, otherwise 0.
+*/
 void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
                  mfem::Array<int>& out);
 } // namespace smoothg

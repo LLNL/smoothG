@@ -52,6 +52,8 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
+       @param coarse_components whether to store different components of coarse M
+              based on trace extensions and bubbles (for construction of coarse M)
        @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
               coarse hybridized system if saamge_param is not nullptr
     */
@@ -65,6 +67,7 @@ public:
                      double spect_tol = 0.001, int max_evects = 4,
                      bool dual_target = false, bool scaled_dual = false,
                      bool energy_dual = false, bool hybridization = false,
+                     bool coarse_components = true,
                      const SAAMGeParam* saamge_param = nullptr);
 
     /**
@@ -79,6 +82,8 @@ public:
        @param max_evects maximum number of eigenvectors to keep per aggregate
        @param trace_method methods for getting edge trace samples
        @param hybridization use hybridization as solver
+       @param coarse_components whether to store different components of coarse M
+              based on trace extensions and bubbles (for construction of coarse M)
        @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
               coarse hybridized system if saamge_param is not nullptr
     */
@@ -92,9 +97,10 @@ public:
                      double spect_tol = 0.001, int max_evects = 4,
                      bool dual_target = false, bool scaled_dual = false,
                      bool energy_dual = false, bool hybridization = false,
+                     bool coarse_components = true,
                      const SAAMGeParam* saamge_param = nullptr);
 
-    void MakeFineSolver() const;
+    void MakeFineSolver();
 
     /// coeff should have the size of the number of *edges* in the
     /// fine graph (not exactly analagous to RescaleCoarseCoefficient)
@@ -106,7 +112,7 @@ public:
 
     /// recreate the fine solver, ie if coefficients have changed
     /// @todo maybe don't have to rebuild whole thing, just M part?
-    void ForceMakeFineSolver() const;
+    void ForceMakeFineSolver();
 
     void MakeCoarseSolver();
 
@@ -115,6 +121,8 @@ private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
     const mfem::Array<int>& ess_attr_;
+
+    const bool coarse_components_;
 
     const SAAMGeParam* saamge_param_;
 };

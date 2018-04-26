@@ -169,9 +169,6 @@ protected:
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;
 
-    /// Some kind of element matrices for hybridization
-    //std::vector<std::unique_ptr<mfem::DenseMatrix>> CM_el_;
-    std::vector<mfem::DenseMatrix> CM_el_;
     mutable std::unique_ptr<mfem::Array<int>> coarseBlockOffsets_;
     mutable std::unique_ptr<mfem::HypreParMatrix> face_dof_truedof_table_;
 
