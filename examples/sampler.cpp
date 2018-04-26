@@ -292,8 +292,8 @@ int main(int argc, char* argv[])
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
-    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
-                          kappa, seed + myid);
+    LogPDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
+                             kappa, seed + myid);
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)

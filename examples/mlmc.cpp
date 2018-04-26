@@ -45,36 +45,6 @@ void MetisPart(mfem::Array<int>& partitioning,
 void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
-class SimpleSampler
-{
-public:
-    SimpleSampler(int fine_size, int coarse_size) :
-        fine_size_(fine_size), coarse_size_(coarse_size)
-    {
-        fine_.SetSize(fine_size_);
-        coarse_.SetSize(coarse_size_);
-    }
-
-    mfem::Vector& GetFineCoefficient(int sample)
-    {
-        fine_ = (1.0 + sample);
-        return fine_;
-    }
-
-    mfem::Vector& GetCoarseCoefficient(int sample)
-    {
-        coarse_ = (1.0 + sample);
-        return coarse_;
-    }
-
-private:
-    int fine_size_;
-    int coarse_size_;
-
-    mfem::Vector fine_;
-    mfem::Vector coarse_;
-};
-
 void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
                const mfem::ParMesh& pmesh, int tag)
 {

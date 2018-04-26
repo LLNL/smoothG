@@ -40,20 +40,41 @@ private:
 };
 
 /**
+   Simply returns a constant coefficient, for testing some
+   sampling and Monte Carlo stuff.
+*/
+class SimpleSampler
+{
+public:
+    SimpleSampler(int fine_size, int coarse_size);
+
+    mfem::Vector& GetFineCoefficient(int sample);
+
+    mfem::Vector& GetCoarseCoefficient(int sample);
+
+private:
+    int fine_size_;
+    int coarse_size_;
+
+    mfem::Vector fine_;
+    mfem::Vector coarse_;
+};
+
+/**
    For now we return the log of the permeability field,
    at some point this class (or its caller?) should
    exponentiate.
 */
-class PDESampler
+class LogPDESampler
 {
 public:
     /**
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(const FiniteVolumeUpscale& fvupscale,
-               int fine_vector_size, int dimension, double cell_volume,
-               double kappa, int seed);
-    ~PDESampler();
+    LogPDESampler(const FiniteVolumeUpscale& fvupscale,
+                  int fine_vector_size, int dimension, double cell_volume,
+                  double kappa, int seed);
+    ~LogPDESampler();
 
     /// Draw white noise on fine level
     void Sample();

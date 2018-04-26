@@ -36,9 +36,29 @@ double NormalDistribution::Sample()
     return out;
 }
 
-PDESampler::PDESampler(const FiniteVolumeUpscale& fvupscale,
-                       int fine_vector_size, int dimension, double cell_volume,
-                       double kappa, int seed)
+SimpleSampler::SimpleSampler(int fine_size, int coarse_size)
+    :
+    fine_size_(fine_size), coarse_size_(coarse_size)
+{
+    fine_.SetSize(fine_size_);
+    coarse_.SetSize(coarse_size_);
+}
+
+mfem::Vector& SimpleSampler::GetFineCoefficient(int sample)
+{
+    fine_ = (1.0 + sample);
+    return fine_;
+}
+
+mfem::Vector& SimpleSampler::GetCoarseCoefficient(int sample)
+{
+    coarse_ = (1.0 + sample);
+    return coarse_;
+}
+
+LogPDESampler::LogPDESampler(const FiniteVolumeUpscale& fvupscale,
+                             int fine_vector_size, int dimension, double cell_volume,
+                             double kappa, int seed)
     :
     fvupscale_(fvupscale),
     normal_distribution_(0.0, 1.0, seed),
@@ -61,12 +81,12 @@ PDESampler::PDESampler(const FiniteVolumeUpscale& fvupscale,
                 std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 }
 
-PDESampler::~PDESampler()
+LogPDESampler::~LogPDESampler()
 {
 }
 
 /// @todo cell_volume should be variable rather than constant
-void PDESampler::Sample()
+void LogPDESampler::Sample()
 {
     current_state_ = FINE_SAMPLE;
 
@@ -79,26 +99,26 @@ void PDESampler::Sample()
     }
 }
 
-void PDESampler::CoarseSample()
+void LogPDESampler::CoarseSample()
 {
     current_state_ = COARSE_SAMPLE;
     MFEM_ASSERT(false, "Not implemented!");
 }
 
-mfem::Vector& PDESampler::GetFineCoefficient()
+mfem::Vector& LogPDESampler::GetFineCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
-                "PDESampler object in wrong state (call Sample() first)!");
+                "LogPDESampler object in wrong state (call Sample() first)!");
 
     fvupscale_.SolveFine(rhs_fine_, coefficient_fine_);
     return coefficient_fine_;
 }
 
-mfem::Vector& PDESampler::GetCoarseCoefficient()
+mfem::Vector& LogPDESampler::GetCoarseCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
                 current_state_ == COARSE_SAMPLE,
-                "PDESampler object in wrong state (call Sample() first)!");
+                "LogPDESampler object in wrong state (call Sample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
         fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
