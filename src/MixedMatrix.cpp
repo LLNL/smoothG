@@ -89,6 +89,16 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 {
 }
 
+MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
+                         std::unique_ptr<MBuilder> mbuilder,
+                         const mfem::HypreParMatrix& edge_d_td)
+    :edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose()), mbuilder_(std::move(mbuilder))
+{
+    M_ = mbuilder_->BuildAssembledM();
+    D_ = ConstructD(vertex_edge, edge_d_td);
+    GenerateRowStarts();
+}
+
 MixedMatrix::MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,

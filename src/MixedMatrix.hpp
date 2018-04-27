@@ -66,6 +66,10 @@ public:
                 const mfem::HypreParMatrix& edge_d_td,
                 DistributeWeight dist_weight = DistributeWeight::True);
 
+    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
+                std::unique_ptr<MBuilder> mbuilder,
+                const mfem::HypreParMatrix& edge_d_td);
+
     MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
@@ -313,9 +317,6 @@ public:
     */
     void UpdateM(const mfem::Vector& agg_weights_inverse);
 
-    static std::unique_ptr<mfem::SparseMatrix> ConstructD(
-        const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
-
 private:
     /**
        Helper routine for the constructors of distributed graph. Note well that
@@ -325,6 +326,9 @@ private:
     void Init(const mfem::SparseMatrix& vertex_edge,
               const mfem::Vector& weight,
               const mfem::SparseMatrix& w_block);
+
+    std::unique_ptr<mfem::SparseMatrix> ConstructD(
+        const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
 
     void GenerateRowStarts();
 
