@@ -766,4 +766,15 @@ SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseM
     return coo.ToSparse();
 }
 
+std::vector<int> PartitionAAT(const SparseMatrix& A, double coarsening_factor)
+{
+    SparseMatrix A_T = A.Transpose();
+    SparseMatrix AA_T = A.Mult(A_T);
+
+    int num_parts = std::max(1.0, (A.Rows() / coarsening_factor) + 0.5);
+    double ubal = 2.0;
+
+    return Partition(AA_T, num_parts, ubal);
+}
+
 } // namespace smoothg

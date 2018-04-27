@@ -42,10 +42,18 @@ public:
     /**
        @brief Build agglomerated topology relation tables of a given graph
 
-       @param comm MPI Communicator
        @param graph Distrubted graph information
     */
-    GraphTopology(MPI_Comm comm, const Graph& graph);
+    GraphTopology(const Graph& graph);
+
+    /**
+        @brief Build agglomerated topology relation tables of the coarse level
+               graph in a given GraphTopology object
+ 
+        @param finer_graph_topology finer level graph topology
+        @param coarsening_factor intended number of vertices in an aggregate
+    */
+    GraphTopology(const GraphTopology& fine_topology, double coarsening_factor);
 
     /** @brief Default Destructor */
     ~GraphTopology() noexcept = default;
@@ -77,6 +85,11 @@ public:
     ParMatrix agg_ext_edge_;   // Aggregate to extended edge
 
 private:
+    void Init(const SparseMatrix& vertex_edge,
+              const std::vector<int>& partition,
+              const ParMatrix& edge_edge,
+              const ParMatrix& edge_true_edge);
+
     SparseMatrix MakeFaceAggInt(const ParMatrix& agg_agg);
 
     SparseMatrix MakeFaceEdge(const ParMatrix& agg_agg,

@@ -23,19 +23,40 @@
 namespace smoothg
 {
 
-GraphTopology::GraphTopology(MPI_Comm comm, const Graph& graph)
+GraphTopology::GraphTopology(const Graph& graph)
 {
-    agg_vertex_local_ = MakeAggVertex(graph.part_local_);
+    const auto& vertex_edge = graph.vertex_edge_local_;
+    const auto& part = graph.part_local_;
 
-    SparseMatrix agg_edge_ext = agg_vertex_local_.Mult(graph.vertex_edge_local_);
+    Init(vertex_edge, part, graph.edge_edge_, graph.edge_true_edge_);
+}
+
+GraphTopology::GraphTopology(const GraphTopology& fine_topology, double coarsening_factor)
+{
+    const auto& vertex_edge = fine_topology.agg_face_local_;
+    const auto& part = PartitionAAT(vertex_edge, coarsening_factor);
+
+    Init(vertex_edge, part, fine_topology.face_face_, fine_topology.face_true_face_);
+}
+
+void GraphTopology::Init(const SparseMatrix& vertex_edge,
+                         const std::vector<int>& partition,
+                         const ParMatrix& edge_edge,
+                         const ParMatrix& edge_true_edge)
+{
+    MPI_Comm comm = edge_true_edge.GetComm();
+
+    agg_vertex_local_ = MakeAggVertex(partition);
+
+    SparseMatrix agg_edge_ext = agg_vertex_local_.Mult(vertex_edge);
     agg_edge_ext.SortIndices();
 
     agg_edge_local_ = RestrictInterior(agg_edge_ext);
 
     SparseMatrix edge_ext_agg = agg_edge_ext.Transpose();
 
-    int num_vertices = graph.vertex_edge_local_.Rows();
-    int num_edges = graph.vertex_edge_local_.Cols();
+    int num_vertices = vertex_edge.Rows();
+    int num_edges = vertex_edge.Cols();
     int num_aggs = agg_edge_local_.Rows();
 
     auto starts = parlinalgcpp::GenerateOffsets(comm, {num_vertices, num_edges, num_aggs});
@@ -46,7 +67,7 @@ GraphTopology::GraphTopology(MPI_Comm comm, const Graph& graph)
     ParMatrix edge_agg_d(comm, edge_starts, agg_starts, std::move(edge_ext_agg));
     ParMatrix agg_edge_d = edge_agg_d.Transpose();
 
-    ParMatrix edge_agg_ext = graph.edge_edge_.Mult(edge_agg_d);
+    ParMatrix edge_agg_ext = edge_edge.Mult(edge_agg_d);
     ParMatrix agg_agg = agg_edge_d.Mult(edge_agg_ext);
 
     agg_edge_ext = 1.0;
@@ -64,20 +85,20 @@ GraphTopology::GraphTopology(MPI_Comm comm, const Graph& graph)
     face_edge_ = ParMatrix(comm, face_starts, edge_starts, face_edge_local_);
     ParMatrix edge_face = face_edge_.Transpose();
 
-    face_face_ = parlinalgcpp::RAP(graph.edge_edge_, edge_face);
+    face_face_ = parlinalgcpp::RAP(edge_edge, edge_face);
     face_face_ = 1;
 
     face_true_face_ = MakeEntityTrueEntity(face_face_);
 
-    ParMatrix vertex_edge_d(comm, vertex_starts, edge_starts, graph.vertex_edge_local_);
-    ParMatrix vertex_edge = vertex_edge_d.Mult(graph.edge_true_edge_);
-    ParMatrix edge_vertex = vertex_edge.Transpose();
-    ParMatrix agg_edge = agg_edge_d.Mult(graph.edge_true_edge_);
+    ParMatrix vertex_edge_d(comm, vertex_starts, edge_starts, vertex_edge);
+    ParMatrix vertex_true_edge = vertex_edge_d.Mult(edge_true_edge);
+    ParMatrix edge_vertex = vertex_true_edge.Transpose();
+    ParMatrix agg_edge = agg_edge_d.Mult(edge_true_edge);
 
     agg_ext_vertex_ = agg_edge.Mult(edge_vertex);
     agg_ext_vertex_ = 1.0;
 
-    ParMatrix agg_ext_edge_ext = agg_ext_vertex_.Mult(vertex_edge);
+    ParMatrix agg_ext_edge_ext = agg_ext_vertex_.Mult(vertex_true_edge);
     agg_ext_edge_ = RestrictInterior(agg_ext_edge_ext);
 }
 

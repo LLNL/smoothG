@@ -69,7 +69,7 @@ void GraphUpscale::Init(const SparseMatrix& vertex_edge,
 {
     graph_ = Graph(comm_, vertex_edge, global_partitioning);
     mgl_.emplace_back(graph_, weight);
-    gt_ = GraphTopology(comm_, graph_);
+    gt_ = GraphTopology(graph_);
 
     coarsener_ = GraphCoarsen(GetFineMatrix(), gt_,
                               max_evects_, spect_tol_);

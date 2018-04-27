@@ -27,6 +27,7 @@
 
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
+#include "partition.hpp"
 
 /// Call output only on processor 0
 #define ParPrint(myid, output) if (myid == 0) output
@@ -267,7 +268,6 @@ SparseMatrix AssembleElemMat(const SparseMatrix& elem_dof, const std::vector<Den
 */
 SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseMatrix& B);
 
-
 /** @brief Handles mpi initialization and finalization */
 struct MpiSession
 {
@@ -292,6 +292,14 @@ struct MpiSession
     int num_procs_;
     int myid_;
 };
+
+/** @brief Partitions matrix = A * A^T
+
+    @param A matrix to partition
+    @param coarsening_factor determine number of parts to partition into
+    @returns partitioning of A * A^T
+*/
+std::vector<int> PartitionAAT(const SparseMatrix& A, double coarsening_factor);
 
 } //namespace smoothg
 
