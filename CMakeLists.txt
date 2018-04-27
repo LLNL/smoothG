@@ -151,7 +151,7 @@ configure_package_config_file(
 )
 
 configure_file(
-  "${PROJECT_SOURCE_DIR}/smoothG_config.h.in"
+  "${PROJECT_SOURCE_DIR}/config/smoothG_config.h.in"
   "${PROJECT_BINARY_DIR}/smoothG_config.h"
   )
 
