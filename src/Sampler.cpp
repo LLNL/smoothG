@@ -63,9 +63,9 @@ mfem::Vector& SimpleSampler::GetCoarseCoefficient()
     return coarse_;
 }
 
-LogPDESampler::LogPDESampler(const Upscale& fvupscale,
-                             int fine_vector_size, int dimension, double cell_volume,
-                             double kappa, int seed)
+PDESampler::PDESampler(const Upscale& fvupscale,
+                       int fine_vector_size, int dimension, double cell_volume,
+                       double kappa, int seed)
     :
     fvupscale_(fvupscale),
     normal_distribution_(0.0, 1.0, seed),
@@ -79,6 +79,7 @@ LogPDESampler::LogPDESampler(const Upscale& fvupscale,
     coefficient_coarse_ = fvupscale_.GetCoarseVector();
 
     double nu_parameter;
+    MFEM_ASSERT(dimension == 2 || dimension == 3, "Invalid dimension!");
     if (dimension == 2)
         nu_parameter = 1.0;
     else
@@ -88,12 +89,12 @@ LogPDESampler::LogPDESampler(const Upscale& fvupscale,
                 std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 }
 
-LogPDESampler::~LogPDESampler()
+PDESampler::~PDESampler()
 {
 }
 
 /// @todo cell_volume should be variable rather than constant
-void LogPDESampler::NewSample()
+void PDESampler::NewSample()
 {
     current_state_ = FINE_SAMPLE;
 
@@ -106,31 +107,39 @@ void LogPDESampler::NewSample()
     }
 }
 
-void LogPDESampler::NewCoarseSample()
+void PDESampler::NewCoarseSample()
 {
     current_state_ = COARSE_SAMPLE;
     MFEM_ASSERT(false, "Not implemented!");
 }
 
-mfem::Vector& LogPDESampler::GetFineCoefficient()
+mfem::Vector& PDESampler::GetFineCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
-                "LogPDESampler object in wrong state (call NewSample() first)!");
+                "PDESampler object in wrong state (call NewSample() first)!");
 
     fvupscale_.SolveFine(rhs_fine_, coefficient_fine_);
+    for (int i = 0; i < coefficient_fine_.Size(); ++i)
+        coefficient_fine_(i) = std::exp(coefficient_fine_(i));
     return coefficient_fine_;
 }
 
-mfem::Vector& LogPDESampler::GetCoarseCoefficient()
+/// @todo: figure this out...
+mfem::Vector& PDESampler::GetCoarseCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
                 current_state_ == COARSE_SAMPLE,
-                "LogPDESampler object in wrong state (call NewSample() first)!");
+                "PDESampler object in wrong state (call NewSample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
         fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
     fvupscale_.SolveCoarse(rhs_coarse_, coefficient_coarse_);
     coefficient_coarse_ *= -1.0; // ??
+    for (int i = 0; i < coefficient_coarse_.Size(); ++i)
+    {
+        // todo: this is wrong; how do we exponentiate in spectral space?
+        coefficient_coarse_(i) = std::exp(coefficient_coarse_(i));
+    }
     return coefficient_coarse_;
 }
 

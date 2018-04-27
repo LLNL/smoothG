@@ -87,20 +87,22 @@ private:
 };
 
 /**
-   For now we return the log of the permeability field,
-   at some point this class (or its caller?) should
-   exponentiate.
+   Provides lognormal random fields with Matern covariance.
+
+   Uses technique from Osborn, Vassilevski, and Villa, A multilevel,
+   hierarchical sampling technique for spatially correlated random fields,
+   SISC 39 (2017) pp. S543-S562.
 */
-class LogPDESampler : public TwoLevelSampler
+class PDESampler : public TwoLevelSampler
 {
 public:
     /**
        @todo cell_volume should be potentially spatially-varying
     */
-    LogPDESampler(const Upscale& upscale,
-                  int fine_vector_size, int dimension, double cell_volume,
-                  double kappa, int seed);
-    ~LogPDESampler();
+    PDESampler(const Upscale& upscale,
+               int fine_vector_size, int dimension, double cell_volume,
+               double kappa, int seed);
+    ~PDESampler();
 
     /// Draw white noise on fine level
     void NewSample();

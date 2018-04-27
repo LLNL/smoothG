@@ -289,8 +289,8 @@ int main(int argc, char* argv[])
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
-    LogPDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
-                             kappa, seed + myid);
+    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
+                          kappa, seed + myid);
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)
@@ -299,6 +299,8 @@ int main(int argc, char* argv[])
         pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficient();
+        for (int i = 0; i < sol_coarse.Size(); ++i)
+            sol_coarse(i) = std::log(sol_coarse(i));
         auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
         fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
         int coarse_iterations = fvupscale.GetCoarseSolveIters();
@@ -314,6 +316,8 @@ int main(int argc, char* argv[])
         }
 
         auto sol_fine = pdesampler.GetFineCoefficient();
+        for (int i = 0; i < sol_fine.Size(); ++i)
+            sol_fine(i) = std::log(sol_fine(i));
         int fine_iterations = fvupscale.GetFineSolveIters();
         total_fine_iterations += fine_iterations;
         double fine_time = fvupscale.GetFineSolveTime();
@@ -377,8 +381,11 @@ int main(int argc, char* argv[])
     {
         Visualize(mean_upscaled, ufespace, 1);
         Visualize(mean_fine, ufespace, 0);
-        Visualize(m2_upscaled, ufespace, 11);
-        Visualize(m2_fine, ufespace, 10);
+        if (count > 1.1)
+        {
+            Visualize(m2_upscaled, ufespace, 11);
+            Visualize(m2_fine, ufespace, 10);
+        }
     }
     if (save_statistics)
     {

@@ -180,9 +180,9 @@ int main(int argc, char* argv[])
 
     if (myid == 0)
     {
-        std::cout << pmesh->GetNEdges() << " fine edges, " <<
-                  pmesh->GetNFaces() << " fine faces, " <<
-                  pmesh->GetNE() << " fine elements\n";
+        std::cout << pmesh->GetNEdges() << " fine FE edges, " <<
+            pmesh->GetNFaces() << " fine FE faces, " <<
+            pmesh->GetNE() << " fine FE elements\n";
     }
 
     ess_attr.SetSize(nbdr);
@@ -282,6 +282,11 @@ int main(int argc, char* argv[])
     const int num_fine_vertices = vertex_edge.Height();
     const int num_fine_edges = vertex_edge.Width();
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
+    if (myid == 0)
+    {
+        std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = " 
+                  << num_fine_edges << ", coarse aggregates = " << num_aggs << std::endl;
+    }
     unique_ptr<TwoLevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {
@@ -291,8 +296,8 @@ int main(int argc, char* argv[])
     {
         const double kappa = 0.01;
         const int seed = 1;
-        sampler = make_unique<LogPDESampler>(*fvupscale, num_fine_edges, nDimensions,
-                                             spe10problem.CellVolume(nDimensions), kappa, seed);
+        sampler = make_unique<PDESampler>(*fvupscale, num_fine_vertices, nDimensions,
+                                          spe10problem.CellVolume(nDimensions), kappa, seed);
     }
     else
     {
