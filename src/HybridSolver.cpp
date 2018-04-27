@@ -159,10 +159,10 @@ void HybridSolver::InitSolver(SparseMatrix local_hybrid)
         }
     }
 
-    trueHrhs_ = Vector(multiplier_d_td_.Cols());
-    trueMu_ = Vector(trueHrhs_.size());
-    Hrhs_ = Vector(num_multiplier_dofs_);
-    Mu_ = Vector(num_multiplier_dofs_);
+    trueHrhs_.SetSize(multiplier_d_td_.Cols());
+    trueMu_.SetSize(trueHrhs_.size());
+    Hrhs_.SetSize(num_multiplier_dofs_);
+    Mu_.SetSize(num_multiplier_dofs_);
 }
 
 SparseMatrix HybridSolver::MakeEdgeDofMultiplier(const MixedMatrix& mgl,
@@ -324,8 +324,8 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         MultLocal(Mloc_solver, Cloc, MinvCT_i);
 
         Cloc.Mult(MinvCT_i, hybrid_elem);
-        Dloc.Mult(MinvDT_i, Aloc);
         Dloc.Mult(MinvCT_i, DMinvCT);
+        Dloc.Mult(MinvDT_i, Aloc);
 
         if (use_w_)
         {
@@ -335,7 +335,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
             Aloc -= Wloc;
         }
 
-        InvertLocal(Aloc, Ainv_i);
+        Aloc.Invert(Ainv_i);
 
         Ainv_i.Mult(DMinvCT, AinvDMinvCT_i);
 
@@ -346,7 +346,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
             hybrid_elem -= CMDADMC;
         }
 
-        // Add contribution of the element matrix to the golbal system
+        // Add contribution of the element matrix to the global system
         hybrid_system.Add(local_multiplier, hybrid_elem);
     }
 
@@ -405,8 +405,6 @@ void HybridSolver::Solve(const BlockVector& Rhs, BlockVector& Sol) const
 void HybridSolver::RHSTransform(const BlockVector& OriginalRHS,
                                 VectorView HybridRHS) const
 {
-    const auto&& OriginalRHS_block2 = OriginalRHS.GetBlock(1);
-
     HybridRHS = 0.;
 
     Vector f_loc;
@@ -422,7 +420,7 @@ void HybridSolver::RHSTransform(const BlockVector& OriginalRHS,
         int nlocal_multiplier = local_multiplier.size();
 
         // Compute local contribution to the RHS of the hybrid system
-        OriginalRHS_block2.GetSubVector(local_vertexdof, f_loc);
+        OriginalRHS.GetBlock(1).GetSubVector(local_vertexdof, f_loc);
         f_loc *= -1.0;
 
         CMinvDTAinv_f_loc.SetSize(nlocal_multiplier);
@@ -447,8 +445,6 @@ void HybridSolver::RecoverOriginalSolution(const VectorView& HybridSol,
     // This procedure is done locally in each element
 
     RecoveredSol = 0.;
-
-    VectorView RecoveredSol_block2 = RecoveredSol.GetBlock(1);
 
     Vector mu_loc;
     Vector sigma_loc;
@@ -492,14 +488,14 @@ void HybridSolver::RecoverOriginalSolution(const VectorView& HybridSol,
         }
 
         // Save local solution to the global solution vector
-        for (int i = 0; i < nlocal_vertexdof; ++i)
-        {
-            RecoveredSol_block2[local_vertexdof[i]] = u_loc[i];
-        }
-
         for (int i = 0; i < nlocal_edgedof; ++i)
         {
             RecoveredSol[local_edgedof[i]] = -sigma_loc[i];
+        }
+
+        for (int i = 0; i < nlocal_vertexdof; ++i)
+        {
+            RecoveredSol.GetBlock(1)[local_vertexdof[i]] = u_loc[i];
         }
     }
 }

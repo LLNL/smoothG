@@ -628,6 +628,7 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
 
             P_edge.Add(edge_dofs, face_coarse_dofs, trace_ext);
         }
+
         solver.OffsetMult(1, vertex_targets_[agg], bubbles, B_potential_[agg]);
         P_edge.Add(edge_dofs, bubble_dofs, bubbles);
     }
@@ -692,7 +693,6 @@ void GraphCoarsen::BuildAggCDofEdge(const GraphTopology& gt)
 
     agg_cdof_edge_ = SparseMatrix(std::move(indptr), std::move(indices), std::move(data),
                                   num_aggs, num_cdofs);
-
 }
 
 ParMatrix GraphCoarsen::BuildEdgeTrueEdge(const GraphTopology& gt) const

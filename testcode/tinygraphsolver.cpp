@@ -88,11 +88,7 @@ int main(int argc, char* argv[])
     
     SparseMatrix W_block = W_coo.ToSparse();
 
-    std::vector<int> partition(nvertices, 0);
-    if (num_procs == 2)
-    {
-        std::fill(std::begin(partition) + 3, std::end(partition), 1);
-    }
+    std::vector<int> partition {0, 0, 0, 1, 1, 1};
 
     Graph graph(comm, vertex_edge, partition);
     MixedMatrix mgl(graph, weight, W_block);

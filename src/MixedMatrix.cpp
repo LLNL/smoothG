@@ -201,7 +201,6 @@ SparseMatrix MixedMatrix::MakeLocalW(const Graph& graph,
     return W_local;
 }
 
-
 int MixedMatrix::Rows() const
 {
     return D_local_.Rows() + D_local_.Cols();

@@ -30,6 +30,9 @@ import sys
 import platform
 import json
 
+import random
+import math
+
 spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@PROJECT_SOURCE_DIR@/graphdata"
 
@@ -392,6 +395,49 @@ def make_tests():
     return tests
 
 
+def stress_test(num_tests=1, verbose=True):
+    """ Generate random problem and solve
+
+    Args:
+        num_test (int):    number of tests to perform
+
+    Returns:
+        int:     number of failed tests
+    """
+    failed_tests = []
+
+    for i in range(int(num_tests)):
+        nv = random.randrange(50, 10000)
+        b = random.uniform(0.00, 0.20)
+        m = random.randrange(1, 5)
+        t = random.uniform(0.00, 0.005)
+        np = random.randrange(5, max(10, int(nv / random.randrange(10, 50))))
+        md = int(math.log(nv) + random.randrange(1, 5))
+
+        if md % 2 > 0:
+            md += 1
+
+        for proc in range(min(np, int(num_procs))):
+            print("Test:\t{0}.{1}".format(i, proc + 1), end='\r')
+
+            test = [["mpirun", "-np", str(proc + 1), "./generalgraph",
+                "-nv", str(nv), "-t", str(t), "-m", str(m), "-md", str(md),
+                "-gg", "-gf", "-ma", "-np", str(np), "-b", str(b), "-s", "-1"]]
+
+            if not run_test(*test, verbose=verbose):
+                failed_tests.append(test)
+
+            test[0].append("-hb")
+
+            if not run_test(*test, verbose=verbose):
+                failed_tests.append(test)
+
+    for test in failed_tests:
+        print("Failed Test:", test[0].join(' '))
+
+    return len(failed_tests)
+
+
 def run_all_tests(tests, verbose=False):
     """ Execute all tests and display results
 
@@ -448,6 +494,18 @@ def main(argv):
     if "-nv" in argv:
         verbose = False
         argv.remove("-nv")
+
+    if "-np" in argv:
+        global num_procs
+        num_procs = argv[argv.index("-np") + 1]
+        argv.remove("-np")
+        argv.remove(num_procs)
+
+    if "-st" in argv:
+        num_tests = argv[argv.index("-st") + 1]
+        num_failed = stress_test(num_tests, verbose)
+        print("Stress test: {0} failed!".format(num_failed))
+        sys.exit(num_failed)
 
     tests = make_tests()
 
