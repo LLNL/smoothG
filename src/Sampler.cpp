@@ -63,20 +63,20 @@ mfem::Vector& SimpleSampler::GetCoarseCoefficient()
     return coarse_;
 }
 
-PDESampler::PDESampler(const Upscale& fvupscale,
-                       int fine_vector_size, int dimension, double cell_volume,
-                       double kappa, int seed)
+PDESampler::PDESampler(const Upscale& fvupscale, int fine_vector_size, int coarse_aggs,
+                       int dimension, double cell_volume, double kappa, int seed)
     :
     fvupscale_(fvupscale),
     normal_distribution_(0.0, 1.0, seed),
     fine_vector_size_(fine_vector_size),
+    num_coarse_aggs_(coarse_aggs),
     cell_volume_(cell_volume),
     current_state_(NO_SAMPLE)
 {
     rhs_fine_.SetSize(fine_vector_size_);
     coefficient_fine_.SetSize(fine_vector_size_);
     rhs_coarse_ = fvupscale_.GetCoarseVector();
-    coefficient_coarse_ = fvupscale_.GetCoarseVector();
+    coefficient_coarse_.SetSize(coarse_aggs);
 
     double nu_parameter;
     MFEM_ASSERT(dimension == 2 || dimension == 3, "Invalid dimension!");
@@ -124,7 +124,6 @@ mfem::Vector& PDESampler::GetFineCoefficient()
     return coefficient_fine_;
 }
 
-/// @todo: figure this out...
 mfem::Vector& PDESampler::GetCoarseCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
@@ -133,13 +132,72 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
 
     if (current_state_ == FINE_SAMPLE)
         fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
-    fvupscale_.SolveCoarse(rhs_coarse_, coefficient_coarse_);
-    coefficient_coarse_ *= -1.0; // ??
+    mfem::Vector coarse_sol = fvupscale_.GetCoarseVector();
+    fvupscale_.SolveCoarse(rhs_coarse_, coarse_sol);
+
+    // coefficient_coarse_ *= -1.0; // ??
+    /*
     for (int i = 0; i < coefficient_coarse_.Size(); ++i)
     {
         // todo: this is wrong; how do we exponentiate in spectral space?
         coefficient_coarse_(i) = std::exp(coefficient_coarse_(i));
     }
+    */
+
+    coefficient_coarse_ = 0.0;
+    const mfem::Vector& coarse_constant_rep = fvupscale_.GetGraphCoarsen().GetCoarseConstantRep();
+    MFEM_ASSERT(coarse_constant_rep.Size() == coarse_sol.Size(),
+                "PDESampler::GetCoarseCoefficient : Sizes do not match!");
+    // for (int i = 0; i < num_coarse_aggs_; ++i)
+    int agg_index = 0;
+    for (int i = 0; i < coarse_sol.Size(); ++i)
+    {
+        if (coarse_constant_rep(i) > 0.0)
+        {
+            coefficient_coarse_(agg_index++) = std::exp(coarse_sol(i) * coarse_constant_rep(i));
+        }
+    }
+
+    return coefficient_coarse_;
+}
+
+/// @todo ugly hack for debugging, @deprecated
+mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
+{
+    MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
+                current_state_ == COARSE_SAMPLE,
+                "PDESampler object in wrong state (call NewSample() first)!");
+
+    if (current_state_ == FINE_SAMPLE)
+        fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
+    coefficient_coarse_.SetSize(rhs_coarse_.Size());
+    fvupscale_.SolveCoarse(rhs_coarse_, coefficient_coarse_);
+    coefficient_coarse_ *= -1.0; // ??
+
+    const mfem::Vector& coarse_constant_rep = fvupscale_.GetGraphCoarsen().GetCoarseConstantRep();
+    MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_coarse_.Size(),
+                "PDESampler::GetCoarseCoefficient : Sizes do not match!");
+    int agg_index = 0;
+    for (int i = 0; i < coefficient_coarse_.Size(); ++i)
+    {
+        // - negation below is mysterioius
+        // coefficient_coarse_(i) = -std::exp(coefficient_coarse_(i) * coarse_constant_rep(i));
+
+        // just to demonstrate the naive thing doesn't work
+        // coefficient_coarse_(i) = 1.0;
+
+        // the below works nicely, I think
+        // coefficient_coarse_(i) = coarse_constant_rep(i);
+
+        // How about this? (yep)
+        // coefficient_coarse_(i) = 2.0 * coarse_constant_rep(i);
+
+        // doing nothing looks okay...
+        // coefficient_coarse_(i) = coefficient_coarse_(i);
+
+        coefficient_coarse_(i) = std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
+    }
+
     return coefficient_coarse_;
 }
 

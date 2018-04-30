@@ -97,10 +97,26 @@ class PDESampler : public TwoLevelSampler
 {
 public:
     /**
+       Initialize the PDESampler based on the Upscale object (probably
+       FiniteVolumeUpscale).
+
+       @param upscale object containing information about fine and coarse grids
+                      and how they are connected
+       @param fine_vector_size number of vertices on the fine graph
+       @param coarse_aggs number of aggregates on coarse graph - note well this
+                          is *not* the number of degrees of freedom - we only
+                          sample coefficient on the *constant* component, not
+                          the spectral components
+       @param dimension spatial dimension of the mesh
+       @param cell_volume size of a typical cell
+       @param kappa inverse correlation length for Matern covariance
+       @param seed seed for random number generator used here
+
        @todo cell_volume should be potentially spatially-varying
     */
     PDESampler(const Upscale& upscale,
-               int fine_vector_size, int dimension, double cell_volume,
+               int fine_vector_size, int coarse_aggs,
+               int dimension, double cell_volume,
                double kappa, int seed);
     ~PDESampler();
 
@@ -110,11 +126,15 @@ public:
     /// Draw white noise on coarse level
     void NewCoarseSample();
 
-    /// Solve PDE with white-noise RHS to find fine coefficient
+    /// Solve PDE with current white-noise RHS to find fine coefficient
     mfem::Vector& GetFineCoefficient();
 
-    /// Solve PDE with white-noise RHS to find coarse coeffiicent
+    /// Solve PDE with current white-noise RHS to find coarse coeffiicent
+    /// this should be on *aggregates*
     mfem::Vector& GetCoarseCoefficient();
+
+    /// @deprecated
+    mfem::Vector& GetCoarseCoefficientForVisualization();
 
 private:
     enum State
@@ -127,6 +147,7 @@ private:
     const Upscale& fvupscale_;
     NormalDistribution normal_distribution_;
     int fine_vector_size_;
+    int num_coarse_aggs_;
     double cell_volume_;
     double scalar_g_;
     State current_state_;

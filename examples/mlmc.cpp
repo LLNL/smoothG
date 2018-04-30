@@ -296,7 +296,7 @@ int main(int argc, char* argv[])
     {
         const double kappa = 0.01;
         const int seed = 1;
-        sampler = make_unique<PDESampler>(*fvupscale, num_fine_vertices, nDimensions,
+        sampler = make_unique<PDESampler>(*fvupscale, num_fine_vertices, num_aggs, nDimensions,
                                           spe10problem.CellVolume(nDimensions), kappa, seed);
     }
     else

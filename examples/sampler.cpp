@@ -289,8 +289,11 @@ int main(int argc, char* argv[])
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
-    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), nDimensions, cell_volume,
-                          kappa, seed + myid);
+    const int num_aggs = partitioning.Max() + 1;
+    if (myid == 0)
+        std::cout << "Number of aggregates: " << num_aggs << std::endl;
+    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), num_aggs, nDimensions,
+                          cell_volume, kappa, seed + myid);
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)
@@ -298,11 +301,13 @@ int main(int argc, char* argv[])
         double count = static_cast<double>(sample) + 1.0;
         pdesampler.NewSample();
 
-        auto sol_coarse = pdesampler.GetCoarseCoefficient();
+        auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
+        /*
         for (int i = 0; i < sol_coarse.Size(); ++i)
             sol_coarse(i) = std::log(sol_coarse(i));
+        */
         auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
-        fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
+        // fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
         int coarse_iterations = fvupscale.GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale.GetCoarseSolveTime();
@@ -316,8 +321,10 @@ int main(int argc, char* argv[])
         }
 
         auto sol_fine = pdesampler.GetFineCoefficient();
+        /*
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
+        */
         int fine_iterations = fvupscale.GetFineSolveIters();
         total_fine_iterations += fine_iterations;
         double fine_time = fvupscale.GetFineSolveTime();
