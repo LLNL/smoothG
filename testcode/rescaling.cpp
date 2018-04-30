@@ -76,14 +76,17 @@ mfem::SparseMatrix ScaledFineM(mfem::FiniteElementSpace& sigmafespace,
     return VectorToMatrix(inverse_weight);
 }
 
-unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix &vertex_edge,
+unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& vertex_edge,
                                                      const MixedMatrix& mgL,
                                                      const mfem::Array<int>& partitioning)
 {
     auto gt = make_unique<GraphTopology>(vertex_edge, mgL.GetEdgeDofToTrueDof(), partitioning);
+    double spect_tol = 1.0;
+    int max_evects = 3;
     bool dual_target = false, scaled_dual = false, energy_dual = false, coarse_components = false;
     auto coarsener = make_unique<SpectralAMG_MGL_Coarsener>(
-        mgL, std::move(gt), 1.0, 3, dual_target, scaled_dual, energy_dual, coarse_components);
+                         mgL, std::move(gt), spect_tol, max_evects, dual_target,
+                         scaled_dual, energy_dual, coarse_components);
     coarsener->construct_coarse_subspace();
     return coarsener;
 }
@@ -129,7 +132,7 @@ int main(int argc, char* argv[])
     PartitionAAT(vertex_edge, partitioning, coarsening_factor);
 
     // Create an aggregate scaling function (agg scaling = agg number + 1)
-    mfem::Vector agg_scale(partitioning.Max()+1);
+    mfem::Vector agg_scale(partitioning.Max() + 1);
     for (int agg = 0; agg < agg_scale.Size(); agg++)
     {
         agg_scale(agg) = agg + 1;
