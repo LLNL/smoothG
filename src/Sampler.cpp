@@ -134,29 +134,24 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
         fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
     mfem::Vector coarse_sol = fvupscale_.GetCoarseVector();
     fvupscale_.SolveCoarse(rhs_coarse_, coarse_sol);
-
-    // coefficient_coarse_ *= -1.0; // ??
-    /*
-    for (int i = 0; i < coefficient_coarse_.Size(); ++i)
-    {
-        // todo: this is wrong; how do we exponentiate in spectral space?
-        coefficient_coarse_(i) = std::exp(coefficient_coarse_(i));
-    }
-    */
+    coarse_sol *= -1.0;
 
     coefficient_coarse_ = 0.0;
     const mfem::Vector& coarse_constant_rep = fvupscale_.GetGraphCoarsen().GetCoarseConstantRep();
     MFEM_ASSERT(coarse_constant_rep.Size() == coarse_sol.Size(),
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
-    // for (int i = 0; i < num_coarse_aggs_; ++i)
     int agg_index = 0;
     for (int i = 0; i < coarse_sol.Size(); ++i)
     {
-        if (coarse_constant_rep(i) > 0.0)
+        if (std::fabs(coarse_constant_rep(i)) > 1.e-8)
         {
-            coefficient_coarse_(agg_index++) = std::exp(coarse_sol(i) * coarse_constant_rep(i));
+            coefficient_coarse_(agg_index++) =
+                std::exp(coarse_sol(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
         }
     }
+    std::cout << "  agg_index = " << agg_index << ", num_coarse_aggs_ = " << num_coarse_aggs_
+              << ", coarse_sol.Size() = " << coarse_sol.Size() << std::endl;
+    MFEM_ASSERT(agg_index == num_coarse_aggs_, "Something wrong in coarse_constant_rep!");
 
     return coefficient_coarse_;
 }
@@ -177,25 +172,10 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
     const mfem::Vector& coarse_constant_rep = fvupscale_.GetGraphCoarsen().GetCoarseConstantRep();
     MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_coarse_.Size(),
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
-    int agg_index = 0;
     for (int i = 0; i < coefficient_coarse_.Size(); ++i)
     {
-        // - negation below is mysterioius
-        // coefficient_coarse_(i) = -std::exp(coefficient_coarse_(i) * coarse_constant_rep(i));
-
-        // just to demonstrate the naive thing doesn't work
-        // coefficient_coarse_(i) = 1.0;
-
-        // the below works nicely, I think
-        // coefficient_coarse_(i) = coarse_constant_rep(i);
-
-        // How about this? (yep)
-        // coefficient_coarse_(i) = 2.0 * coarse_constant_rep(i);
-
-        // doing nothing looks okay...
-        // coefficient_coarse_(i) = coefficient_coarse_(i);
-
-        coefficient_coarse_(i) = std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
+        coefficient_coarse_(i) =
+            std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
     }
 
     return coefficient_coarse_;

@@ -302,12 +302,17 @@ int main(int argc, char* argv[])
         pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-        /*
-        for (int i = 0; i < sol_coarse.Size(); ++i)
-            sol_coarse(i) = std::log(sol_coarse(i));
-        */
+
+        {
+            auto sol_check = pdesampler.GetCoarseCoefficient();
+            sol_check.Add(-1.0, sol_coarse);
+            std::cout << "   check norm: " << sol_check.Norml2() << std::endl;
+        }
+
         auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
-        // fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
+        for (int i = 0; i < sol_upscaled.Size(); ++i)
+            sol_upscaled(i) = std::log(sol_upscaled(i));
+        fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
         int coarse_iterations = fvupscale.GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale.GetCoarseSolveTime();
@@ -321,10 +326,8 @@ int main(int argc, char* argv[])
         }
 
         auto sol_fine = pdesampler.GetFineCoefficient();
-        /*
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
-        */
         int fine_iterations = fvupscale.GetFineSolveIters();
         total_fine_iterations += fine_iterations;
         double fine_time = fvupscale.GetFineSolveTime();
