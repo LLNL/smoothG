@@ -49,7 +49,7 @@ public:
     /**
         @brief Build agglomerated topology relation tables of the coarse level
                graph in a given GraphTopology object
- 
+
         @param finer_graph_topology finer level graph topology
         @param coarsening_factor intended number of vertices in an aggregate
     */

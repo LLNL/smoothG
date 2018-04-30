@@ -111,12 +111,12 @@ void GraphUpscale::MakeFineSolver() const
 
 Vector GraphUpscale::ReadVertexVector(const std::string& filename) const
 {
-    return Upscale::ReadVector(filename, graph_.vertex_map_);
+    return ReadVector(filename, graph_.vertex_map_);
 }
 
 Vector GraphUpscale::ReadEdgeVector(const std::string& filename) const
 {
-    return Upscale::ReadVector(filename, graph_.edge_map_);
+    return ReadVector(filename, graph_.edge_map_);
 }
 
 BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filename) const
@@ -141,12 +141,12 @@ BlockVector GraphUpscale::ReadEdgeBlockVector(const std::string& filename) const
 
 void GraphUpscale::WriteVertexVector(const VectorView& vect, const std::string& filename) const
 {
-    WriteVector(vect, filename, global_vertices_, graph_.vertex_map_);
+    WriteVector(comm_, vect, filename, global_vertices_, graph_.vertex_map_);
 }
 
 void GraphUpscale::WriteEdgeVector(const VectorView& vect, const std::string& filename) const
 {
-    WriteVector(vect, filename, global_edges_, graph_.edge_map_);
+    WriteVector(comm_, vect, filename, global_edges_, graph_.edge_map_);
 }
 
 } // namespace smoothg

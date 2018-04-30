@@ -299,7 +299,66 @@ struct MpiSession
     @param coarsening_factor determine number of parts to partition into
     @returns partitioning of A * A^T
 */
-std::vector<int> PartitionAAT(const SparseMatrix& A, double coarsening_factor);
+std::vector<int> PartitionAAT(const SparseMatrix& A, double coarsening_factor,
+                              bool ubal = 2.0, bool contig = true);
+
+
+/** @brief Read serial vector from file and extract local portion
+
+    @param filename name of vector file
+    @param local_to_global set of local indices to extract
+    @returns local vector
+*/
+Vector ReadVector(const std::string& filename,
+                  const std::vector<int>& local_to_global);
+
+/** @brief Write a serial vector to file, combining local vectors from all processors
+
+    @param vect vector to write
+    @param filename name of vector file
+    @param global_size global size of vector
+    @param local_to_global map of local indices to global indices
+*/
+template <typename T = VectorView>
+void WriteVector(MPI_Comm comm, const T& vect, const std::string& filename, int global_size,
+                 const std::vector<int>& local_to_global)
+{
+    assert(global_size > 0);
+    assert(vect.size() <= global_size);
+
+    int myid;
+    int num_procs;
+    MPI_Comm_size(comm, &num_procs);
+    MPI_Comm_rank(comm, &myid);
+
+    std::vector<double> global_global(global_size, 0.0);
+    std::vector<double> global_local(global_size, 0.0);
+
+    int local_size = local_to_global.size();
+
+    for (int i = 0; i < local_size; ++i)
+    {
+        global_local[local_to_global[i]] = vect[i];
+    }
+
+    MPI_Scan(global_local.data(), global_global.data(), global_size,
+             MPI_DOUBLE, MPI_SUM, comm);
+
+    if (myid == num_procs - 1)
+    {
+        linalgcpp::WriteText(global_global, filename);
+    }
+}
+
+/**
+   @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
+
+   This function is modified from mfem::Mesh::GetElementColoring.
+
+   @param el_el element connectivity matrix (assuming nonzero diagonal)
+   @returns colors contains colors of all elements
+*/
+std::vector<int> GetElementColoring(const SparseMatrix& el_el);
 
 } //namespace smoothg
 

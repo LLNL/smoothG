@@ -497,46 +497,4 @@ void Upscale::MakeCoarseVectors()
     sol_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
 }
 
-Vector Upscale::ReadVector(const std::string& filename,
-                           const std::vector<int>& local_to_global) const
-{
-    std::vector<double> global_vect = linalgcpp::ReadText(filename);
-
-    int local_size = local_to_global.size();
-
-    Vector local_vect(local_size);
-
-    for (int i = 0; i < local_size; ++i)
-    {
-        local_vect[i] = global_vect[local_to_global[i]];
-    }
-
-    return local_vect;
-}
-
-void Upscale::WriteVector(const VectorView& vect, const std::string& filename, int global_size,
-                          const std::vector<int>& local_to_global) const
-{
-    assert(global_size > 0);
-    assert(vect.size() <= global_size);
-
-    std::vector<double> global_global(global_size, 0.0);
-    std::vector<double> global_local(global_size, 0.0);
-
-    int local_size = local_to_global.size();
-
-    for (int i = 0; i < local_size; ++i)
-    {
-        global_local[local_to_global[i]] = vect[i];
-    }
-
-    MPI_Scan(global_local.data(), global_global.data(), global_size,
-             MPI_DOUBLE, MPI_SUM, comm_);
-
-    if (myid_ == num_procs_ - 1)
-    {
-        linalgcpp::WriteText(global_global, filename);
-    }
-}
-
 } // namespace smoothg

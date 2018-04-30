@@ -179,12 +179,6 @@ protected:
 
     void MakeCoarseVectors();
 
-    Vector ReadVector(const std::string& filename,
-                      const std::vector<int>& local_to_global) const;
-
-    void WriteVector(const VectorView& vect, const std::string& filename, int global_size,
-                     const std::vector<int>& local_to_global) const;
-
     std::vector<MixedMatrix> mgl_;
     GraphCoarsen coarsener_;
     std::unique_ptr<MGLSolver> coarse_solver_;
