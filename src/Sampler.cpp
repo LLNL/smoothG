@@ -149,8 +149,6 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
                 std::exp(coarse_sol(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
         }
     }
-    std::cout << "  agg_index = " << agg_index << ", num_coarse_aggs_ = " << num_coarse_aggs_
-              << ", coarse_sol.Size() = " << coarse_sol.Size() << std::endl;
     MFEM_ASSERT(agg_index == num_coarse_aggs_, "Something wrong in coarse_constant_rep!");
 
     return coefficient_coarse_;

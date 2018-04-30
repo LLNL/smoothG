@@ -302,13 +302,6 @@ int main(int argc, char* argv[])
         pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-
-        {
-            auto sol_check = pdesampler.GetCoarseCoefficient();
-            sol_check.Add(-1.0, sol_coarse);
-            std::cout << "   check norm: " << sol_check.Norml2() << std::endl;
-        }
-
         auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
         for (int i = 0; i < sol_upscaled.Size(); ++i)
             sol_upscaled(i) = std::log(sol_upscaled(i));
