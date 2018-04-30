@@ -73,10 +73,12 @@ void GraphCoarsen::BuildPVertices(
 
     int* Pvertices_i = new int[nvertices + 1];
     Pvertices_i[0] = 0;
+    int total_coarse_dofs = 0;
     for (unsigned int i = 0; i < nAggs; ++i)
     {
         GetTableRow(Agg_vertex, i, local_fine_dofs);
         nlocal_coarse_dofs = vertex_target[i].Width();
+        total_coarse_dofs += nlocal_coarse_dofs;
         nlocal_fine_dofs = local_fine_dofs.Size();
         for (int j = 0; j < nlocal_fine_dofs; ++j)
             Pvertices_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
@@ -87,6 +89,8 @@ void GraphCoarsen::BuildPVertices(
     int* Pvertices_j = new int[Pvertices_i[nvertices]];
     double* Pvertices_data = new double[Pvertices_i[nvertices]];
 
+    coarse_constant_rep_.SetSize(total_coarse_dofs);
+    coarse_constant_rep_ = 0.0;
     int coarse_vertex_dof_counter = 0;
     int ptr;
     for (unsigned int i = 0; i < nAggs; ++i)
@@ -102,6 +106,21 @@ void GraphCoarsen::BuildPVertices(
             {
                 Pvertices_j[ptr] = coarse_vertex_dof_counter + k;
                 Pvertices_data[ptr++] = target_i(j, k);
+                if (k == 0)
+                {
+                    const double cval = coarse_constant_rep_(coarse_vertex_dof_counter);
+                    if (cval == 0)
+                    {
+                        // @todo this should probably depend on volume size etc?
+                        coarse_constant_rep_(coarse_vertex_dof_counter) =
+                            1.0 / target_i(j, k);
+                    }
+                    else
+                    {
+                        MFEM_ASSERT(std::fabs(cval - (1.0 / target_i(j, k))) < 1.e-8,
+                                    "WIP: Coarse DOFs not working as I expect!");
+                    }
+                }
             }
         }
         coarse_vertex_dof_counter += nlocal_coarse_dofs;
