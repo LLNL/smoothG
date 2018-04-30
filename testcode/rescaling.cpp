@@ -76,11 +76,12 @@ mfem::SparseMatrix ScaledFineM(mfem::FiniteElementSpace& sigmafespace,
     return VectorToMatrix(inverse_weight);
 }
 
-unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& vertex_edge,
+unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& v_e,
                                                      const MixedMatrix& mgL,
-                                                     const mfem::Array<int>& partitioning)
+                                                     const mfem::Array<int>& partition,
+                                                     const mfem::SparseMatrix* edge_bdratt)
 {
-    auto gt = make_unique<GraphTopology>(vertex_edge, mgL.GetEdgeDofToTrueDof(), partitioning);
+    auto gt = make_unique<GraphTopology>(v_e, mgL.GetEdgeDofToTrueDof(), partition, edge_bdratt);
     double spect_tol = 1.0;
     int max_evects = 3;
     bool dual_target = false, scaled_dual = false, energy_dual = false, coarse_components = false;
@@ -124,6 +125,8 @@ int main(int argc, char* argv[])
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     auto vertex_edge = TableToMatrix(pmesh->ElementToFaceTable());
+    auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh.get());
+
     mfem::RT_FECollection sigmafec(0, pmesh->SpaceDimension());
     mfem::ParFiniteElementSpace sigmafespace(pmesh.get(), &sigmafec);
 
@@ -142,7 +145,7 @@ int main(int argc, char* argv[])
     auto fine_mgL = UnscaledFineMixedMatrix(sigmafespace, vertex_edge);
 
     // Create a coarsener to build interpolation matrices and coarse M builder
-    auto coarsener = BuildCoarsener(vertex_edge, fine_mgL, partitioning);
+    auto coarsener = BuildCoarsener(vertex_edge, fine_mgL, partitioning, &edge_bdratt);
 
     // Interpolate agg scaling (coarse level) to elements (fine level)
     mfem::Vector elem_scale(pmesh->GetNE());
