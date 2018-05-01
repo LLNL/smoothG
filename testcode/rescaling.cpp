@@ -70,10 +70,7 @@ mfem::SparseMatrix ScaledFineM(mfem::FiniteElementSpace& sigmafespace,
     a1.AddDomainIntegrator(new FiniteVolumeMassIntegrator(inv_scale_coef));
     a1.Assemble();
     a1.Finalize();
-
-    mfem::Vector inverse_weight;
-    a1.SpMat().GetDiag(inverse_weight);
-    return VectorToMatrix(inverse_weight);
+    return mfem::SparseMatrix(a1.SpMat());
 }
 
 unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& v_e,
