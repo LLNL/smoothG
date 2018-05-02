@@ -181,8 +181,8 @@ int main(int argc, char* argv[])
     if (myid == 0)
     {
         std::cout << pmesh->GetNEdges() << " fine FE edges, " <<
-            pmesh->GetNFaces() << " fine FE faces, " <<
-            pmesh->GetNE() << " fine FE elements\n";
+                  pmesh->GetNFaces() << " fine FE faces, " <<
+                  pmesh->GetNE() << " fine FE elements\n";
     }
 
     ess_attr.SetSize(nbdr);
@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
     if (myid == 0)
     {
-        std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = " 
+        std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = "
                   << num_fine_edges << ", coarse aggregates = " << num_aggs << std::endl;
     }
     unique_ptr<TwoLevelSampler> sampler;
