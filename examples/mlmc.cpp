@@ -133,6 +133,9 @@ int main(int argc, char* argv[])
     const char* sampler_type = "simple";
     args.AddOption(&sampler_type, "--sampler-type", "--sampler-type",
                    "Which sampler to use for coefficient: simple, pde");
+    double kappa = 0.001;
+    args.AddOption(&kappa, "--kappa", "--kappa",
+                   "Correlation length for Gaussian samples.");
     args.Parse();
     if (!args.Good())
     {
@@ -284,7 +287,6 @@ int main(int argc, char* argv[])
     fvupscale->MakeFineSolver();
 
     // beginning to think PDESampler should really own this FiniteVolumeUpscale object
-        const double kappa = 0.001;
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
     const double cell_volume = spe10problem.CellVolume(nDimensions);
     W_block *= cell_volume * kappa * kappa;
