@@ -173,7 +173,16 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     const double proc_part_ubal = 2.0;
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+
+    const char* perm_maybe;
+    {
+        std::ifstream check(permFile);
+        if (check.is_open())
+            perm_maybe = permFile;
+        else
+            perm_maybe = NULL;
+    }
+    SPE10Problem spe10problem(perm_maybe, nDimensions, spe10_scale, slice,
                               metis_agglomeration, proc_part_ubal, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
@@ -270,10 +279,16 @@ int main(int argc, char* argv[])
                         edge_boundary_att, ess_attr, spect_tol, max_evects,
                         dual_target, scaled_dual, energy_dual, hybridization, coarse_components);
     }
-
     fvupscale->PrintInfo();
     fvupscale->ShowSetupTime();
     fvupscale->MakeFineSolver();
+
+    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
+    FiniteVolumeUpscale upscale_sampler(comm, vertex_edge, weight, W_block,
+                                        partitioning, *edge_d_td, edge_boundary_att,
+                                        ess_attr, spect_tol, max_evects, dual_target,
+                                        scaled_dual, energy_dual, hybridization);
+    upscale_sampler.MakeFineSolver();
 
     mfem::BlockVector rhs_fine(fvupscale->GetFineBlockVector());
     rhs_fine.GetBlock(0) = 0.0;
@@ -296,7 +311,7 @@ int main(int argc, char* argv[])
     {
         const double kappa = 0.01;
         const int seed = 1;
-        sampler = make_unique<PDESampler>(*fvupscale, num_fine_vertices, num_aggs, nDimensions,
+        sampler = make_unique<PDESampler>(upscale_sampler, num_fine_vertices, num_aggs, nDimensions,
                                           spe10problem.CellVolume(nDimensions), kappa, seed);
     }
     else

@@ -120,10 +120,22 @@ mfem::Vector& PDESampler::GetFineCoefficient()
 
     fvupscale_.SolveFine(rhs_fine_, coefficient_fine_);
     for (int i = 0; i < coefficient_fine_.Size(); ++i)
+    {
         coefficient_fine_(i) = std::exp(coefficient_fine_(i));
+    }
     return coefficient_fine_;
 }
 
+/**
+   For myself:
+
+   c_i              : coefficient for coarse basis function, representing ~normal field K
+   (c_i / q_i)      : value of ~normal field K on agg i
+   exp(c_i/q_i)     : value of lognormal field exp(K) on agg i
+   exp(c_i/q_i) q_i : coefficient for coarse basis function, representing lognormal field exp(K)
+
+   indexing: we consider only the coefficient for the *constant* component i
+*/
 mfem::Vector& PDESampler::GetCoarseCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
@@ -134,7 +146,7 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
         fvupscale_.Restrict(rhs_fine_, rhs_coarse_);
     mfem::Vector coarse_sol = fvupscale_.GetCoarseVector();
     fvupscale_.SolveCoarse(rhs_coarse_, coarse_sol);
-    coarse_sol *= -1.0;
+    coarse_sol *= -1.0; // ?
 
     coefficient_coarse_ = 0.0;
     const mfem::Vector& coarse_constant_rep = fvupscale_.GetGraphCoarsen().GetCoarseConstantRep();
@@ -146,7 +158,7 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
         if (std::fabs(coarse_constant_rep(i)) > 1.e-8)
         {
             coefficient_coarse_(agg_index++) =
-                std::exp(coarse_sol(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
+                std::exp(coarse_sol(i) / coarse_constant_rep(i));
         }
     }
     MFEM_ASSERT(agg_index == num_coarse_aggs_, "Something wrong in coarse_constant_rep!");
