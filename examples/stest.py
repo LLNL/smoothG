@@ -118,11 +118,11 @@ def make_tests():
 
     tests["eigenvector1"] = \
         [["./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "1"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "1"],
          {"finest-div-error": 2.0312444586906591e-08,
           "finest-p-error": 0.14743131732550618,
           "finest-u-error": 0.22621045683612057,
@@ -130,11 +130,11 @@ def make_tests():
 
     tests["eigenvector4"] = \
         [["./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "4"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "4"],
          {"finest-div-error": 2.0336350399372878e-08,
           "finest-p-error": 0.05516198497834629,
           "finest-u-error": 0.052317636963252999,
@@ -142,11 +142,11 @@ def make_tests():
 
     tests["fv-hybridization"] = \
         [["./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "4", "-hb"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "4", "--hb"],
          {"finest-div-error": 1.3301680521537587e-08,
           "finest-p-error": 0.055161984984368362,
           "finest-u-error": 0.052317636981330032,
@@ -154,11 +154,11 @@ def make_tests():
 
     tests["slice19"] = \
         [["./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_19.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "1"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_19.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "1"],
          {"finest-div-error": 1.2837519341678676e-08,
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
@@ -166,11 +166,11 @@ def make_tests():
 
     tests["fv-metis"] = \
         [["./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "1", "-ma", "-np", "132"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "1", "--ma", "--np", "132"],
          {"finest-div-error": 0.5640399150429396,
           "finest-p-error": 0.17385749780334459,
           "finest-u-error": 0.29785869880514693,
@@ -178,7 +178,7 @@ def make_tests():
 
     tests["samplegraph1"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "1"],
+          "--t", "1.0", "--m", "1"],
          {"finest-div-error": 0.37918423747873353,
           "finest-p-error": 0.38013398274257243,
           "finest-u-error": 0.38079825403520218,
@@ -186,7 +186,7 @@ def make_tests():
 
     tests["graph-metis"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "1", "-ma"],
+          "--t", "1.0", "--m", "1", "--ma"],
          {"finest-div-error": 0.44710819907744104,
           "finest-p-error": 0.44939226988126274,
           "finest-u-error": 0.42773807524771068,
@@ -194,8 +194,7 @@ def make_tests():
 
     tests["graph-metis-mac"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "1",
-          "--metis-agglomeration"],
+          "--t", "1.0", "--m", "1", "--ma"],
          {"finest-div-error": 0.22228470008233389,
           "finest-p-error": 0.22265174467689006,
           "finest-u-error": 0.22168973853676807,
@@ -203,7 +202,7 @@ def make_tests():
 
     tests["samplegraph4"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "4"],
+          "--t", "1.0", "--m", "4"],
          {"finest-div-error": 0.12043046187567592,
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
@@ -211,7 +210,7 @@ def make_tests():
 
     tests["graph-hybridization"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "4", "-hb"],
+          "--t", "1.0", "--m", "4", "--hb"],
          {"finest-div-error": 0.12051328492652449,
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
@@ -219,7 +218,7 @@ def make_tests():
 
     tests["graph-usegenerator"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "4", "-gg"],
+          "--t", "1.0", "--m", "4", "--gg"],
          {"finest-div-error": 0.11283262603381641,
           "finest-p-error": 0.1203852548326301,
           "finest-u-error": 0.16674213482507089,
@@ -227,7 +226,7 @@ def make_tests():
 
     tests["graph-usegenerator-mac"] = \
         [["./generalgraph",
-          "-t", "1.0", "-m", "4", "-gg"],
+          "--t", "1.0", "--m", "4", "--gg"],
          {"finest-div-error": 0.1070681247529167,
           "finest-p-error": 0.10863131137013603,
           "finest-u-error": 0.12848813745253315,
@@ -242,9 +241,9 @@ def make_tests():
 
     tests["graph-weight"] = \
         [["./generalgraph",
-          "-g", graph_data + "/vertex_edge_tiny.txt",
-          "-w", graph_data + "/tiny_weights.txt",
-          "-gf", "-ma", "-np", "2"],
+          "--g", graph_data + "/vertex_edge_tiny.txt",
+          "--w", graph_data + "/tiny_weights.txt",
+          "--gf", "--ma", "--np", "2"],
          {"finest-div-error": 0.3033520464019937,
           "finest-p-error": 0.31217311873637132,
           "finest-u-error": 0.14767829457535478,
@@ -252,11 +251,11 @@ def make_tests():
 
     tests["pareigenvector1"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "1"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "1"],
          {"finest-div-error": 2.0312444586906591e-08,
           "finest-p-error": 0.14743131732550618,
           "finest-u-error": 0.22621045683612057,
@@ -264,11 +263,11 @@ def make_tests():
 
     tests["pareigenvector4"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "4"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "4"],
          {"finest-div-error": 2.0336350399372878e-08,
           "finest-p-error": 0.05516198497834629,
           "finest-u-error": 0.052317636963252999,
@@ -276,11 +275,11 @@ def make_tests():
 
     tests["parfv-hybridization"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_0.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "4", "-hb"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_0.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "4", "--hb"],
          {"finest-div-error": 1.3301680521537587e-08,
           "finest-p-error": 0.055161984984368362,
           "finest-u-error": 0.052317636981330032,
@@ -288,11 +287,11 @@ def make_tests():
 
     tests["parslice19"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-g", graph_data + "/fe_vertex_edge.txt",
-          "-w", graph_data + "/fe_weight_19.txt",
-          "-p", graph_data + "/fe_part.txt",
-          "-f", graph_data + "/fe_rhs.txt",
-          "-t", "1.0", "-m", "1"],
+          "--g", graph_data + "/fe_vertex_edge.txt",
+          "--w", graph_data + "/fe_weight_19.txt",
+          "--p", graph_data + "/fe_part.txt",
+          "--f", graph_data + "/fe_rhs.txt",
+          "--t", "1.0", "--m", "1"],
          {"finest-div-error": 1.2837519341678676e-08,
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
@@ -300,7 +299,7 @@ def make_tests():
 
     tests["parsamplegraph1"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "1"],
+          "--t", "1.0", "--m", "1"],
          {"finest-div-error": 0.37918423727222522,
           "finest-p-error": 0.38013398274257243,
           "finest-u-error": 0.38079825403520218,
@@ -308,7 +307,7 @@ def make_tests():
 
     tests["pargraph-metis"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "1", "-ma"],
+          "--t", "1.0", "--m", "1", "--ma"],
          {"finest-div-error": 0.44710819906667049,
           "finest-p-error": 0.44939226988126274,
           "finest-u-error": 0.42773807524771068,
@@ -316,7 +315,7 @@ def make_tests():
 
     tests["pargraph-metis-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "1", "-ma"],
+          "--t", "1.0", "--m", "1", "--ma"],
          {"finest-div-error": 0.22228470008233389,
           "finest-p-error": 0.22265174467689006,
           "finest-u-error": 0.22168973853676807,
@@ -324,7 +323,7 @@ def make_tests():
 
     tests["parsamplegraph4"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "4"],
+          "--t", "1.0", "--m", "4"],
          {"finest-div-error": 0.12043046187567592,
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
@@ -332,7 +331,7 @@ def make_tests():
 
     tests["pargraph-hybridization"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "4", "-hb"],
+          "--t", "1.0", "--m", "4", "--hb"],
          {"finest-div-error": 0.12051328492652449,
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
@@ -340,7 +339,7 @@ def make_tests():
 
     tests["pargraph-usegenerator"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "4", "-gg"],
+          "--t", "1.0", "--m", "4", "--gg"],
          {"finest-div-error": 0.11283262603381641,
           "finest-p-error": 0.1203852548326301,
           "finest-u-error": 0.16674213482507089,
@@ -348,7 +347,7 @@ def make_tests():
 
     tests["pargraph-usegenerator-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
-          "-t", "1.0", "-m", "4", "-gg"],
+          "--t", "1.0", "--m", "4", "--gg"],
          {"finest-div-error": 0.1070681247529167,
           "finest-p-error": 0.10863131137013603,
           "finest-u-error": 0.12848813745253315,
@@ -374,23 +373,23 @@ def make_tests():
             [["mpirun", "-n", num_procs,
               memorycheck_command, "--leak-check=full",
               "./generalgraph",
-              "-g", graph_data + "/fe_vertex_edge.txt",
-              "-w", graph_data + "/fe_weight_0.txt",
-              "-p", graph_data + "/fe_part.txt",
-              "-f", graph_data + "/fe_rhs.txt",
-              "-t", "1.0", "-m", "1"]]
+              "--g", graph_data + "/fe_vertex_edge.txt",
+              "--w", graph_data + "/fe_weight_0.txt",
+              "--p", graph_data + "/fe_part.txt",
+              "--f", graph_data + "/fe_rhs.txt",
+              "--t", "1.0", "--m", "1"]]
 
         tests["vgraph-small-usegenerator"] = \
             [[memorycheck_command, "--leak-check=full",
               "./generalgraph",
-              "-nv", "20", "-md", "4", "-t", "1.0",
-              "-m", "1", "-gg"]]
+              "--nv", "20", "--md", "4", "--t", "1.0",
+              "--m", "1", "--gg"]]
 
         tests["vgraph-small-usegenerator-hb"] = \
             [[memorycheck_command, "--leak-check=full",
               "./generalgraph",
-              "-nv", "20", "-md", "4", "-t", "1.0",
-              "-m", "1", "-gg", "-hb"]]
+              "--nv", "20", "--md", "4", "--t", "1.0",
+              "--m", "1", "--gg", "--hb"]]
 
     return tests
 
@@ -421,13 +420,13 @@ def stress_test(num_tests=1, verbose=True):
             print("Test:\t{0}.{1}".format(i, proc + 1), end='\r')
 
             test = [["mpirun", "-np", str(proc + 1), "./generalgraph",
-                "-nv", str(nv), "-t", str(t), "-m", str(m), "-md", str(md),
-                "-gg", "-gf", "-ma", "-np", str(np), "-b", str(b), "-s", "-1"]]
+                "--nv", str(nv), "--t", str(t), "--m", str(m), "--md", str(md),
+                "--gg", "--gf", "--ma", "--np", str(np), "--b", str(b), "--s", "-1"]]
 
             if not run_test(*test, verbose=verbose):
                 failed_tests.append(test)
 
-            test[0].append("-hb")
+            test[0].append("--hb")
 
             if not run_test(*test, verbose=verbose):
                 failed_tests.append(test)

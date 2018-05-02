@@ -300,7 +300,7 @@ struct MpiSession
     @returns partitioning of A * A^T
 */
 std::vector<int> PartitionAAT(const SparseMatrix& A, double coarsening_factor,
-                              bool ubal = 2.0, bool contig = true);
+                              double ubal = 2.0, bool contig = true);
 
 
 /** @brief Read serial vector from file and extract local portion

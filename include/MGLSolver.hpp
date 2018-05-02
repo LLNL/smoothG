@@ -96,8 +96,8 @@ protected:
     // default linear solver options
     int print_level_ = 0;
     int max_num_iter_ = 5000;
-    double rtol_ = 1e-9 * 1e-9;
-    double atol_ = 1e-12 * 1e-12;
+    double rtol_ = 1e-9;
+    double atol_ = 1e-12;
 
     int nnz_ = 0;
     mutable int num_iterations_ = 0;

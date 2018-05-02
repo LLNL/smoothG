@@ -25,11 +25,11 @@ namespace smoothg
 {
 
 MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
-    : MGLSolver(mgl.offsets_), M_(mgl.M_global_), D_(mgl.D_global_), W_(mgl.W_global_),
-      edge_true_edge_(mgl.edge_true_edge_),
+    : MGLSolver(mgl.Offsets()), M_(mgl.GlobalM()), D_(mgl.GlobalD()), W_(mgl.GlobalW()),
+      edge_true_edge_(mgl.EdgeTrueEdge()),
       comm_(M_.GetComm()), myid_(M_.GetMyId()),
-      op_(mgl.true_offsets_), prec_(mgl.true_offsets_),
-      true_rhs_(mgl.true_offsets_), true_sol_(mgl.true_offsets_),
+      op_(mgl.TrueOffsets()), prec_(mgl.TrueOffsets()),
+      true_rhs_(mgl.TrueOffsets()), true_sol_(mgl.TrueOffsets()),
       use_w_(mgl.CheckW())
 {
     if (!use_w_ && myid_ == 0)

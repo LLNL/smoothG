@@ -24,59 +24,22 @@
 namespace smoothg
 {
 
-std::vector<std::vector<double>>
-HybridSolver::BuildFineLevelLocalMassMatrix(const SparseMatrix& vertex_edge,
-                                            const SparseMatrix& M)
-{
-    const int num_vertices = vertex_edge.Rows();
-
-    std::vector<std::vector<double>> M_el(num_vertices);
-
-    SparseMatrix edge_vertex = vertex_edge.Transpose();
-
-    const auto& M_data = M.GetData();
-
-    for (int i = 0; i < num_vertices; ++i)
-    {
-        std::vector<int> edge_dofs = vertex_edge.GetIndices(i);
-
-        int num_dofs = edge_dofs.size();
-
-        M_el[i].resize(num_dofs);
-
-        for (int j = 0; j < num_dofs; ++j)
-        {
-            if (edge_vertex.RowSize(edge_dofs[j]) == 2)
-            {
-                M_el[i][j] = M_data[edge_dofs[j]] / 2.0;
-            }
-            else
-            {
-                M_el[i][j] = M_data[edge_dofs[j]];
-            }
-        }
-    }
-
-    return M_el;
-}
-
-
-HybridSolver::HybridSolver(const MixedMatrix& mgl)
+HybridSolver::HybridSolver(const ElemMixedMatrix<std::vector<double>>& mgl)
     :
-    MGLSolver(mgl.offsets_), comm_(mgl.D_global_.GetComm()), myid_(mgl.D_global_.GetMyId()),
-    agg_vertexdof_(SparseIdentity(mgl.D_local_.Rows())),
-    agg_edgedof_(mgl.D_local_),
+    MGLSolver(mgl.Offsets()), comm_(mgl.GlobalD().GetComm()), myid_(mgl.GlobalD().GetMyId()),
+    agg_vertexdof_(SparseIdentity(mgl.LocalD().Rows())),
+    agg_edgedof_(mgl.LocalD()),
     agg_multiplier_(agg_edgedof_),
     num_aggs_(agg_edgedof_.Rows()),
     num_edge_dofs_(agg_edgedof_.Cols()),
     num_multiplier_dofs_(num_edge_dofs_),
-    multiplier_d_td_(mgl.edge_true_edge_),
+    multiplier_d_td_(mgl.EdgeTrueEdge()),
     MinvDT_(num_aggs_), MinvCT_(num_aggs_),
     AinvDMinvCT_(num_aggs_), Ainv_(num_aggs_),
-    Ainv_f_(num_aggs_),
-    use_w_(mgl.CheckW())
+    hybrid_elem_(num_aggs_), Ainv_f_(num_aggs_),
+    agg_weights_(num_aggs_, 1.0), use_w_(mgl.CheckW())
 {
-    auto M_el = BuildFineLevelLocalMassMatrix(mgl.D_local_, mgl.M_local_);
+    const std::vector<std::vector<double>>& M_el = mgl.GetElemM();
     std::vector<int> j_multiplier_edgedof(num_edge_dofs_);
     std::iota(std::begin(j_multiplier_edgedof), std::end(j_multiplier_edgedof), 0);
 
@@ -86,10 +49,10 @@ HybridSolver::HybridSolver(const MixedMatrix& mgl)
 }
 
 
-HybridSolver::HybridSolver(const MixedMatrix& mgl,
+HybridSolver::HybridSolver(const ElemMixedMatrix<DenseMatrix>& mgl,
                            const GraphCoarsen& coarsener)
     :
-    MGLSolver(mgl.offsets_), comm_(mgl.D_global_.GetComm()), myid_(mgl.D_global_.GetMyId()),
+    MGLSolver(mgl.Offsets()), comm_(mgl.GlobalD().GetComm()), myid_(mgl.GlobalD().GetMyId()),
     agg_vertexdof_(coarsener.GetAggCDofVertex()),
     agg_edgedof_(coarsener.GetAggCDofEdge()),
     num_aggs_(agg_edgedof_.Rows()),
@@ -97,8 +60,8 @@ HybridSolver::HybridSolver(const MixedMatrix& mgl,
     num_multiplier_dofs_(coarsener.GetFaceCDof().Cols()),
     MinvDT_(num_aggs_), MinvCT_(num_aggs_),
     AinvDMinvCT_(num_aggs_), Ainv_(num_aggs_),
-    Ainv_f_(num_aggs_),
-    use_w_(mgl.CheckW())
+    hybrid_elem_(num_aggs_), Ainv_f_(num_aggs_),
+    agg_weights_(num_aggs_, 1.0), use_w_(mgl.CheckW())
 {
     SparseMatrix edgedof_multiplier = MakeEdgeDofMultiplier(mgl, coarsener);
     SparseMatrix multiplier_edgedof = edgedof_multiplier.Transpose();
@@ -106,14 +69,14 @@ HybridSolver::HybridSolver(const MixedMatrix& mgl,
 
     agg_multiplier_ = agg_edgedof_.Mult(edgedof_multiplier);
 
-    ParMatrix edge_td_d = mgl.edge_true_edge_.Transpose();
-    ParMatrix edge_edge = mgl.edge_true_edge_.Mult(edge_td_d);
+    ParMatrix edge_td_d = mgl.EdgeTrueEdge().Transpose();
+    ParMatrix edge_edge = mgl.EdgeTrueEdge().Mult(edge_td_d);
     ParMatrix edgedof_multiplier_d(comm_, std::move(edgedof_multiplier));
     ParMatrix multiplier_d_td_d = parlinalgcpp::RAP(edge_edge, edgedof_multiplier_d);
 
     multiplier_d_td_ = MakeEntityTrueEntity(multiplier_d_td_d);
 
-    const std::vector<DenseMatrix>& M_el = coarsener.GetMelem();
+    const std::vector<DenseMatrix>& M_el = mgl.GetElemM();
     SparseMatrix local_hybrid = AssembleHybridSystem(mgl, M_el, j_multiplier_edgedof);
 
     InitSolver(std::move(local_hybrid));
@@ -187,7 +150,7 @@ SparseMatrix HybridSolver::MakeLocalC(int agg, const MixedMatrix& mgl,
                                       std::vector<int>& edge_map,
                                       std::vector<bool>& edge_marker) const
 {
-    const auto& edgedof_IsOwned = mgl.edge_true_edge_.GetDiag();
+    const auto& edgedof_IsOwned = mgl.EdgeTrueEdge().GetDiag();
 
     std::vector<int> local_edgedof = agg_edgedof_.GetIndices(agg);
     std::vector<int> local_multiplier = agg_multiplier_.GetIndices(agg);
@@ -282,7 +245,6 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
     DenseMatrix Wloc;
     DenseMatrix CMDADMC;
     DenseMatrix DMinvCT;
-    DenseMatrix hybrid_elem;
 
     CooMatrix hybrid_system(num_multiplier_dofs_);
 
@@ -296,7 +258,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         const int nlocal_vertexdof = local_vertexdof.size();
         const int nlocal_multiplier = local_multiplier.size();
 
-        SparseMatrix Dloc = mgl.D_local_.GetSubMatrix(local_vertexdof, local_edgedof,
+        SparseMatrix Dloc = mgl.LocalD().GetSubMatrix(local_vertexdof, local_edgedof,
                                                       edge_map);
 
         SparseMatrix Cloc = MakeLocalC(agg, mgl, j_multiplier_edgedof, edge_map, edge_marker);
@@ -314,6 +276,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         DenseMatrix& MinvDT_i(MinvDT_[agg]);
         DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[agg]);
         DenseMatrix& Ainv_i(Ainv_[agg]);
+        DenseMatrix& hybrid_elem(hybrid_elem_[agg]);
 
         AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
         hybrid_elem.SetSize(nlocal_multiplier, nlocal_multiplier);
@@ -329,7 +292,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
 
         if (use_w_)
         {
-            auto Wloc_tmp = mgl.W_local_.GetSubMatrix(local_vertexdof, local_vertexdof, edge_map);
+            auto Wloc_tmp = mgl.LocalW().GetSubMatrix(local_vertexdof, local_vertexdof, edge_map);
             Wloc_tmp.ToDense(Wloc);
 
             Aloc -= Wloc;
@@ -434,6 +397,7 @@ void HybridSolver::RHSTransform(const BlockVector& OriginalRHS,
         // Save the element rhs [M B^T;B 0]^-1[f;g] for solution recovery
         Ainv_f_[iAgg].SetSize(nlocal_vertexdof);
         Ainv_[iAgg].Mult(f_loc, Ainv_f_[iAgg]);
+        Ainv_f_[iAgg] /= agg_weights_[iAgg];
     }
 }
 
@@ -485,6 +449,7 @@ void HybridSolver::RecoverOriginalSolution(const VectorView& HybridSol,
             tmp.SetSize(sigma_loc.size());
             MinvCT_[iAgg].Mult(mu_loc, tmp);
             sigma_loc += tmp;
+            sigma_loc *= agg_weights_[iAgg];
         }
 
         // Save local solution to the global solution vector
@@ -498,6 +463,25 @@ void HybridSolver::RecoverOriginalSolution(const VectorView& HybridSol,
             RecoveredSol.GetBlock(1)[local_vertexdof[i]] = u_loc[i];
         }
     }
+}
+
+void HybridSolver::UpdateAggScaling(const std::vector<double>& agg_weight)
+{
+    assert(!use_w_);
+    assert(static_cast<int>(agg_weight.size()) == num_aggs_);
+
+    std::copy(std::begin(agg_weight), std::end(agg_weight), std::begin(agg_weights_));
+
+    CooMatrix hybrid_system(num_multiplier_dofs_);
+
+    for (int i = 0; i < num_aggs_; ++i)
+    {
+        std::vector<int> local_multipliers = agg_multiplier_.GetIndices(i);
+
+        hybrid_system.Add(local_multipliers, agg_weight[i], hybrid_elem_[i]);
+    }
+
+    InitSolver(hybrid_system.ToSparse());
 }
 
 void HybridSolver::SetPrintLevel(int print_level)

@@ -77,18 +77,12 @@ namespace smoothg
 class HybridSolver : public MGLSolver
 {
 public:
-    /// Construct local mass matrix for the fine level edge space
-    static std::vector<std::vector<double>>
-    BuildFineLevelLocalMassMatrix(const SparseMatrix& vertex_edge,
-                                  const SparseMatrix& M);
-
-public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
 
        @param mgL Mixed matrices for the graph Laplacian in the fine level
     */
-    HybridSolver(const MixedMatrix& mgL);
+    HybridSolver(const ElemMixedMatrix<std::vector<double>>& mgL);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
@@ -96,7 +90,7 @@ public:
        @param mgL Mixed matrices for the graph Laplacian in the coarse level
        @param mgLc Mixed graph Laplacian Coarsener from fine to coarse level
     */
-    HybridSolver(const MixedMatrix& mgl,
+    HybridSolver(const ElemMixedMatrix<DenseMatrix>& mgl,
                  const GraphCoarsen& coarsener);
 
     virtual ~HybridSolver() = default;
@@ -125,6 +119,14 @@ public:
     */
     void RecoverOriginalSolution(const VectorView& HybridSol,
                                  BlockVector& RecoveredSol) const;
+
+    /**
+       @brief Update weights of local M matrices on aggregates
+       @param agg_weights weights per aggregate
+
+       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
+    */
+    void UpdateAggScaling(const std::vector<double>& agg_weight);
 
     ///@name Set solver parameters
     ///@{
@@ -174,8 +176,11 @@ private:
     std::vector<DenseMatrix> MinvCT_;
     std::vector<DenseMatrix> AinvDMinvCT_;
     std::vector<DenseMatrix> Ainv_;
+    std::vector<DenseMatrix> hybrid_elem_;
 
     mutable std::vector<Vector> Ainv_f_;
+
+    std::vector<double> agg_weights_;
 
     mutable Vector trueHrhs_;
     mutable Vector trueMu_;

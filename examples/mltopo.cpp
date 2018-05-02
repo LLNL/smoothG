@@ -60,17 +60,17 @@ int main(int argc, char* argv[])
 
     linalgcpp::ArgParser arg_parser(argc, argv);
 
-    arg_parser.Parse(graph_filename, "-g", "Graph connection data.");
-    arg_parser.Parse(partition_filename, "-p", "Partition data.");
-    arg_parser.Parse(save_output, "-save", "Save topology partitionings.");
-    arg_parser.Parse(num_levels, "-nl", "Number of topology levels.");
-    arg_parser.Parse(coarsen_factor, "-cf", "Coarsening factor between levels.");
-    arg_parser.Parse(metis_agglomeration, "-ma", "Enable Metis partitioning for initial partition.");
-    arg_parser.Parse(generate_graph, "-gg", "Generate a graph.");
-    arg_parser.Parse(gen_vertices, "-nv", "Number of vertices of generated graph.");
-    arg_parser.Parse(mean_degree, "-md", "Average vertex degree of generated graph.");
-    arg_parser.Parse(beta, "-b", "Probability of rewiring in the Watts-Strogatz model.");
-    arg_parser.Parse(seed, "-s", "Seed for random number generator.");
+    arg_parser.Parse(graph_filename, "--g", "Graph connection data.");
+    arg_parser.Parse(partition_filename, "--p", "Partition data.");
+    arg_parser.Parse(save_output, "--save", "Save topology partitionings.");
+    arg_parser.Parse(num_levels, "--nl", "Number of topology levels.");
+    arg_parser.Parse(coarsen_factor, "--cf", "Coarsening factor between levels.");
+    arg_parser.Parse(metis_agglomeration, "--ma", "Enable Metis partitioning for initial partition.");
+    arg_parser.Parse(generate_graph, "--gg", "Generate a graph.");
+    arg_parser.Parse(gen_vertices, "--nv", "Number of vertices of generated graph.");
+    arg_parser.Parse(mean_degree, "--md", "Average vertex degree of generated graph.");
+    arg_parser.Parse(beta, "--b", "Probability of rewiring in the Watts-Strogatz model.");
+    arg_parser.Parse(seed, "--s", "Seed for random number generator.");
 
     if (!arg_parser.IsGood())
     {

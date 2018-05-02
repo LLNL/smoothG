@@ -14,9 +14,9 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @example
-   @file generalgraph.cpp
-   @brief Compares a graph upscaled solution to the fine solution.
+   @file mlmc.cpp
+   @brief This is an example for upscaling a graph Laplacian,
+   where we change coefficients in the model without re-coarsening.
 */
 
 #include <fstream>
@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
     std::string partition_filename = "../../graphdata/partition_sample.txt";
     std::string weight_filename = "";
     std::string w_block_filename = "";
+    bool save_output = false;
 
     int isolate = -1;
     int max_evects = 4;
@@ -68,6 +69,8 @@ int main(int argc, char* argv[])
     double beta = 0.15;
     int seed = 0;
 
+    int num_samples = 3;
+
     linalgcpp::ArgParser arg_parser(argc, argv);
 
     arg_parser.Parse(graph_filename, "--g", "Graph connection data.");
@@ -75,6 +78,7 @@ int main(int argc, char* argv[])
     arg_parser.Parse(partition_filename, "--p", "Partition data.");
     arg_parser.Parse(weight_filename, "--w", "Edge weight data.");
     arg_parser.Parse(w_block_filename, "--wb", "W block data.");
+    arg_parser.Parse(save_output, "--save", "Save solutions.");
     arg_parser.Parse(isolate, "--isolate", "Isolate a single vertex.");
     arg_parser.Parse(max_evects, "--m", "Maximum eigenvectors per aggregate.");
     arg_parser.Parse(spect_tol, "--t", "Spectral tolerance for eigenvalue problem.");
@@ -88,6 +92,7 @@ int main(int argc, char* argv[])
     arg_parser.Parse(mean_degree, "--md", "Average vertex degree of generated graph.");
     arg_parser.Parse(beta, "--b", "Probability of rewiring in the Watts-Strogatz model.");
     arg_parser.Parse(seed, "--s", "Seed for random number generator.");
+    arg_parser.Parse(num_samples, "--ns", "Number of samples.");
 
     if (!arg_parser.IsGood())
     {
@@ -116,15 +121,15 @@ int main(int argc, char* argv[])
     /// [Load graph from file or generate one]
 
     /// [Partitioning]
-    std::vector<int> global_partitioning;
+    std::vector<int> part;
     if (metis_agglomeration || generate_graph)
     {
         assert(num_partitions >= num_procs);
-        global_partitioning = MetisPart(vertex_edge_global, num_partitions);
+        part = MetisPart(vertex_edge_global, num_partitions);
     }
     else
     {
-        global_partitioning = ReadText<int>(partition_filename);
+        part = ReadText<int>(partition_filename);
     }
     /// [Partitioning]
 
@@ -142,7 +147,7 @@ int main(int argc, char* argv[])
 
     // Set up GraphUpscale
     /// [Upscale]
-    GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
+    GraphUpscale upscale(comm, vertex_edge_global, part,
                          spect_tol, max_evects, hybridization, weight);
 
     upscale.PrintInfo();
@@ -161,20 +166,48 @@ int main(int argc, char* argv[])
     {
         fine_rhs.GetBlock(1) = upscale.ReadVertexVector(fiedler_filename);
     }
-
     /// [Right Hand Side]
 
     /// [Solve]
-    BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-    upscale.ShowCoarseSolveInfo();
+    int num_aggs = upscale.NumAggs();
+    std::vector<double> fine_weights(upscale.Rows());
+    std::vector<double> coarse_weights(num_aggs);
 
-    BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-    upscale.ShowFineSolveInfo();
+    BlockVector fine_sol = upscale.GetFineBlockVector();
+    BlockVector upscaled_sol = upscale.GetFineBlockVector();
+
+    for (int i = 0; i < num_samples; ++i)
+    {
+        std::fill(std::begin(coarse_weights), std::end(coarse_weights), i + 1.0);
+        std::fill(std::begin(fine_weights), std::end(fine_weights), i + 1.0);
+
+        upscale.MakeCoarseSolver(coarse_weights);
+        upscale.MakeFineSolver(fine_weights);
+
+        upscale.Solve(fine_rhs, upscaled_sol);
+        upscale.SolveFine(fine_rhs, fine_sol);
+
+        if (save_output)
+        {
+            std::stringstream ss_coarse;
+            std::stringstream ss_fine;
+
+            ss_coarse << "coarse_sol_" << i << ".txt";
+            ss_fine << "fine_sol_" << i << ".txt";
+
+            upscale.WriteVertexVector(upscaled_sol.GetBlock(1), ss_coarse.str());
+            upscale.WriteVertexVector(fine_sol.GetBlock(1), ss_fine.str());
+        }
+
+        upscale.ShowCoarseSolveInfo();
+        upscale.ShowFineSolveInfo();
+
+        /// [Check Error]
+        upscale.ShowErrors(upscaled_sol, fine_sol);
+        /// [Check Error]
+
+    }
     /// [Solve]
-
-    /// [Check Error]
-    upscale.ShowErrors(upscaled_sol, fine_sol);
-    /// [Check Error]
 
     if (save_fiedler)
     {

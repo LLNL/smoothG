@@ -76,10 +76,9 @@ public:
     /** @brief Create the coarse mixed matrix
         @param gt Fine level graph topology relationships
         @param mgl Fine level mixed matrix
-        @param hybridization if false, assembles M from element matrices
     */
-    MixedMatrix Coarsen(const GraphTopology& gt, const MixedMatrix& mgl,
-                        bool hybridization) const;
+    ElemMixedMatrix<DenseMatrix> Coarsen(const GraphTopology& gt,
+                                         const MixedMatrix& mgl) const;
 
     /** @brief Interpolate a coarse vertex vector to the fine level
         @param coarse_vect vertex vector to interpolate

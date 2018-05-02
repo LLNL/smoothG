@@ -196,27 +196,27 @@ BlockVector Upscale::Restrict(const BlockVector& x) const
 
 const std::vector<int>& Upscale::FineBlockOffsets() const
 {
-    return GetFineMatrix().offsets_;
+    return GetFineMatrix().Offsets();
 }
 
 const std::vector<int>& Upscale::CoarseBlockOffsets() const
 {
-    return GetCoarseMatrix().offsets_;
+    return GetCoarseMatrix().Offsets();
 }
 
 const std::vector<int>& Upscale::FineTrueBlockOffsets() const
 {
-    return GetFineMatrix().true_offsets_;
+    return GetFineMatrix().TrueOffsets();
 }
 
 const std::vector<int>& Upscale::CoarseTrueBlockOffsets() const
 {
-    return GetCoarseMatrix().true_offsets_;
+    return GetCoarseMatrix().TrueOffsets();
 }
 
 void Upscale::Orthogonalize(VectorView vect) const
 {
-    OrthoConstant(comm_, vect, GetFineMatrix().D_global_.GlobalRows());
+    OrthoConstant(comm_, vect, GetFineMatrix().GlobalD().GlobalRows());
 }
 
 void Upscale::Orthogonalize(BlockVector& vect) const
@@ -226,50 +226,52 @@ void Upscale::Orthogonalize(BlockVector& vect) const
 
 Vector Upscale::GetCoarseVector() const
 {
-    int coarse_size = GetCoarseMatrix().D_local_.Rows();
+    int coarse_size = GetCoarseMatrix().LocalD().Rows();
 
     return Vector(coarse_size);
 }
 
 Vector Upscale::GetFineVector() const
 {
-    int fine_size = GetFineMatrix().D_local_.Rows();
+    int fine_size = GetFineMatrix().LocalD().Rows();
 
     return Vector(fine_size);
 }
 
 BlockVector Upscale::GetCoarseBlockVector() const
 {
-    return BlockVector(GetCoarseMatrix().offsets_);
+    return BlockVector(GetCoarseMatrix().Offsets());
 }
 
 BlockVector Upscale::GetFineBlockVector() const
 {
-    return BlockVector(GetFineMatrix().offsets_);
+    return BlockVector(GetFineMatrix().Offsets());
 }
 
 BlockVector Upscale::GetCoarseTrueBlockVector() const
 {
-    return BlockVector(GetCoarseMatrix().true_offsets_);
+    return BlockVector(GetCoarseMatrix().TrueOffsets());
 }
 
 BlockVector Upscale::GetFineTrueBlockVector() const
 {
-    return BlockVector(GetFineMatrix().true_offsets_);
+    return BlockVector(GetFineMatrix().TrueOffsets());
 }
 
 MixedMatrix& Upscale::GetMatrix(int level)
 {
     assert(level >= 0 && level < static_cast<int>(mgl_.size()));
+    assert(mgl_[level]);
 
-    return mgl_[level];
+    return *mgl_[level];
 }
 
 const MixedMatrix& Upscale::GetMatrix(int level) const
 {
     assert(level >= 0 && level < static_cast<int>(mgl_.size()));
+    assert(mgl_[level]);
 
-    return mgl_[level];
+    return *mgl_[level];
 }
 
 MixedMatrix& Upscale::GetFineMatrix()
@@ -471,8 +473,8 @@ double Upscale::GetSetupTime() const
 std::vector<double> Upscale::ComputeErrors(const BlockVector& upscaled_sol,
                                            const BlockVector& fine_sol) const
 {
-    const SparseMatrix& M = GetFineMatrix().M_local_;
-    const SparseMatrix& D = GetFineMatrix().D_local_;
+    const SparseMatrix& M = GetFineMatrix().LocalM();
+    const SparseMatrix& D = GetFineMatrix().LocalD();
 
     auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
     info.push_back(OperatorComplexity());
@@ -493,8 +495,8 @@ void Upscale::ShowErrors(const BlockVector& upscaled_sol,
 
 void Upscale::MakeCoarseVectors()
 {
-    rhs_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
-    sol_coarse_ = BlockVector(GetCoarseMatrix().offsets_);
+    rhs_coarse_ = BlockVector(GetCoarseMatrix().Offsets());
+    sol_coarse_ = BlockVector(GetCoarseMatrix().Offsets());
 }
 
 } // namespace smoothg

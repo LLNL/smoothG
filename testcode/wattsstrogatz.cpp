@@ -41,9 +41,9 @@ int main(int argc, char* argv[])
     double beta = 0.15;
     unsigned int seed = 5;
 
-    arg_parser.Parse(nvertices, "-nv", "Number of vertices of the graph to be generated.");
-    arg_parser.Parse(mean_degree, "-md", "Average vertex degree of the graph to be generated.");
-    arg_parser.Parse(beta, "-b", "Probability of rewiring in the Watts-Strogatz model.");
+    arg_parser.Parse(nvertices, "--nv", "Number of vertices of the graph to be generated.");
+    arg_parser.Parse(mean_degree, "--md", "Average vertex degree of the graph to be generated.");
+    arg_parser.Parse(beta, "--b", "Probability of rewiring in the Watts-Strogatz model.");
 
     if (!arg_parser.IsGood())
     {

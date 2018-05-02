@@ -179,9 +179,10 @@ protected:
 
     void MakeCoarseVectors();
 
-    std::vector<MixedMatrix> mgl_;
+    std::vector<std::unique_ptr<MixedMatrix>> mgl_;
     GraphCoarsen coarsener_;
     std::unique_ptr<MGLSolver> coarse_solver_;
+    std::unique_ptr<MGLSolver> fine_solver_;
 
     MPI_Comm comm_;
     int myid_;
@@ -196,9 +197,6 @@ protected:
 
     mutable BlockVector rhs_coarse_;
     mutable BlockVector sol_coarse_;
-
-    // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    mutable std::unique_ptr<MGLSolver> fine_solver_;
 };
 
 } // namespace smoothg

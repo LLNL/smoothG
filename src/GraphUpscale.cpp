@@ -24,7 +24,18 @@ namespace smoothg
 {
 
 GraphUpscale::GraphUpscale(MPI_Comm comm,
-                           const linalgcpp::SparseMatrix<double>& vertex_edge_global,
+                           const SparseMatrix& vertex_edge_global,
+                           double coarse_factor, double spect_tol,
+                           int max_evects, bool hybridization,
+                           const std::vector<double>& weight_global)
+    : GraphUpscale(comm, vertex_edge_global, PartitionAAT(vertex_edge_global, coarse_factor),
+                   spect_tol, max_evects, hybridization, weight_global)
+{
+
+}
+
+GraphUpscale::GraphUpscale(MPI_Comm comm,
+                           const SparseMatrix& vertex_edge_global,
                            const std::vector<int>& partitioning_global,
                            double spect_tol, int max_evects, bool hybridization,
                            const std::vector<double>& weight_global)
@@ -33,79 +44,96 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
 {
     Timer timer(Timer::Start::True);
 
-    Init(vertex_edge_global, partitioning_global, weight_global);
-
-    timer.Click();
-    setup_time_ += timer.TotalTime();
-}
-
-GraphUpscale::GraphUpscale(MPI_Comm comm,
-                           const SparseMatrix& vertex_edge_global,
-                           double coarse_factor,
-                           double spect_tol, int max_evects, bool hybridization,
-                           const std::vector<double>& weight_global)
-    : Upscale(comm, vertex_edge_global, hybridization),
-      spect_tol_(spect_tol), max_evects_(max_evects)
-{
-    Timer timer(Timer::Start::True);
-
-    SparseMatrix edge_vertex = vertex_edge_global.Transpose();
-    SparseMatrix vertex_vertex = vertex_edge_global.Mult(edge_vertex);
-
-    int num_parts = std::max(1.0, (global_vertices_ / (double)(coarse_factor)) + 0.5);
-
-    double ubal = 2.0;
-    std::vector<int> partitioning_global = Partition(vertex_vertex, num_parts, ubal);
-
-    Init(vertex_edge_global, partitioning_global, weight_global);
-
-    timer.Click();
-    setup_time_ += timer.TotalTime();
-}
-
-void GraphUpscale::Init(const SparseMatrix& vertex_edge,
-                        const std::vector<int>& global_partitioning,
-                        const std::vector<double>& weight)
-{
-    graph_ = Graph(comm_, vertex_edge, global_partitioning);
-    mgl_.emplace_back(graph_, weight);
+    graph_ = Graph(comm_, vertex_edge_global, partitioning_global);
     gt_ = GraphTopology(graph_);
 
-    coarsener_ = GraphCoarsen(GetFineMatrix(), gt_,
-                              max_evects_, spect_tol_);
+    VectorElemMM fine_mm(graph_, weight_global);
+    fine_mm.AssembleM(); // Coarsening requires assembled M, for now
 
-    mgl_.push_back(coarsener_.Coarsen(gt_, GetFineMatrix(), hybridization_));
+    coarsener_ = GraphCoarsen(fine_mm, gt_, max_evects_, spect_tol_);
 
-    if (hybridization_)
-    {
-        coarse_solver_ = make_unique<HybridSolver>(GetCoarseMatrix(), coarsener_);
-    }
-    else
-    {
-        coarse_solver_ = make_unique<MinresBlockSolver>(GetCoarseMatrix());
-    }
+    DenseElemMM coarse_mm = coarsener_.Coarsen(gt_, fine_mm);
 
-    MakeCoarseVectors();
+    mgl_.push_back(make_unique<VectorElemMM>(std::move(fine_mm)));
+    mgl_.push_back(make_unique<DenseElemMM>(std::move(coarse_mm)));
 
     Operator::rows_ = graph_.vertex_edge_local_.Rows();
     Operator::cols_ = graph_.vertex_edge_local_.Rows();
 
-    // TODO(gelever1): Set for now, should be unset and user can determine if they need a fine solver.
-    MakeFineSolver();
+    MakeCoarseVectors();
+    MakeCoarseSolver();
+    MakeFineSolver(); // TODO(gelever1): unset and let user make
+
+    timer.Click();
+    setup_time_ += timer.TotalTime();
 }
 
-void GraphUpscale::MakeFineSolver() const
+void GraphUpscale::MakeCoarseSolver()
 {
-    if (!fine_solver_)
+    auto& mm = dynamic_cast<DenseElemMM&>(GetCoarseMatrix());
+
+    if (hybridization_)
     {
-        if (hybridization_)
+        coarse_solver_ = make_unique<HybridSolver>(mm, coarsener_);
+    }
+    else
+    {
+        mm.AssembleM();
+        coarse_solver_ = make_unique<MinresBlockSolver>(mm);
+    }
+}
+
+void GraphUpscale::MakeFineSolver()
+{
+    auto& mm = dynamic_cast<VectorElemMM&>(GetFineMatrix());
+
+    if (hybridization_)
+    {
+        fine_solver_ = make_unique<HybridSolver>(mm);
+    }
+    else
+    {
+        mm.AssembleM();
+        fine_solver_ = make_unique<MinresBlockSolver>(mm);
+    }
+}
+
+void GraphUpscale::MakeCoarseSolver(const std::vector<double>& agg_weights)
+{
+    auto& mm = dynamic_cast<DenseElemMM&>(GetCoarseMatrix());
+
+    if (hybridization_)
+    {
+        assert(coarse_solver_);
+
+        auto& hb = dynamic_cast<HybridSolver&>(*coarse_solver_);
+        hb.UpdateAggScaling(agg_weights);
+    }
+    else
+    {
+        mm.AssembleM(agg_weights);
+        coarse_solver_ = make_unique<MinresBlockSolver>(mm);
+    }
+}
+
+void GraphUpscale::MakeFineSolver(const std::vector<double>& agg_weights)
+{
+    auto& mm = dynamic_cast<VectorElemMM&>(GetFineMatrix());
+
+    if (hybridization_)
+    {
+        if (!fine_solver_)
         {
-            fine_solver_ = make_unique<HybridSolver>(GetFineMatrix());
+            fine_solver_ = make_unique<HybridSolver>(mm);
         }
-        else
-        {
-            fine_solver_ = make_unique<MinresBlockSolver>(GetFineMatrix());
-        }
+
+        auto& hb = dynamic_cast<HybridSolver&>(*fine_solver_);
+        hb.UpdateAggScaling(agg_weights);
+    }
+    else
+    {
+        mm.AssembleM(agg_weights);
+        fine_solver_ = make_unique<MinresBlockSolver>(mm);
     }
 }
 

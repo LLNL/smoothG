@@ -45,9 +45,9 @@ int main(int argc, char* argv[])
 
     linalgcpp::ArgParser arg_parser(argc, argv);
 
-    arg_parser.Parse(graph_filename, "-g", "Graph connection data.");
-    arg_parser.Parse(weighted, "-wg", "Use weighted graph.");
-    arg_parser.Parse(w_block, "-wb", "Use w block.");
+    arg_parser.Parse(graph_filename, "--g", "Graph connection data.");
+    arg_parser.Parse(weighted, "--wg", "Use weighted graph.");
+    arg_parser.Parse(w_block, "--wb", "Use w block.");
 
     if (!arg_parser.IsGood())
     {
@@ -92,9 +92,11 @@ int main(int argc, char* argv[])
 
     Graph graph(comm, vertex_edge, partition);
     MixedMatrix mgl(graph, weight, W_block);
+    ElemMixedMatrix<std::vector<double>> elem_mgl(graph, weight, W_block);
+    elem_mgl.AssembleM();
 
-    BlockVector sol(mgl.offsets_);
-    BlockVector rhs(mgl.offsets_);
+    BlockVector sol(mgl.Offsets());
+    BlockVector rhs(mgl.Offsets());
     rhs.GetBlock(0) = 0.0;
     rhs.GetBlock(1) = 1.0;
 
@@ -151,10 +153,12 @@ int main(int argc, char* argv[])
     }
 
     MinresBlockSolver minres(mgl);
-    HybridSolver hb(mgl);
+    MinresBlockSolver elem_minres(elem_mgl);
+    HybridSolver hb(elem_mgl);
 
     std::map<MGLSolver*, std::string> solver_to_name;
     solver_to_name[&minres] = "Minres + block preconditioner";
+    solver_to_name[&elem_minres] = "Elem Minres + block preconditioner";
     solver_to_name[&hb] = "Hybridizaiton + BoomerAMG";
 
     const double equality_tolerance = 1.e-9;
