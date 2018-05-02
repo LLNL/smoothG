@@ -98,9 +98,8 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    auto D = MixedMatrix::ConstructD(vertex_edge, edge_d_td_);
     auto fine_mbuilder = make_unique<FineMBuilder>(local_weight, vertex_edge);
-    mixed_laplacians_.emplace_back(std::move(fine_mbuilder), std::move(D), nullptr, edge_d_td_);
+    mixed_laplacians_.emplace_back(vertex_edge, std::move(fine_mbuilder), edge_d_td_);
 
     auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
                                                      &edge_boundary_att_);

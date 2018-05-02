@@ -156,7 +156,10 @@ int main(int argc, char* argv[])
                    "--no-visualization", "Enable visualization.");
     bool elem_mass = false;
     args.AddOption(&elem_mass, "-el-mass", "--element-mass", "-no-el-mass",
-                   "--no-element-mass", "Store M in element matrices format.");
+                   "--no-element-mass", "Store fine M in element matrices format.");
+    bool coarse_components = true;
+    args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
+                   "--no-coarse-components", "Store trace, bubble components of coarse M.");
     args.Parse();
     if (!args.Good())
     {
@@ -285,14 +288,14 @@ int main(int argc, char* argv[])
         fvupscale = make_unique<FiniteVolumeMLMC>(
                         comm, vertex_edge, weight, partitioning, *edge_d_td,
                         edge_boundary_att, ess_attr, spect_tol, max_evects,
-                        dual_target, scaled_dual, energy_dual, hybridization);
+                        dual_target, scaled_dual, energy_dual, hybridization, coarse_components);
     }
     else
     {
         fvupscale = make_unique<FiniteVolumeMLMC>(
                         comm, vertex_edge, local_weight, partitioning, *edge_d_td,
                         edge_boundary_att, ess_attr, spect_tol, max_evects,
-                        dual_target, scaled_dual, energy_dual, hybridization);
+                        dual_target, scaled_dual, energy_dual, hybridization, coarse_components);
     }
 
     fvupscale->PrintInfo();
