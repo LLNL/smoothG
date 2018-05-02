@@ -46,7 +46,7 @@ void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
               mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
 void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
-               const mfem::ParMesh& pmesh, int tag)
+               const mfem::ParMesh& pmesh, const std::string& title)
 {
     char vishost[] = "localhost";
     int  visport   = 19916;
@@ -60,7 +60,7 @@ void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
     vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
     vis_v << "solution\n" << pmesh << field;
     vis_v << "window_size 500 800\n";
-    vis_v << "window_title 'pressure" << tag << "'\n";
+    vis_v << "window_title '" << title << "'\n";
     vis_v << "autoscale values\n";
 
     if (pmesh.Dimension() == 2)
@@ -283,7 +283,11 @@ int main(int argc, char* argv[])
     fvupscale->ShowSetupTime();
     fvupscale->MakeFineSolver();
 
+    // beginning to think PDESampler should really own this FiniteVolumeUpscale object
+        const double kappa = 0.001;
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
+    const double cell_volume = spe10problem.CellVolume(nDimensions);
+    W_block *= cell_volume * kappa * kappa;
     FiniteVolumeUpscale upscale_sampler(comm, vertex_edge, weight, W_block,
                                         partitioning, *edge_d_td, edge_boundary_att,
                                         ess_attr, spect_tol, max_evects, dual_target,
@@ -309,7 +313,6 @@ int main(int argc, char* argv[])
     }
     else if (std::string(sampler_type) == "pde")
     {
-        const double kappa = 0.01;
         const int seed = 1;
         sampler = make_unique<PDESampler>(upscale_sampler, num_fine_vertices, num_aggs, nDimensions,
                                           spe10problem.CellVolume(nDimensions), kappa, seed);
@@ -352,8 +355,13 @@ int main(int argc, char* argv[])
         {
             mfem::ParGridFunction field(&ufespace);
 
-            Visualize(sol_upscaled.GetBlock(1), field, *pmesh, sample);
-            Visualize(sol_fine.GetBlock(1), field, *pmesh, sample);
+            std::stringstream ss1, ss2, ss3;
+            ss1 << "upscaled pressure" << sample;
+            Visualize(sol_upscaled.GetBlock(1), field, *pmesh, ss1.str());
+            ss2 << "fine pressure" << sample;
+            Visualize(sol_fine.GetBlock(1), field, *pmesh, ss2.str());
+            ss3 << "coefficient" << sample;
+            Visualize(fine_coefficient, field, *pmesh, ss3.str());
         }
     }
 
