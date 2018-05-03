@@ -34,8 +34,8 @@ using std::make_shared;
 
 using namespace smoothg;
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
-               int isolate);
+void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
+                    int isolate);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> global_partitioning;
     if (metis_agglomeration || generate_graph)
     {
-        MetisPart(vertex_edge_global, global_partitioning, num_partitions, isolate);
+        MetisGraphPart(vertex_edge_global, global_partitioning, num_partitions, isolate);
     }
     else
     {
@@ -231,8 +231,8 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
-               int isolate)
+void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
+                    int isolate)
 {
     smoothg::MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(2);

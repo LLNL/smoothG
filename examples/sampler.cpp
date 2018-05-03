@@ -45,14 +45,6 @@
 
 using namespace smoothg;
 
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor);
-
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
-
 void SaveFigure(const mfem::Vector& sol,
                 mfem::ParFiniteElementSpace& fespace,
                 const std::string& name)
@@ -410,43 +402,4 @@ int main(int argc, char* argv[])
         std::cout << picojson::value(serialize).serialize() << std::endl;
 
     return EXIT_SUCCESS;
-}
-
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor)
-{
-    mfem::DiscreteLinearOperator DivOp(&sigmafespace, &ufespace);
-    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
-    DivOp.Assemble();
-    DivOp.Finalize();
-
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
-
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
-}
-
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor)
-{
-    const int nDimensions = num_procs_xyz.size();
-
-    mfem::Array<int> nxyz(nDimensions);
-    nxyz[0] = 60 / num_procs_xyz[0] / coarsening_factor[0];
-    nxyz[1] = 220 / num_procs_xyz[1] / coarsening_factor[1];
-    if (nDimensions == 3)
-        nxyz[2] = 85 / num_procs_xyz[2] / coarsening_factor[2];
-
-    for (int& i : nxyz)
-    {
-        i = std::max(1, i);
-    }
-
-    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
-    partitioning.Append(cart_part);
-
-    cart_part.MakeDataOwner();
 }

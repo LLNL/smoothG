@@ -1170,4 +1170,26 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
     }
 }
 
+void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
+              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor)
+{
+    const int nDimensions = num_procs_xyz.size();
+
+    mfem::Array<int> nxyz(nDimensions);
+    nxyz[0] = 60 / num_procs_xyz[0] / coarsening_factor[0];
+    nxyz[1] = 220 / num_procs_xyz[1] / coarsening_factor[1];
+    if (nDimensions == 3)
+        nxyz[2] = 85 / num_procs_xyz[2] / coarsening_factor[2];
+
+    for (int& i : nxyz)
+    {
+        i = std::max(1, i);
+    }
+
+    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
+    partitioning.Append(cart_part);
+
+    cart_part.MakeDataOwner();
+}
+
 } // namespace smoothg
