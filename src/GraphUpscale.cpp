@@ -27,7 +27,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                            const SparseMatrix& vertex_edge_global,
                            double coarse_factor, double spect_tol,
                            int max_evects, bool hybridization,
-                           const std::vector<double>& weight_global)
+                           const std::vector<double>& weight_global,
+                           const SparseMatrix& W_block_global)
     : GraphUpscale(comm, vertex_edge_global, PartitionAAT(vertex_edge_global, coarse_factor),
                    spect_tol, max_evects, hybridization, weight_global)
 {
@@ -38,7 +39,8 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                            const SparseMatrix& vertex_edge_global,
                            const std::vector<int>& partitioning_global,
                            double spect_tol, int max_evects, bool hybridization,
-                           const std::vector<double>& weight_global)
+                           const std::vector<double>& weight_global,
+                           const SparseMatrix& W_block_global)
     : Upscale(comm, vertex_edge_global, hybridization),
       spect_tol_(spect_tol), max_evects_(max_evects)
 {
@@ -47,7 +49,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
     graph_ = Graph(comm_, vertex_edge_global, partitioning_global);
     gt_ = GraphTopology(graph_);
 
-    VectorElemMM fine_mm(graph_, weight_global);
+    VectorElemMM fine_mm(graph_, weight_global, W_block_global);
     fine_mm.AssembleM(); // Coarsening requires assembled M, for now
 
     coarsener_ = GraphCoarsen(fine_mm, gt_, max_evects_, spect_tol_);

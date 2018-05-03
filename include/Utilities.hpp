@@ -360,6 +360,28 @@ void WriteVector(MPI_Comm comm, const T& vect, const std::string& filename, int 
 */
 std::vector<int> GetElementColoring(const SparseMatrix& el_el);
 
+/**
+   @brief Extract a subvector from a vector
+
+   @param global_vect global vector from which to extract
+   @param map indices to extract
+   @returns subvector
+*/
+template <typename T = VectorView>
+T GetSubVector(const T& global_vect, const std::vector<int>& map)
+{
+    int size = map.size();
+
+    T local_vect(size);
+
+    for (int i = 0; i < size; ++i)
+    {
+        local_vect[i] = global_vect[map[i]];
+    }
+
+    return local_vect;
+}
+
 } //namespace smoothg
 
 #endif // __UTILITIES_HPP__

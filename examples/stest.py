@@ -249,6 +249,10 @@ def make_tests():
           "finest-u-error": 0.14767829457535478,
           "operator-complexity": 1.1666666666666667}]
 
+    tests["timestep"] = \
+        [["./timestep",
+          "--time", "100.0"]]
+
     tests["pareigenvector1"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--g", graph_data + "/fe_vertex_edge.txt",
@@ -359,6 +363,10 @@ def make_tests():
           "coarse-eval": 0.17663653207421526,
           "fine-error": 2.9887390635842169e-05,
           "fine-eval": 0.17545528997977797}]
+
+    tests["partimestep"] = \
+        [["mpirun", "-n", num_procs, "./timestep",
+          "--time", "100.0"]]
 
     # tests["isolate-coarsen"] = \
     #     [["./generalgraph",
