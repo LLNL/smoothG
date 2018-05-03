@@ -422,8 +422,9 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
 
 } // namespace smoothg
 

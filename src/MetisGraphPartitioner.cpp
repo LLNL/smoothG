@@ -347,10 +347,10 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
     Partition(vert_vert, partitioning, num_partitions);
 }
 
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor)
+void FESpaceMetisPartition(mfem::Array<int>& partitioning,
+                           mfem::ParFiniteElementSpace& sigmafespace,
+                           mfem::ParFiniteElementSpace& ufespace,
+                           mfem::Array<int>& coarsening_factor)
 {
     mfem::DiscreteLinearOperator DivOp(&sigmafespace, &ufespace);
     DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);

@@ -131,10 +131,10 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
                   mfem::Array<int>& partitioning, int coarsening_factor);
 
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor);
+void FESpaceMetisPartition(mfem::Array<int>& partitioning,
+                           mfem::ParFiniteElementSpace& sigmafespace,
+                           mfem::ParFiniteElementSpace& ufespace,
+                           mfem::Array<int>& coarsening_factor);
 
 } // namespace smoothg
 

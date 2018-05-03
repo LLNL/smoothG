@@ -176,12 +176,12 @@ int main(int argc, char* argv[])
     mfem::Array<int> partitioning;
     if (metis_agglomeration)
     {
-        MetisPart(partitioning, sigmafespace, ufespace, coarseningFactor);
+        FESpaceMetisPartition(partitioning, sigmafespace, ufespace, coarseningFactor);
     }
     else
     {
         auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
+        FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
     }
 
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
