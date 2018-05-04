@@ -248,23 +248,25 @@ double GraphCoarsen::DTTraceProduct(const mfem::SparseMatrix& DtransferT,
     return smoothg::InnerProduct(ref_vec3, trace);
 }
 
-void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs,
-                                       const mfem::Array<int>& partition,
+void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face,
+                                       const mfem::SparseMatrix& vert_Agg,
                                        const mfem::SparseMatrix& edge_vert,
                                        const int agg,
                                        mfem::Vector& Mloc)
 {
-    Mloc.SetSize(edge_dofs.Size());
-    mfem::Array<int> verts;
-    mfem::Array<int> local_edge_dofs;
-    for (int i = 0; i < edge_dofs.Size(); i++)
+    Mloc.SetSize(edge_dofs_on_face.Size());
+
+    mfem::Array<int> partition(vert_Agg.GetJ(), vert_Agg.Height());
+    mfem::Array<int> verts, local_edge_dofs;
+    int j;
+    for (int i = 0; i < edge_dofs_on_face.Size(); i++)
     {
-        int edge_dof = edge_dofs[i];
+        int edge_dof = edge_dofs_on_face[i];
         GetTableRow(edge_vert, edge_dof, verts);
         int vert = (partition[verts[0]] == agg) ? verts[0] : verts[1];
         const mfem::Vector& M_el_i = fine_mbuilder_->GetElementMatrices()[vert];
         GetTableRow(fine_mbuilder_->GetAggEdgeDofTable(), vert, local_edge_dofs);
-        for (int j = 0; j < local_edge_dofs.Size(); j++)
+        for (j = 0; j < local_edge_dofs.Size(); j++)
         {
             if (local_edge_dofs[j] == edge_dof)
             {
@@ -272,6 +274,8 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs,
                 break;
             }
         }
+        // local_edge_dofs should contain edge_dof
+        assert(j < local_edge_dofs.Size());
     }
 }
 
@@ -489,7 +493,6 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
     auto edge_vert = smoothg::Transpose(D_proc_); // TODO: use vertex_edge
     auto vert_Agg = smoothg::Transpose(Agg_vertex);
-    mfem::Array<int> partition(vert_Agg.GetJ(), vert_Agg.Height());
 
     mfem::Vector Mloc_v;
     mfem::Array<int> Aggs;
@@ -517,7 +520,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         GetTableRow(face_Agg, i, Aggs);
         for (int a = 0; a < Aggs.Size(); a++)
         {
-            BuildAggregateFaceM(local_fine_dofs, partition, edge_vert, Aggs[a], Mloc_v);
+            BuildAggregateFaceM(local_fine_dofs, vert_Agg, edge_vert, Aggs[a], Mloc_v);
             for (int l = 0; l < facecdofs.Size(); l++)
             {
                 const int row = facecdofs[l];

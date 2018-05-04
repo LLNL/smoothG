@@ -22,9 +22,9 @@ namespace smoothg
 
 std::unique_ptr<mfem::SparseMatrix> MBuilder::BuildAssembledM() const
 {
-    mfem::Vector agg_weights(num_aggs_);
-    agg_weights = 1.0;
-    return BuildAssembledM(agg_weights);
+    mfem::Vector agg_weights_inverse(num_aggs_);
+    agg_weights_inverse = 1.0;
+    return BuildAssembledM(agg_weights_inverse);
 }
 
 void ElementMBuilder::Setup(

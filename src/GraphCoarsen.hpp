@@ -244,8 +244,8 @@ private:
     /**
        @brief Build fine-level aggregate sub-M corresponding to dofs on a face
     */
-    void BuildAggregateFaceM(const mfem::Array<int>& edge_dofs,
-                             const mfem::Array<int>& partition,
+    void BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face,
+                             const mfem::SparseMatrix& vert_Agg,
                              const mfem::SparseMatrix& edge_vert,
                              const int agg,
                              mfem::Vector& Mloc);
