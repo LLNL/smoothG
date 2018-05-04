@@ -42,10 +42,13 @@ public:
     /**
        @brief Build the assembled M for the local processor
      */
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const = 0;
+    std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
 
     /**
-       @brief Set weights on aggregates for assembly of mass matrix.
+       @brief Assemble the rescaled M for the local processor
+
+       Build the assembled M with "element" contribution inversely scaled
+       by agg_weights_inverse.
 
        The point of this class is to be able to build the mass matrix M
        with different weights, without recoarsening the whole thing.
@@ -55,10 +58,10 @@ public:
        a finite volume problem, agg_weights is the weights on the mass matrix
        in the mixed form, which is the reciprocal of that.
     */
-    void SetCoefficient(const mfem::Vector& agg_weights_inverse);
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse) const = 0;
 protected:
-    /// weights on aggregates (on fine level, aggregate = vertex)
-    mfem::Vector agg_weights_;
+    unsigned int num_aggs_;
 };
 
 /**
@@ -95,7 +98,7 @@ public:
     virtual void AddTraceTraceBlock(int l, double value) {}
 
     /// Deal with shared dofs for Trace-Trace block
-    virtual void AddTraceAcross(int row, int col, double value) {}
+    virtual void AddTraceAcross(int row, int col, int agg, double value) {}
 
     virtual void SetBubbleBubbleBlock(int l, int j, double value) {}
 
@@ -104,7 +107,8 @@ public:
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                                      const mfem::SparseMatrix& Agg_cdof_edge) {}
 
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const = 0;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse) const = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
 
@@ -138,7 +142,7 @@ public:
     void AddTraceTraceBlock(int l, double value);
 
     /// Deal with shared dofs for Trace-Trace block
-    void AddTraceAcross(int row, int col, double value);
+    void AddTraceAcross(int row, int col, int agg, double value);
 
     void SetBubbleBubbleBlock(int l, int j, double value);
 
@@ -152,7 +156,8 @@ public:
         Agg_cdof_edge_ref_.MakeRef(Agg_cdof_edge);
     }
 
-    std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse) const;
 
     bool NeedsCoarseVertexDofs() { return true; }
 
@@ -164,13 +169,11 @@ private:
     std::vector<mfem::DenseMatrix> CM_el_;
     mfem::SparseMatrix Agg_cdof_edge_ref_;
 
-    mfem::Array<int> edge_cdof_marker_;
-    mfem::Array<int> edge_cdof_marker2_;
+    std::vector<std::vector<int>> edge_cdof_markers_;
     int agg_index_;
     int cdof_loc_;
 
-    int Agg0_;
-    int Agg1_;
+    mfem::Array<int> Aggs_;
 };
 
 /**
@@ -209,7 +212,8 @@ public:
                          const mfem::SparseMatrix& Pedges,
                          const mfem::SparseMatrix& face_cdof);
 
-    std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse) const;
 
 private:
     /// @todo remove this (GetTableRowCopy is the same thing?)
@@ -250,7 +254,8 @@ public:
     FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
                  const mfem::SparseMatrix& Agg_edgedof);
 
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
+    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse) const;
     const std::vector<mfem::Vector>& GetElementMatrices() const { return M_el_; }
     const mfem::SparseMatrix& GetAggEdgeDofTable() const { return Agg_edgedof_; }
 private:

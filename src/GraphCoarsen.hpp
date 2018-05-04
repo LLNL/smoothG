@@ -61,31 +61,10 @@ public:
 
        This doesn't do much, just sets up the object to be coarsened.
 
-       @param M_proc edge-weighting matrix on fine level
-       @param D_proc directed vertex_edge (divergence) matrix
-       @param graph_topology describes vertex partitioning, agglomeration, etc.
-    */
-    GraphCoarsen(const mfem::SparseMatrix& M_proc,
-                 const mfem::SparseMatrix& D_proc,
-                 const GraphTopology& graph_topology);
-
-    GraphCoarsen(const mfem::SparseMatrix& M_proc,
-                 const mfem::SparseMatrix& D_proc,
-                 const mfem::SparseMatrix* W_proc,
-                 const GraphTopology& graph_topology);
-
-    /**
-       @brief Constructor based on the fine graph and a vertex partitioning.
-
-       This doesn't do much, just sets up the object to be coarsened.
-
        @param mgL describes fine graph
        @param graph_topology describes vertex partitioning, agglomeration, etc.
     */
-    GraphCoarsen(const MixedMatrix& mgL,
-                 const GraphTopology& graph_topology)
-        : GraphCoarsen( mgL.GetM(), mgL.GetD(), mgL.GetW(), graph_topology)
-    { }
+    GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_topology);
 
     /**
        @brief Given edge_trace and vertex_targets functions, construct the
@@ -258,13 +237,23 @@ private:
         std::vector<mfem::DenseMatrix>& vertex_target,
         mfem::SparseMatrix& face_cdof,
         mfem::SparseMatrix& Pedges,
-        CoarseMBuilder& coarse_m_builder);
+        CoarseMBuilder& coarse_mbuilder);
 
     void BuildW(const mfem::SparseMatrix& Pvertices);
+
+    /**
+       @brief Build fine-level aggregate sub-M corresponding to dofs on a face
+    */
+    void BuildAggregateFaceM(const mfem::Array<int>& edge_dofs,
+                             const mfem::Array<int>& partition,
+                             const mfem::SparseMatrix& edge_vert,
+                             const int agg,
+                             mfem::Vector& Mloc);
 
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix* W_proc_;
+    const FineMBuilder* fine_mbuilder_;
     const GraphTopology& graph_topology_;
 
     /// Aggregate-to-coarse vertex dofs relation table

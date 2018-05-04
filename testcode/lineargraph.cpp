@@ -266,9 +266,14 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
     mfem::SparseMatrix face_dof; // not used in this example
-    std::vector<mfem::DenseMatrix> CM_el_;
 
-    GraphCoarsen graph_coarsen(graph.GetM(), graph.GetD(), graph_topology);
+    mfem::Vector weight(graph.GetM().Size());
+    for (int i = 0; i < weight.Size(); i++)
+    {
+        weight(i) = graph.GetM()(i, i);
+    }
+    MixedMatrix mgL(graph.GetD(), weight, *partition.edge_d_td);
+    GraphCoarsen graph_coarsen(mgL, graph_topology);
     ElementMBuilder builder;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
                                      Pp, Pu, face_dof, builder);

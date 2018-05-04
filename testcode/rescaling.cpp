@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
 
     //Create simple element and aggregate scaling
     mfem::Vector elem_scale = SimpleAscendingScaling(pmesh->GetNE());
-    mfem::Vector agg_scale = SimpleAscendingScaling(partitioning.Max()+1);
+    mfem::Vector agg_scale = SimpleAscendingScaling(partitioning.Max() + 1);
 
     // Create a fine level MixedMatrix corresponding to piecewise constant coefficient
     auto fine_mgL = OriginalScaledFineMatrix(sigmafespace, vertex_edge, elem_scale);
@@ -177,8 +177,8 @@ int main(int argc, char* argv[])
     unique_ptr<mfem::SparseMatrix> coarse_M2(mfem::RAP(Psigma, fine_M2, Psigma));
 
     // Check relative differences measured in Frobenius norm
-    bool fine_rescale_fail = (RelativeDiff(comm, fine_M1, fine_M2) > 1e-16);
-    bool coarse_rescale_fail = (RelativeDiff(comm, coarse_M1, *coarse_M2) > 1e-16);
+    bool fine_rescale_fail = (RelativeDiff(comm, fine_M1, fine_M2) > 1e-14);
+    bool coarse_rescale_fail = (RelativeDiff(comm, coarse_M1, *coarse_M2) > 1e-14);
     if (myid == 0 && fine_rescale_fail)
     {
         std::cerr << "Fine level rescaling is NOT working as expected! \n";
