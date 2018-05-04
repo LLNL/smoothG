@@ -118,7 +118,7 @@ void swap(MinresBlockSolver& lhs, MinresBlockSolver& rhs) noexcept
     swap(lhs.true_sol_, rhs.true_sol_);
 }
 
-void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
+void MinresBlockSolver::Solve(const BlockVector& rhs, BlockVector& sol) const
 {
     Timer timer(Timer::Start::True);
 
@@ -139,11 +139,6 @@ void MinresBlockSolver::Mult(const BlockVector& rhs, BlockVector& sol) const
 
     timer.Click();
     timing_ += timer.TotalTime();
-}
-
-void MinresBlockSolver::Solve(const BlockVector& rhs, BlockVector& sol) const
-{
-    Mult(rhs, sol);
 }
 
 void MinresBlockSolver::SetPrintLevel(int print_level)

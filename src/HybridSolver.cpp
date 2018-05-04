@@ -63,7 +63,7 @@ HybridSolver::HybridSolver(const ElemMixedMatrix<DenseMatrix>& mgl,
     hybrid_elem_(num_aggs_), Ainv_f_(num_aggs_),
     agg_weights_(num_aggs_, 1.0), use_w_(mgl.CheckW())
 {
-    SparseMatrix edgedof_multiplier = MakeEdgeDofMultiplier(mgl, coarsener);
+    SparseMatrix edgedof_multiplier = MakeEdgeDofMultiplier();
     SparseMatrix multiplier_edgedof = edgedof_multiplier.Transpose();
     const std::vector<int>& j_multiplier_edgedof = multiplier_edgedof.GetIndices();
 
@@ -128,8 +128,7 @@ void HybridSolver::InitSolver(SparseMatrix local_hybrid)
     Mu_.SetSize(num_multiplier_dofs_);
 }
 
-SparseMatrix HybridSolver::MakeEdgeDofMultiplier(const MixedMatrix& mgl,
-                                                 const GraphCoarsen& coarsener) const
+SparseMatrix HybridSolver::MakeEdgeDofMultiplier() const
 {
     std::vector<int> indptr(num_edge_dofs_ + 1);
     std::iota(std::begin(indptr), std::begin(indptr) + num_multiplier_dofs_ + 1, 0);

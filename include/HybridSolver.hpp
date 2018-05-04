@@ -96,7 +96,7 @@ public:
     virtual ~HybridSolver() = default;
 
     /// Wrapper for solving the saddle point system through hybridization
-    void Solve(const BlockVector& Rhs, BlockVector& Sol) const;
+    void Solve(const BlockVector& Rhs, BlockVector& Sol) const override;
 
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const BlockVector& OriginalRHS, VectorView HybridRHS) const;
@@ -144,8 +144,7 @@ private:
         const std::vector<T>& M_el,
         const std::vector<int>& j_multiplier_edgedof);
 
-    SparseMatrix MakeEdgeDofMultiplier(const MixedMatrix& mgl,
-                                       const GraphCoarsen& coarsener) const;
+    SparseMatrix MakeEdgeDofMultiplier() const;
 
     SparseMatrix MakeLocalC(int agg, const MixedMatrix& mgl,
                             const std::vector<int>& j_multiplier_edgedof,

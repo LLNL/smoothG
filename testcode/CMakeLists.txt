@@ -43,15 +43,11 @@ target_link_libraries(wattsstrogatz smoothG)
 # add_test(lineargraph64 lineargraph --size 64)
 # add_valgrind_test(vlineargraph lineargraph)
 
+
 add_test(tinygraphsolver tinygraphsolver)
 add_test(tinygraphsolver_wg tinygraphsolver -wg)
 add_test(tinygraphsolver_wb tinygraphsolver -wb)
 add_test(tinygraphsolver_wg_wb tinygraphsolver -wg -wb)
-
-add_valgrind_test(vtinygraph tinygraphsolver)
-add_valgrind_test(vtinygraph_wg tinygraphsolver -wg)
-add_valgrind_test(vtinygraph_wb tinygraphsolver -wb)
-add_valgrind_test(vtinygraph_wg_wb tinygraphsolver -wg -wb)
 
 add_test(partinygraphsolver mpirun -np 2 ./tinygraphsolver)
 add_test(partinygraphsolver_wg mpirun -np 2 ./tinygraphsolver -wg)
@@ -59,19 +55,24 @@ add_test(partinygraphsolver_wb mpirun -np 2 ./tinygraphsolver -wb)
 add_test(partinygraphsolver_wg_wb mpirun -np 2 ./tinygraphsolver -wg -wb)
 
 add_test(eigen eigen)
-add_valgrind_test(veigen eigen)
 
 add_test(test_MetisGraphPartitioner test_MetisGraphPartitioner)
-add_valgrind_test(vtest_MetisGraphPartitioner test_MetisGraphPartitioner)
 
 # add_test(test_IsolatePartitioner test_IsolatePartitioner)
 # add_valgrind_test(vtest_IsolatePartitioner test_IsolatePartitioner)
 
 add_test(wattsstrogatz wattsstrogatz)
 add_test(parwattsstrogatz mpirun -np 2 ./wattsstrogatz)
-add_valgrind_test(vwattsstrogatz wattsstrogatz)
 
-
+if (NOT APPLE)
+    add_valgrind_test(vtinygraph tinygraphsolver)
+    add_valgrind_test(vtinygraph_wg tinygraphsolver -wg)
+    add_valgrind_test(vtinygraph_wb tinygraphsolver -wb)
+    add_valgrind_test(vtinygraph_wg_wb tinygraphsolver -wg -wb)
+    add_valgrind_test(veigen eigen)
+    add_valgrind_test(vtest_MetisGraphPartitioner test_MetisGraphPartitioner)
+    add_valgrind_test(vwattsstrogatz wattsstrogatz)
+endif()
 
 # add_test(NAME style
 #   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp

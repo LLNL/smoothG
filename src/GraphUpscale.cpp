@@ -30,7 +30,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm,
                            const std::vector<double>& weight_global,
                            const SparseMatrix& W_block_global)
     : GraphUpscale(comm, vertex_edge_global, PartitionAAT(vertex_edge_global, coarse_factor),
-                   spect_tol, max_evects, hybridization, weight_global)
+                   spect_tol, max_evects, hybridization, weight_global, W_block_global)
 {
 
 }

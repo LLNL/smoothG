@@ -32,7 +32,7 @@ MGLSolver::MGLSolver(const std::vector<int>& offsets)
 }
 
 MGLSolver::MGLSolver(const MGLSolver& other) noexcept
-    : rhs_(other.rhs_), sol_(other.sol_),
+    : Operator(other), rhs_(other.rhs_), sol_(other.sol_),
       print_level_(other.print_level_),
       max_num_iter_(other.max_num_iter_),
       rtol_(other.rtol_), atol_(other.atol_),

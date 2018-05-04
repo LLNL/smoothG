@@ -87,9 +87,6 @@ public:
     */
     void Solve(const BlockVector& rhs, BlockVector& sol) const override;
 
-    /// Same as Solve()
-    virtual void Mult(const BlockVector& rhs, BlockVector& sol) const;
-
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;

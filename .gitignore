@@ -9,9 +9,4 @@ build/
 *.in~
 *.md~
 *.swp
-
-GPATH
-GRTAGS
-GTAGS
-mfem-link
-parelag-link
+*.bak

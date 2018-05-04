@@ -82,7 +82,8 @@ set_target_properties(smoothG PROPERTIES
         CXX_EXTENSIONS NO
 )
 
-target_compile_options(smoothG PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall -O2>)
+target_compile_options(smoothG PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wpedantic -O2>)
+target_compile_options(smoothG PRIVATE $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Wpedantic -O2>)
 
 target_link_libraries(smoothG
     PUBLIC
