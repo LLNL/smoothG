@@ -128,6 +128,9 @@ int main(int argc, char* argv[])
     double kappa = 0.001;
     args.AddOption(&kappa, "--kappa", "--kappa",
                    "Correlation length for Gaussian samples.");
+    int num_samples = 3;
+    args.AddOption(&num_samples, "--num-samples", "--num-samples",
+                   "Number of samples to draw and simulate.");
     args.Parse();
     if (!args.Good())
     {
@@ -297,7 +300,7 @@ int main(int argc, char* argv[])
     }
     else if (std::string(sampler_type) == "pde")
     {
-        const int seed = 1;
+        const int seed = 1 + myid;
         sampler = make_unique<PDESampler>(
                       comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
                       vertex_edge, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
@@ -312,7 +315,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    const int num_samples = 3;
     for (int sample = 0; sample < num_samples; ++sample)
     {
         if (myid == 0)
