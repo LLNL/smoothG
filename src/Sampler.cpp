@@ -74,10 +74,48 @@ PDESampler::PDESampler(std::shared_ptr<const Upscale> fvupscale, int fine_vector
     cell_volume_(cell_volume),
     current_state_(NO_SAMPLE)
 {
+    Initialize(dimension, kappa);
+}
+
+/**
+   Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object
+*/
+PDESampler::PDESampler(MPI_Comm comm, int dimension,
+                       double cell_volume, double kappa, int seed,
+                       const mfem::SparseMatrix& vertex_edge,
+                       const mfem::Array<int>& partitioning,
+                       const mfem::HypreParMatrix& edge_d_td,
+                       const mfem::SparseMatrix& edge_boundary_att,
+                       const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
+                       bool dual_target, bool scaled_dual, bool energy_dual,
+                       bool hybridization)
+    :
+    normal_distribution_(0.0, 1.0, seed),
+    fine_vector_size_(vertex_edge.Height()),
+    num_coarse_aggs_(partitioning.Max() + 1),
+    cell_volume_(cell_volume),
+    current_state_(NO_SAMPLE)
+{  
+    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
+    W_block *= cell_volume_ * kappa * kappa;
+    mfem::Vector one_weight(vertex_edge.Width());
+    one_weight = 1.0;
+    auto fvupscale_temp = std::make_shared<FiniteVolumeUpscale>(
+        comm, vertex_edge, one_weight, W_block, partitioning, edge_d_td,
+        edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
+        scaled_dual, energy_dual, hybridization);
+    fvupscale_temp->MakeFineSolver();
+    fvupscale_ = fvupscale_temp;
+
+    Initialize(dimension, kappa);
+}
+
+void PDESampler::Initialize(int dimension, double kappa)
+{
     rhs_fine_.SetSize(fine_vector_size_);
     coefficient_fine_.SetSize(fine_vector_size_);
     rhs_coarse_ = fvupscale_->GetCoarseVector();
-    coefficient_coarse_.SetSize(coarse_aggs);
+    coefficient_coarse_.SetSize(num_coarse_aggs_);
 
     double nu_parameter;
     MFEM_ASSERT(dimension == 2 || dimension == 3, "Invalid dimension!");
@@ -88,19 +126,6 @@ PDESampler::PDESampler(std::shared_ptr<const Upscale> fvupscale, int fine_vector
     double ddim = static_cast<double>(dimension);
     scalar_g_ = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
                 std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
-}
-
-/**
-   Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object
-*/
-PDESampler::PDESampler(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge,
-                       const mfem::Array<int>& partitioning,
-                       const mfem::HypreParMatrix& edge_d_td,
-                       const mfem::SparseMatrix& edge_boundary_att,
-                       const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
-                       bool dual_target, bool scaled_dual, bool energy_dual,
-                       bool hybridization)
-{
 }
 
 PDESampler::~PDESampler()

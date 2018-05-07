@@ -122,7 +122,9 @@ public:
     /**
        Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object
     */
-    PDESampler(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge,
+    PDESampler(MPI_Comm comm, int dimension,
+               double cell_volume, double kappa, int seed,
+               const mfem::SparseMatrix& vertex_edge,
                const mfem::Array<int>& partitioning,
                const mfem::HypreParMatrix& edge_d_td,
                const mfem::SparseMatrix& edge_boundary_att,
@@ -170,6 +172,8 @@ private:
     mfem::Vector rhs_coarse_;
     mfem::Vector coefficient_fine_;
     mfem::Vector coefficient_coarse_;
+
+    void Initialize(int dimension, double kappa);
 };
 
 }
