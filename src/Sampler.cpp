@@ -95,15 +95,15 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     num_coarse_aggs_(partitioning.Max() + 1),
     cell_volume_(cell_volume),
     current_state_(NO_SAMPLE)
-{  
+{
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
     W_block *= cell_volume_ * kappa * kappa;
     mfem::Vector one_weight(vertex_edge.Width());
     one_weight = 1.0;
     auto fvupscale_temp = std::make_shared<FiniteVolumeUpscale>(
-        comm, vertex_edge, one_weight, W_block, partitioning, edge_d_td,
-        edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
-        scaled_dual, energy_dual, hybridization);
+                              comm, vertex_edge, one_weight, W_block, partitioning, edge_d_td,
+                              edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
+                              scaled_dual, energy_dual, hybridization);
     fvupscale_temp->MakeFineSolver();
     fvupscale_ = fvupscale_temp;
 

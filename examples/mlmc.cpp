@@ -299,10 +299,10 @@ int main(int argc, char* argv[])
     {
         const int seed = 1;
         sampler = make_unique<PDESampler>(
-            comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
-            vertex_edge, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
-            spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-            hybridization);
+                      comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
+                      vertex_edge, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
+                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
+                      hybridization);
     }
     else
     {

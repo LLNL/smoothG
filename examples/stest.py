@@ -366,6 +366,12 @@ def make_tests():
           "--perm", spe10_perm_file],
          {"finest-p-error": 0.10754186878360708}]
 
+    tests["mlmc-pde-sampler"] = \
+        [["./mlmc",
+          "--sampler-type","pde",
+          "--kappa","0.01"],
+         {"finest-p-error": 0.19865665579298755}]
+
     tests["timestep"] = \
         [["./timestep",
           "--total-time", "100.0",
