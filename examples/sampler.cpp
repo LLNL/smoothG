@@ -272,14 +272,14 @@ int main(int argc, char* argv[])
     double total_fine_time = 0.0;
 
     // Create Upscaler
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
-                                  partitioning, *edge_d_td, edge_boundary_att,
-                                  ess_attr, spect_tol, max_evects, dual_target,
-                                  scaled_dual, energy_dual, hybridization);
+    auto fvupscale = std::make_shared<FiniteVolumeUpscale>(
+        comm, vertex_edge, weight, W_block, partitioning, *edge_d_td,
+        edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target, scaled_dual,
+        energy_dual, hybridization);
 
-    fvupscale.MakeFineSolver();
-    fvupscale.PrintInfo();
-    fvupscale.ShowSetupTime();
+    fvupscale->MakeFineSolver();
+    fvupscale->PrintInfo();
+    fvupscale->ShowSetupTime();
 
     const int num_aggs = partitioning.Max() + 1;
     if (myid == 0)
@@ -294,13 +294,13 @@ int main(int argc, char* argv[])
         pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-        auto sol_upscaled = fvupscale.Interpolate(sol_coarse);
+        auto sol_upscaled = fvupscale->Interpolate(sol_coarse);
         for (int i = 0; i < sol_upscaled.Size(); ++i)
             sol_upscaled(i) = std::log(sol_upscaled(i));
-        fvupscale.Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
-        int coarse_iterations = fvupscale.GetCoarseSolveIters();
+        fvupscale->Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
+        int coarse_iterations = fvupscale->GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
-        double coarse_time = fvupscale.GetCoarseSolveTime();
+        double coarse_time = fvupscale->GetCoarseSolveTime();
         total_coarse_time += coarse_time;
         for (int i = 0; i < mean_upscaled.Size(); ++i)
         {
@@ -313,9 +313,9 @@ int main(int argc, char* argv[])
         auto sol_fine = pdesampler.GetFineCoefficient();
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
-        int fine_iterations = fvupscale.GetFineSolveIters();
+        int fine_iterations = fvupscale->GetFineSolveIters();
         total_fine_iterations += fine_iterations;
-        double fine_time = fvupscale.GetFineSolveTime();
+        double fine_time = fvupscale->GetFineSolveTime();
         total_fine_time += fine_time;
         for (int i = 0; i < mean_fine.Size(); ++i)
         {

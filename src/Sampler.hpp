@@ -114,10 +114,22 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(const Upscale& upscale,
+    PDESampler(std::shared_ptr<const Upscale> upscale,
                int fine_vector_size, int coarse_aggs,
                int dimension, double cell_volume,
                double kappa, int seed);
+
+    /**
+       Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object
+    */
+    PDESampler(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge,
+               const mfem::Array<int>& partitioning,
+               const mfem::HypreParMatrix& edge_d_td,
+               const mfem::SparseMatrix& edge_boundary_att,
+               const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
+               bool dual_target, bool scaled_dual, bool energy_dual,
+               bool hybridization);
+
     ~PDESampler();
 
     /// Draw white noise on fine level
@@ -144,7 +156,8 @@ private:
         COARSE_SAMPLE
     };
 
-    const Upscale& fvupscale_;
+    // const Upscale& fvupscale_;
+    std::shared_ptr<const Upscale> fvupscale_;
     NormalDistribution normal_distribution_;
     int fine_vector_size_;
     int num_coarse_aggs_;

@@ -9,5 +9,7 @@
  (c-mode .
          ((c-basic-offset . 4)
           (c-indent-level . 4)
-          (c-file-style . "BSD"))))
+          (c-file-style . "BSD")))
 
+ (nil .
+      ((compile-command . "cd ../build; make -k"))))

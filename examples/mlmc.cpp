@@ -282,11 +282,13 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
     const double cell_volume = spe10problem.CellVolume(nDimensions);
     W_block *= cell_volume * kappa * kappa;
-    FiniteVolumeUpscale upscale_sampler(comm, vertex_edge, weight, W_block,
-                                        partitioning, *edge_d_td, edge_boundary_att,
-                                        ess_attr, spect_tol, max_evects, dual_target,
-                                        scaled_dual, energy_dual, hybridization);
-    upscale_sampler.MakeFineSolver();
+    mfem::Vector one_weight(weight);
+    one_weight = 1.0;
+    auto upscale_sampler = std::make_shared<FiniteVolumeUpscale>(
+        comm, vertex_edge, one_weight, W_block, partitioning, *edge_d_td,
+        edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
+        scaled_dual, energy_dual, hybridization);
+    upscale_sampler->MakeFineSolver();
 
     mfem::BlockVector rhs_fine(fvupscale->GetFineBlockVector());
     rhs_fine.GetBlock(0) = 0.0;
