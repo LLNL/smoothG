@@ -39,6 +39,16 @@ GraphTopology::GraphTopology(const GraphTopology& fine_topology, double coarseni
     Init(vertex_edge, part, fine_topology.face_face_, fine_topology.face_true_face_);
 }
 
+GraphTopology::GraphTopology(const SparseMatrix& vertex_edge,
+                             const std::vector<int>& partition,
+                             const ParMatrix& edge_true_edge)
+{
+    const auto true_edge_edge = edge_true_edge.Transpose();
+    const auto edge_edge = edge_true_edge.Mult(true_edge_edge);
+
+    Init(vertex_edge, partition, edge_edge, edge_true_edge);
+}
+
 void GraphTopology::Init(const SparseMatrix& vertex_edge,
                          const std::vector<int>& partition,
                          const ParMatrix& edge_edge,

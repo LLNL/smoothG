@@ -125,9 +125,9 @@ int main(int argc, char* argv[])
     /// [Set up W block]
 
     /// [Upscale]
-    GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                         spect_tol, max_evects, hybridization,
-                         weight, W_block);
+    Graph graph(comm, vertex_edge_global, global_partitioning, weight, W_block);
+    GraphUpscale upscale(graph, spect_tol, max_evects, hybridization);
+
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();

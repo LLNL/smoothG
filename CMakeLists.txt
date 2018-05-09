@@ -72,7 +72,6 @@ add_library(smoothG
     src/MinresBlockSolver.cpp
     src/MixedMatrix.cpp
     src/SharedEntityComm.cpp
-    src/Upscale.cpp
     src/Utilities.cpp
 )
 

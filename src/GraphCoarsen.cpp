@@ -214,7 +214,6 @@ std::vector<std::vector<DenseMatrix>> GraphCoarsen::CollectSigma(const GraphTopo
 std::vector<std::vector<SparseMatrix>> GraphCoarsen::CollectD(const GraphTopology& gt,
                                                               const SparseMatrix& D_local)
 {
-
     SharedEntityComm<SparseMatrix> sec_D(gt.face_true_face_);
 
     int num_faces = gt.face_edge_local_.Rows();
@@ -593,6 +592,9 @@ void GraphCoarsen::BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl)
     int num_coarse_dofs = agg_bubble_dof_.Cols();
 
     CooMatrix P_edge(num_edges, num_coarse_dofs);
+
+    // TODO(gelever1): Compute this correctly, not this wild guess
+    P_edge.Reserve(3.14 * ((agg_bubble_dof_.nnz() * num_aggs) + (num_faces * face_cdof_.nnz())));
 
     DenseMatrix bubbles;
     DenseMatrix trace_ext;

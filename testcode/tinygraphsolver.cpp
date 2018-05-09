@@ -90,9 +90,9 @@ int main(int argc, char* argv[])
 
     std::vector<int> partition {0, 0, 0, 1, 1, 1};
 
-    Graph graph(comm, vertex_edge, partition);
-    MixedMatrix mgl(graph, weight, W_block);
-    ElemMixedMatrix<std::vector<double>> elem_mgl(graph, weight, W_block);
+    Graph graph(comm, vertex_edge, partition, weight, W_block);
+    MixedMatrix mgl(graph);
+    ElemMixedMatrix<std::vector<double>> elem_mgl(graph);
     elem_mgl.AssembleM();
 
     BlockVector sol(mgl.Offsets());

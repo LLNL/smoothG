@@ -55,6 +55,18 @@ public:
     */
     GraphTopology(const GraphTopology& fine_topology, double coarsening_factor);
 
+    /**
+       @brief Build agglomerated topology relation tables of a given graph
+              Using already distributed information
+
+       @param vertex_edge local vertex to edge relationship
+       @param partition local vertex partition
+       @param edge_true_edge edge to true edge relationship
+    */
+    GraphTopology(const SparseMatrix& vertex_edge,
+                  const std::vector<int>& partition,
+                  const ParMatrix& edge_true_edge);
+
     /** @brief Default Destructor */
     ~GraphTopology() noexcept = default;
 

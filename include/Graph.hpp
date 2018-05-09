@@ -50,7 +50,23 @@ struct Graph
        @param part_global partition of the global vertices
     */
     Graph(MPI_Comm comm, const SparseMatrix& vertex_edge_global,
-          const std::vector<int>& part_global);
+          const std::vector<int>& part_global,
+          const std::vector<double>& weight_global = {},
+          const SparseMatrix& W_block_global = {});
+
+    /**
+       @brief Accepts an already distributed graph.
+              Computes vertex and edge maps from local info,
+              these are necessarily the same as the original maps!
+
+       @param vertex_edge_local local vertex edge relationship
+       @param edge_true_edge edge to true edge relationship
+       @param part_local partition of the local vertices
+    */
+    Graph(SparseMatrix vertex_edge_local, ParMatrix edge_true_edge,
+          std::vector<int> part_local,
+          std::vector<double> weight_local = {},
+          SparseMatrix W_block_local = {});
 
     /** @brief Default Destructor */
     ~Graph() noexcept = default;
@@ -78,6 +94,19 @@ struct Graph
     SparseMatrix vertex_edge_local_;
     ParMatrix edge_true_edge_;
     ParMatrix edge_edge_;
+
+    // I'm not sure this is `graph` information?
+    // Graph Weight / Block
+    std::vector<double> weight_local_;
+    SparseMatrix W_local_;
+
+    int global_vertices_;
+    int global_edges_;
+
+private:
+    void MakeLocalWeight(const std::vector<double>& global_weight);
+
+    void MakeLocalW(const SparseMatrix& W_global);
 };
 
 } // namespace smoothg

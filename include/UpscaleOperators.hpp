@@ -35,7 +35,7 @@ g  \\
 \end{bmatrix}
 \f]
 
-## Upscale
+## GraphUpscale
 
 The Upscaler usually solves for \f$ u \f$ by restricting to
 the coarse level, solving, and interpolating back to the fine level.
@@ -70,17 +70,17 @@ The user provides both \f$ f_c \f$ and \f$ g_c \f$ and is returned \f$ u_c \f$ a
 #define __UPSCALE_OPERATORS_HPP__
 
 #include "Utilities.hpp"
-#include "Upscale.hpp"
+#include "GraphUpscale.hpp"
 
 namespace smoothg
 {
 
-/// UpscaleBlockSolve performs the same thing as Upscale, but in mixed form.
+/// UpscaleBlockSolve performs the same thing as GraphUpscale, but in mixed form.
 /** @note All vectors assumed to be block vectors with the same offsets as the Upscaler */
 class UpscaleBlockSolve : public linalgcpp::Operator
 {
 public:
-    UpscaleBlockSolve(const Upscale& A) : linalgcpp::Operator(A.GetFineMatrix().Rows()), A_(A),
+    UpscaleBlockSolve(const GraphUpscale& A) : linalgcpp::Operator(A.GetFineMatrix().Rows()), A_(A),
         x_(A_.FineBlockOffsets()), y_(A_.FineBlockOffsets()) { }
 
     void Mult(const VectorView& x, VectorView y) const
@@ -94,7 +94,7 @@ public:
     }
 
 private:
-    const Upscale& A_;
+    const GraphUpscale& A_;
 
     mutable BlockVector x_;
     mutable BlockVector y_;
@@ -104,12 +104,12 @@ private:
 class UpscaleFineSolve : public linalgcpp::Operator
 {
 public:
-    UpscaleFineSolve(const Upscale& A) : linalgcpp::Operator(A.GetFineMatrix().LocalD().Rows()),
+    UpscaleFineSolve(const GraphUpscale& A) : linalgcpp::Operator(A.GetFineMatrix().LocalD().Rows()),
         A_(A)  { }
     void Mult(const VectorView& x, VectorView y) const { A_.SolveFine(x, y); }
 
 private:
-    const Upscale& A_;
+    const GraphUpscale& A_;
 };
 
 /// UpscaleFineSolve Solves the fine problem in the mixed form as its operation
@@ -117,7 +117,7 @@ private:
 class UpscaleFineBlockSolve : public linalgcpp::Operator
 {
 public:
-    UpscaleFineBlockSolve(const Upscale& A) : linalgcpp::Operator(A.GetFineMatrix().Rows()),
+    UpscaleFineBlockSolve(const GraphUpscale& A) : linalgcpp::Operator(A.GetFineMatrix().Rows()),
         A_(A)
     {
     }
@@ -133,7 +133,7 @@ public:
     }
 
 private:
-    const Upscale& A_;
+    const GraphUpscale& A_;
 
     mutable BlockVector x_;
     mutable BlockVector y_;
@@ -143,12 +143,12 @@ private:
 class UpscaleCoarseSolve : public linalgcpp::Operator
 {
 public:
-    UpscaleCoarseSolve(const Upscale& A) : linalgcpp::Operator(A.GetCoarseMatrix().LocalD().Rows()),
+    UpscaleCoarseSolve(const GraphUpscale& A) : linalgcpp::Operator(A.GetCoarseMatrix().LocalD().Rows()),
         A_(A)  {}
     void Mult(const VectorView& x, VectorView y) const { A_.SolveCoarse(x, y); }
 
 private:
-    const Upscale& A_;
+    const GraphUpscale& A_;
 };
 
 /// UpscaleCoarseBlockSolve Solves the coarse problem in the mixed form as its operation
@@ -156,7 +156,7 @@ private:
 class UpscaleCoarseBlockSolve : public linalgcpp::Operator
 {
 public:
-    UpscaleCoarseBlockSolve(const Upscale& A) : linalgcpp::Operator(A.GetCoarseMatrix().Rows()),
+    UpscaleCoarseBlockSolve(const GraphUpscale& A) : linalgcpp::Operator(A.GetCoarseMatrix().Rows()),
         A_(A), x_(A_.CoarseBlockOffsets()), y_(A_.CoarseBlockOffsets()) { }
 
     void Mult(const VectorView& x, VectorView y) const
@@ -170,7 +170,7 @@ public:
     }
 
 private:
-    const Upscale& A_;
+    const GraphUpscale& A_;
 
     mutable BlockVector x_;
     mutable BlockVector y_;

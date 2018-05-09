@@ -38,6 +38,9 @@ target_link_libraries(test_MetisGraphPartitioner smoothG)
 add_executable(wattsstrogatz wattsstrogatz.cpp)
 target_link_libraries(wattsstrogatz smoothG)
 
+add_executable(test_Graph test_Graph.cpp)
+target_link_libraries(test_Graph smoothG)
+
 # add tests
 # add_test(lineargraph lineargraph)
 # add_test(lineargraph64 lineargraph --size 64)
@@ -57,6 +60,9 @@ add_test(partinygraphsolver_wg_wb mpirun -np 2 ./tinygraphsolver -wg -wb)
 add_test(eigen eigen)
 
 add_test(test_MetisGraphPartitioner test_MetisGraphPartitioner)
+
+add_test(test_Graph test_Graph)
+add_test(parttest_Graph mpirun -np 2 ./test_Graph)
 
 # add_test(test_IsolatePartitioner test_IsolatePartitioner)
 # add_valgrind_test(vtest_IsolatePartitioner test_IsolatePartitioner)
