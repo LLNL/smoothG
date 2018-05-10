@@ -102,8 +102,7 @@ public:
 
     void MakeFineSolver();
 
-    /// coeff should have the size of the number of *edges* in the
-    /// fine graph (not exactly analagous to RescaleCoarseCoefficient)
+    /// coeff should have the size of the number of *vertices* in the fine graph
     void RescaleFineCoefficient(const mfem::Vector& coeff);
 
     /// coeff should have the size of the number of *aggregates*

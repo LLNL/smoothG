@@ -27,14 +27,35 @@
 using namespace smoothg;
 using std::unique_ptr;
 
-MixedMatrix UnscaledFineMixedMatrix(mfem::ParFiniteElementSpace& sigmafespace,
-                                    const mfem::SparseMatrix& vertex_edge)
+const mfem::Vector SimpleAscendingScaling(const int size)
 {
-    mfem::BilinearForm a2(&sigmafespace);
-    a2.AddDomainIntegrator(new FiniteVolumeMassIntegrator());
+    mfem::Vector scale(size);
+    for (int i = 0; i < size; i++)
+    {
+        scale(i) = i + 1;
+    }
+    return scale;
+}
 
-    std::vector<mfem::Vector> local_weight;
-    local_weight.resize(sigmafespace.GetMesh()->GetNE());
+mfem::PWConstCoefficient InvElemScaleCoefficient(const mfem::Vector& elem_scale)
+{
+    mfem::Vector inverse_elem_scale(elem_scale.Size());
+    for (int elem = 0; elem < elem_scale.Size(); elem++)
+    {
+        inverse_elem_scale(elem) = 1.0 / elem_scale(elem);
+    }
+    return mfem::PWConstCoefficient(inverse_elem_scale);
+}
+
+MixedMatrix OriginalScaledFineMatrix(mfem::ParFiniteElementSpace& sigmafespace,
+                                     const mfem::SparseMatrix& vertex_edge,
+                                     const mfem::Vector& elem_scale)
+{
+    auto inv_scale_coef = InvElemScaleCoefficient(elem_scale);
+    mfem::BilinearForm a2(&sigmafespace);
+    a2.AddDomainIntegrator(new FiniteVolumeMassIntegrator(inv_scale_coef));
+
+    std::vector<mfem::Vector> local_weight(sigmafespace.GetMesh()->GetNE());
     mfem::DenseMatrix M_el_i;
     for (unsigned int i = 0; i < local_weight.size(); i++)
     {
@@ -46,28 +67,22 @@ MixedMatrix UnscaledFineMixedMatrix(mfem::ParFiniteElementSpace& sigmafespace,
             local_weight_i[j] = 1.0 / M_el_i(j, j);
         }
     }
-
     auto edge_trueedge = sigmafespace.Dof_TrueDof_Matrix();
-    auto mbuilder =  make_unique<FineMBuilder>(local_weight, vertex_edge);
-    return MixedMatrix(vertex_edge, std::move(mbuilder), *edge_trueedge);
+    return MixedMatrix(vertex_edge, local_weight, *edge_trueedge);
 }
 
-mfem::SparseMatrix ScaledFineM(mfem::FiniteElementSpace& sigmafespace,
-                               const mfem::Vector& elem_scale)
+mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,
+                                 const mfem::Vector& original_elem_scale,
+                                 const mfem::Vector& additional_elem_scale)
 {
-    mfem::Mesh* mesh = sigmafespace.GetMesh();
-    const int nDimensions = mesh->SpaceDimension();
-    mfem::L2_FECollection ufec(0, nDimensions);
-    mfem::FiniteElementSpace ufespace(mesh, &ufec);
-    mfem::GridFunction inverse_elem_scale(&ufespace);
-    for (int elem = 0; elem < elem_scale.Size(); elem++)
+    mfem::Vector new_elem_scale(original_elem_scale);
+    for (int i = 0; i < new_elem_scale.Size(); i++)
     {
-        inverse_elem_scale(elem) = 1.0 / elem_scale(elem);
+        new_elem_scale(i) *= additional_elem_scale(i);
     }
-    mfem::GridFunctionCoefficient inv_scale_coef(&inverse_elem_scale);
-
+    auto new_inv_scale_coef = InvElemScaleCoefficient(new_elem_scale);
     mfem::BilinearForm a1(&sigmafespace);
-    a1.AddDomainIntegrator(new FiniteVolumeMassIntegrator(inv_scale_coef));
+    a1.AddDomainIntegrator(new FiniteVolumeMassIntegrator(new_inv_scale_coef));
     a1.Assemble();
     a1.Finalize();
     return mfem::SparseMatrix(a1.SpMat());
@@ -92,10 +107,9 @@ unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& v_e,
 double FrobeniusNorm(MPI_Comm comm, const mfem::SparseMatrix& mat)
 {
     double frob_norm_square, frob_norm_square_loc = 0.0;
-    double* mat_data = mat.GetData();
     for (int i = 0; i < mat.NumNonZeroElems(); i++)
     {
-        frob_norm_square_loc += (mat_data[i] * mat_data[i]);
+        frob_norm_square_loc += (mat.GetData()[i] * mat.GetData()[i]);
     }
     MPI_Allreduce(&frob_norm_square_loc, &frob_norm_square, 1, MPI_DOUBLE, MPI_SUM, comm);
     return std::sqrt(frob_norm_square);
@@ -121,6 +135,10 @@ int main(int argc, char* argv[])
         mfem::Mesh mesh(4, 4, 4, mfem::Element::HEXAHEDRON, 1);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
+    for (int i = 0; i < pmesh->GetNE(); i++)
+    {
+        pmesh->SetAttribute(i, i + 1);
+    }
     auto vertex_edge = TableToMatrix(pmesh->ElementToFaceTable());
     auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh.get());
 
@@ -131,39 +149,36 @@ int main(int argc, char* argv[])
     int coarsening_factor = 8;
     PartitionAAT(vertex_edge, partitioning, coarsening_factor);
 
-    // Create an aggregate scaling function (agg scaling = agg number + 1)
-    mfem::Vector agg_scale(partitioning.Max() + 1);
-    for (int agg = 0; agg < agg_scale.Size(); agg++)
-    {
-        agg_scale(agg) = agg + 1;
-    }
+    //Create simple element and aggregate scaling
+    mfem::Vector elem_scale = SimpleAscendingScaling(pmesh->GetNE());
+    mfem::Vector agg_scale = SimpleAscendingScaling(partitioning.Max() + 1);
 
-    // Create a fine level MixedMatrix corresponding to constant coefficient
-    auto fine_mgL = UnscaledFineMixedMatrix(sigmafespace, vertex_edge);
+    // Create a fine level MixedMatrix corresponding to piecewise constant coefficient
+    auto fine_mgL = OriginalScaledFineMatrix(sigmafespace, vertex_edge, elem_scale);
 
     // Create a coarsener to build interpolation matrices and coarse M builder
     auto coarsener = BuildCoarsener(vertex_edge, fine_mgL, partitioning, &edge_bdratt);
 
     // Interpolate agg scaling (coarse level) to elements (fine level)
-    mfem::Vector elem_scale(pmesh->GetNE());
+    mfem::Vector interp_agg_scale(pmesh->GetNE());
     auto part_mat = PartitionToMatrix(partitioning, agg_scale.Size());
-    part_mat.MultTranspose(agg_scale, elem_scale);
+    part_mat.MultTranspose(agg_scale, interp_agg_scale);
 
-    // Assemble scaled fine and coarse M through rescaling
-    fine_mgL.UpdateM(elem_scale);
+    // Assemble rescaled fine and coarse M through MixedMatrix
+    fine_mgL.UpdateM(interp_agg_scale);
     auto& fine_M1 = fine_mgL.GetM();
     auto coarse_mgL = coarsener->GetCoarse();
     coarse_mgL.UpdateM(agg_scale);
     auto& coarse_M1 = coarse_mgL.GetM();
 
-    // Assembled scaled fine and coarse M through direct assembling and RAP
-    auto fine_M2 = ScaledFineM(sigmafespace, elem_scale);
+    // Assembled rescaled fine and coarse M through direct assembling and RAP
+    auto fine_M2 = RescaledFineM(sigmafespace, elem_scale, interp_agg_scale);
     auto& Psigma = coarsener->get_Psigma();
     unique_ptr<mfem::SparseMatrix> coarse_M2(mfem::RAP(Psigma, fine_M2, Psigma));
 
     // Check relative differences measured in Frobenius norm
-    bool fine_rescale_fail = (RelativeDiff(comm, fine_M1, fine_M2) > 1e-10);
-    bool coarse_rescale_fail = (RelativeDiff(comm, coarse_M1, *coarse_M2) > 1e-10);
+    bool fine_rescale_fail = (RelativeDiff(comm, fine_M1, fine_M2) > 1e-14);
+    bool coarse_rescale_fail = (RelativeDiff(comm, coarse_M1, *coarse_M2) > 1e-14);
     if (myid == 0 && fine_rescale_fail)
     {
         std::cerr << "Fine level rescaling is NOT working as expected! \n";

@@ -90,10 +90,11 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 }
 
 MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         std::unique_ptr<MBuilder> mbuilder,
+                         const std::vector<mfem::Vector>& local_weight,
                          const mfem::HypreParMatrix& edge_d_td)
-    : edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose()), mbuilder_(std::move(mbuilder))
+    : edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose())
 {
+    mbuilder_ = make_unique<FineMBuilder>(local_weight, vertex_edge);
     M_ = mbuilder_->BuildAssembledM();
     D_ = ConstructD(vertex_edge, edge_d_td);
     GenerateRowStarts();
@@ -138,8 +139,7 @@ void MixedMatrix::ScaleM(const mfem::Vector& weight)
 void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
 {
     assert(mbuilder_);
-    mbuilder_->SetCoefficient(agg_weights_inverse);
-    M_ = mbuilder_->BuildAssembledM();
+    M_ = mbuilder_->BuildAssembledM(agg_weights_inverse);
 }
 
 /// @todo better documentation of the 1/-1 issue, make it optional?
