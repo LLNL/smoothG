@@ -270,7 +270,7 @@ int main(int argc, char* argv[])
     mfem::Vector weight(graph.GetM().Size());
     for (int i = 0; i < weight.Size(); i++)
     {
-        weight(i) = graph.GetM()(i, i);
+        weight(i) = 1.0 / graph.GetM()(i, i);
     }
     MixedMatrix mgL(graph.GetD(), weight, *partition.edge_d_td);
     GraphCoarsen graph_coarsen(mgL, graph_topology);
