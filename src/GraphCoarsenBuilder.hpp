@@ -47,9 +47,6 @@ public:
     /**
        @brief Assemble the rescaled M for the local processor
 
-       Build the assembled M with "element" contribution inversely scaled
-       by agg_weights_inverse.
-
        The point of this class is to be able to build the mass matrix M
        with different weights, without recoarsening the whole thing.
 
@@ -57,6 +54,8 @@ public:
        that is, agg_weights_inverse in the input is like the coefficient in
        a finite volume problem, agg_weights is the weights on the mass matrix
        in the mixed form, which is the reciprocal of that.
+
+       @note In the fine level, an agg is just a vertex.
     */
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const = 0;

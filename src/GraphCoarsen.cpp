@@ -491,7 +491,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
 
-    auto edge_vert = smoothg::Transpose(D_proc_); // TODO: use vertex_edge
+    auto edge_vert = smoothg::Transpose(D_proc_);
     auto vert_Agg = smoothg::Transpose(Agg_vertex);
 
     mfem::Vector Mloc_v;
