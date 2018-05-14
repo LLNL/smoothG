@@ -23,6 +23,7 @@
 
 #include "FiniteVolumeUpscale.hpp"
 
+#include <random>
 #include "mfem.hpp"
 
 namespace smoothg
