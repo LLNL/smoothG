@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
                               : pmesh->ElementToFaceTable();
     mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
-    // Construct agglomerated topology based on METIS or Cartesian aggloemration
+    // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
     if (metis_agglomeration)
     {
