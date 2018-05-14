@@ -369,13 +369,15 @@ def make_tests():
     tests["mlmc-pde-sampler"] = \
         [["./mlmc",
           "--sampler-type", "pde",
-          "--kappa", "0.01"],
+          "--kappa", "0.01",
+          "--blank-perm"],
          {"finest-p-error": 0.19865665579298755}]
 
     tests["par-mlmc"] = \
         [["mpirun", "-n", "2", "./mlmc",
           "--sampler-type", "pde",
-          "--kappa", "0.01"],
+          "--kappa", "0.01",
+          "--blank-perm"],
          {"finest-p-error": 0.3205701404356}]
 
     tests["timestep"] = \

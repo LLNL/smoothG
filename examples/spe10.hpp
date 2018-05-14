@@ -111,31 +111,48 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 class SPE10Problem
 {
 public:
+    /// constructor for the usual SPE10 dataset permeabilities
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
                  int slice, bool metis_partition, double proc_part_ubal,
                  const mfem::Array<int>& coarsening_factor);
+
+    /// constructor for a flat permeability=1 version of the problem
+    SPE10Problem(int nDimensions, int spe10_scale, bool metis_partition,
+                 double proc_part_ubal, const mfem::Array<int>& coarsening_factor);
+
     ~SPE10Problem();
+
     mfem::ParMesh* GetParMesh()
     {
         return pmesh_;
     }
+
     mfem::VectorFunctionCoefficient* GetKInv()
     {
         return kinv_;
     }
+
     GCoefficient* GetForceCoeff()
     {
         return source_coeff_;
     }
+
     const std::vector<int>& GetNumProcsXYZ()
     {
         return num_procs_xyz_;
     }
+
     static double CellVolume(int nDimensions)
     {
         return (nDimensions == 2 ) ? (20.0 * 10.0) : (20.0 * 10.0 * 2.0);
     }
+
 private:
+    void Init(
+        const char* permFile, int nDimensions, int spe10_scale, int slice,
+        bool blank_perm, bool metis_partition, double proc_part_ubal,
+        const mfem::Array<int>& coarsening_factor);
+
     double Lx, Ly, Lz, Hx, Hy, Hz;
     mfem::ParMesh* pmesh_;
     mfem::VectorFunctionCoefficient* kinv_;
@@ -144,8 +161,24 @@ private:
 };
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
-                           int spe10_scale, int slice,  bool metis_partition, double proc_part_ubal,
+                           int spe10_scale, int slice, bool metis_partition, double proc_part_ubal,
                            const mfem::Array<int>& coarsening_factor)
+{
+    Init(permFile, nDimensions, spe10_scale, slice, false, metis_partition, proc_part_ubal,
+         coarsening_factor);
+}
+
+SPE10Problem::SPE10Problem(int nDimensions,
+                           int spe10_scale,  bool metis_partition, double proc_part_ubal,
+                           const mfem::Array<int>& coarsening_factor)
+{
+    Init(NULL, nDimensions, spe10_scale, 0, true, metis_partition, proc_part_ubal,
+         coarsening_factor);
+}
+
+void SPE10Problem::Init(
+    const char* permFile, int nDimensions, int spe10_scale, int slice, bool blank_perm,
+    bool metis_partition, double proc_part_ubal, const mfem::Array<int>& coarsening_factor)
 {
     int num_procs, myid;
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -168,7 +201,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     IPF::SetNumberCells(N[0], N[1], N[2]);
     IPF::SetMeshSizes(h(0), h(1), h(2));
-    if (permFile == NULL)
+    if (blank_perm && permFile == NULL)
     {
         IPF::BlankPermeability();
     }
@@ -183,22 +216,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
     kinv_ = new mfem::VectorFunctionCoefficient(
         nDimensions, IPF::InversePermeability);
 
-    const bool use_egg_model = false;
-    if (use_egg_model)
-    {
-        std::string meshfile = "Egg_model.mesh";
-        std::ifstream imesh(meshfile.c_str());
-        if (!imesh)
-        {
-            if (myid == 0)
-                std::cerr << "\nCan not open mesh file: " << meshfile
-                          << std::endl;
-            throw 2;
-        }
-        mesh = make_unique<mfem::Mesh>(imesh, 1, 1);
-        imesh.close();
-    }
-    else if (nDimensions == 3)
+    if (nDimensions == 3)
     {
         mesh = make_unique<mfem::Mesh>(
                    N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1,
