@@ -37,6 +37,27 @@
 
 using namespace smoothg;
 
+void SaveFigure(const mfem::Vector& sol,
+                mfem::ParFiniteElementSpace& fespace,
+                const std::string& name)
+{
+    mfem::ParGridFunction field(&fespace);
+    mfem::ParMesh* pmesh = fespace.GetParMesh();
+    field = sol;
+    {
+        std::stringstream filename;
+        filename << name << ".mesh";
+        std::ofstream out(filename.str().c_str());
+        pmesh->Print(out);
+    }
+    {
+        std::stringstream filename;
+        filename << name << ".gridfunction";
+        std::ofstream out(filename.str().c_str());
+        field.Save(out);
+    }
+}
+
 void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
                const mfem::ParMesh& pmesh, const std::string& title)
 {
@@ -343,6 +364,13 @@ int main(int argc, char* argv[])
         {
             ShowErrors(error_info);
         }
+
+        std::stringstream coarsename;
+        coarsename << "upscaledpressure" << sample;
+        SaveFigure(sol_upscaled.GetBlock(1), ufespace, coarsename.str());
+        std::stringstream finename;
+        finename << "finepressure" << sample;
+        SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
 
         // Visualize the solution
         if (visualization)
