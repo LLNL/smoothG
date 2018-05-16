@@ -49,7 +49,7 @@ void SimpleSampler::NewSample()
     sample_++;
 }
 
-mfem::Vector& SimpleSampler::GetFineCoefficient()
+const mfem::Vector& SimpleSampler::GetFineCoefficient()
 {
     MFEM_ASSERT(sample_ >= 0, "SimpleSampler in wrong state (call NewSample() first)!");
     fine_ = (1.0 + sample_);
@@ -152,7 +152,7 @@ void PDESampler::NewCoarseSample()
     MFEM_ASSERT(false, "Not implemented!");
 }
 
-mfem::Vector& PDESampler::GetFineCoefficient()
+const mfem::Vector& PDESampler::GetFineCoefficient()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
                 "PDESampler object in wrong state (call NewSample() first)!");
@@ -205,7 +205,6 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
     return coefficient_coarse_;
 }
 
-/// @todo ugly hack for debugging, @deprecated
 mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
 {
     MFEM_ASSERT(current_state_ == FINE_SAMPLE ||

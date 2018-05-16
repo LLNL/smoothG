@@ -1171,8 +1171,8 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
 }
 
 void FVMeshCartesianPartition(
-    mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-    mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor)
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor)
 {
     const int SPE10_num_x_volumes = 60;
     const int SPE10_num_y_volumes = 220;

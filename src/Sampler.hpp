@@ -56,7 +56,7 @@ public:
     virtual void NewSample() {}
 
     /// return current sample realized on fine mesh
-    virtual mfem::Vector& GetFineCoefficient() = 0;
+    virtual const mfem::Vector& GetFineCoefficient() = 0;
 
     /// return current sample realized on coarse mesh
     virtual mfem::Vector& GetCoarseCoefficient() = 0;
@@ -73,7 +73,7 @@ public:
 
     void NewSample();
 
-    mfem::Vector& GetFineCoefficient();
+    const mfem::Vector& GetFineCoefficient();
 
     mfem::Vector& GetCoarseCoefficient();
 
@@ -142,13 +142,13 @@ public:
     void NewCoarseSample();
 
     /// Solve PDE with current white-noise RHS to find fine coefficient
-    mfem::Vector& GetFineCoefficient();
+    const mfem::Vector& GetFineCoefficient();
 
     /// Solve PDE with current white-noise RHS to find coarse coeffiicent
     /// this should be on *aggregates*
     mfem::Vector& GetCoarseCoefficient();
 
-    /// @deprecated
+    /// Only for debugging/visualization, most users should use GetCoarseCoefficient
     mfem::Vector& GetCoarseCoefficientForVisualization();
 
 private:
