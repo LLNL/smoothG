@@ -373,6 +373,15 @@ def make_tests():
           "--blank-perm"],
          {"finest-p-error": 0.19865665579298755}]
 
+    tests["mlmc-pde-sampler-hb"] = \
+        [["./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01",
+          "--blank-perm",
+          "--hybridization",
+          "--no-coarse-components"],
+         {"finest-p-error": 0.21056830139286675}]
+
     tests["par-mlmc"] = \
         [["mpirun", "-n", "2", "./mlmc",
           "--sampler-type", "pde",

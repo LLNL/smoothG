@@ -123,8 +123,6 @@ public:
     virtual MixedMatrix& GetCoarseMatrix();
     virtual const MixedMatrix& GetCoarseMatrix() const;
 
-    virtual const mfem::SparseMatrix& GetVertexProjection() const { return coarsener_->get_Pu(); }
-
     /// @todo I feel like needing this reflects some leaky abstractions
     ///       or bad design in one way or another.
     virtual const GraphCoarsen& GetGraphCoarsen() const { return coarsener_->get_GraphCoarsen_ref(); }

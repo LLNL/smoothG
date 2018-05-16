@@ -125,7 +125,7 @@ void PDESampler::Initialize(int dimension, double kappa)
         nu_parameter = 0.5;
     double ddim = static_cast<double>(dimension);
     scalar_g_ = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
-                std::sqrt( tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+                std::sqrt( std::tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 }
 
 PDESampler::~PDESampler()
