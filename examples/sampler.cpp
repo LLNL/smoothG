@@ -296,7 +296,7 @@ int main(int argc, char* argv[])
         auto sol_upscaled = fvupscale->Interpolate(sol_coarse);
         for (int i = 0; i < sol_upscaled.Size(); ++i)
             sol_upscaled(i) = std::log(sol_upscaled(i));
-        fvupscale->Orthogonalize(sol_upscaled); // can we orthogonalize on coarse grid?
+        fvupscale->Orthogonalize(sol_upscaled);
         int coarse_iterations = fvupscale->GetCoarseSolveIters();
         total_coarse_iterations += coarse_iterations;
         double coarse_time = fvupscale->GetCoarseSolveTime();

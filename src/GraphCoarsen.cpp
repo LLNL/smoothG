@@ -81,8 +81,6 @@ void GraphCoarsen::BuildPVertices(
     int* Pvertices_j = new int[Pvertices_i[nvertices]];
     double* Pvertices_data = new double[Pvertices_i[nvertices]];
 
-    coarse_constant_rep_.SetSize(total_coarse_dofs);
-    coarse_constant_rep_ = 0.0;
     int coarse_vertex_dof_counter = 0;
     int ptr;
     for (unsigned int i = 0; i < nAggs; ++i)
@@ -98,25 +96,6 @@ void GraphCoarsen::BuildPVertices(
             {
                 Pvertices_j[ptr] = coarse_vertex_dof_counter + k;
                 Pvertices_data[ptr++] = target_i(j, k);
-                if (k == 0)
-                {
-                    const double cval = coarse_constant_rep_(coarse_vertex_dof_counter);
-                    if (cval == 0.0)
-                    {
-                        // @todo this should probably depend on volume size etc?
-                        coarse_constant_rep_(coarse_vertex_dof_counter) =
-                            1.0 / target_i(j, k);
-                    }
-                    else
-                    {
-                        /* In practice I am seeing differences around 1.e-7, which is larger
-                           than I expect from our (usually direct) eigensolver, but not as
-                           large as I would expect if the numbers were *actually* different.
-                           This may be worth keeping an eye on. */
-                        MFEM_ASSERT(std::fabs(cval - (1.0 / target_i(j, k))) < 1.e-6,
-                                    "WIP: Coarse DOFs not working as I expect!");
-                    }
-                }
             }
         }
         coarse_vertex_dof_counter += nlocal_coarse_dofs;
@@ -125,6 +104,10 @@ void GraphCoarsen::BuildPVertices(
     mfem::SparseMatrix newPvertices(Pvertices_i, Pvertices_j, Pvertices_data,
                                     nvertices, coarse_vertex_dof_counter);
     Pvertices.Swap(newPvertices);
+    mfem::Vector fine_one(Pvertices.Height());
+    fine_one = 1.0;
+    coarse_constant_rep_.SetSize(Pvertices.Width());
+    Pvertices.MultTranspose(fine_one, coarse_constant_rep_);
 
     // Generate the "start" array for coarse vertex dofs
     MPI_Comm comm = graph_topology_.face_d_td_->GetComm();
