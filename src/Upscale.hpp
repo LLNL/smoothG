@@ -93,6 +93,9 @@ public:
     virtual void Orthogonalize(mfem::Vector& vect) const;
     virtual void Orthogonalize(mfem::BlockVector& vect) const;
 
+    virtual void OrthogonalizeCoarse(mfem::Vector& vect) const;
+    virtual void OrthogonalizeCoarse(mfem::BlockVector& vect) const;
+
     /// Create a coarse vertex space vector
     virtual mfem::Vector GetCoarseVector() const;
 

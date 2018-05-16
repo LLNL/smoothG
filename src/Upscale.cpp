@@ -104,6 +104,7 @@ void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) cons
 
     coarse_solver_->Solve(x, y);
     y *= -1.0;
+    OrthogonalizeCoarse(y);
 }
 
 mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
@@ -242,6 +243,20 @@ void Upscale::Orthogonalize(mfem::Vector& vect) const
 void Upscale::Orthogonalize(mfem::BlockVector& vect) const
 {
     Orthogonalize(vect.GetBlock(1));
+}
+
+void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
+{
+    const mfem::Vector& coarse_constant_rep = GetGraphCoarsen().GetCoarseConstantRep();
+    double local_dot = (vect * coarse_constant_rep);
+    double global_dot;
+    MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
+    vect.Add(-global_dot, coarse_constant_rep);
+}
+
+void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
+{
+    OrthogonalizeCoarse(vect.GetBlock(1));
 }
 
 mfem::Vector Upscale::GetCoarseVector() const
