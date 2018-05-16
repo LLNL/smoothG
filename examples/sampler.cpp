@@ -173,7 +173,6 @@ int main(int argc, char* argv[])
         {
             args.PrintUsage(std::cout);
         }
-        MPI_Finalize();
         return 1;
     }
     if (myid == 0)
@@ -399,7 +398,7 @@ int main(int argc, char* argv[])
     }
 
     if (myid == 0)
-        std::cout << picojson::value(serialize).serialize() << std::endl;
+        std::cout << picojson::value(serialize).serialize(true) << std::endl;
 
     return EXIT_SUCCESS;
 }
