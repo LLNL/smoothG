@@ -163,7 +163,6 @@ int main(int argc, char* argv[])
         {
             args.PrintUsage(std::cout);
         }
-        MPI_Finalize();
         return 1;
     }
     if (myid == 0)
@@ -337,7 +336,6 @@ int main(int argc, char* argv[])
     {
         if (myid == 0)
             std::cerr << "Unrecognized sampler: " << sampler_type << "!" << std::endl;
-        MPI_Finalize();
         return 1;
     }
 
