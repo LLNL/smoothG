@@ -126,9 +126,9 @@ public:
     virtual MixedMatrix& GetCoarseMatrix();
     virtual const MixedMatrix& GetCoarseMatrix() const;
 
-    /// @todo I feel like needing this reflects some leaky abstractions
-    ///       or bad design in one way or another.
-    virtual const GraphCoarsen& GetGraphCoarsen() const { return coarsener_->get_GraphCoarsen_ref(); }
+    /// Get a vector of coefficients that represents a constant vector on
+    /// the coarse graph; that is, return a vector v such that P_{vertices} v = 1
+    mfem::Vector GetCoarseConstantRep() const;
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;

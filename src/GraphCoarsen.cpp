@@ -104,10 +104,6 @@ void GraphCoarsen::BuildPVertices(
     mfem::SparseMatrix newPvertices(Pvertices_i, Pvertices_j, Pvertices_data,
                                     nvertices, coarse_vertex_dof_counter);
     Pvertices.Swap(newPvertices);
-    mfem::Vector fine_one(Pvertices.Height());
-    fine_one = 1.0;
-    coarse_constant_rep_.SetSize(Pvertices.Width());
-    Pvertices.MultTranspose(fine_one, coarse_constant_rep_);
 
     // Generate the "start" array for coarse vertex dofs
     MPI_Comm comm = graph_topology_.face_d_td_->GetComm();

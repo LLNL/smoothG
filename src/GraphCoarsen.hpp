@@ -153,8 +153,6 @@ public:
         return std::move(CoarseW_);
     }
 
-    const mfem::Vector& GetCoarseConstantRep() const { return coarse_constant_rep_; }
-
 private:
     /// @brief take vertex-based target functions and assemble them in matrix
     void BuildPVertices(std::vector<mfem::DenseMatrix>& vertex_targets,
@@ -283,9 +281,6 @@ private:
 
     /// Coarse W operator
     std::unique_ptr<mfem::SparseMatrix> CoarseW_;
-
-    /// how to represent a constant on the coarse grid
-    mfem::Vector coarse_constant_rep_;
 };
 
 } // namespace smoothg

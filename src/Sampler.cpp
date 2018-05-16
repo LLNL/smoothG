@@ -166,12 +166,12 @@ const mfem::Vector& PDESampler::GetFineCoefficient()
 }
 
 /**
-   For myself:
+   Implementation notes:
 
    c_i              : coefficient for coarse basis function, representing ~normal field K
    (c_i / q_i)      : value of ~normal field K on agg i
-   exp(c_i/q_i)     : value of lognormal field exp(K) on agg i
-   exp(c_i/q_i) q_i : coefficient for coarse basis function, representing lognormal field exp(K)
+   exp(c_i/q_i)     : value of lognormal field exp(K) on agg i (what this returns)
+   exp(c_i/q_i) q_i : coefficient for coarse basis function, representing lognormal field exp(K) (what ForVisualization variant returns)
 
    indexing: we consider only the coefficient for the *constant* component i
 */
@@ -188,7 +188,7 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
     coarse_sol *= -1.0; // ?
 
     coefficient_coarse_ = 0.0;
-    const mfem::Vector& coarse_constant_rep = fvupscale_->GetGraphCoarsen().GetCoarseConstantRep();
+    mfem::Vector coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
     MFEM_ASSERT(coarse_constant_rep.Size() == coarse_sol.Size(),
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
     int agg_index = 0;
@@ -217,7 +217,7 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
     fvupscale_->SolveCoarse(rhs_coarse_, coefficient_coarse_);
     coefficient_coarse_ *= -1.0; // ??
 
-    const mfem::Vector& coarse_constant_rep = fvupscale_->GetGraphCoarsen().GetCoarseConstantRep();
+    const mfem::Vector& coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
     MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_coarse_.Size(),
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
     for (int i = 0; i < coefficient_coarse_.Size(); ++i)

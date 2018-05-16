@@ -247,7 +247,7 @@ void Upscale::Orthogonalize(mfem::BlockVector& vect) const
 
 void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
 {
-    const mfem::Vector& coarse_constant_rep = GetGraphCoarsen().GetCoarseConstantRep();
+    const mfem::Vector coarse_constant_rep = GetCoarseConstantRep();
     double local_dot = (vect * coarse_constant_rep);
     double global_dot;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
@@ -333,6 +333,13 @@ MixedMatrix& Upscale::GetCoarseMatrix()
 const MixedMatrix& Upscale::GetCoarseMatrix() const
 {
     return GetMatrix(1);
+}
+
+mfem::Vector Upscale::GetCoarseConstantRep() const
+{
+    mfem::Vector fine_ones = GetFineVector();
+    fine_ones = 1.0;
+    return Restrict(fine_ones);
 }
 
 void Upscale::PrintInfo(std::ostream& out) const
