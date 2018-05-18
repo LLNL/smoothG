@@ -23,36 +23,55 @@
 namespace smoothg
 {
 
-MixedMatrix::MixedMatrix(const SparseMatrix& vertex_edge_local, ParMatrix edge_true_edge,
-                         std::vector<double> weight_local,
-                         SparseMatrix W_local)
-    : edge_true_edge_(std::move(edge_true_edge)),
-      D_local_(MakeLocalD(edge_true_edge_, vertex_edge_local)),
-      W_local_(std::move(W_local))
+MixedMatrix::MixedMatrix(const Graph& graph)
+    : edge_true_edge_(graph.edge_true_edge_),
+      D_local_(MakeLocalD(graph.edge_true_edge_, graph.vertex_edge_local_)),
+      W_local_(graph.W_local_),
+      elem_dof_(graph.vertex_edge_local_),
+      agg_vertexdof_(SparseIdentity(D_local_.Rows())),
+      face_facedof_(SparseIdentity(elem_dof_.Cols()))
 {
-    for (auto& i : weight_local)
+    const int num_vertices = D_local_.Rows();
+
+    M_elem_.resize(num_vertices);
+
+    SparseMatrix edge_vertex = D_local_.Transpose();
+    std::vector<double> weight_inv = graph.weight_local_;
+
+    for (auto& i : weight_inv)
     {
         assert(std::fabs(i) > 1e-12);
         i = 1.0 / i;
     }
 
-    M_local_ = SparseMatrix(std::move(weight_local));
+    for (int i = 0; i < num_vertices; ++i)
+    {
+        std::vector<int> edge_dofs = D_local_.GetIndices(i);
+
+        int num_dofs = edge_dofs.size();
+
+        M_elem_[i].SetSize(num_dofs, 0.0);
+
+        for (int j = 0; j < num_dofs; ++j)
+        {
+            M_elem_[i](j, j) = weight_inv[edge_dofs[j]] / edge_vertex.RowSize(edge_dofs[j]);
+        }
+    }
 
     Init();
 }
 
-MixedMatrix::MixedMatrix(const Graph& graph)
-    : MixedMatrix(graph.vertex_edge_local_, graph.edge_true_edge_,
-                  graph.weight_local_, graph.W_local_)
-{
-
-}
-
-MixedMatrix::MixedMatrix(SparseMatrix M_local, SparseMatrix D_local,
-                         SparseMatrix W_local, ParMatrix edge_true_edge)
+MixedMatrix::MixedMatrix(std::vector<DenseMatrix> M_elem, SparseMatrix elem_dof,
+                         SparseMatrix D_local, SparseMatrix W_local,
+                         ParMatrix edge_true_edge, SparseMatrix agg_vertexdof,
+                         SparseMatrix face_facedof_)
     : edge_true_edge_(std::move(edge_true_edge)),
-      M_local_(std::move(M_local)), D_local_(std::move(D_local)),
-      W_local_(std::move(W_local))
+      D_local_(std::move(D_local)),
+      W_local_(std::move(W_local)),
+      M_elem_(std::move(M_elem)),
+      elem_dof_(std::move(elem_dof)),
+      agg_vertexdof_(std::move(agg_vertexdof)),
+      face_facedof_(std::move(face_facedof_))
 {
     Init();
 }
@@ -92,21 +111,22 @@ MixedMatrix::MixedMatrix(const MixedMatrix& other) noexcept
       D_global_(other.D_global_),
       W_global_(other.W_global_),
       offsets_(other.offsets_),
-      true_offsets_(other.true_offsets_)
+      true_offsets_(other.true_offsets_),
+      agg_vertexdof_(other.agg_vertexdof_),
+      face_facedof_(other.face_facedof_)
 {
+}
 
+MixedMatrix& MixedMatrix::operator=(MixedMatrix&& other) noexcept
+{
+    swap(*this, other);
+
+    return *this;
 }
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
 {
     swap(*this, other);
-}
-
-MixedMatrix& MixedMatrix::operator=(MixedMatrix other) noexcept
-{
-    swap(*this, other);
-
-    return *this;
 }
 
 void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
@@ -123,44 +143,12 @@ void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
 
     std::swap(lhs.offsets_, rhs.offsets_);
     std::swap(lhs.true_offsets_, rhs.true_offsets_);
-}
 
-SparseMatrix MixedMatrix::MakeLocalD(const ParMatrix& edge_true_edge,
-                                     const SparseMatrix& vertex_edge)
-{
-    SparseMatrix edge_vertex = vertex_edge.Transpose();
+    swap(lhs.M_elem_, rhs.M_elem_);
+    swap(lhs.elem_dof_, rhs.elem_dof_);
 
-    std::vector<int> indptr = edge_vertex.GetIndptr();
-    std::vector<int> indices = edge_vertex.GetIndices();
-    std::vector<double> data = edge_vertex.GetData();
-
-    int num_edges = edge_vertex.Rows();
-    int num_vertices = edge_vertex.Cols();
-
-    const SparseMatrix& owned_edges = edge_true_edge.GetDiag();
-
-    for (int i = 0; i < num_edges; i++)
-    {
-        const int row_edges = edge_vertex.RowSize(i);
-        assert(row_edges == 1 || row_edges == 2);
-
-        data[indptr[i]] = 1.;
-
-        if (row_edges == 2)
-        {
-            data[indptr[i] + 1] = -1.;
-        }
-        else if (owned_edges.RowSize(i) == 0)
-        {
-            assert(row_edges == 1);
-            data[indptr[i]] = -1.;
-        }
-    }
-
-    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data),
-                    num_edges, num_vertices);
-
-    return DT.Transpose();
+    swap(lhs.agg_vertexdof_, rhs.agg_vertexdof_);
+    std::swap(lhs.face_facedof_, rhs.face_facedof_);
 }
 
 int MixedMatrix::Rows() const
@@ -207,8 +195,12 @@ bool MixedMatrix::CheckW() const
     return global_size > 0 && W_global_.MaxNorm() > zero_tol;
 }
 
+
 ParMatrix MixedMatrix::ToPrimal() const
 {
+    assert(M_global_.Cols() == D_global_.Cols());
+    assert(M_global_.Rows() == D_global_.Cols());
+
     ParMatrix MinvDT = D_global_.Transpose();
     MinvDT.InverseScaleRows(M_global_.GetDiag().GetDiag());
 
@@ -222,53 +214,85 @@ ParMatrix MixedMatrix::ToPrimal() const
     return A;
 }
 
-template <>
-ElemMixedMatrix<std::vector<double>>::ElemMixedMatrix(SparseMatrix vertex_edge_local,
-                                                      ParMatrix edge_true_edge,
-                                                      std::vector<double> weight_local,
-                                                      SparseMatrix W_local)
-    : elem_dof_(std::move(vertex_edge_local))
+void MixedMatrix::AssembleM()
 {
-    edge_true_edge_ = std::move(edge_true_edge);
+    int M_size = D_local_.Cols();
+    CooMatrix M_coo(M_size, M_size);
 
-    D_local_ = MakeLocalD(edge_true_edge_, elem_dof_);
-    W_local_ = std::move(W_local);
+    int num_aggs = M_elem_.size();
 
-    const int num_vertices = D_local_.Rows();
-
-    M_elem_.resize(num_vertices);
-
-    SparseMatrix edge_vertex = D_local_.Transpose();
-
-    for (auto& i : weight_local)
+    for (int i = 0; i < num_aggs; ++i)
     {
-        assert(std::fabs(i) > 1e-12);
-        i = 1.0 / i;
+        std::vector<int> dofs = elem_dof_.GetIndices(i);
+        M_coo.Add(dofs, dofs, M_elem_[i]);
     }
 
-    for (int i = 0; i < num_vertices; ++i)
+    M_coo.EliminateZeros(1e-12);
+    M_local_ = M_coo.ToSparse();
+    ParMatrix M_d(edge_true_edge_.GetComm(), edge_true_edge_.GetRowStarts(), M_local_);
+    M_global_ = parlinalgcpp::RAP(M_d, edge_true_edge_);
+}
+
+void MixedMatrix::AssembleM(const std::vector<double>& agg_weight)
+{
+    assert(agg_weight.size() == M_elem_.size());
+
+    int M_size = D_local_.Cols();
+    CooMatrix M_coo(M_size, M_size);
+
+    int num_aggs = M_elem_.size();
+
+    for (int i = 0; i < num_aggs; ++i)
     {
-        std::vector<int> edge_dofs = D_local_.GetIndices(i);
+        double scale = 1.0 / agg_weight[i];
+        std::vector<int> dofs = elem_dof_.GetIndices(i);
 
-        int num_dofs = edge_dofs.size();
+        M_coo.Add(dofs, dofs, scale, M_elem_[i]);
+    }
 
-        M_elem_[i].resize(num_dofs);
+    M_coo.EliminateZeros(1e-12);
+    M_local_ = M_coo.ToSparse();
+    ParMatrix M_d(edge_true_edge_.GetComm(), edge_true_edge_.GetRowStarts(), M_local_);
+    M_global_ = parlinalgcpp::RAP(M_d, edge_true_edge_);
+}
 
-        for (int j = 0; j < num_dofs; ++j)
+SparseMatrix MixedMatrix::MakeLocalD(const ParMatrix& edge_true_edge,
+                                     const SparseMatrix& vertex_edge) const
+{
+    SparseMatrix edge_vertex = vertex_edge.Transpose();
+
+    std::vector<int> indptr = edge_vertex.GetIndptr();
+    std::vector<int> indices = edge_vertex.GetIndices();
+    std::vector<double> data = edge_vertex.GetData();
+
+    int num_edges = edge_vertex.Rows();
+    int num_vertices = edge_vertex.Cols();
+
+    const SparseMatrix& owned_edges = edge_true_edge.GetDiag();
+
+    for (int i = 0; i < num_edges; i++)
+    {
+        const int row_edges = edge_vertex.RowSize(i);
+        assert(row_edges == 1 || row_edges == 2);
+
+        data[indptr[i]] = 1.;
+
+        if (row_edges == 2)
         {
-            M_elem_[i][j] = weight_local[edge_dofs[j]] / edge_vertex.RowSize(edge_dofs[j]);
+            data[indptr[i] + 1] = -1.;
+        }
+        else if (owned_edges.RowSize(i) == 0)
+        {
+            assert(row_edges == 1);
+            data[indptr[i]] = -1.;
         }
     }
 
-    MixedMatrix::Init();
+    SparseMatrix DT(std::move(indptr), std::move(indices), std::move(data),
+                    num_edges, num_vertices);
+
+    return DT.Transpose();
 }
 
-template <>
-ElemMixedMatrix<std::vector<double>>::ElemMixedMatrix(const Graph& graph)
-    : ElemMixedMatrix(graph.vertex_edge_local_, graph.edge_true_edge_,
-                      graph.weight_local_, graph.W_local_)
-{
-
-}
 
 } // namespace smoothg

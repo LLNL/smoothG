@@ -92,8 +92,7 @@ int main(int argc, char* argv[])
 
     Graph graph(comm, vertex_edge, partition, weight, W_block);
     MixedMatrix mgl(graph);
-    ElemMixedMatrix<std::vector<double>> elem_mgl(graph);
-    elem_mgl.AssembleM();
+    mgl.AssembleM();
 
     BlockVector sol(mgl.Offsets());
     BlockVector rhs(mgl.Offsets());
@@ -153,12 +152,10 @@ int main(int argc, char* argv[])
     }
 
     MinresBlockSolver minres(mgl);
-    MinresBlockSolver elem_minres(elem_mgl);
-    HybridSolver hb(elem_mgl);
+    HybridSolver hb(mgl);
 
     std::map<MGLSolver*, std::string> solver_to_name;
     solver_to_name[&minres] = "Minres + block preconditioner";
-    solver_to_name[&elem_minres] = "Elem Minres + block preconditioner";
     solver_to_name[&hb] = "Hybridizaiton + BoomerAMG";
 
     const double equality_tolerance = 1.e-9;

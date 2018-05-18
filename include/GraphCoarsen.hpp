@@ -49,13 +49,13 @@ public:
 
     /** @brief Construtor from a fine level graph
 
+        @param graph Fine level graph
         @param mgl Fine level mixed matrix
-        @param gt Fine level graph topology relationships
         @param max_evects maximum number of eigenvectors per aggregate
         @param spect_tol spectral tolerance used to determine how many eigenvectors
                          to keep per aggregate
     */
-    GraphCoarsen(const MixedMatrix& mgl, const GraphTopology& gt,
+    GraphCoarsen(const Graph& graph, const MixedMatrix& mgl,
                  int max_evects, double spect_tol);
 
     /** @brief Default Destructor */
@@ -74,11 +74,9 @@ public:
     friend void swap(GraphCoarsen& lhs, GraphCoarsen& rhs) noexcept;
 
     /** @brief Create the coarse mixed matrix
-        @param gt Fine level graph topology relationships
         @param mgl Fine level mixed matrix
     */
-    ElemMixedMatrix<DenseMatrix> Coarsen(const GraphTopology& gt,
-                                         const MixedMatrix& mgl) const;
+    MixedMatrix Coarsen(const MixedMatrix& mgl) const;
 
     /** @brief Interpolate a coarse vertex vector to the fine level
         @param coarse_vect vertex vector to interpolate
@@ -131,29 +129,22 @@ public:
     /** @brief Get the face to coarse dof relationship */
     const SparseMatrix& GetFaceCDof() const { return face_cdof_; }
 
-    /** @brief Get the aggregate to coarse vertex dof relationship */
-    const SparseMatrix& GetAggCDofVertex() const { return agg_cdof_vertex_; }
-
-    /** @brief Get the aggregate to coarse edge dof relationship */
-    const SparseMatrix& GetAggCDofEdge() const { return agg_cdof_edge_; }
-
-    /** @brief Get the element matrices for coarse M*/
-    const std::vector<DenseMatrix>& GetMelem() const { return M_elem_; }
+    /** @brief Get Graph Topology */
+    const GraphTopology& GetGraphTopology() const { return gt_; }
 
 private:
     template <class T>
     using Vect2D = std::vector<std::vector<T>>;
 
-    void ComputeVertexTargets(const GraphTopology& gt, const ParMatrix& M_ext, const ParMatrix& D_ext);
-    void ComputeEdgeTargets(const GraphTopology& gt,
-                            const MixedMatrix& mgl,
+    void ComputeVertexTargets(const ParMatrix& M_ext, const ParMatrix& D_ext);
+    void ComputeEdgeTargets(const MixedMatrix& mgl,
                             const ParMatrix& face_edge_perm);
-    void ScaleEdgeTargets(const GraphTopology& gt, const SparseMatrix& D_local);
+    void ScaleEdgeTargets(const SparseMatrix& D_local);
 
 
-    Vect2D<DenseMatrix> CollectSigma(const GraphTopology& gt, const SparseMatrix& face_edge);
-    Vect2D<SparseMatrix> CollectD(const GraphTopology& gt, const SparseMatrix& D_local);
-    Vect2D<std::vector<double>> CollectM(const GraphTopology& gt, const SparseMatrix& M_local);
+    Vect2D<DenseMatrix> CollectSigma(const SparseMatrix& face_edge);
+    Vect2D<SparseMatrix> CollectD(const SparseMatrix& D_local);
+    Vect2D<std::vector<double>> CollectM(const SparseMatrix& M_local);
 
     std::vector<double> Combine(const std::vector<std::vector<double>>& face_M,
                                 int num_face_edges) const;
@@ -161,19 +152,24 @@ private:
 
     Vector MakeOneNegOne(int size, int split) const;
 
-    int GetSplit(const GraphTopology& gt, int face) const;
+    int GetSplit(int face) const;
 
     void BuildAggBubbleDof();
-    void BuildFaceCoarseDof(const GraphTopology& gt);
-    void BuildPvertex(const GraphTopology& gt);
-    void BuildPedge(const GraphTopology& gt, const MixedMatrix& mgl);
-    void BuildAggCDofVertex(const GraphTopology& gt);
-    void BuildAggCDofEdge(const GraphTopology& gt);
+    void BuildFaceCoarseDof();
+    void BuildPvertex();
+    void BuildPedge(const MixedMatrix& mgl);
 
-    ParMatrix BuildEdgeTrueEdge(const GraphTopology& gt) const;
+    // These only depend on GraphTopology and are sent directly to
+    // the coarse mixed matrix
+    // {
+    SparseMatrix BuildAggCDofVertex() const;
+    SparseMatrix BuildAggCDofEdge() const;
+    ParMatrix BuildEdgeTrueEdge() const;
+    // }
 
-    SparseMatrix BuildCoarseD(const GraphTopology& gt) const;
-    std::vector<DenseMatrix> BuildElemM(const MixedMatrix& mgl, const GraphTopology& gt) const;
+    SparseMatrix BuildCoarseD() const;
+    std::vector<DenseMatrix> BuildElemM(const MixedMatrix& mgl,
+                                        const SparseMatrix& agg_cdof_edge) const;
 
     DenseMatrix RestrictLocal(const DenseMatrix& ext_mat,
                               std::vector<int>& global_marker,
@@ -184,6 +180,8 @@ private:
 
     ParMatrix MakeExtPermutation(const ParMatrix& parmat) const;
 
+    GraphTopology gt_;
+
     int max_evects_;
     double spect_tol_;
 
@@ -191,9 +189,6 @@ private:
     SparseMatrix P_vertex_;
     SparseMatrix face_cdof_;
     SparseMatrix agg_bubble_dof_;
-
-    SparseMatrix agg_cdof_vertex_;
-    SparseMatrix agg_cdof_edge_;
 
     std::vector<DenseMatrix> vertex_targets_;
     std::vector<DenseMatrix> edge_targets_;
@@ -206,7 +201,6 @@ private:
     std::vector<std::vector<double>> D_trace_sum_;
     std::vector<std::vector<DenseMatrix>> D_trace_;
     std::vector<std::vector<DenseMatrix>> F_potential_;
-    mutable std::vector<DenseMatrix> M_elem_;
 };
 
 } // namespace smoothg

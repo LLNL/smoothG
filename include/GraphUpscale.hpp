@@ -43,9 +43,6 @@ namespace smoothg
 
 class GraphUpscale : public linalgcpp::Operator
 {
-    using VectorElemMM = ElemMixedMatrix<std::vector<double>>;
-    using DenseElemMM = ElemMixedMatrix<DenseMatrix>;
-
 public:
     /// Default Constructor
     GraphUpscale() = default;
@@ -104,7 +101,7 @@ public:
     void MakeCoarseSolver(const std::vector<double>& agg_weights);
 
     /// Get number of aggregates
-    int NumAggs() const { return gt_.agg_vertex_local_.Rows(); }
+    int NumAggs() const { return coarsener_.GetGraphTopology().agg_vertex_local_.Rows(); }
 
     /// Wrapper for applying the upscaling, in linalgcpp terminology
     void Mult(const VectorView& x, VectorView y) const override;
@@ -180,10 +177,6 @@ public:
     /// Create a fine mixed form vector on true dofs
     BlockVector GetFineTrueBlockVector() const;
 
-    // Get Mixed Matrix
-    MixedMatrix& GetMatrix(int level);
-    const MixedMatrix& GetMatrix(int level) const;
-
     /// Get Fine level Mixed Matrix
     MixedMatrix& GetFineMatrix();
     const MixedMatrix& GetFineMatrix() const;
@@ -191,6 +184,10 @@ public:
     /// Get Coarse level Mixed Matrix
     MixedMatrix& GetCoarseMatrix();
     const MixedMatrix& GetCoarseMatrix() const;
+
+    /// Get Matrix by level
+    MixedMatrix& GetMatrix(int level);
+    const MixedMatrix& GetMatrix(int level) const;
 
     /// Show Solver Information
     void PrintInfo(std::ostream& out = std::cout) const;
@@ -244,7 +241,8 @@ public:
 protected:
     void MakeCoarseVectors();
 
-    std::vector<std::unique_ptr<MixedMatrix>> mgl_;
+    std::vector<MixedMatrix> mgl_;
+
     GraphCoarsen coarsener_;
     std::unique_ptr<MGLSolver> coarse_solver_;
     std::unique_ptr<MGLSolver> fine_solver_;
@@ -265,7 +263,6 @@ private:
     int max_evects_;
     bool hybridization_;
 
-    GraphTopology gt_;
     Graph graph_;
 };
 

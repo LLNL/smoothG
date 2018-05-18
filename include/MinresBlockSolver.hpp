@@ -122,25 +122,6 @@ private:
     bool use_w_;
 };
 
-/**
-   @brief MinresBlockSolver acts on "true" dofs, this one does not.
-*/
-class MinresBlockSolverFalse : public MinresBlockSolver
-{
-public:
-    MinresBlockSolverFalse() = default;
-    MinresBlockSolverFalse(const MixedMatrix& mgl);
-
-    ~MinresBlockSolverFalse() = default;
-
-    virtual void Mult(const BlockVector& rhs, BlockVector& sol) const;
-
-private:
-    //const MixedMatrix& mixed_matrix_;
-
-    mutable BlockVector true_rhs_;
-    mutable BlockVector true_sol_;
-};
 
 } // namespace smoothg
 

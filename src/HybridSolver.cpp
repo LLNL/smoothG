@@ -24,40 +24,14 @@
 namespace smoothg
 {
 
-HybridSolver::HybridSolver(const ElemMixedMatrix<std::vector<double>>& mgl)
+HybridSolver::HybridSolver(const MixedMatrix& mgl)
     :
     MGLSolver(mgl.Offsets()), comm_(mgl.GlobalD().GetComm()), myid_(mgl.GlobalD().GetMyId()),
-    agg_vertexdof_(SparseIdentity(mgl.LocalD().Rows())),
-    agg_edgedof_(mgl.LocalD()),
-    agg_multiplier_(agg_edgedof_),
+    agg_vertexdof_(mgl.GetAggVertexDof()),
+    agg_edgedof_(mgl.GetElemDof()),
     num_aggs_(agg_edgedof_.Rows()),
     num_edge_dofs_(agg_edgedof_.Cols()),
-    num_multiplier_dofs_(num_edge_dofs_),
-    multiplier_d_td_(mgl.EdgeTrueEdge()),
-    MinvDT_(num_aggs_), MinvCT_(num_aggs_),
-    AinvDMinvCT_(num_aggs_), Ainv_(num_aggs_),
-    hybrid_elem_(num_aggs_), Ainv_f_(num_aggs_),
-    agg_weights_(num_aggs_, 1.0), use_w_(mgl.CheckW())
-{
-    const std::vector<std::vector<double>>& M_el = mgl.GetElemM();
-    std::vector<int> j_multiplier_edgedof(num_edge_dofs_);
-    std::iota(std::begin(j_multiplier_edgedof), std::end(j_multiplier_edgedof), 0);
-
-    SparseMatrix local_hybrid = AssembleHybridSystem(mgl, M_el, j_multiplier_edgedof);
-
-    InitSolver(std::move(local_hybrid));
-}
-
-
-HybridSolver::HybridSolver(const ElemMixedMatrix<DenseMatrix>& mgl,
-                           const GraphCoarsen& coarsener)
-    :
-    MGLSolver(mgl.Offsets()), comm_(mgl.GlobalD().GetComm()), myid_(mgl.GlobalD().GetMyId()),
-    agg_vertexdof_(coarsener.GetAggCDofVertex()),
-    agg_edgedof_(coarsener.GetAggCDofEdge()),
-    num_aggs_(agg_edgedof_.Rows()),
-    num_edge_dofs_(agg_edgedof_.Cols()),
-    num_multiplier_dofs_(coarsener.GetFaceCDof().Cols()),
+    num_multiplier_dofs_(mgl.GetFaceFaceDof().Cols()),
     MinvDT_(num_aggs_), MinvCT_(num_aggs_),
     AinvDMinvCT_(num_aggs_), Ainv_(num_aggs_),
     hybrid_elem_(num_aggs_), Ainv_f_(num_aggs_),
@@ -76,11 +50,11 @@ HybridSolver::HybridSolver(const ElemMixedMatrix<DenseMatrix>& mgl,
 
     multiplier_d_td_ = MakeEntityTrueEntity(multiplier_d_td_d);
 
-    const std::vector<DenseMatrix>& M_el = mgl.GetElemM();
-    SparseMatrix local_hybrid = AssembleHybridSystem(mgl, M_el, j_multiplier_edgedof);
+    SparseMatrix local_hybrid = AssembleHybridSystem(mgl, j_multiplier_edgedof);
 
     InitSolver(std::move(local_hybrid));
 }
+
 
 void HybridSolver::InitSolver(SparseMatrix local_hybrid)
 {
@@ -144,12 +118,12 @@ SparseMatrix HybridSolver::MakeEdgeDofMultiplier() const
                         num_edge_dofs_, num_multiplier_dofs_);
 }
 
-SparseMatrix HybridSolver::MakeLocalC(int agg, const MixedMatrix& mgl,
+SparseMatrix HybridSolver::MakeLocalC(int agg, const ParMatrix& edge_true_edge,
                                       const std::vector<int>& j_multiplier_edgedof,
                                       std::vector<int>& edge_map,
                                       std::vector<bool>& edge_marker) const
 {
-    const auto& edgedof_IsOwned = mgl.EdgeTrueEdge().GetDiag();
+    const auto& edgedof_IsOwned = edge_true_edge.GetDiag();
 
     std::vector<int> local_edgedof = agg_edgedof_.GetIndices(agg);
     std::vector<int> local_multiplier = agg_multiplier_.GetIndices(agg);
@@ -190,55 +164,17 @@ SparseMatrix HybridSolver::MakeLocalC(int agg, const MixedMatrix& mgl,
                         nlocal_multiplier, nlocal_edgedof);
 }
 
-/// Helper function for assembly
-void InvertLocal(const std::vector<double>& elem, std::vector<double>& inverse)
-{
-    int size = elem.size();
-
-    inverse.resize(size);
-
-    for (int i = 0; i < size; ++i)
-    {
-        assert(elem[i] != 0.0);
-
-        inverse[i] = 1.0 / elem[i];
-    }
-}
-
-/// Helper function for assembly
-void InvertLocal(const DenseMatrix& elem, DenseMatrix& inverse)
-{
-    elem.Invert(inverse);
-}
-
-/// Helper function for assembly
-void MultLocal(const std::vector<double>& Minv, const SparseMatrix& DCloc, DenseMatrix& MinvDCT)
-{
-    auto DCT = DCloc.Transpose();
-    DCT.ScaleRows(Minv);
-
-    DCT.ToDense(MinvDCT);
-}
-
-/// Helper function for assembly
-void MultLocal(const DenseMatrix& Minv, const SparseMatrix& DCloc, DenseMatrix& MinvDCT)
-{
-    MinvDCT.SetSize(Minv.Cols(), DCloc.Rows());
-
-    DCloc.MultCT(Minv, MinvDCT);
-}
-
-template <typename T>
 SparseMatrix HybridSolver::AssembleHybridSystem(
     const MixedMatrix& mgl,
-    const std::vector<T>& M_el,
     const std::vector<int>& j_multiplier_edgedof)
 {
+    const auto& M_el = mgl.GetElemM();
+
     const int map_size = std::max(num_edge_dofs_, agg_vertexdof_.Cols());
     std::vector<int> edge_map(map_size, -1);
     std::vector<bool> edge_marker(num_edge_dofs_, true);
 
-    T Mloc_solver;
+    DenseMatrix Minv;
 
     DenseMatrix Aloc;
     DenseMatrix Wloc;
@@ -260,7 +196,8 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         SparseMatrix Dloc = mgl.LocalD().GetSubMatrix(local_vertexdof, local_edgedof,
                                                       edge_map);
 
-        SparseMatrix Cloc = MakeLocalC(agg, mgl, j_multiplier_edgedof, edge_map, edge_marker);
+        SparseMatrix Cloc = MakeLocalC(agg, mgl.EdgeTrueEdge(), j_multiplier_edgedof,
+                                       edge_map, edge_marker);
 
         // Compute:
         //      CMinvCT = Cloc * MinvCT
@@ -269,7 +206,7 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         //      CMinvDTAinvDMinvCT = CMinvDT * AinvDMinvCT_
         //      hybrid_elem = CMinvCT - CMinvDTAinvDMinvCT
 
-        InvertLocal(M_el[agg], Mloc_solver);
+        M_el[agg].Invert(Minv);
 
         DenseMatrix& MinvCT_i(MinvCT_[agg]);
         DenseMatrix& MinvDT_i(MinvDT_[agg]);
@@ -282,8 +219,11 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
         Aloc.SetSize(nlocal_vertexdof, nlocal_vertexdof);
         DMinvCT.SetSize(nlocal_vertexdof, nlocal_multiplier);
 
-        MultLocal(Mloc_solver, Dloc, MinvDT_i);
-        MultLocal(Mloc_solver, Cloc, MinvCT_i);
+        MinvDT_i.SetSize(Minv.Cols(), Dloc.Rows());
+        MinvCT_i.SetSize(Minv.Cols(), Cloc.Rows());
+
+        Dloc.MultCT(Minv, MinvDT_i);
+        Cloc.MultCT(Minv, MinvCT_i);
 
         Cloc.Mult(MinvCT_i, hybrid_elem);
         Dloc.Mult(MinvCT_i, DMinvCT);
@@ -314,6 +254,8 @@ SparseMatrix HybridSolver::AssembleHybridSystem(
 
     return hybrid_system.ToSparse();
 }
+
+
 
 void HybridSolver::Solve(const BlockVector& Rhs, BlockVector& Sol) const
 {

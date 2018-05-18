@@ -83,6 +83,7 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgl)
     nnz_ = M_.nnz() + DT_.nnz() + D_.nnz() + W_.nnz();
 }
 
+
 MinresBlockSolver::MinresBlockSolver(const MinresBlockSolver& other) noexcept
     : MGLSolver(other), op_(other.op_), prec_(other.prec_),
       M_prec_(other.M_prec_), schur_prec_(other.schur_prec_),

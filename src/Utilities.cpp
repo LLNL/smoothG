@@ -743,7 +743,7 @@ SparseMatrix Add(double alpha, const SparseMatrix& A, double beta, const SparseM
 
     CooMatrix coo(A.Rows(), A.Cols());
 
-    auto add_mat = [&coo](double scale, const SparseMatrix& mat)
+    auto add_mat = [&coo](double scale, const SparseMatrix & mat)
     {
         const auto& indptr = mat.GetIndptr();
         const auto& indices = mat.GetIndices();

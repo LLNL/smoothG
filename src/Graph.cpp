@@ -119,9 +119,9 @@ void Graph::MakeLocalW(const SparseMatrix& W_global)
 }
 
 Graph::Graph(SparseMatrix vertex_edge_local, ParMatrix edge_true_edge,
-          std::vector<int> part_local,
-          std::vector<double> weight_local,
-          SparseMatrix W_block_local)
+             std::vector<int> part_local,
+             std::vector<double> weight_local,
+             SparseMatrix W_block_local)
     : part_local_(std::move(part_local)),
       vertex_edge_local_(std::move(vertex_edge_local)),
       edge_true_edge_(std::move(edge_true_edge)),

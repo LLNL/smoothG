@@ -440,7 +440,7 @@ def stress_test(num_tests=1, verbose=True):
                 failed_tests.append(test)
 
     for test in failed_tests:
-        print("Failed Test:", test[0].join(' '))
+        print("Failed Test:\n\t", " ".join(test[0]))
 
     return len(failed_tests)
 
