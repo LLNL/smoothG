@@ -88,6 +88,8 @@ void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
     assert(coarse_solver_);
 
     coarse_solver_->Solve(x, y);
+    y *= -1.0;
+    // OrthogonalizeCoarse(y); // this makes solver crash and burn?
 }
 
 mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const

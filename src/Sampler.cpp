@@ -185,7 +185,6 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
         fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
     mfem::Vector coarse_sol = fvupscale_->GetCoarseVector();
     fvupscale_->SolveCoarse(rhs_coarse_, coarse_sol);
-    coarse_sol *= -1.0; // ?
 
     coefficient_coarse_ = 0.0;
     mfem::Vector coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
@@ -215,7 +214,6 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
         fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
     coefficient_coarse_.SetSize(rhs_coarse_.Size());
     fvupscale_->SolveCoarse(rhs_coarse_, coefficient_coarse_);
-    coefficient_coarse_ *= -1.0; // ??
 
     const mfem::Vector& coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
     MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_coarse_.Size(),
