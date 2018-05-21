@@ -168,12 +168,16 @@ const mfem::Vector& PDESampler::GetFineCoefficient()
 /**
    Implementation notes:
 
+   c_i comes from solving PDE with white noise on right-hand side
+   q_i represents the constant on the coarse mesh
+
    c_i              : coefficient for coarse basis function, representing ~normal field K
    (c_i / q_i)      : value of ~normal field K on agg i
    exp(c_i/q_i)     : value of lognormal field exp(K) on agg i (what this returns)
    exp(c_i/q_i) q_i : coefficient for coarse basis function, representing lognormal field exp(K) (what ForVisualization variant returns)
 
-   indexing: we consider only the coefficient for the *constant* component i
+   indexing: the indexing above is wrong if there is more than one dof / aggregate,
+             we consider only the coefficient for the *constant* component i
 */
 mfem::Vector& PDESampler::GetCoarseCoefficient()
 {
@@ -224,6 +228,10 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
         {
             coefficient_coarse_(i) =
                 std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
+        }
+        else
+        {
+            coefficient_coarse_(i) = 0.0;
         }
     }
 

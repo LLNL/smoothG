@@ -89,7 +89,7 @@ void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
 
     coarse_solver_->Solve(x, y);
     y *= -1.0;
-    // OrthogonalizeCoarse(y); // this makes solver crash and burn?
+    OrthogonalizeCoarse(y);
 }
 
 mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const
@@ -253,7 +253,12 @@ void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
     double local_dot = (vect * coarse_constant_rep);
     double global_dot;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
-    vect.Add(-global_dot, coarse_constant_rep);
+
+    double local_scale = (coarse_constant_rep * coarse_constant_rep);
+    double global_scale;
+    MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
+
+    vect.Add(-global_dot / global_scale, coarse_constant_rep);
 }
 
 void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const

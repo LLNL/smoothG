@@ -371,7 +371,7 @@ def make_tests():
           "--sampler-type", "pde",
           "--kappa", "0.01",
           "--blank-perm"],
-         {"finest-p-error": 0.19865665579298755}]
+         {"finest-p-error": 0.15128057370130901}]
 
     tests["mlmc-pde-sampler-hb"] = \
         [["./mlmc",
@@ -380,14 +380,14 @@ def make_tests():
           "--blank-perm",
           "--hybridization",
           "--no-coarse-components"],
-         {"finest-p-error": 0.21056830139286675}]
+         {"finest-p-error": 0.14918631067920285}]
 
     tests["par-mlmc"] = \
         [["mpirun", "-n", "2", "./mlmc",
           "--sampler-type", "pde",
           "--kappa", "0.01",
           "--blank-perm"],
-         {"finest-p-error": 0.3205701404356}]
+         {"finest-p-error": 0.31135492024186001}]
 
     tests["timestep"] = \
         [["./timestep",
