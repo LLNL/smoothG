@@ -383,18 +383,10 @@ int main(int argc, char* argv[])
     }
     if (save_statistics)
     {
-        std::stringstream coarsename;
-        coarsename << "coarse_mean";
-        SaveFigure(mean_upscaled, ufespace, coarsename.str());
-        std::stringstream finename;
-        finename << "fine_mean";
-        SaveFigure(mean_fine, ufespace, finename.str());
-        std::stringstream coarsenamev;
-        coarsenamev << "coarse_variance";
-        SaveFigure(mean_upscaled, ufespace, coarsenamev.str());
-        std::stringstream finenamev;
-        finenamev << "fine_variance";
-        SaveFigure(mean_fine, ufespace, finenamev.str());
+        SaveFigure(mean_upscaled, ufespace, "coarse_mean");
+        SaveFigure(mean_fine, ufespace, "fine_mean");
+        SaveFigure(m2_upscaled, ufespace, "coarse_variance");
+        SaveFigure(m2_fine, ufespace, "fine_variance");
     }
 
     if (myid == 0)
