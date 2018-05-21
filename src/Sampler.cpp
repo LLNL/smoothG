@@ -222,8 +222,11 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
     for (int i = 0; i < coefficient_coarse_.Size(); ++i)
     {
-        coefficient_coarse_(i) =
-            std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
+        if (std::fabs(coarse_constant_rep(i)) > 1.e-8)
+        {
+            coefficient_coarse_(i) =
+                std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
+        }
     }
 
     return coefficient_coarse_;
