@@ -156,6 +156,8 @@ int main(int argc, char* argv[])
     args.AddOption(&blank_perm, "--blank-perm", "--blank-perm",
                    "--no-blank-perm", "--no-blank-perm",
                    "Instead of loading SPE10 data, use constant permeability.");
+    int argseed = 1;
+    args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
     args.Parse();
     if (!args.Good())
     {
@@ -325,7 +327,7 @@ int main(int argc, char* argv[])
     }
     else if (std::string(sampler_type) == "pde")
     {
-        const int seed = 1 + myid;
+        const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
                       comm, nDimensions, spe10problem->CellVolume(nDimensions), kappa, seed,
                       vertex_edge, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
@@ -363,12 +365,21 @@ int main(int argc, char* argv[])
             ShowErrors(error_info);
         }
 
+        // for more informative visualization
+        for (int i = 0; i < fine_coefficient.Size(); ++i)
+        {
+            fine_coefficient[i] = std::log(fine_coefficient[i]);
+        }
+
         std::stringstream coarsename;
         coarsename << "upscaledpressure" << sample;
         SaveFigure(sol_upscaled.GetBlock(1), ufespace, coarsename.str());
         std::stringstream finename;
         finename << "finepressure" << sample;
         SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
+        std::stringstream coeffname;
+        coeffname << "coefficient" << sample;
+        SaveFigure(fine_coefficient, ufespace, coeffname.str());
 
         // Visualize the solution
         if (visualization)
