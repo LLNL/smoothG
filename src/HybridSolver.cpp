@@ -905,7 +905,7 @@ void HybridSolver::SetMaxIter(int max_num_iter)
 
 void HybridSolver::SetRelTol(double rtol)
 {
-    MixedLaplacianSolver::SetMaxIter(rtol);
+    MixedLaplacianSolver::SetRelTol(rtol);
 
     cg_->SetRelTol(rtol_);
 }
