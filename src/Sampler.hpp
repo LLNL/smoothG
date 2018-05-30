@@ -121,11 +121,26 @@ public:
                double kappa, int seed);
 
     /**
-       Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object
+       Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object.
+
+       Many of these parameters are simply passed to the FiniteVolumeUpscale constructor.
+
+       The underlying FiniteVolumeUpscale object represents the problem
+       \f[
+         \kappa^2 u - \Delta u = w
+       \f]
+       which is used to generate samples on both fine and coarse grids, where w
+       is a white noise right-hand side.
+
+       @param vertex_edge the fine graph structure
+       @param weight edge weights on fine graph
+       @param partitioning pre-calculated agglomerate partitioning
+       @param edge_d_td parallel dof-truedof relation for fine edges
     */
     PDESampler(MPI_Comm comm, int dimension,
                double cell_volume, double kappa, int seed,
                const mfem::SparseMatrix& vertex_edge,
+               const mfem::Vector& weight,
                const mfem::Array<int>& partitioning,
                const mfem::HypreParMatrix& edge_d_td,
                const mfem::SparseMatrix& edge_boundary_att,

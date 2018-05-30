@@ -217,17 +217,14 @@ int main(int argc, char* argv[])
         a.AddDomainIntegrator(
             new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
 
-        if (elem_mass == false)
+        a.Assemble();
+        a.Finalize();
+        a.SpMat().GetDiag(weight);
+        for (int i = 0; i < weight.Size(); ++i)
         {
-            a.Assemble();
-            a.Finalize();
-            a.SpMat().GetDiag(weight);
-            for (int i = 0; i < weight.Size(); ++i)
-            {
-                weight[i] = 1.0 / weight[i];
-            }
+            weight[i] = 1.0 / weight[i];
         }
-        else
+        if (elem_mass)
         {
             local_weight.resize(pmesh->GetNE());
             mfem::DenseMatrix M_el_i;
@@ -316,7 +313,7 @@ int main(int argc, char* argv[])
         const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
                       comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
-                      vertex_edge, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
+                      vertex_edge, weight, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
                       spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
                       hybridization);
     }

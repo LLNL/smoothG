@@ -77,12 +77,10 @@ PDESampler::PDESampler(std::shared_ptr<const Upscale> fvupscale, int fine_vector
     Initialize(dimension, kappa);
 }
 
-/**
-   Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object
-*/
 PDESampler::PDESampler(MPI_Comm comm, int dimension,
                        double cell_volume, double kappa, int seed,
                        const mfem::SparseMatrix& vertex_edge,
+                       const mfem::Vector& weight,
                        const mfem::Array<int>& partitioning,
                        const mfem::HypreParMatrix& edge_d_td,
                        const mfem::SparseMatrix& edge_boundary_att,
@@ -98,10 +96,8 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
 {
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
     W_block *= cell_volume_ * kappa * kappa;
-    mfem::Vector one_weight(vertex_edge.Width());
-    one_weight = 1.0;
     auto fvupscale_temp = std::make_shared<FiniteVolumeUpscale>(
-                              comm, vertex_edge, one_weight, W_block, partitioning, edge_d_td,
+                              comm, vertex_edge, weight, W_block, partitioning, edge_d_td,
                               edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
                               scaled_dual, energy_dual, hybridization);
     fvupscale_temp->MakeFineSolver();
