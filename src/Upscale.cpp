@@ -342,11 +342,15 @@ const MixedMatrix& Upscale::GetCoarseMatrix() const
     return GetMatrix(1);
 }
 
-mfem::Vector Upscale::GetCoarseConstantRep() const
+const mfem::Vector& Upscale::GetCoarseConstantRep() const
 {
-    mfem::Vector fine_ones = GetFineVector();
-    fine_ones = 1.0;
-    return Restrict(fine_ones);
+    if (coarse_constant_rep_.Size() == 0)
+    {
+        mfem::Vector fine_ones = GetFineVector();
+        fine_ones = 1.0;
+        coarse_constant_rep_ = Restrict(fine_ones);
+    }
+    return coarse_constant_rep_;
 }
 
 void Upscale::PrintInfo(std::ostream& out) const
