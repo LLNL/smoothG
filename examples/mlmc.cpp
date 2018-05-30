@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
+    const char* permFile = "";
     args.AddOption(&permFile, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
@@ -152,10 +152,6 @@ int main(int argc, char* argv[])
     int num_samples = 3;
     args.AddOption(&num_samples, "--num-samples", "--num-samples",
                    "Number of samples to draw and simulate.");
-    bool blank_perm = false;
-    args.AddOption(&blank_perm, "--blank-perm", "--blank-perm",
-                   "--no-blank-perm", "--no-blank-perm",
-                   "Instead of loading SPE10 data, use constant permeability.");
     int argseed = 1;
     args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
     args.Parse();
@@ -197,20 +193,10 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     const double proc_part_ubal = 2.0;
-    std::unique_ptr<SPE10Problem> spe10problem;
-    if (blank_perm)
-    {
-        spe10problem = make_unique<SPE10Problem>(
-                           nDimensions, spe10_scale, metis_agglomeration, proc_part_ubal,
-                           coarseningFactor);
-    }
-    else
-    {
-        spe10problem = make_unique<SPE10Problem>(
-                           permFile, nDimensions, spe10_scale, slice, metis_agglomeration,
-                           proc_part_ubal, coarseningFactor);
-    }
-    mfem::ParMesh* pmesh = spe10problem->GetParMesh();
+    SPE10Problem spe10problem(
+        permFile, nDimensions, spe10_scale, slice, metis_agglomeration,
+        proc_part_ubal, coarseningFactor);
+    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
     if (myid == 0)
     {
@@ -229,7 +215,7 @@ int main(int argc, char* argv[])
     {
         mfem::ParBilinearForm a(&sigmafespace);
         a.AddDomainIntegrator(
-            new FiniteVolumeMassIntegrator(*spe10problem->GetKInv()) );
+            new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
 
         if (elem_mass == false)
         {
@@ -263,7 +249,7 @@ int main(int argc, char* argv[])
 
     mfem::LinearForm q(&ufespace);
     q.AddDomainIntegrator(
-        new mfem::DomainLFIntegrator(*spe10problem->GetForceCoeff()) );
+        new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
     q.Assemble();
     rhs_u_fine = q;
 
@@ -280,7 +266,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        auto num_procs_xyz = spe10problem->GetNumProcsXYZ();
+        auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
         FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
     }
 
@@ -329,7 +315,7 @@ int main(int argc, char* argv[])
     {
         const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
-                      comm, nDimensions, spe10problem->CellVolume(nDimensions), kappa, seed,
+                      comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
                       vertex_edge, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
                       spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
                       hybridization);

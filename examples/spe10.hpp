@@ -116,10 +116,6 @@ public:
                  int slice, bool metis_partition, double proc_part_ubal,
                  const mfem::Array<int>& coarsening_factor);
 
-    /// constructor for a flat permeability=1 version of the problem
-    SPE10Problem(int nDimensions, int spe10_scale, bool metis_partition,
-                 double proc_part_ubal, const mfem::Array<int>& coarsening_factor);
-
     ~SPE10Problem();
 
     mfem::ParMesh* GetParMesh()
@@ -150,7 +146,7 @@ public:
 private:
     void Init(
         const char* permFile, int nDimensions, int spe10_scale, int slice,
-        bool blank_perm, bool metis_partition, double proc_part_ubal,
+        bool metis_partition, double proc_part_ubal,
         const mfem::Array<int>& coarsening_factor);
 
     double Lx, Ly, Lz, Hx, Hy, Hz;
@@ -164,20 +160,12 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
                            int spe10_scale, int slice, bool metis_partition, double proc_part_ubal,
                            const mfem::Array<int>& coarsening_factor)
 {
-    Init(permFile, nDimensions, spe10_scale, slice, false, metis_partition, proc_part_ubal,
-         coarsening_factor);
-}
-
-SPE10Problem::SPE10Problem(int nDimensions,
-                           int spe10_scale,  bool metis_partition, double proc_part_ubal,
-                           const mfem::Array<int>& coarsening_factor)
-{
-    Init(NULL, nDimensions, spe10_scale, 0, true, metis_partition, proc_part_ubal,
+    Init(permFile, nDimensions, spe10_scale, slice, metis_partition, proc_part_ubal,
          coarsening_factor);
 }
 
 void SPE10Problem::Init(
-    const char* permFile, int nDimensions, int spe10_scale, int slice, bool blank_perm,
+    const char* permFile, int nDimensions, int spe10_scale, int slice,
     bool metis_partition, double proc_part_ubal, const mfem::Array<int>& coarsening_factor)
 {
     int num_procs, myid;
@@ -201,7 +189,7 @@ void SPE10Problem::Init(
 
     IPF::SetNumberCells(N[0], N[1], N[2]);
     IPF::SetMeshSizes(h(0), h(1), h(2));
-    if (blank_perm && permFile == NULL)
+    if (permFile != NULL && (std::strcmp(permFile, "") == 0))
     {
         IPF::BlankPermeability();
     }

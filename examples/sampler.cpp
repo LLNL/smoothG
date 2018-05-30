@@ -189,7 +189,7 @@ int main(int argc, char* argv[])
     mfem::Vector weight;
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(nDimensions, spe10_scale,
+    SPE10Problem spe10problem("", nDimensions, spe10_scale, 0,
                               metis_agglomeration, 2.0, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
