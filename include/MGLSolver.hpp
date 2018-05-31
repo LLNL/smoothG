@@ -37,10 +37,10 @@ public:
     /** @brief Default Constructor */
     MGLSolver() = default;
 
-    /** @brief Constructor settting offsets for block vectors
-        @param offsets block vector offsets
+    /** @brief Constructor from a mixed matrix
+        @param mgl mixed matrix information
     */
-    MGLSolver(const std::vector<int>& offsets);
+    MGLSolver(const MixedMatrix& mgl);
 
     /** @brief Copy Constructor */
     MGLSolver(const MGLSolver& other) noexcept;
@@ -92,6 +92,10 @@ public:
     ///@}
 
 protected:
+    MPI_Comm comm_;
+    int myid_;
+    bool use_w_;
+
     mutable BlockVector rhs_;
     mutable BlockVector sol_;
 

@@ -33,6 +33,7 @@
 
 #include "MinresBlockSolver.hpp"
 #include "HybridSolver.hpp"
+#include "SPDSolver.hpp"
 
 namespace smoothg
 {
@@ -57,10 +58,16 @@ public:
        @param hybridization use hybridization as solver
     */
     GraphUpscale(Graph graph, double spect_tol = 0.001, int max_evects = 4,
-                 bool hybridization = false);
+                 bool hybridization = false, const std::vector<int>& elim_edge_dofs = {});
 
     /// Default Destructor
     ~GraphUpscale() = default;
+
+    /// Get global number of rows (vertex dofs)
+    int GlobalRows() const;
+
+    /// Get global number of columns (vertex dofs)
+    int GlobalCols() const;
 
     /// Extract a local fine vertex space vector from global vector
     template <typename T>
@@ -83,10 +90,12 @@ public:
     BlockVector ReadEdgeBlockVector(const std::string& filename) const;
 
     /// Write permuted vertex vector
-    void WriteVertexVector(const VectorView& vect, const std::string& filename) const;
+    template <typename T>
+    void WriteVertexVector(const T& vect, const std::string& filename) const;
 
     /// Write permuted edge vector
-    void WriteEdgeVector(const VectorView& vect, const std::string& filename) const;
+    template <typename T>
+    void WriteEdgeVector(const T& vect, const std::string& filename) const;
 
     /// Create Fine Level Solver
     void MakeFineSolver();
@@ -158,6 +167,13 @@ public:
     /// Orthogonalize against the constant vector
     void Orthogonalize(VectorView vect) const;
     void Orthogonalize(BlockVector& vect) const;
+
+    /// Orthogonalize against the coarse constant vector
+    void OrthogonalizeCoarse(VectorView vect) const;
+    void OrthogonalizeCoarse(BlockVector& vect) const;
+
+    /// Get Normalized Coarse Constant Representation
+    const Vector& GetCoarseConstant() const;
 
     /// Create a coarse vertex space vector
     Vector GetCoarseVector() const;
@@ -258,12 +274,19 @@ protected:
     mutable BlockVector rhs_coarse_;
     mutable BlockVector sol_coarse_;
 
+    Vector constant_coarse_;
+
+    std::vector<int> fine_elim_dofs_;
+    std::vector<int> coarse_elim_dofs_;
+
 private:
     double spect_tol_;
     int max_evects_;
     bool hybridization_;
 
     Graph graph_;
+
+    bool do_ortho_;
 };
 
 template <typename T>
@@ -276,6 +299,18 @@ template <typename T>
 T GraphUpscale::GetEdgeVector(const T& global_vect) const
 {
     return GetSubVector(global_vect, graph_.edge_map_);
+}
+
+template <typename T>
+void GraphUpscale::WriteVertexVector(const T& vect, const std::string& filename) const
+{
+    WriteVector(comm_, vect, filename, global_vertices_, graph_.vertex_map_);
+}
+
+template <typename T>
+void GraphUpscale::WriteEdgeVector(const T& vect, const std::string& filename) const
+{
+    WriteVector(comm_, vect, filename, global_edges_, graph_.edge_map_);
 }
 
 } // namespace smoothg

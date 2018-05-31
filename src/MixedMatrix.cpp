@@ -31,7 +31,8 @@ MixedMatrix::MixedMatrix(const Graph& graph)
       agg_vertexdof_(SparseIdentity(D_local_.Rows())),
       face_facedof_(SparseIdentity(elem_dof_.Cols()))
 {
-    const int num_vertices = D_local_.Rows();
+    int num_vertices = D_local_.Rows();
+    int num_edges = D_local_.Cols();
 
     M_elem_.resize(num_vertices);
 
@@ -41,12 +42,21 @@ MixedMatrix::MixedMatrix(const Graph& graph)
     for (auto& i : weight_inv)
     {
         assert(std::fabs(i) > 1e-12);
+        assert(i == i);
         i = 1.0 / i;
+    }
+
+    for (int i = 0; i < num_edges; ++i)
+    {
+        if (graph.edge_edge_.GetOffd().RowSize(i) == 0)
+        {
+            weight_inv[i] /= 2.0;
+        }
     }
 
     for (int i = 0; i < num_vertices; ++i)
     {
-        std::vector<int> edge_dofs = D_local_.GetIndices(i);
+        std::vector<int> edge_dofs = elem_dof_.GetIndices(i);
 
         int num_dofs = edge_dofs.size();
 
@@ -54,7 +64,7 @@ MixedMatrix::MixedMatrix(const Graph& graph)
 
         for (int j = 0; j < num_dofs; ++j)
         {
-            M_elem_[i](j, j) = weight_inv[edge_dofs[j]] / edge_vertex.RowSize(edge_dofs[j]);
+            M_elem_[i](j, j) = weight_inv[edge_dofs[j]];
         }
     }
 
@@ -220,6 +230,14 @@ void MixedMatrix::AssembleM()
     CooMatrix M_coo(M_size, M_size);
 
     int num_aggs = M_elem_.size();
+    int nnz = 0;
+
+    for (const auto& elem : M_elem_)
+    {
+        nnz += elem.Rows() * elem.Cols();
+    }
+
+    M_coo.Reserve(nnz);
 
     for (int i = 0; i < num_aggs; ++i)
     {
@@ -241,6 +259,14 @@ void MixedMatrix::AssembleM(const std::vector<double>& agg_weight)
     CooMatrix M_coo(M_size, M_size);
 
     int num_aggs = M_elem_.size();
+    int nnz = 0;
+
+    for (const auto& elem : M_elem_)
+    {
+        nnz += elem.Rows() * elem.Cols();
+    }
+
+    M_coo.Reserve(nnz);
 
     for (int i = 0; i < num_aggs; ++i)
     {

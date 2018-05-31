@@ -26,7 +26,7 @@ namespace smoothg
 
 HybridSolver::HybridSolver(const MixedMatrix& mgl)
     :
-    MGLSolver(mgl.Offsets()), comm_(mgl.GlobalD().GetComm()), myid_(mgl.GlobalD().GetMyId()),
+    MGLSolver(mgl),
     agg_vertexdof_(mgl.GetAggVertexDof()),
     agg_edgedof_(mgl.GetElemDof()),
     num_aggs_(agg_edgedof_.Rows()),
@@ -35,7 +35,7 @@ HybridSolver::HybridSolver(const MixedMatrix& mgl)
     MinvDT_(num_aggs_), MinvCT_(num_aggs_),
     AinvDMinvCT_(num_aggs_), Ainv_(num_aggs_),
     hybrid_elem_(num_aggs_), Ainv_f_(num_aggs_),
-    agg_weights_(num_aggs_, 1.0), use_w_(mgl.CheckW())
+    agg_weights_(num_aggs_, 1.0)
 {
     SparseMatrix edgedof_multiplier = MakeEdgeDofMultiplier();
     SparseMatrix multiplier_edgedof = edgedof_multiplier.Transpose();
@@ -276,14 +276,14 @@ void HybridSolver::Solve(const BlockVector& Rhs, BlockVector& Sol) const
     cg_.Mult(trueHrhs_, trueMu_);
 
     timer.Click();
-    timing_ += timer.TotalTime();
+    timing_ = timer.TotalTime();
 
     if (myid_ == 0 && print_level_ > 0)
     {
         std::cout << "  Timing: PCG done in " << timing_ << "s. \n";
     }
 
-    num_iterations_ += cg_.GetNumIterations();
+    num_iterations_ = cg_.GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
     {

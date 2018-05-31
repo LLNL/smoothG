@@ -141,9 +141,6 @@ private:
 
     void InitSolver(SparseMatrix local_hybrid);
 
-    MPI_Comm comm_;
-    int myid_;
-
     SparseMatrix agg_vertexdof_;
     SparseMatrix agg_edgedof_;
     SparseMatrix agg_multiplier_;
@@ -173,8 +170,6 @@ private:
     mutable Vector trueMu_;
     mutable Vector Hrhs_;
     mutable Vector Mu_;
-
-    bool use_w_;
 };
 
 

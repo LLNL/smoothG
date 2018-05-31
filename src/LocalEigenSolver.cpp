@@ -321,7 +321,6 @@ public:
 
     void MultOP(double* in, double* out) override
     {
-        //VIEW
         VectorView v_in(in, size_);
         VectorView v_out(out, size_);
 

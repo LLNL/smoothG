@@ -8,7 +8,12 @@ find_package(parlinalgcpp REQUIRED)
 find_package(partition REQUIRED)
 find_package(sparsesolve REQUIRED)
 
+if (SMOOTHG_USE_ARPACK)
+    find_package(ARPACK REQUIRED)
+endif()
+
 LIST(REMOVE_AT CMAKE_MODULE_PATH -1)
+
 
 if(NOT TARGET smoothg::smoothg)
     include("${smoothg_CMAKE_DIR}/smoothgTargets.cmake")

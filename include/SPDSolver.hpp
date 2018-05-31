@@ -14,14 +14,14 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file MinresBlockSolver.hpp
+   @file SPDSolver.hpp
 
    @brief Given a graph in mixed form, solve the resulting system with
-   preconditioned MINRES
+   preconditioned CG
 */
 
-#ifndef MINRESBLOCKSOLVER_HPP
-#define MINRESBLOCKSOLVER_HPP
+#ifndef SPDSOLVER_HPP
+#define SPDSOLVER_HPP
 
 #include <memory>
 #include <assert.h>
@@ -34,8 +34,8 @@ namespace smoothg
 {
 
 /**
-   @brief Block diagonal preconditioned MINRES solver for saddle point
-   problem.
+   @brief BoomerAMG Preconditioned CG solver for saddle point
+   problem in primal form.
 
    Given matrix M and D, setup and solve the graph Laplacian problem
    \f[
@@ -51,41 +51,38 @@ namespace smoothg
        f \\ g
      \end{array} \right)
    \f]
-   using MinRes with a block-diagonal preconditioner.
-
-   This class and its implementation owes a lot to MFEM example ex5p
 */
-class MinresBlockSolver : public MGLSolver
+class SPDSolver : public MGLSolver
 {
 public:
     /** @brief Default Constructor */
-    MinresBlockSolver() = default;
+    SPDSolver() = default;
 
     /** @brief Constructor from a mixed matrix
         @param mgl mixed matrix information
     */
-    MinresBlockSolver(const MixedMatrix& mgl);
+    SPDSolver(const MixedMatrix& mgl);
 
     /** @brief Constructor from a mixed matrix, with eliminated edge dofs
         @param mgl mixed matrix information
         @param elim_dofs dofs to eliminate
     */
-    MinresBlockSolver(const MixedMatrix& mgl, const std::vector<int>& elim_dofs);
+    SPDSolver(const MixedMatrix& mgl, const std::vector<int>& elim_dofs);
 
     /** @brief Copy Constructor */
-    MinresBlockSolver(const MinresBlockSolver& other) noexcept;
+    SPDSolver(const SPDSolver& other) noexcept;
 
     /** @brief Move Constructor */
-    MinresBlockSolver(MinresBlockSolver&& other) noexcept;
+    SPDSolver(SPDSolver&& other) noexcept;
 
     /** @brief Assignment Operator */
-    MinresBlockSolver& operator=(MinresBlockSolver other) noexcept;
+    SPDSolver& operator=(SPDSolver other) noexcept;
 
     /** @brief Swap two solvers */
-    friend void swap(MinresBlockSolver& lhs, MinresBlockSolver& rhs) noexcept;
+    friend void swap(SPDSolver& lhs, SPDSolver& rhs) noexcept;
 
     /** @brief Default Destructor */
-    ~MinresBlockSolver() noexcept = default;
+    ~SPDSolver() noexcept = default;
 
     /** @brief Use block-preconditioned MINRES to solve the problem.
         @param rhs Right hand side
@@ -102,28 +99,16 @@ public:
     ///@}
 
 protected:
-
-    ParMatrix M_;
-    ParMatrix D_;
-    ParMatrix DT_;
-    ParMatrix W_;
-
-    ParMatrix edge_true_edge_;
+    ParMatrix A_;
+    ParMatrix MinvDT_;
 
 private:
-    linalgcpp::BlockOperator op_;
-    linalgcpp::BlockOperator prec_;
-
-    parlinalgcpp::ParDiagScale M_prec_;
-    parlinalgcpp::BoomerAMG schur_prec_;
-
-    linalgcpp::PMINRESSolver pminres_;
-
-    mutable BlockVector true_rhs_;
-    mutable BlockVector true_sol_;
+    parlinalgcpp::BoomerAMG prec_;
+    linalgcpp::PCGSolver pcg_;
 };
 
 
 } // namespace smoothg
 
-#endif // MINRESBLOCKSOLVER_HPP
+#endif // SPDSOLVER_HPP
+

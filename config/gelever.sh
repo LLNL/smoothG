@@ -37,9 +37,9 @@ HYPRE_DIR=~/hypre
 SUITESPARSE_DIR=~/SuiteSparse
 ARPACK_DIR=~/arpack
 ARPACKPP_DIR=~/arpackpp/include
-USE_ARPACK=NO
+USE_ARPACK=Yes
 BUILD_TYPE=Debug
-TEST_TOL=1e-2
+TEST_TOL=1e-4
 TEST_PROCS=2
 
 CC=mpicc CXX=mpic++ cmake \

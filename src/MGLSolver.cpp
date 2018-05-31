@@ -23,16 +23,20 @@
 namespace smoothg
 {
 
-MGLSolver::MGLSolver(const std::vector<int>& offsets)
-    : rhs_(offsets),
-      sol_(offsets),
+MGLSolver::MGLSolver(const MixedMatrix& mgl)
+    : comm_(mgl.GlobalD().GetComm()),
+      myid_(mgl.GlobalD().GetMyId()),
+      use_w_(mgl.CheckW()),
+      rhs_(mgl.Offsets()), sol_(mgl.Offsets()),
       nnz_(0), num_iterations_(0), timing_(0)
 {
 
 }
 
 MGLSolver::MGLSolver(const MGLSolver& other) noexcept
-    : Operator(other), rhs_(other.rhs_), sol_(other.sol_),
+    : Operator(other),  comm_(other.comm_),
+      myid_(other.myid_), use_w_(other.use_w_),
+      rhs_(other.rhs_), sol_(other.sol_),
       print_level_(other.print_level_),
       max_num_iter_(other.max_num_iter_),
       rtol_(other.rtol_), atol_(other.atol_),
@@ -45,6 +49,10 @@ void swap(MGLSolver& lhs, MGLSolver& rhs) noexcept
 {
     swap(static_cast<linalgcpp::Operator&>(lhs),
          static_cast<linalgcpp::Operator&>(rhs));
+
+    std::swap(lhs.comm_, rhs.comm_);
+    std::swap(lhs.myid_, rhs.myid_);
+    std::swap(lhs.use_w_, rhs.use_w_);
 
     std::swap(lhs.rhs_, rhs.rhs_);
     std::swap(lhs.sol_, rhs.sol_);

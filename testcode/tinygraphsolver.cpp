@@ -153,10 +153,12 @@ int main(int argc, char* argv[])
 
     MinresBlockSolver minres(mgl);
     HybridSolver hb(mgl);
+    SPDSolver spd(mgl);
 
     std::map<MGLSolver*, std::string> solver_to_name;
     solver_to_name[&minres] = "Minres + block preconditioner";
     solver_to_name[&hb] = "Hybridizaiton + BoomerAMG";
+    solver_to_name[&spd] = "Primal BoomerAMG";
 
     const double equality_tolerance = 1.e-9;
     bool some_solver_fails = false;
@@ -191,7 +193,8 @@ int main(int argc, char* argv[])
             std::cout << "Global system has " << nnz << " nonzeros.\n";
             std::cout << name << " converged in " << iter << " iterations.\n";
             std::cout << "Error norm: " << error << "\n";
-            sol.GetBlock(1).Print("Sol:");
+            sol.GetBlock(0).Print("Edge Sol:");
+            sol.GetBlock(1).Print("Vertex Sol:");
         }
     }
 

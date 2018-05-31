@@ -173,6 +173,8 @@ Graph::Graph(SparseMatrix vertex_edge_local, ParMatrix edge_true_edge,
     {
         MakeLocalWeight(std::vector<double>());
     }
+
+    W_local_ *= -1.0;
 }
 
 Graph::Graph(const Graph& other) noexcept
