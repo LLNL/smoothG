@@ -88,6 +88,8 @@ void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
     assert(coarse_solver_);
 
     coarse_solver_->Solve(x, y);
+    y *= -1.0;
+    OrthogonalizeCoarse(y);
 }
 
 mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const
@@ -104,6 +106,7 @@ void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) cons
 
     coarse_solver_->Solve(x, y);
     y *= -1.0;
+    OrthogonalizeCoarse(y);
 }
 
 mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
@@ -244,6 +247,25 @@ void Upscale::Orthogonalize(mfem::BlockVector& vect) const
     Orthogonalize(vect.GetBlock(1));
 }
 
+void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
+{
+    const mfem::Vector coarse_constant_rep = GetCoarseConstantRep();
+    double local_dot = (vect * coarse_constant_rep);
+    double global_dot;
+    MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
+
+    double local_scale = (coarse_constant_rep * coarse_constant_rep);
+    double global_scale;
+    MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
+
+    vect.Add(-global_dot / global_scale, coarse_constant_rep);
+}
+
+void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
+{
+    OrthogonalizeCoarse(vect.GetBlock(1));
+}
+
 mfem::Vector Upscale::GetCoarseVector() const
 {
     const auto& offsets = GetCoarseMatrix().GetBlockOffsets();
@@ -318,6 +340,17 @@ MixedMatrix& Upscale::GetCoarseMatrix()
 const MixedMatrix& Upscale::GetCoarseMatrix() const
 {
     return GetMatrix(1);
+}
+
+const mfem::Vector& Upscale::GetCoarseConstantRep() const
+{
+    if (coarse_constant_rep_.Size() == 0)
+    {
+        mfem::Vector fine_ones = GetFineVector();
+        fine_ones = 1.0;
+        coarse_constant_rep_ = Restrict(fine_ones);
+    }
+    return coarse_constant_rep_;
 }
 
 void Upscale::PrintInfo(std::ostream& out) const

@@ -833,6 +833,15 @@ void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
     npos = npos_;
 }
 
+void InversePermeabilityFunction::BlankPermeability()
+{
+    inversePermeability = new double[3 * Nx * Ny * Nz];
+    for (int i = 0; i < 3 * Nx * Ny * Nz; ++i)
+    {
+        inversePermeability[i] = 1.0;
+    }
+}
+
 void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName)
 {
     std::ifstream permfile(fileName.c_str());
@@ -943,7 +952,6 @@ void InversePermeabilityFunction::InversePermeability(const mfem::Vector& x,
 
     if (orientation == NONE)
         val[2] = inversePermeability[Ny * Nx * k + Nx * j + i + 2 * Nx * Ny * Nz];
-
 }
 
 double InversePermeabilityFunction::InvNorm2(const mfem::Vector& x)
@@ -1160,6 +1168,33 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
 
         colors[i] = color;
     }
+}
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor)
+{
+    const int SPE10_num_x_volumes = 60;
+    const int SPE10_num_y_volumes = 220;
+    const int SPE10_num_z_volumes = 85;
+
+    const int nDimensions = num_procs_xyz.size();
+
+    mfem::Array<int> nxyz(nDimensions);
+    nxyz[0] = SPE10_num_x_volumes / num_procs_xyz[0] / coarsening_factor[0];
+    nxyz[1] = SPE10_num_y_volumes / num_procs_xyz[1] / coarsening_factor[1];
+    if (nDimensions == 3)
+        nxyz[2] = SPE10_num_z_volumes / num_procs_xyz[2] / coarsening_factor[2];
+
+    for (int& i : nxyz)
+    {
+        i = std::max(1, i);
+    }
+
+    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
+    partitioning.Append(cart_part);
+
+    cart_part.MakeDataOwner();
 }
 
 } // namespace smoothg

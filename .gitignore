@@ -16,3 +16,4 @@ GRTAGS
 GTAGS
 mfem-link
 parelag-link
+.dir-locals.el

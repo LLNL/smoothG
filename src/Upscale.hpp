@@ -93,6 +93,9 @@ public:
     virtual void Orthogonalize(mfem::Vector& vect) const;
     virtual void Orthogonalize(mfem::BlockVector& vect) const;
 
+    virtual void OrthogonalizeCoarse(mfem::Vector& vect) const;
+    virtual void OrthogonalizeCoarse(mfem::BlockVector& vect) const;
+
     /// Create a coarse vertex space vector
     virtual mfem::Vector GetCoarseVector() const;
 
@@ -122,6 +125,10 @@ public:
     /// Get Coarse level Mixed Matrix
     virtual MixedMatrix& GetCoarseMatrix();
     virtual const MixedMatrix& GetCoarseMatrix() const;
+
+    /// Get a vector of coefficients that represents a constant vector on
+    /// the coarse graph; that is, return a vector v such that P_{vertices} v = 1
+    const mfem::Vector& GetCoarseConstantRep() const;
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
@@ -207,6 +214,8 @@ protected:
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
     std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+
+    mutable mfem::Vector coarse_constant_rep_;
 
 private:
     void SetOperator(const mfem::Operator& op) {};

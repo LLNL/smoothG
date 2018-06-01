@@ -362,6 +362,7 @@ public:
     static void SetMeshSizes(double hx, double hy, double hz);
     static void Set2DSlice(SliceOrientation o, int npos );
 
+    static void BlankPermeability();
     static void ReadPermeabilityFile(const std::string& fileName);
     static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
 
@@ -420,6 +421,10 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
    @param el_el element connectivity matrix (assuming nonzero diagonal)
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor);
 
 } // namespace smoothg
 

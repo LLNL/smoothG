@@ -34,3 +34,4 @@
 #include "GraphUpscale.hpp"
 #include "FiniteVolumeUpscale.hpp"
 #include "FiniteVolumeMLMC.hpp"
+#include "Sampler.hpp"

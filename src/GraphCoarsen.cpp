@@ -65,10 +65,12 @@ void GraphCoarsen::BuildPVertices(
 
     int* Pvertices_i = new int[nvertices + 1];
     Pvertices_i[0] = 0;
+    int total_coarse_dofs = 0;
     for (unsigned int i = 0; i < nAggs; ++i)
     {
         GetTableRow(Agg_vertex, i, local_fine_dofs);
         nlocal_coarse_dofs = vertex_target[i].Width();
+        total_coarse_dofs += nlocal_coarse_dofs;
         nlocal_fine_dofs = local_fine_dofs.Size();
         for (int j = 0; j < nlocal_fine_dofs; ++j)
             Pvertices_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;

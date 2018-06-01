@@ -152,6 +152,7 @@ public:
     {
         return std::move(CoarseW_);
     }
+
 private:
     /// @brief take vertex-based target functions and assemble them in matrix
     void BuildPVertices(std::vector<mfem::DenseMatrix>& vertex_targets,

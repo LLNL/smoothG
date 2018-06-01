@@ -361,6 +361,31 @@ def make_tests():
           "finest-u-error": 0.14767829457535478,
           "operator-complexity": 1.1666666666666667}]
 
+    tests["mlmc-sanity"] = \
+        [["./mlmc",
+          "--perm", spe10_perm_file],
+         {"finest-p-error": 0.10754186878360708}]
+
+    tests["mlmc-pde-sampler"] = \
+        [["./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01"],
+         {"finest-p-error": 0.1487505869352104}]
+
+    tests["mlmc-pde-sampler-hb"] = \
+        [["./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01",
+          "--hybridization",
+          "--no-coarse-components"],
+         {"finest-p-error": 0.14875751525009742}]
+
+    tests["par-mlmc"] = \
+        [["mpirun", "-n", "2", "./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01"],
+         {"finest-p-error": 0.38805214759478951}]
+
     tests["timestep"] = \
         [["./timestep",
           "--total-time", "100.0",
@@ -550,6 +575,13 @@ def make_tests():
           "--metis-agglomeration",
           "--isolate", "0"],
          {"operator-complexity": 1.2736672633273667}]
+
+    tests["sampler"] = \
+        [["./sampler",
+          "--kappa", "0.01",
+          "--num-samples", "2"],
+         {"fine-mean-l1": 0.54961180496539375,
+          "max-p-error": 0.39696741537314961}]
 
     if "tux" in platform.node():
         tests["veigenvector"] = \

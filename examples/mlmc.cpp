@@ -37,46 +37,29 @@
 
 using namespace smoothg;
 
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor);
-
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor);
-
-class SimpleSampler
+void SaveFigure(const mfem::Vector& sol,
+                mfem::ParFiniteElementSpace& fespace,
+                const std::string& name)
 {
-public:
-    SimpleSampler(int fine_size, int coarse_size) :
-        fine_size_(fine_size), coarse_size_(coarse_size)
+    mfem::ParGridFunction field(&fespace);
+    mfem::ParMesh* pmesh = fespace.GetParMesh();
+    field = sol;
     {
-        fine_.SetSize(fine_size_);
-        coarse_.SetSize(coarse_size_);
+        std::stringstream filename;
+        filename << name << ".mesh";
+        std::ofstream out(filename.str().c_str());
+        pmesh->Print(out);
     }
-
-    mfem::Vector& GetFineCoefficient(int sample)
     {
-        fine_ = (1.0 + sample);
-        return fine_;
+        std::stringstream filename;
+        filename << name << ".gridfunction";
+        std::ofstream out(filename.str().c_str());
+        field.Save(out);
     }
-
-    mfem::Vector& GetCoarseCoefficient(int sample)
-    {
-        coarse_ = (1.0 + sample);
-        return coarse_;
-    }
-
-private:
-    int fine_size_;
-    int coarse_size_;
-
-    mfem::Vector fine_;
-    mfem::Vector coarse_;
-};
+}
 
 void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
-               const mfem::ParMesh& pmesh, int tag)
+               const mfem::ParMesh& pmesh, const std::string& title)
 {
     char vishost[] = "localhost";
     int  visport   = 19916;
@@ -90,7 +73,7 @@ void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
     vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
     vis_v << "solution\n" << pmesh << field;
     vis_v << "window_size 500 800\n";
-    vis_v << "window_title 'pressure" << tag << "'\n";
+    vis_v << "window_title '" << title << "'\n";
     vis_v << "autoscale values\n";
 
     if (pmesh.Dimension() == 2)
@@ -117,7 +100,7 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
+    const char* permFile = "";
     args.AddOption(&permFile, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
@@ -160,6 +143,17 @@ int main(int argc, char* argv[])
     bool coarse_components = true;
     args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
                    "--no-coarse-components", "Store trace, bubble components of coarse M.");
+    const char* sampler_type = "simple";
+    args.AddOption(&sampler_type, "--sampler-type", "--sampler-type",
+                   "Which sampler to use for coefficient: simple, pde");
+    double kappa = 0.001;
+    args.AddOption(&kappa, "--kappa", "--kappa",
+                   "Correlation length for Gaussian samples.");
+    int num_samples = 3;
+    args.AddOption(&num_samples, "--num-samples", "--num-samples",
+                   "Number of samples to draw and simulate.");
+    int argseed = 1;
+    args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
     args.Parse();
     if (!args.Good())
     {
@@ -167,7 +161,6 @@ int main(int argc, char* argv[])
         {
             args.PrintUsage(std::cout);
         }
-        MPI_Finalize();
         return 1;
     }
     if (myid == 0)
@@ -200,16 +193,16 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     const double proc_part_ubal = 2.0;
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, proc_part_ubal, coarseningFactor);
-
+    SPE10Problem spe10problem(
+        permFile, nDimensions, spe10_scale, slice, metis_agglomeration,
+        proc_part_ubal, coarseningFactor);
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
     if (myid == 0)
     {
-        std::cout << pmesh->GetNEdges() << " fine edges, " <<
-                  pmesh->GetNFaces() << " fine faces, " <<
-                  pmesh->GetNE() << " fine elements\n";
+        std::cout << pmesh->GetNEdges() << " fine FE edges, " <<
+                  pmesh->GetNFaces() << " fine FE faces, " <<
+                  pmesh->GetNE() << " fine FE elements\n";
     }
 
     ess_attr.SetSize(nbdr);
@@ -224,17 +217,14 @@ int main(int argc, char* argv[])
         a.AddDomainIntegrator(
             new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
 
-        if (elem_mass == false)
+        a.Assemble();
+        a.Finalize();
+        a.SpMat().GetDiag(weight);
+        for (int i = 0; i < weight.Size(); ++i)
         {
-            a.Assemble();
-            a.Finalize();
-            a.SpMat().GetDiag(weight);
-            for (int i = 0; i < weight.Size(); ++i)
-            {
-                weight[i] = 1.0 / weight[i];
-            }
+            weight[i] = 1.0 / weight[i];
         }
-        else
+        if (elem_mass)
         {
             local_weight.resize(pmesh->GetNE());
             mfem::DenseMatrix M_el_i;
@@ -269,12 +259,12 @@ int main(int argc, char* argv[])
     mfem::Array<int> partitioning;
     if (metis_agglomeration)
     {
-        MetisPart(partitioning, sigmafespace, ufespace, coarseningFactor);
+        FESpaceMetisPartition(partitioning, sigmafespace, ufespace, coarseningFactor);
     }
     else
     {
         auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        CartPart(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
+        FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
     }
 
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
@@ -297,7 +287,6 @@ int main(int argc, char* argv[])
                         edge_boundary_att, ess_attr, spect_tol, max_evects,
                         dual_target, scaled_dual, energy_dual, hybridization, coarse_components);
     }
-
     fvupscale->PrintInfo();
     fvupscale->ShowSetupTime();
     fvupscale->MakeFineSolver();
@@ -307,21 +296,47 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
     const int num_fine_vertices = vertex_edge.Height();
+    const int num_fine_edges = vertex_edge.Width();
     const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
-    SimpleSampler sampler(num_fine_vertices, num_aggs);
+    if (myid == 0)
+    {
+        std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = "
+                  << num_fine_edges << ", coarse aggregates = " << num_aggs << std::endl;
+    }
+    unique_ptr<TwoLevelSampler> sampler;
+    if (std::string(sampler_type) == "simple")
+    {
+        sampler = make_unique<SimpleSampler>(num_fine_vertices, num_aggs);
+    }
+    else if (std::string(sampler_type) == "pde")
+    {
+        const int seed = argseed + myid;
+        sampler = make_unique<PDESampler>(
+                      comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
+                      vertex_edge, weight, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
+                      spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
+                      hybridization);
+    }
+    else
+    {
+        if (myid == 0)
+            std::cerr << "Unrecognized sampler: " << sampler_type << "!" << std::endl;
+        return 1;
+    }
 
-    const int num_samples = 3;
     for (int sample = 0; sample < num_samples; ++sample)
     {
         if (myid == 0)
             std::cout << "---\nSample " << sample << "\n---" << std::endl;
 
-        auto coarse_coefficient = sampler.GetCoarseCoefficient(sample);
+        sampler->NewSample();
+
+        auto coarse_coefficient = sampler->GetCoarseCoefficient();
         fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = fvupscale->Solve(rhs_fine);
         fvupscale->ShowCoarseSolveInfo();
 
-        auto fine_coefficient = sampler.GetFineCoefficient(sample);
+        auto fine_coefficient = sampler->GetFineCoefficient();
         fvupscale->RescaleFineCoefficient(fine_coefficient);
         auto sol_fine = fvupscale->SolveFine(rhs_fine);
         fvupscale->ShowFineSolveInfo();
@@ -333,54 +348,36 @@ int main(int argc, char* argv[])
             ShowErrors(error_info);
         }
 
+        // for more informative visualization
+        for (int i = 0; i < fine_coefficient.Size(); ++i)
+        {
+            fine_coefficient[i] = std::log(fine_coefficient[i]);
+        }
+
+        std::stringstream coarsename;
+        coarsename << "upscaledpressure" << sample;
+        SaveFigure(sol_upscaled.GetBlock(1), ufespace, coarsename.str());
+        std::stringstream finename;
+        finename << "finepressure" << sample;
+        SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
+        std::stringstream coeffname;
+        coeffname << "coefficient" << sample;
+        SaveFigure(fine_coefficient, ufespace, coeffname.str());
+
         // Visualize the solution
         if (visualization)
         {
             mfem::ParGridFunction field(&ufespace);
 
-            Visualize(sol_upscaled.GetBlock(1), field, *pmesh, sample);
-            Visualize(sol_fine.GetBlock(1), field, *pmesh, sample);
+            std::stringstream ss1, ss2, ss3;
+            ss1 << "upscaled pressure" << sample;
+            Visualize(sol_upscaled.GetBlock(1), field, *pmesh, ss1.str());
+            ss2 << "fine pressure" << sample;
+            Visualize(sol_fine.GetBlock(1), field, *pmesh, ss2.str());
+            ss3 << "coefficient" << sample;
+            Visualize(fine_coefficient, field, *pmesh, ss3.str());
         }
     }
 
     return EXIT_SUCCESS;
-}
-
-void MetisPart(mfem::Array<int>& partitioning,
-               mfem::ParFiniteElementSpace& sigmafespace,
-               mfem::ParFiniteElementSpace& ufespace,
-               mfem::Array<int>& coarsening_factor)
-{
-    mfem::DiscreteLinearOperator DivOp(&sigmafespace, &ufespace);
-    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
-    DivOp.Assemble();
-    DivOp.Finalize();
-
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
-
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
-}
-
-void CartPart(mfem::Array<int>& partitioning, std::vector<int>& num_procs_xyz,
-              mfem::ParMesh& pmesh, mfem::Array<int>& coarsening_factor)
-{
-    const int nDimensions = num_procs_xyz.size();
-
-    mfem::Array<int> nxyz(nDimensions);
-    nxyz[0] = 60 / num_procs_xyz[0] / coarsening_factor[0];
-    nxyz[1] = 220 / num_procs_xyz[1] / coarsening_factor[1];
-    if (nDimensions == 3)
-        nxyz[2] = 85 / num_procs_xyz[2] / coarsening_factor[2];
-
-    for (int& i : nxyz)
-    {
-        i = std::max(1, i);
-    }
-
-    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
-    partitioning.Append(cart_part);
-
-    cart_part.MakeDataOwner();
 }

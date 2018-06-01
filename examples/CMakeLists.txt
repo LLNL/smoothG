@@ -19,6 +19,9 @@
 add_executable(finitevolume finitevolume.cpp)
 target_link_libraries(finitevolume smoothg ${TPL_LIBRARIES})
 
+add_executable(sampler sampler.cpp)
+target_link_libraries(sampler smoothg ${TPL_LIBRARIES})
+
 add_executable(generalgraph generalgraph.cpp)
 target_link_libraries(generalgraph smoothg ${TPL_LIBRARIES})
 
@@ -70,6 +73,10 @@ add_test(samplegraph4-coeff-hb python stest.py samplegraph4-coeff-hb)
 add_test(graph-hybridization python stest.py graph-hybridization)
 add_test(poweriter python stest.py poweriter)
 add_test(graph-weight python stest.py graph-weight)
+add_test(mlmc-sanity python stest.py mlmc-sanity)
+add_test(mlmc-pde-sampler python stest.py mlmc-pde-sampler)
+add_test(mlmc-pde-sampler-hb python stest.py mlmc-pde-sampler-hb)
+add_test(par-mlmc python stest.py par-mlmc)
 add_test(timestep python stest.py timestep)
 add_test(graphupscale graphupscale)
 add_test(mltopo mltopo --no-visualization)
@@ -106,6 +113,7 @@ else()
   add_test(pargraph-metis python stest.py pargraph-metis)
 endif()
 add_test(isolate_coarsen python stest.py isolate-coarsen)
+add_test(sampler python stest.py sampler)
 
 add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
 add_test(vgraph-small-usegenerator-hb python stest.py vgraph-small-usegenerator-hb)

@@ -215,7 +215,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     minres_.Mult(*rhs_, sol);
 
     chrono.Stop();
-    timing_ += chrono.RealTime();
+    timing_ = chrono.RealTime();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -233,7 +233,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
                       << minres_.GetFinalNorm() << "\n";
     }
 
-    num_iterations_ += minres_.GetNumIterations();
+    num_iterations_ = minres_.GetNumIterations();
 }
 
 /**
@@ -277,7 +277,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
 
     chrono.Stop();
 
-    timing_ += chrono.RealTime();
+    timing_ = chrono.RealTime();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -295,7 +295,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
                       << minres_.GetFinalNorm() << "\n";
     }
 
-    num_iterations_ += minres_.GetNumIterations();
+    num_iterations_ = minres_.GetNumIterations();
 }
 
 void MinresBlockSolver::SetPrintLevel(int print_level)

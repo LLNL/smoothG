@@ -122,9 +122,9 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 /// this implementation is sloppy
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
+    GetFineMatrix().UpdateM(coeff);
     if (!hybridization_)
     {
-        GetFineMatrix().UpdateM(coeff);
         ForceMakeFineSolver();
     }
     else
