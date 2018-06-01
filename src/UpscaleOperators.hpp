@@ -80,7 +80,7 @@ namespace smoothg
 class UpscaleBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleBlockSolve(const Upscale& A) : mfem::Operator(A.GetFineMatrix().get_num_total_dofs()), A_(A)
+    UpscaleBlockSolve(const Upscale& A) : mfem::Operator(A.GetFineMatrix().GetNumTotalDofs()), A_(A)
     {
         A_.FineBlockOffsets(offsets_);
     }
@@ -100,7 +100,7 @@ private:
 class UpscaleFineSolve : public mfem::Operator
 {
 public:
-    UpscaleFineSolve(const Upscale& A) : mfem::Operator(A.GetFineMatrix().getD().Height()), A_(A)  { }
+    UpscaleFineSolve(const Upscale& A) : mfem::Operator(A.GetFineMatrix().GetD().Height()), A_(A)  { }
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.SolveFine(x, y); }
 
 private:
@@ -112,7 +112,7 @@ private:
 class UpscaleFineBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleFineBlockSolve(const Upscale& A) : mfem::Operator(A.GetFineMatrix().get_num_total_dofs()),
+    UpscaleFineBlockSolve(const Upscale& A) : mfem::Operator(A.GetFineMatrix().GetNumTotalDofs()),
         A_(A)
     {
         A_.FineBlockOffsets(offsets_);
@@ -133,7 +133,7 @@ private:
 class UpscaleCoarseSolve : public mfem::Operator
 {
 public:
-    UpscaleCoarseSolve(const Upscale& A) : mfem::Operator(A.GetCoarseMatrix().getD().Height()),
+    UpscaleCoarseSolve(const Upscale& A) : mfem::Operator(A.GetCoarseMatrix().GetD().Height()),
         A_(A)  {}
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.SolveCoarse(x, y); }
 
@@ -147,7 +147,7 @@ class UpscaleCoarseBlockSolve : public mfem::Operator
 {
 public:
     UpscaleCoarseBlockSolve(const Upscale& A) : mfem::Operator(
-            A.GetCoarseMatrix().get_num_total_dofs()), A_(A)
+            A.GetCoarseMatrix().GetNumTotalDofs()), A_(A)
     {
         A_.CoarseBlockOffsets(offsets_);
     }

@@ -1,4 +1,5 @@
 build/
+generated-docs/
 
 *.sh~
 *.cpp~
@@ -15,3 +16,4 @@ GRTAGS
 GTAGS
 mfem-link
 parelag-link
+.dir-locals.el

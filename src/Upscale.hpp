@@ -73,13 +73,13 @@ public:
     virtual void Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Interpolate(const mfem::BlockVector& x) const;
 
-    /// Coarsen a fine vector to the coarse level
-    virtual void Coarsen(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Coarsen(const mfem::Vector& x) const;
+    /// Restrict a fine vector to the coarse level
+    virtual void Restrict(const mfem::Vector& x, mfem::Vector& y) const;
+    virtual mfem::Vector Restrict(const mfem::Vector& x) const;
 
-    /// Coarsen a fine vector to the coarse level, in mixed form
-    virtual void Coarsen(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Coarsen(const mfem::BlockVector& x) const;
+    /// Restrict a fine vector to the coarse level, in mixed form
+    virtual void Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    virtual mfem::BlockVector Restrict(const mfem::BlockVector& x) const;
 
     /// Get block offsets
     virtual void FineBlockOffsets(mfem::Array<int>& offsets) const;
@@ -92,6 +92,9 @@ public:
     /// Orthogonalize against the constant vector
     virtual void Orthogonalize(mfem::Vector& vect) const;
     virtual void Orthogonalize(mfem::BlockVector& vect) const;
+
+    virtual void OrthogonalizeCoarse(mfem::Vector& vect) const;
+    virtual void OrthogonalizeCoarse(mfem::BlockVector& vect) const;
 
     /// Create a coarse vertex space vector
     virtual mfem::Vector GetCoarseVector() const;
@@ -123,6 +126,10 @@ public:
     virtual MixedMatrix& GetCoarseMatrix();
     virtual const MixedMatrix& GetCoarseMatrix() const;
 
+    /// Get a vector of coefficients that represents a constant vector on
+    /// the coarse graph; that is, return a vector v such that P_{vertices} v = 1
+    const mfem::Vector& GetCoarseConstantRep() const;
+
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
 
@@ -130,7 +137,7 @@ public:
     double OperatorComplexity() const;
 
     /// Get Row Starts
-    virtual mfem::Array<HYPRE_Int>& get_Drow_start() const { return mixed_laplacians_[0].get_Drow_start();};
+    virtual mfem::Array<HYPRE_Int>& GetDrowStart() const { return GetFineMatrix().GetDrowStart();}
 
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
@@ -184,8 +191,8 @@ protected:
 
     void MakeCoarseVectors()
     {
-        rhs_coarse_ = make_unique<mfem::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
-        sol_coarse_ = make_unique<mfem::BlockVector>(mixed_laplacians_.back().get_blockoffsets());
+        rhs_coarse_ = make_unique<mfem::BlockVector>(GetCoarseMatrix().GetBlockOffsets());
+        sol_coarse_ = make_unique<mfem::BlockVector>(GetCoarseMatrix().GetBlockOffsets());
     }
 
     std::vector<smoothg::MixedMatrix> mixed_laplacians_;
@@ -206,7 +213,9 @@ protected:
     std::unique_ptr<mfem::BlockVector> sol_coarse_;
 
     // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    mutable std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+    std::unique_ptr<MixedLaplacianSolver> fine_solver_;
+
+    mutable mfem::Vector coarse_constant_rep_;
 
 private:
     void SetOperator(const mfem::Operator& op) {};

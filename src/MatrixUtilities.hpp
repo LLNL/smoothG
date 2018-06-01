@@ -41,18 +41,21 @@ void Print(const mfem::SparseMatrix& mat, const std::string& label = "",
 */
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol = 1e-8);
 
-
 /**
     @brief Creates a sparse matrix from a table
 */
-mfem::SparseMatrix TableToSparse(const mfem::Table& table);
+mfem::SparseMatrix TableToMatrix(const mfem::Table& table);
+
+/**
+    @brief Creates a table from a sparse matrix's graph
+*/
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat);
 
 // Rap by hand that seems to be faster than the mfem rap but uses more memory
 // Use mfem::RAP if memory is more important than cycles
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
                           const mfem::HypreParMatrix& P);
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& P);
-
 
 /**
     @brief Broadcast a SparseMatrix on processor 0 to all other processors
@@ -111,16 +114,47 @@ mfem::SparseMatrix SparseIdentity(int size);
    @brief Construct an rectangular identity matrix (as a SparseMatrix)
    @param rows number of row
    @param cols number of columns
-   @params row_offset offset row where diagonal identity starts
-   @params col_offset offset column where diagonal identity starts
+   @param row_offset offset row where diagonal identity starts
+   @param col_offset offset column where diagonal identity starts
 */
 mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset = 0, int col_offset = 0);
+
+/**
+   @brief mat = a * mat + b * diag(vec) or diag(vec^{-1}) if invert_vec = true
+
+   mat must have nonzeros on the diagonal
+*/
+void Add(const double a, mfem::SparseMatrix& mat, const double b,
+         const mfem::Vector& vec, const bool invert_vec = false);
+
+/**
+   @brief mat = mat + diag(vec) or diag(vec^{-1}) if invert_vec = true
+
+   mat must have nonzeros on the diagonal
+*/
+void Add(mfem::SparseMatrix& mat, const mfem::Vector& vec,
+         const bool invert_vec = false);
+
+/**
+   @brief Compute A^t * diag(D) * A
+*/
+mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D);
 
 /**
    @brief Construct a diagonal matrix with the entries specified by a vector
    @param vect diagonal entries
 */
 mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect);
+
+/**
+   Add scaling*subm into the matrix mat at locations given by rows and cols.
+
+   The implementation is simply copied from mfem::SparseMatrix::AddSubMatrix,
+   with the scaling added.
+*/
+void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
+                        const mfem::Array<int>& cols, const mfem::DenseMatrix& subm,
+                        double scaling = 1.0, int skip_zeros = 1);
 
 /**
    @brief Add two parallel matrices C = A + B
@@ -164,6 +198,20 @@ void ExtractSubMatrix(
     const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
     const mfem::Array<int>& cols, const mfem::Array<int>& colMapper,
     mfem::DenseMatrix& A_sub);
+
+/**
+   @brief Extract columns from a dense matrix (A) to another dense matrix (A_sub)
+
+   @param A the matrix to extract from
+   @param ref_to_col mapping from reference index to column index of A
+   @param subcol_to_ref mapping from column index of A_sub to reference index
+   @param A_sub the returned matrix where the extracted columns are collected
+   @param row_offset which row of A_sub to start putting the extracted columns
+*/
+void ExtractColumns(
+    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
+    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
+    const int row_offset = 0);
 
 /**
    @brief Fill a DenseMatrix with the entries of a SparseMatrix
@@ -338,6 +386,24 @@ double InnerProduct(const mfem::Vector& weight, const mfem::Vector& u,
 */
 double InnerProduct(const mfem::Vector& u, const mfem::Vector& v);
 
+/**
+   @brief Construct entity to true entity table from entity_trueentity_entity
+
+   Pick one of the processors sharing a true entity to own the true entity
+   (pick the processor with a smaller id)
+
+   @param entity_trueentity_entity = entity_trueentity * trueentity_entity
+*/
+std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
+    const mfem::HypreParMatrix& entity_trueentity_entity);
+
+/**
+   @brief out = bool(mat) * bool(vec)
+   Compute mat * vec, with entries of mat and vec treated as boolean.
+   For mat, entries in the matrix graph are treated as 1, otherwise 0.
+*/
+void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
+                 mfem::Array<int>& out);
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

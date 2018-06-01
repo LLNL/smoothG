@@ -250,6 +250,10 @@ private:
 void GetTableRow(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
 
+/// if you call GetTableRow repeatedly, bad things might happen
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
+
 /**
    @brief Finite volume integrator
 
@@ -322,49 +326,6 @@ private:
 }; // class SVD_Calculator
 
 /**
-   @brief Dense eigensolver based on LAPACK dsyevx
-*/
-class Eigensolver
-{
-public:
-    Eigensolver();
-    /**
-       Calculate smallest eigenvalues and eigenvectors corresponding
-       for matrix A. Returns eigenvalues < rel_tol * eig_max, up
-       to maxEvals total.
-    */
-    int Compute(
-        mfem::DenseMatrix& A, mfem::Vector& evals,
-        mfem::DenseMatrix& evects, double rel_tol, int maxEvals);
-    ~Eigensolver() = default;
-private:
-    void AllocateWorkspace(int n);
-
-    char uplo_;
-    char side_;
-    char trans_;
-    double abstol_;
-
-    int info_;
-    int n_max_;
-    int lwork_;
-
-    std::vector<double> A_;
-    std::vector<double> work_;
-    std::vector<int> iwork_;
-
-    // Triangularization info
-    std::vector<double> d_;
-    std::vector<double> e_;
-    std::vector<double> tau_;
-
-    // Block info for dstein_ / dormtr_
-    std::vector<int> iblock_;
-    std::vector<int> isplit_;
-    std::vector<int> ifail_;
-}; // class Eigensolver
-
-/**
    @brief Read a graph from a file.
 
    The graph is represented as a vertex_edge table.
@@ -401,6 +362,7 @@ public:
     static void SetMeshSizes(double hx, double hy, double hz);
     static void Set2DSlice(SliceOrientation o, int npos );
 
+    static void BlankPermeability();
     static void ReadPermeabilityFile(const std::string& fileName);
     static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
 
@@ -446,6 +408,23 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::
 /// Use power iterations to find the maximum eigenpair
 double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
+
+// Rescale vec by scaling: vec = diag(scaling) * vec
+void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
+
+/**
+   @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
+
+   This function is copied from mfem::Mesh::GetElementColoring.
+
+   @param colors at return containing colors of all elements
+   @param el_el element connectivity matrix (assuming nonzero diagonal)
+*/
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor);
 
 } // namespace smoothg
 

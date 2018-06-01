@@ -37,6 +37,9 @@ target_link_libraries(test_IsolatePartitioner smoothg ${TPL_LIBRARIES})
 add_executable(wattsstrogatz wattsstrogatz.cpp)
 target_link_libraries(wattsstrogatz smoothg ${TPL_LIBRARIES})
 
+add_executable(rescaling rescaling.cpp)
+target_link_libraries(rescaling smoothg ${TPL_LIBRARIES})
+
 # add tests
 add_test(lineargraph lineargraph)
 add_test(lineargraph64 lineargraph --size 64)
@@ -67,3 +70,14 @@ add_valgrind_test(vtest_IsolatePartitioner test_IsolatePartitioner)
 add_test(wattsstrogatz wattsstrogatz)
 add_test(parwattsstrogatz mpirun -np 2 ./wattsstrogatz)
 add_valgrind_test(vwattsstrogatz wattsstrogatz)
+
+add_test(rescaling rescaling)
+add_test(parrescaling mpirun -np 2 ./rescaling)
+add_valgrind_test(vrescaling rescaling)
+
+add_test(NAME style
+  COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(style
+  PROPERTIES FAIL_REGULAR_EXPRESSION
+  "Formatted")

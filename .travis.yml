@@ -1,0 +1,174 @@
+sudo: false
+
+language: cpp
+
+matrix:
+  include:
+    #
+    # Linux
+    #
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          packages:
+            - liblapack-dev
+            - libblas-dev
+            - doxygen
+            - valgrind
+            - gfortran
+      env: DEBUG=YES
+           MPI=YES
+      cache:
+        directories:
+          - $TRAVIS_BUILD_DIR/../hypre-install
+          - $TRAVIS_BUILD_DIR/../mfem-install
+          - $TRAVIS_BUILD_DIR/../SuiteSparse-install
+          - $TRAVIS_BUILD_DIR/../metis-install
+          - $TRAVIS_BUILD_DIR/../spe10-install
+          - $TRAVIS_BUILD_DIR/../mpich-install
+          - $TRAVIS_BUILD_DIR/../astyle-install
+
+install:
+   # Back out of the smoothG directory to install the libraries
+   - cd ..
+
+   # Astyle
+   - if [ ! -e astyle-install/bin/astyle ]; then
+        svn checkout https://svn.code.sf.net/p/astyle/code/trunk@638 astyle-code;
+        pushd astyle-code/AStyle/build/gcc;
+        make;
+        make install prefix=/home/travis/build/LLNL/astyle-install;
+        popd;
+     else
+        echo "Reusing cached astyle";
+     fi;
+   - export PATH="/home/travis/build/LLNL/astyle-install/bin":$PATH;
+
+   # mpich
+   - if [ ! -e mpich-install/bin/mpirun ]; then
+        wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz;
+        tar xzf mpich-3.2.1.tar.gz;
+        rm mpich-3.2.1.tar.gz;
+        cd mpich-3.2.1;
+        ./configure --prefix="/home/travis/build/LLNL/mpich-install";
+        make -j3;
+        make install;
+        export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
+        cd ..;
+     else
+        export PATH="/home/travis/build/LLNL/mpich-install/bin":$PATH;
+        echo "Reusing cached mpich";
+     fi;
+
+   # Set MPI compilers, print compiler version
+   - if [ $MPI == "YES" ]; then
+        if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+           export MPICH_CC="$CC";
+           export MPICH_CXX="$CXX";
+        else
+           export OMPI_CC="$CC";
+           export OMPI_CXX="$CXX";
+           mpic++ --showme:version;
+        fi;
+        mpic++ -v;
+     else
+        $CXX -v;
+     fi
+
+   # spe10 dataset
+   - if [ ! -e spe10-install/spe_perm.dat ]; then
+        wget --user-agent="Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" http://www.spe.org/web/csp/datasets/por_perm_case2a.zip;
+        unzip -d spe10-install por_perm_case2a.zip;
+        rm por_perm_case2a.zip;
+     else
+        echo "Reusing cached spe10";
+     fi;
+
+   # metis
+   - if [ ! -e metis-install/lib/libmetis.a ]; then
+        wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz;
+        tar -xzf metis-5.1.0.tar.gz;
+        cd metis-5.1.0;
+        make config prefix=/home/travis/build/LLNL/metis-install;
+        make -j3 install;
+        cd ..;
+     else
+        echo "Reusing cached metis";
+     fi;
+
+   # suitesparse
+   - if [ ! -e SuiteSparse-install/lib/libumfpack.so ]; then
+        wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz;
+        tar xzf SuiteSparse-4.5.4.tar.gz;
+        cd SuiteSparse;
+        make -j3 install INSTALL=/home/travis/build/LLNL/SuiteSparse-install BLAS=-lblas MY_METIS_LIB=/home/travis/build/LLNL/metis-install/lib/libmetis.a MY_METIS_INC=/home/travis/build/LLNL/metis-install/include/;
+        cd ..;
+     else
+        echo "Reusing cached SuiteSparse-4.5.4";
+     fi;
+
+   # hypre
+   - if [ $MPI == "YES" ]; then
+        if [ ! -e hypre-install/lib/libHYPRE.a ]; then
+           wget https://computation.llnl.gov/project/linear_solvers/download/hypre-2.10.0b.tar.gz --no-check-certificate;
+           rm -rf hypre-2.10.0b;
+           tar xzf hypre-2.10.0b.tar.gz;
+           cd hypre-2.10.0b/src;
+           ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++ prefix=/home/travis/build/LLNL/hypre-install;
+           make -j3;
+           make install;
+           cd ../..;
+        else
+            echo "Reusing cached hypre-2.10.0b/";
+        fi;
+     else
+        echo "Serial build, not using hypre";
+     fi
+
+   # mfem
+   - if [ $MPI == "YES" ]; then
+        if [ ! -e mfem-install/lib/libmfem.a ]; then
+            git clone https://github.com/mfem/mfem.git mfem;
+            cd mfem;
+            git checkout v3.3.2;
+            make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES HYPRE_DIR=/home/travis/build/LLNL/hypre-install SUITESPARSE_DIR=/home/travis/build/LLNL/SuiteSparse-install METIS_DIR=/home/travis/build/LLNL/metis-install PREFIX=/home/build/travis/build/LLNL/mfem-install;
+            CC=mpicc CXX=mpic++ make -j3 install PREFIX=/home/travis/build/LLNL/mfem-install;
+            cd ..;
+        else
+            echo "Reusing cached mfem";
+        fi;
+     else
+        echo "Serial build, not using mfem";
+     fi
+
+
+script:
+   # Compiler
+   - export MYCXX=mpic++;
+
+   # Print the compiler version
+   - $MYCXX -v
+
+   # Set some variables
+   - cd $TRAVIS_BUILD_DIR;
+     CPPFLAGS="";
+     SKIP_TEST_DIRS="";
+
+   # Configure the library
+   - mkdir build;
+   - cd build;
+   - |
+       CC=mpicc CXX=mpic++ cmake -DMFEM_DIR="/home/travis/build/LLNL/mfem-install" \
+       -DHYPRE_DIR="/home/travis/build/LLNL/hypre-install" \
+       -DSuiteSparse_DIR="/home/travis/build/LLNL/SuiteSparse-install" \
+       -DMETIS_DIR="/home/travis/build/LLNL/metis-install" \
+       -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=Debug \
+       -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" \
+       -DSMOOTHG_TEST_PROCS=2 -DSMOOTHG_TEST_TOL="1e-2" ..;
+
+   # Build the library
+   - make -j3
+
+   # Run tests
+   - env CTEST_OUTPUT_ON_FAILURE=1 make test;

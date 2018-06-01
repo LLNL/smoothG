@@ -109,7 +109,7 @@ mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
     return out;
 }
 
-mfem::SparseMatrix TableToSparse(const mfem::Table& table)
+mfem::SparseMatrix TableToMatrix(const mfem::Table& table)
 {
     const int height = table.Size();
     const int width = table.Width();
@@ -124,6 +124,22 @@ mfem::SparseMatrix TableToSparse(const mfem::Table& table)
     std::fill_n(data, nnz, 1.);
 
     return mfem::SparseMatrix(i, j, data, height, width);
+}
+
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat)
+{
+    const int nrows = mat.Height();
+    const int nnz = mat.NumNonZeroElems();
+
+    int* i = new int[nrows + 1];
+    int* j = new int[nnz];
+
+    std::copy_n(mat.GetI(), nrows + 1, i);
+    std::copy_n(mat.GetJ(), nnz, j);
+
+    mfem::Table table;
+    table.SetIJ(i, j, nrows);
+    return table;
 }
 
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
@@ -196,9 +212,9 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
 void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C)
 {
-    MFEM_ASSERT(C.Height() == A.Height() && C.Width() == B.Width() &&
-                A.Width() == B.Height(), "incompatible dimensions");
-    //    auto B_ref = const_cast<DenseMatrix&>(B);
+    C.SetSize(A.Height(), B.Width());
+    MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
+
     mfem::Vector column_in, column_out;
     for (int j = 0; j < B.Width(); ++j)
     {
@@ -322,6 +338,45 @@ mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset, int col_of
     return mfem::SparseMatrix(I, J, Data, rows, cols);
 }
 
+void Add(const double a, mfem::SparseMatrix& mat, const double b,
+         const mfem::Vector& vec, const bool invert_vec)
+{
+    assert(mat.Height() == vec.Size());
+    assert(mat.Width() == vec.Size());
+
+    if (a != 1.0)
+        mat *= a;
+
+    if (invert_vec)
+    {
+        for (int i = 0; i < vec.Size() ; i++)
+        {
+            mat(i, i) += (b / vec(i));
+        }
+    }
+    else
+    {
+        for (int i = 0; i < vec.Size() ; i++)
+        {
+            mat(i, i) += (b * vec(i));
+        }
+    }
+}
+
+void Add(mfem::SparseMatrix& mat, const mfem::Vector& vec, const bool invert_vec)
+{
+    smoothg::Add(1.0, mat, 1.0, vec, invert_vec);
+}
+
+mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D)
+{
+    std::unique_ptr<mfem::SparseMatrix> AtDA_ptr(mfem::Mult_AtDA(A, D));
+    mfem::SparseMatrix AtDA;
+    AtDA.Swap(*AtDA_ptr);
+
+    return AtDA;
+}
+
 mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect)
 {
     if (vect.Size() == 0)
@@ -344,6 +399,49 @@ mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect)
     std::iota(J, J + size, 0);
 
     return mfem::SparseMatrix(I, J, Data, size, size);
+}
+
+/// I am worried that some of these methods (especially _Add_) will not be public
+/// in future versions of MFEM
+void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
+                        const mfem::Array<int>& cols, const mfem::DenseMatrix& subm,
+                        double scaling, int skip_zeros)
+{
+    int i, j, gi, gj, s, t;
+    double a;
+    const int height = mat.Height();
+    const int width = mat.Width();
+
+    for (i = 0; i < rows.Size(); i++)
+    {
+        if ((gi = rows[i]) < 0) { gi = -1 - gi, s = -1; }
+        else { s = 1; }
+        MFEM_ASSERT(gi < height,
+                    "Trying to insert a row " << gi << " outside the matrix height "
+                    << height);
+        mat.SetColPtr(gi);
+        for (j = 0; j < cols.Size(); j++)
+        {
+            if ((gj = cols[j]) < 0) { gj = -1 - gj, t = -s; }
+            else { t = s; }
+            MFEM_ASSERT(gj < width,
+                        "Trying to insert a column " << gj << " outside the matrix width "
+                        << width);
+            a = scaling * subm(i, j);
+            if (skip_zeros && a == 0.0)
+            {
+                // if the element is zero do not assemble it unless this breaks
+                // the symmetric structure
+                if (&rows != &cols || subm(j, i) == 0.0)
+                {
+                    continue;
+                }
+            }
+            if (t < 0) { a = -a; }
+            mat._Add_(gj, a);
+        }
+        mat.ClearColPtr();
+    }
 }
 
 // Modified from MFEM
@@ -615,6 +713,27 @@ void ExtractSubMatrix(
     }
 }
 
+void ExtractColumns(
+    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
+    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
+    const int row_offset)
+{
+    const int A_width = A.Width();
+    const int A_height = A.Height();
+    const int A_sub_height = A_sub.Height();
+
+    assert((A_height + row_offset) <= A_sub_height);
+
+    for (int j = 0; j < subcol_to_ref.Size(); ++j)
+    {
+        int A_col = ref_to_col[subcol_to_ref[j]];
+        assert(A_col >= 0);
+        assert(A_col < A_width);
+        std::copy_n(A.Data() + A_col * A_height, A_height,
+                    A_sub.Data() + j * A_sub_height + row_offset);
+    }
+}
+
 void Full(const mfem::SparseMatrix& Asparse, mfem::DenseMatrix& Adense)
 {
     const int nrow = Asparse.Size();
@@ -878,8 +997,8 @@ void LocalGraphEdgeSolver::Init(double* M_data, const mfem::SparseMatrix& D)
     solver_ = make_unique<mfem::UMFPackSolver>(A_);
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::
-                                Vector& sol_sigma)
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
+                                mfem::Vector& sol_sigma)
 {
     // Set rhs(0)=0 so that the modified system after
     // the elimination is consistent with the original one
@@ -939,5 +1058,69 @@ double InnerProduct(const mfem::Vector& u, const mfem::Vector& v)
         out += (*u_data++) * (*v_data++);
     return out;
 }
+
+std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
+    const mfem::HypreParMatrix& entity_trueentity_entity)
+{
+    hypre_ParCSRMatrix* entity_shared = entity_trueentity_entity;
+    HYPRE_Int* entity_shared_i = entity_shared->offd->i;
+    HYPRE_Int* entity_shared_j = entity_shared->offd->j;
+    HYPRE_Int* entity_shared_map = entity_shared->col_map_offd;
+    HYPRE_Int max_entity = entity_shared->last_row_index;
+
+    // Diagonal part
+    int nentities = entity_trueentity_entity.Width();
+    int* select_i = new int[nentities + 1];
+    int ntrueentities = 0;
+    for (int i = 0; i < nentities; i++)
+    {
+        select_i[i] = ntrueentities;
+        int j_offset = entity_shared_i[i];
+        if (entity_shared_i[i + 1] == j_offset)
+            ntrueentities++;
+        else if (entity_shared_map[entity_shared_j[j_offset]] > max_entity)
+            ntrueentities++;
+    }
+    select_i[nentities] = ntrueentities;
+    int* select_j = new int[ntrueentities];
+    double* select_data = new double[ntrueentities];
+    std::iota(select_j, select_j + ntrueentities, 0);
+    std::fill_n(select_data, ntrueentities, 1.);
+    mfem::SparseMatrix select_diag(select_i, select_j, select_data,
+                                   nentities, ntrueentities);
+
+    // Construct a "block diagonal" global select matrix from local
+    auto comm = entity_trueentity_entity.GetComm();
+    mfem::Array<int> trueentity_starts;
+    GenerateOffsets(comm, ntrueentities, trueentity_starts);
+
+    mfem::HypreParMatrix select(
+        comm, entity_shared->global_num_rows, trueentity_starts.Last(),
+        entity_shared->row_starts, trueentity_starts, &select_diag);
+
+    auto out = mfem::ParMult(&entity_trueentity_entity, &select);
+    out->CopyRowStarts();
+    out->CopyColStarts();
+
+    return unique_ptr<mfem::HypreParMatrix>(out);
+}
+
+void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
+                 mfem::Array<int>& out)
+{
+    out.SetSize(mat.Height(), 0);
+    for (int i = 0; i < mat.Height(); i++)
+    {
+        for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; j++)
+        {
+            if (vec[mat.GetJ()[j]])
+            {
+                out[i] = 1;
+                break;
+            }
+        }
+    }
+}
+
 
 } // namespace smoothg

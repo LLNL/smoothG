@@ -23,38 +23,39 @@
 namespace smoothg
 {
 
+/// @todo why is there not timing here?
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
                            const mfem::Array<int>& global_partitioning,
-                           double spect_tol, int max_evects, bool hybridization,
-                           const mfem::Vector& global_weight)
+                           double spect_tol, int max_evects,
+                           bool dual_target, bool scaled_dual, bool energy_dual,
+                           bool hybridization, bool coarse_components,
+                           const mfem::Vector& global_weight, const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
-    Init(vertex_edge_global, global_partitioning, global_weight, spect_tol, max_evects);
+    Init(vertex_edge_global, global_partitioning, global_weight, spect_tol,
+         max_evects, dual_target, scaled_dual, energy_dual, coarse_components, saamge_param);
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
-                           int coarse_factor,
-                           double spect_tol, int max_evects, bool hybridization,
-                           const mfem::Vector& weight)
+                           int coarse_factor, double spect_tol, int max_evects,
+                           bool dual_target, bool scaled_dual, bool energy_dual,
+                           bool hybridization, bool coarse_components,
+                           const mfem::Vector& weight,
+                           const SAAMGeParam* saamge_param)
     : Upscale(comm, vertex_edge_global.Height(), hybridization),
       global_edges_(vertex_edge_global.Width()), global_vertices_(vertex_edge_global.Height())
 {
     mfem::StopWatch chrono;
     chrono.Start();
 
-    mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge_global);
-    mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge_global, edge_vertex);
-
-    int num_parts = (vertex_edge_global.Height() / (double)(coarse_factor)) + 0.5;
-    num_parts = std::max(1, num_parts);
-
     // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
     // obtain the same global partition from metis?
     mfem::Array<int> global_partitioning;
-    Partition(vertex_vertex, global_partitioning, num_parts);
+    PartitionAAT(vertex_edge_global, global_partitioning, coarse_factor);
 
-    Init(vertex_edge_global, global_partitioning, weight, spect_tol, max_evects);
+    Init(vertex_edge_global, global_partitioning, weight, spect_tol, max_evects,
+         dual_target, scaled_dual, energy_dual, coarse_components, saamge_param);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -63,7 +64,10 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
 void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
                         const mfem::Array<int>& global_partitioning,
                         const mfem::Vector& global_weight,
-                        double spect_tol, int max_evects)
+                        double spect_tol, int max_evects,
+                        bool dual_target, bool scaled_dual, bool energy_dual,
+                        bool coarse_components,
+                        const SAAMGeParam* saamge_param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -78,35 +82,39 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
     edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
 
+    mfem::Vector local_weight(vertex_edge.Width());
     if (global_weight.Size() == vertex_edge_global.Width())
     {
-        mfem::Vector local_weight(vertex_edge.Width());
         global_weight.GetSubVector(pgraph_->GetEdgeLocalToGlobalMap(), local_weight);
-
-        mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
     }
     else
     {
-        mixed_laplacians_.emplace_back(vertex_edge, *edge_e_te_);
+        local_weight = 1.0;
     }
-
+    mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
 
     auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
-                     spect_tol, max_evects, hybridization_);
+                     spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
+                     coarse_components);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
     if (hybridization_)
     {
-        coarse_solver_ = make_unique<HybridSolver>(comm_, GetCoarseMatrix(),
-                                                   *coarsener_);
+        // coarse_components method does not store element matrices
+        assert(!coarse_components);
+
+        coarse_solver_ = make_unique<HybridSolver>(
+                             comm_, GetCoarseMatrix(), *coarsener_,
+                             nullptr, nullptr, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
+        GetCoarseMatrix().BuildM();
         coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 
@@ -119,7 +127,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     MakeFineSolver();
 }
 
-void GraphUpscale::MakeFineSolver() const
+void GraphUpscale::MakeFineSolver()
 {
     if (!fine_solver_)
     {

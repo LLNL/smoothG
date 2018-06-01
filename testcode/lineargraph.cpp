@@ -201,6 +201,9 @@ int main(int argc, char* argv[])
     const int num_partitions = 2;
     const int max_evects = 1;
     const double spect_tol = 0.0;
+    const bool dual_target = false;
+    const bool scaled_dual = false;
+    const bool energy_dual = false;
     const double test_tol = 1.e-8;
     args.Parse();
     if (myid == 0)
@@ -220,11 +223,12 @@ int main(int argc, char* argv[])
                                  *partition.face_d_td,
                                  *partition.face_d_td_d);
 
-    std::vector<mfem::DenseMatrix> local_edge_traces(num_partitions - 1);
-    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets(num_partitions);
+    std::vector<mfem::DenseMatrix> local_edge_traces;
+    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(
-        spect_tol, max_evects, graph.GetM(), graph.GetD(), graph_topology);
+        spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
+        graph.GetM(), graph.GetD(), graph_topology);
 
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
@@ -262,11 +266,17 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
     mfem::SparseMatrix face_dof; // not used in this example
-    std::vector<mfem::DenseMatrix> CM_el_;
 
-    GraphCoarsen graph_coarsen(graph.GetM(), graph.GetD(), graph_topology);
+    mfem::Vector weight(graph.GetM().Size());
+    for (int i = 0; i < weight.Size(); i++)
+    {
+        weight(i) = 1.0 / graph.GetM()(i, i);
+    }
+    MixedMatrix mgL(graph.GetD(), weight, *partition.edge_d_td);
+    GraphCoarsen graph_coarsen(mgL, graph_topology);
+    ElementMBuilder builder;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, face_dof, CM_el_);
+                                     Pp, Pu, face_dof, builder);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;

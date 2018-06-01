@@ -33,23 +33,6 @@ extern "C"
                  const int* n, double* a, const int* lda, double* s,
                  double* u, const int* ldu, double* vt, const int* ldvt,
                  double* work, const int* lwork, int* info);
-
-    void dsytrd_(char* uplo, const int* n, double* a, const int* lda,
-                 double* d, double* e, double* tau, double* work,
-                 int* lwork, int* info );
-
-    void dsterf_(const int* n, double* d, double* e, int* info);
-
-    void dstein_(const int* n, const double* d, const double* e,
-                 int* m, const double* w, const int* iblock,
-                 const int* isplit, double* z, const int* ldz,
-                 double* work, int* iwork, int* ifailv,
-                 int* info);
-
-    void dormtr_(char* side, char* uplo, char* trans, const int* m,
-                 const int* n, const double* a, const int* lda,
-                 const double* tau, double* c, const int* ldc, double* work,
-                 int* lwork, int* info);
 }
 
 namespace smoothg
@@ -86,7 +69,7 @@ void UpscalingStatistics::ComputeErrorSquare(
     {
         for (unsigned int j = 0; j < help_.size(); ++j)
         {
-            help_[j] = make_unique<mfem::BlockVector>(mgL[j].get_blockoffsets());
+            help_[j] = make_unique<mfem::BlockVector>(mgL[j].GetBlockOffsets());
             (*help_[j]) = 0.0;
         }
     }
@@ -104,14 +87,14 @@ void UpscalingStatistics::ComputeErrorSquare(
     if (!mgL[0].CheckW())
     {
         par_orthogonalize_from_constant(help_[0]->GetBlock(1),
-                                        mgL[0].get_Drow_start().Last());
+                                        mgL[0].GetDrowStart().Last());
     }
 
     for (int j(0); j <= k; ++j)
     {
         MFEM_ASSERT(help_[j]->Size() == sol[j]->Size() &&
                     sol[j]->GetBlock(0).Size()
-                    == mgL[j].getD().Width(),
+                    == mgL[j].GetD().Width(),
                     "Graph Laplacian");
 
         int sigmasize = sol[0]->GetBlock(0).Size();
@@ -140,21 +123,21 @@ void UpscalingStatistics::ComputeErrorSquare(
 
         if (j == k)
         {
-            mgL[0].getD().Mult(sigma_h, dsigma_h);
+            mgL[0].GetD().Mult(sigma_h, dsigma_h);
 
             sigma_weighted_l2_error_square_(k, j)
-                = mgL[0].getWeight().InnerProduct(sigma_h, sigma_h);
+                = mgL[0].GetM().InnerProduct(sigma_h, sigma_h);
             Dsigma_l2_error_square_(k, j) = dsigma_h * dsigma_h;
             u_l2_error_square_(k, j) = u_h * u_h;
         }
         else
         {
             subtract(sigma_H, sigma_h, sigma_diff);
-            mgL[j].getD().Mult(sigma_diff, dsigma_diff);
+            mgL[j].GetD().Mult(sigma_diff, dsigma_diff);
             subtract(u_H, u_h, u_diff);
 
             sigma_weighted_l2_error_square_(k, j)
-                = mgL[j].getWeight().InnerProduct(sigma_diff, sigma_diff);
+                = mgL[j].GetM().InnerProduct(sigma_diff, sigma_diff);
             Dsigma_l2_error_square_(k, j) = dsigma_diff * dsigma_diff;
             u_l2_error_square_(k, j) = u_diff * u_diff;
         }
@@ -634,11 +617,6 @@ ParGraph::ParGraph(MPI_Comm comm,
     vertex_edge_local_.Swap(tmp);
 }
 
-/**
-   This implementation basically taken from
-   DofAgglomeration::GetViewAgglomerateDofGlobalNumbering()
-   as one step to extracting from Parelag.
-*/
 void GetTableRow(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
 {
@@ -646,6 +624,18 @@ void GetTableRow(
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
     J.MakeRef(mat.GetJ() + begin, size);
+}
+
+/// instead of a reference, get a copy
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
+{
+    const int begin = mat.GetI()[rownum];
+    const int end = mat.GetI()[rownum + 1];
+    const int size = end - begin;
+    mfem::Array<int> temp;
+    temp.MakeRef(mat.GetJ() + begin, size);
+    temp.Copy(J);
 }
 
 void FiniteVolumeMassIntegrator::AssembleElementMatrix(
@@ -766,119 +756,6 @@ void SVD_Calculator::Compute(mfem::DenseMatrix& A, mfem::Vector& singularValues)
             &lwork_, &info_);
 }
 
-Eigensolver::Eigensolver():
-    uplo_('U'),
-    side_('L'),
-    trans_('N'),
-    abstol_(2 * std::numeric_limits<double>::min()),
-    info_(0),
-    n_max_(-1),
-    lwork_(-1)
-{
-}
-
-int Eigensolver::Compute(mfem::DenseMatrix& A_mat, mfem::Vector& evals,
-                         mfem::DenseMatrix& evects, double rel_tol, int maxEvals)
-{
-    const int n = A_mat.Size();
-
-    if (n < 1)
-    {
-        evects.SetSize(n, 0);
-        evals.SetSize(0);
-        return 0;
-    }
-
-    if (n_max_ < n)
-        AllocateWorkspace(n);
-
-    std::copy(A_mat.Data(), A_mat.Data() + n * n, begin(A_));
-    double* a = A_.data();
-    evals.SetSize(n);
-
-    // Triangularize A = Q * T * Q^T
-    dsytrd_(&uplo_, &n, a, &n, d_.data(), e_.data(), tau_.data(), work_.data(),
-            &lwork_, &info_ );
-
-    // d_ and e_ changed by dsterf_
-    // copy since they are needed for dstein_
-    std::copy(std::begin(d_), std::end(d_), evals.GetData());
-    auto e_copy = e_;
-
-    // Compute all eigenvalues
-    dsterf_(&n, evals.GetData(), e_copy.data(), &info_);
-
-    // Determine how many eigenvectors to be computed
-    const double tol = evals(n - 1) * rel_tol;
-
-    if (maxEvals == -1)
-    {
-        maxEvals = n;
-    }
-
-    int m = 1;
-
-    while (m < maxEvals && evals(m) < tol)
-    {
-        ++m;
-    }
-
-    evects.SetSize(n, m);
-
-    ifail_.resize(m);
-    isplit_[0] = n;
-
-    // Calculate Eigenvectors of T
-    dstein_(&n, d_.data(), e_.data(),
-            &m, evals.GetData(), iblock_.data(),
-            isplit_.data(), evects.Data(), &n,
-            work_.data(), iwork_.data(), ifail_.data(),
-            &info_);
-
-    // Compute Q * (eigenvectors of T)
-    dormtr_(&side_, &uplo_, &trans_, &n,
-            &m, a, &n,
-            tau_.data(), evects.Data(), &n, work_.data(),
-            &lwork_, &info_);
-
-    return info_;
-}
-
-void Eigensolver::AllocateWorkspace(int n)
-{
-    A_.resize(n * n, 0.0);
-    n_max_ = n;
-
-    int lwork = -1;
-    double wkopt;
-
-    // find max workspace between dsytrd_, dstein_ and dormtr_
-    dsytrd_(&uplo_, &n, nullptr, &n,
-            d_.data(), e_.data(), tau_.data(), &wkopt,
-            &lwork, &info_ );
-
-    // 5n is for dstein_
-    lwork_ = std::max(5 * n, (int)wkopt);
-
-    dormtr_( &side_, &uplo_, &trans_, &n,
-             &n, nullptr, &n,
-             tau_.data(), nullptr, &n, &wkopt,
-             &lwork, &info_ );
-
-    lwork_ = std::max(lwork_, (int)wkopt);
-
-    work_.resize(lwork_);
-    iwork_.resize(n);
-
-    d_.resize(n);
-    e_.resize(n);
-    tau_.resize(n);
-
-    iblock_.resize(n, 1);
-    isplit_.resize(n, 0);
-    iwork_.resize(n);
-}
-
 void ReadVertexEdge(std::ifstream& graphFile, mfem::SparseMatrix& out)
 {
     int nvertices, nedges;
@@ -956,13 +833,22 @@ void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
     npos = npos_;
 }
 
+void InversePermeabilityFunction::BlankPermeability()
+{
+    inversePermeability = new double[3 * Nx * Ny * Nz];
+    for (int i = 0; i < 3 * Nx * Ny * Nz; ++i)
+    {
+        inversePermeability[i] = 1.0;
+    }
+}
+
 void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName)
 {
     std::ifstream permfile(fileName.c_str());
 
     if (!permfile.is_open())
     {
-        std::cout << "Error in opening file " << fileName << std::endl;
+        std::cerr << "Error in opening file " << fileName << std::endl;
         mfem::mfem_error("File does not exist");
     }
 
@@ -1066,7 +952,6 @@ void InversePermeabilityFunction::InversePermeability(const mfem::Vector& x,
 
     if (orientation == NONE)
         val[2] = inversePermeability[Ny * Nx * k + Nx * j + i + 2 * Nx * Ny * Nz];
-
 }
 
 double InversePermeabilityFunction::InvNorm2(const mfem::Vector& x)
@@ -1202,5 +1087,114 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
     return rayleigh;
 }
 
+void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
+{
+    for (int i = 0; i < vec.Size(); i++)
+    {
+        vec[i] *= scaling[i];
+    }
+}
+
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el)
+{
+    const int el0 = 0;
+
+    int num_el = el_el.Size(), stack_p, stack_top_p, max_num_colors;
+    mfem::Array<int> el_stack(num_el);
+
+    const int* i_el_el = el_el.GetI();
+    const int* j_el_el = el_el.GetJ();
+
+    colors.SetSize(num_el);
+    colors = -2;
+    max_num_colors = 1;
+    stack_p = stack_top_p = 0;
+    for (int el = el0; stack_top_p < num_el; el = (el + 1) % num_el)
+    {
+        if (colors[el] != -2)
+        {
+            continue;
+        }
+
+        colors[el] = -1;
+        el_stack[stack_top_p++] = el;
+
+        for ( ; stack_p < stack_top_p; stack_p++)
+        {
+            int i = el_stack[stack_p];
+            int num_nb = i_el_el[i + 1] - i_el_el[i] - 1; // assume nonzero diagonal
+            max_num_colors = std::max(max_num_colors, num_nb + 1);
+            for (int j = i_el_el[i]; j < i_el_el[i + 1]; j++)
+            {
+                int k = j_el_el[j];
+                if (j == i)
+                {
+                    continue; // skip self-interaction
+                }
+                if (colors[k] == -2)
+                {
+                    colors[k] = -1;
+                    el_stack[stack_top_p++] = k;
+                }
+            }
+        }
+    }
+
+    mfem::Array<int> color_marker(max_num_colors);
+    for (stack_p = 0; stack_p < stack_top_p; stack_p++)
+    {
+        int i = el_stack[stack_p], color;
+        color_marker = 0;
+        for (int j = i_el_el[i]; j < i_el_el[i + 1]; j++)
+        {
+            if (j_el_el[j] == i)
+            {
+                continue;          // skip self-interaction
+            }
+            color = colors[j_el_el[j]];
+            if (color != -1)
+            {
+                color_marker[color] = 1;
+            }
+        }
+
+        for (color = 0; color < max_num_colors; color++)
+        {
+            if (color_marker[color] == 0)
+            {
+                break;
+            }
+        }
+
+        colors[i] = color;
+    }
+}
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor)
+{
+    const int SPE10_num_x_volumes = 60;
+    const int SPE10_num_y_volumes = 220;
+    const int SPE10_num_z_volumes = 85;
+
+    const int nDimensions = num_procs_xyz.size();
+
+    mfem::Array<int> nxyz(nDimensions);
+    nxyz[0] = SPE10_num_x_volumes / num_procs_xyz[0] / coarsening_factor[0];
+    nxyz[1] = SPE10_num_y_volumes / num_procs_xyz[1] / coarsening_factor[1];
+    if (nDimensions == 3)
+        nxyz[2] = SPE10_num_z_volumes / num_procs_xyz[2] / coarsening_factor[2];
+
+    for (int& i : nxyz)
+    {
+        i = std::max(1, i);
+    }
+
+    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
+    partitioning.Append(cart_part);
+
+    cart_part.MakeDataOwner();
+}
 
 } // namespace smoothg
