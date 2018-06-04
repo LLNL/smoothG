@@ -14,14 +14,22 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file mlmc.cpp
-   @brief This is an example for upscaling a graph Laplacian,
-   where we change coefficients in the model without re-coarsening.
+   @file sampler.cpp
+
+   @brief Try to do scalable hierarchical sampling with finite volumes
+
+   See Osborn, Vassilevski, and Villa, A multilevel, hierarchical sampling technique for
+   spatially correlated random fields, SISC 39 (2017) pp. S543-S562.
+
+   A simple way to run the example:
+
+   mpirun -n 4 ./sampler
 */
 
 #include <fstream>
 #include <sstream>
 #include <mpi.h>
+#include <map>
 #include <random>
 
 #include "smoothG.hpp"
@@ -37,6 +45,8 @@ using parlinalgcpp::LOBPCG;
 using parlinalgcpp::BoomerAMG;
 
 std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts);
+double Mean(const std::vector<double>& vect);
+double MeanL1(const std::vector<double>& vect);
 
 int main(int argc, char* argv[])
 {
@@ -55,7 +65,6 @@ int main(int argc, char* argv[])
     std::string w_block_filename = "";
     bool save_output = false;
 
-    int isolate = -1;
     int max_evects = 4;
     double spect_tol = 1e-3;
     int num_partitions = 12;
@@ -137,65 +146,114 @@ int main(int argc, char* argv[])
 
     // Set up GraphUpscale
     /// [Upscale]
-    Graph sampler_graph(comm, vertex_edge_global, part, one_weight, W_block);
-    Graph graph(comm, vertex_edge_global, part, weight);
+    Graph graph(comm, vertex_edge_global, part, weight, W_block);
 
     int sampler_seed = initial_seed + myid;
-    PDESampler sampler(std::move(sampler_graph), spect_tol, max_evects, hybridization,
+    PDESampler sampler(std::move(graph), spect_tol, max_evects, hybridization,
                        dimension, kappa, cell_volume, sampler_seed);
-    GraphUpscale upscale(std::move(graph), spect_tol, max_evects, hybridization);
+    const auto& upscale = sampler.GetUpscale();
 
     /// [Upscale]
 
-    /// [Right Hand Side]
-    BlockVector fine_rhs = upscale.GetFineBlockVector();
+    /// [Sample]
 
-    fine_rhs.GetBlock(0) = 0.0;
-    fine_rhs.GetBlock(1) = upscale.ReadVertexVector(fiedler_filename);
-    /// [Right Hand Side]
+    Vector fine_sol = upscale.GetFineVector();
+    Vector upscaled_sol = upscale.GetFineVector();
 
-    /// [Solve]
+    int fine_size = fine_sol.size();
 
-    BlockVector fine_sol = upscale.GetFineBlockVector();
-    BlockVector upscaled_sol = upscale.GetFineBlockVector();
+    std::vector<double> mean_upscaled(fine_size, 0.0);
+    std::vector<double> mean_fine(fine_size, 0.0);
 
-    for (int i = 1; i <= num_samples; ++i)
+    std::vector<double> m2_upscaled(fine_size, 0.0);
+    std::vector<double> m2_fine(fine_size, 0.0);
+
+    double max_error = 0.0;
+
+    for (int sample = 1; sample <= num_samples; ++sample)
     {
         ParPrint(myid, std::cout << "\n---------------------\n\n");
-        ParPrint(myid, std::cout << "Sample " << i << " :\n");
+        ParPrint(myid, std::cout << "Sample " << sample << " :\n");
 
         sampler.Sample(coarse_sample);
 
-        const auto& fine_coeff = sampler.GetCoefficientFine();
-        const auto& coarse_coeff = sampler.GetCoefficientCoarse();
         const auto& upscaled_coeff = sampler.GetCoefficientUpscaled();
+        const auto& fine_coeff = sampler.GetCoefficientFine();
 
-        upscale.MakeCoarseSolver(coarse_coeff);
-        upscale.MakeFineSolver(fine_coeff);
+        for (int i = 0; i < fine_size; ++i)
+        {
+            upscaled_sol[i] = std::log(upscaled_coeff[i]);
+            fine_sol[i] = std::log(fine_coeff[i]);
+        }
 
-        upscale.Solve(fine_rhs, upscaled_sol);
-        upscale.SolveFine(fine_rhs, fine_sol);
+        //upscale.Orthogonalize(upscaled_sol);
+        //upscale.Orthogonalize(fine_sol);
+
+        for (int i = 0; i < fine_size; ++i)
+        {
+            double delta_c = upscaled_sol[i] - mean_upscaled[i];
+            mean_upscaled[i] += delta_c / sample;
+
+            double delta2_c = upscaled_sol[i] - mean_upscaled[i];
+            m2_upscaled[i] += delta_c * delta2_c;
+
+            double delta_f = fine_sol[i] - mean_fine[i];
+            mean_fine[i] += delta_f / sample;
+
+            double delta2_f = fine_sol[i] - mean_fine[i];
+            m2_fine[i] += delta_f * delta2_f;
+        }
+
+        double error = CompareError(comm, upscaled_sol, fine_sol);
+        max_error = std::max(error, max_error);
+
+        ParPrint(myid, std::cout << "\nError: " << error << "\n");
 
         if (save_output)
         {
-            SaveOutput(upscale, upscaled_sol.GetBlock(1), "coarse_sol_", i);
-            SaveOutput(upscale, fine_sol.GetBlock(1), "fine_sol_", i);
-            SaveOutput(upscale, upscaled_coeff, "coarse_coeff_", i);
-            SaveOutput(upscale, fine_coeff, "fine_coeff_", i);
+            SaveOutput(upscale, upscaled_sol, "coarse_sol_", sample);
+            SaveOutput(upscale, fine_sol, "fine_sol_", sample);
         }
+    }
 
-        upscale.ShowCoarseSolveInfo();
-        upscale.ShowFineSolveInfo();
-
-        /// [Check Error]
-        upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
-
+    if (num_samples > 1)
+    {
+        for (int i = 0; i < fine_size; ++i)
+        {
+            m2_upscaled[i] /= (num_samples - 1);
+            m2_fine[i] /= (num_samples - 1);
+        }
     }
 
     ParPrint(myid, std::cout << "\n---------------------\n\n");
 
-    /// [Solve]
+    std::map<std::string, double> output_vals;
+
+    output_vals["fine-total-iters"] = sampler.FineTotalIters();
+    output_vals["fine-total-time"] = sampler.FineTotalTime();
+    output_vals["fine-mean-typical"] = mean_fine[fine_size / 2];
+    output_vals["fine-mean-l1"] = MeanL1(mean_fine);
+    output_vals["fine-variance-mean"] = Mean(m2_fine);
+
+    output_vals["coarse-total-iters"] = sampler.CoarseTotalIters();
+    output_vals["coarse-total-time"] = sampler.CoarseTotalTime();
+    output_vals["coarse-mean-typical"] = mean_upscaled[fine_size / 2];
+    output_vals["coarse-mean-l1"] = MeanL1(mean_upscaled);
+    output_vals["coarse-variance-mean"] = Mean(m2_upscaled);
+
+    output_vals["max-p-error"] = max_error;
+
+    ParPrint(myid, PrintJSON(output_vals));
+
+    /// [Sample]
+
+    if (save_output)
+    {
+        upscale.WriteVertexVector(mean_upscaled, "mean_upscaled.txt");
+        upscale.WriteVertexVector(mean_fine, "mean_fine.txt");
+        upscale.WriteVertexVector(m2_upscaled, "m2_upscaled.txt");
+        upscale.WriteVertexVector(m2_fine, "m2_fine.txt");
+    }
 
     return 0;
 }
@@ -208,4 +266,15 @@ std::vector<int> MetisPart(const SparseMatrix& vertex_edge, int num_parts)
     double ubal_tol = 2.0;
 
     return Partition(vertex_vertex, num_parts, ubal_tol);
+}
+
+double Mean(const std::vector<double>& vect)
+{
+    return std::accumulate(std::begin(vect), std::end(vect), 0.0) / vect.size();
+}
+
+double MeanL1(const std::vector<double>& vect)
+{
+    return std::accumulate(std::begin(vect), std::end(vect), 0.0,
+    [](double i, double j) { return i + std::abs(j); }) / vect.size();
 }
