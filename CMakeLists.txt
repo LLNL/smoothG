@@ -205,3 +205,13 @@ add_subdirectory(src)
 #####
 add_subdirectory(examples)
 add_subdirectory(testcode)
+
+#####
+# include files for install target
+#####
+install(DIRECTORY src/ DESTINATION include
+  FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY src/ DESTINATION include
+  FILES_MATCHING PATTERN "*.h")
+install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}_config.h"
+  DESTINATION include)
