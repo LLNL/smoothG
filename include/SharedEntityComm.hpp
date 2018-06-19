@@ -40,6 +40,8 @@
 #ifndef __SHAREDENTITYCOMM_HPP__
 #define __SHAREDENTITYCOMM_HPP__
 
+#include <unordered_map>
+
 #include "linalgcpp.hpp"
 #include "parlinalgcpp.hpp"
 
@@ -455,8 +457,10 @@ void SharedEntityComm<T>::Broadcast(std::vector<T>& mats)
 template <class T>
 void SharedEntityComm<T>::BroadcastSizes(std::vector<T>& mats)
 {
+    int header_len = size_specifier_ + 1;
+
     send_headers_.resize(num_master_comms_);
-    recv_headers_.resize(num_slave_comms_, std::vector<int>(size_specifier_));
+    recv_headers_.resize(num_slave_comms_, std::vector<int>(header_len));
 
     header_requests_.resize(num_master_comms_ + num_slave_comms_);
 
@@ -470,7 +474,7 @@ void SharedEntityComm<T>::BroadcastSizes(std::vector<T>& mats)
         int entity = offd_T_indices[i];
         int owner = entity_master_[entity];
 
-        MPI_Irecv(recv_headers_[i].data(), size_specifier_, MPI_INT,
+        MPI_Irecv(recv_headers_[i].data(), header_len, MPI_INT,
                   owner, ENTITY_HEADER_TAG, comm_,
                   &header_requests_[i]);
     }
@@ -489,8 +493,9 @@ void SharedEntityComm<T>::BroadcastSizes(std::vector<T>& mats)
             if (neighbor != myid_)
             {
                 send_headers_[send_counter] = PackSendSize(mats[entity]);
+                send_headers_[send_counter].push_back(GetTrueEntity(entity));
 
-                MPI_Isend(send_headers_[send_counter].data(), size_specifier_,
+                MPI_Isend(send_headers_[send_counter].data(), header_len,
                           MPI_INT, neighbor, ENTITY_HEADER_TAG, comm_,
                           &header_requests_[num_slave_comms_ + send_counter]);
                 send_counter++;
@@ -515,10 +520,21 @@ void SharedEntityComm<T>::BroadcastData(std::vector<T>& mats)
     int num_recv = entity_offd.Cols();
     assert(num_recv == num_slave_comms_);
 
+    std::unordered_map<int, int> true_entity_to_entity;
+    true_entity_to_entity.reserve(num_recv);
+
     for (int i = 0; i < num_recv; ++i)
     {
         int entity = offd_T_indices[i];
-        int owner = entity_master_[entity];
+        true_entity_to_entity[GetTrueEntity(entity)] = entity;
+    }
+
+    for (int i = 0; i < num_recv; ++i)
+    {
+        int owner = entity_master_[offd_T_indices[i]];
+
+        int true_entity = recv_headers_[i].back();
+        int entity = true_entity_to_entity.at(true_entity);
 
         mats[entity] = ReceiveData(recv_headers_[i], owner,
                                    ENTITY_MESSAGE_TAG,
