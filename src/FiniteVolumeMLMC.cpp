@@ -35,13 +35,15 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    bool energy_dual, bool hybridization,
                                    bool coarse_components,
                                    const SAAMGeParam* saamge_param)
-    : Upscale(comm, vertex_edge.Height(), hybridization),
-      weight_(weight),
-      edge_d_td_(edge_d_td),
-      edge_boundary_att_(edge_boundary_att),
-      ess_attr_(ess_attr),
-      coarse_components_(coarse_components),
-      saamge_param_(saamge_param)
+    :
+    Upscale(comm, vertex_edge.Height()),
+    weight_(weight),
+    edge_d_td_(edge_d_td),
+    edge_boundary_att_(edge_boundary_att),
+    ess_attr_(ess_attr),
+    coarse_components_(coarse_components),
+    saamge_param_(saamge_param),
+    hybridization_(hybridization)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -84,13 +86,14 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    bool coarse_components,
                                    const SAAMGeParam* saamge_param)
     :
-    Upscale(comm, vertex_edge.Height(), hybridization),
+    Upscale(comm, vertex_edge.Height()),
     weight_(local_weight[0]),
     edge_d_td_(edge_d_td),
     edge_boundary_att_(edge_boundary_att),
     ess_attr_(ess_attr),
     coarse_components_(coarse_components),
-    saamge_param_(saamge_param)
+    saamge_param_(saamge_param),
+    hybridization_(hybridization)
 {
     mfem::StopWatch chrono;
     chrono.Start();

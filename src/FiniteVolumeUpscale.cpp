@@ -35,10 +35,11 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          bool dual_target, bool scaled_dual,
                                          bool energy_dual, bool hybridization,
                                          const SAAMGeParam* saamge_param)
-    : Upscale(comm, vertex_edge.Height(), hybridization),
+    : Upscale(comm, vertex_edge.Height()),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
-      ess_attr_(ess_attr)
+      ess_attr_(ess_attr),
+      hybridization_(hybridization)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -110,7 +111,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          bool dual_target, bool scaled_dual,
                                          bool energy_dual, bool hybridization,
                                          const SAAMGeParam* saamge_param)
-    : Upscale(comm, vertex_edge.Height(), hybridization),
+    : Upscale(comm, vertex_edge.Height()),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
       ess_attr_(ess_attr)

@@ -45,55 +45,25 @@ public:
        @param vertex_edge relationship between vertices and edge
        @param global_partitioning partition of global vertices
        @param weight edge weights. if not provided, set to an empty vector
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param coefficient use coarse coefficient rescaling construction
-       @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
                  const mfem::Array<int>& global_partitioning,
-                 double spect_tol = 0.001, int max_evects = 4,
-                 bool dual_target = false, bool scaled_dual = false,
-                 bool energy_dual = false, bool hybridization = false,
-                 bool coarse_coefficient = false,
-                 const mfem::Vector& weight = mfem::Vector(),
-                 const SAAMGeParam* saamge_param = nullptr);
+                 const UpscaleParameters& param = UpscaleParameters(),
+                 const mfem::Vector& global_weight = mfem::Vector());
+
     /**
        @brief Constructor
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
        @param coarse_factor how coarse to partition the graph
-       @param weight edge weights. if not provided, set to an empty vector
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param dual_target get traces from eigenvectors of dual graph Laplacian
-       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
-              Typically coarse problem gets better accuracy but becomes harder
-              to solve when this option is turned on.
-       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
-              (guarantees approximation property in edge energy norm)
-       @param hybridization use hybridization as solver
-       @param coarse_components whether to store different components of coarse M
-              based on trace extensions and bubbles (for construction of coarse M)
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
                  int coarse_factor,
-                 double spect_tol = 0.001, int max_evects = 4,
-                 bool dual_target = false, bool scaled_dual = false,
-                 bool energy_dual = false, bool hybridization = false,
-                 bool coarse_components = false,
-                 const mfem::Vector& weight = mfem::Vector(),
-                 const SAAMGeParam* saamge_param = nullptr);
+                 const UpscaleParameters& param = UpscaleParameters(),
+                 const mfem::Vector& weight = mfem::Vector());
 
     /// Read permuted vertex vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
@@ -119,11 +89,7 @@ public:
 private:
     void Init(const mfem::SparseMatrix& vertex_edge,
               const mfem::Array<int>& global_partitioning,
-              const mfem::Vector& weight,
-              double spect_tol, int max_evects,
-              bool dual_target, bool scaled_dual, bool energy_dual,
-              bool coarse_components,
-              const SAAMGeParam* saamge_param);
+              const mfem::Vector& weight);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
@@ -135,6 +101,7 @@ private:
 
     const int global_edges_;
     const int global_vertices_;
+    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg

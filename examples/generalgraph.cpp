@@ -184,9 +184,16 @@ int main(int argc, char* argv[])
     // Set up GraphUpscale
     {
         /// [Upscale]
+        UpscaleParameters param;
+        param.spect_tol = spect_tol;
+        param.max_evects = max_evects;
+        param.dual_target = dual_target;
+        param.scaled_dual = scaled_dual;
+        param.energy_dual = energy_dual;
+        param.hybridization = hybridization;
+        param.coarse_components = coarse_components;
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, coarse_components, weight);
+                             param, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

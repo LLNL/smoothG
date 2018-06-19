@@ -60,9 +60,14 @@ int main(int argc, char* argv[])
     // Power Iteration With Upscale Operators
     {
         // Upscaler
-        const GraphUpscale upscale(comm, vertex_edge, coarse_factor, spect_tol,
-                                   max_evects, dual_target, scaled_dual,
-                                   energy_dual, hybridization);
+        UpscaleParameters param;
+        param.spect_tol = spect_tol;
+        param.max_evects = max_evects;
+        param.dual_target = dual_target;
+        param.scaled_dual = scaled_dual;
+        param.energy_dual = energy_dual;
+        param.hybridization = hybridization;
+        const GraphUpscale upscale(comm, vertex_edge, coarse_factor, param);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);

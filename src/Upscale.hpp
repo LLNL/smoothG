@@ -32,6 +32,42 @@ namespace smoothg
 {
 
 /**
+   Collection of parameters for upscaling methods
+
+   @param spect_tol spectral tolerance determines how many eigenvectors to
+          keep per aggregate
+   @param max_evects maximum number of eigenvectors to keep per aggregate
+   @param trace_method methods for getting edge trace samples
+   @param hybridization use hybridization as solver
+   @param coefficient use coarse coefficient rescaling construction
+   @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+          coarse hybridized system if saamge_param is not nullptr
+*/
+class UpscaleParameters
+{
+public:
+    double spect_tol;
+    int max_evects;
+    bool dual_target;
+    bool scaled_dual;
+    bool energy_dual;
+    bool hybridization;
+    bool coarse_components;
+    SAAMGeParam* saamge_param;
+    // possibly also boundary condition information?
+
+    UpscaleParameters() : spect_tol(0.001),
+        max_evects(4),
+        dual_target(false),
+        scaled_dual(false),
+        energy_dual(false),
+        hybridization(false),
+        coarse_components(false),
+        saamge_param(NULL)
+    {}
+};
+
+/**
    @brief Use upscaling as operator.
 */
 class Upscale : public mfem::Operator
@@ -183,8 +219,8 @@ public:
                     const mfem::BlockVector& fine_sol) const;
 
 protected:
-    Upscale(MPI_Comm comm, int size, bool hybridization = false)
-        : Operator(size), comm_(comm), setup_time_(0.0), hybridization_(hybridization)
+    Upscale(MPI_Comm comm, int size)
+        : Operator(size), comm_(comm), setup_time_(0.0)
     {
         MPI_Comm_rank(comm_, &myid_);
     }
@@ -206,8 +242,6 @@ protected:
     int myid_;
 
     double setup_time_;
-
-    const bool hybridization_;
 
     std::unique_ptr<mfem::BlockVector> rhs_coarse_;
     std::unique_ptr<mfem::BlockVector> sol_coarse_;

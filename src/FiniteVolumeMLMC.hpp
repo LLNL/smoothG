@@ -124,6 +124,8 @@ private:
     const bool coarse_components_;
 
     const SAAMGeParam* saamge_param_;
+
+    bool hybridization_;
 };
 
 } // namespace smoothg

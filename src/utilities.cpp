@@ -393,25 +393,25 @@ mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh)
     int* edge_bdrattr_i = new int[nedges + 1]();
     int* edge_bdrattr_j = new int[nbdr_edges];
 
-
+    // in the loop below, edge_bdrattr_i is used as a temporary array
     for (int j = 0; j < nbdr_edges; j++)
     {
         int edge = mesh->GetBdrElementEdgeIndex(j);
         edge_bdrattr_i[edge + 1] = mesh->GetBdrAttribute(j);
     }
+    edge_bdrattr_i[0] = 0;
 
     int count = 0;
-
     for (int j = 1; j <= nedges; j++)
     {
         if (edge_bdrattr_i[j])
         {
             edge_bdrattr_j[count++] = edge_bdrattr_i[j] - 1;
-            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1] + 1;
+            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1] + 1; // single nonzero in this row
         }
         else
         {
-            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1];
+            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1]; // no nonzeros in this row
         }
     }
 

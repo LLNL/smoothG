@@ -46,6 +46,11 @@ public:
        @param vertex_edge relationship between vertices and edge
        @param weight edge weights.
        @param partitioning partition of vertices
+       @param edge_d_td the paralle dof_truedof table for the edge space
+       @param edge_boundary_att table with ones whenever a edge has a particular
+                        boundary attribute
+       @param ess_attr for edge space, list of boundary attributes to treat
+                        as essential boundary conditions
        @param spect_tol spectral tolerance determines how many eigenvectors to
                         keep per aggregate
        @param max_evects maximum number of eigenvectors to keep per aggregate
@@ -102,6 +107,8 @@ private:
     const mfem::SparseMatrix& edge_boundary_att_;
     const mfem::Array<int>& ess_attr_;
     //std::vector<double> ess_data;
+
+    bool hybridization_;
 };
 
 } // namespace smoothg
