@@ -273,19 +273,25 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     unique_ptr<FiniteVolumeMLMC> fvupscale;
+    UpscaleParameters param;
+    param.spect_tol = spect_tol;
+    param.max_evects = max_evects;
+    param.dual_target = dual_target;
+    param.scaled_dual = scaled_dual;
+    param.energy_dual = energy_dual;
+    param.hybridization = hybridization;
+    param.coarse_components = coarse_components;
     if (elem_mass == false)
     {
         fvupscale = make_unique<FiniteVolumeMLMC>(
                         comm, vertex_edge, weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, spect_tol, max_evects,
-                        dual_target, scaled_dual, energy_dual, hybridization, coarse_components);
+                        edge_boundary_att, ess_attr, param);
     }
     else
     {
         fvupscale = make_unique<FiniteVolumeMLMC>(
                         comm, vertex_edge, local_weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, spect_tol, max_evects,
-                        dual_target, scaled_dual, energy_dual, hybridization, coarse_components);
+                        edge_boundary_att, ess_attr, param);
     }
     fvupscale->PrintInfo();
     fvupscale->ShowSetupTime();
@@ -303,13 +309,6 @@ int main(int argc, char* argv[])
         std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = "
                   << num_fine_edges << ", coarse aggregates = " << num_aggs << std::endl;
     }
-    UpscaleParameters param;
-    param.spect_tol = spect_tol;
-    param.max_evects = max_evects;
-    param.dual_target = dual_target;
-    param.scaled_dual = scaled_dual;
-    param.energy_dual = energy_dual;
-    param.hybridization = hybridization;
     unique_ptr<TwoLevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {

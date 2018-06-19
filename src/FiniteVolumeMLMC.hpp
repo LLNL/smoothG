@@ -47,15 +47,6 @@ public:
        @param vertex_edge relationship between vertices and edge
        @param weight fine edge weights.
        @param partitioning partition of vertices
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param coarse_components whether to store different components of coarse M
-              based on trace extensions and bubbles (for construction of coarse M)
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeMLMC(MPI_Comm comm,
                      const mfem::SparseMatrix& vertex_edge,
@@ -64,11 +55,7 @@ public:
                      const mfem::HypreParMatrix& edge_d_td,
                      const mfem::SparseMatrix& edge_boundary_att,
                      const mfem::Array<int>& ess_attr,
-                     double spect_tol = 0.001, int max_evects = 4,
-                     bool dual_target = false, bool scaled_dual = false,
-                     bool energy_dual = false, bool hybridization = false,
-                     bool coarse_components = true,
-                     const SAAMGeParam* saamge_param = nullptr);
+                     const UpscaleParameters& param = UpscaleParameters());
 
     /**
        @brief Constructor
@@ -77,15 +64,6 @@ public:
        @param vertex_edge relationship between vertices and edge
        @param local_weight vertex-based fine edge weights.
        @param partitioning partition of vertices
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param coarse_components whether to store different components of coarse M
-              based on trace extensions and bubbles (for construction of coarse M)
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeMLMC(MPI_Comm comm,
                      const mfem::SparseMatrix& vertex_edge,
@@ -94,11 +72,7 @@ public:
                      const mfem::HypreParMatrix& edge_d_td,
                      const mfem::SparseMatrix& edge_boundary_att,
                      const mfem::Array<int>& ess_attr,
-                     double spect_tol = 0.001, int max_evects = 4,
-                     bool dual_target = false, bool scaled_dual = false,
-                     bool energy_dual = false, bool hybridization = false,
-                     bool coarse_components = true,
-                     const SAAMGeParam* saamge_param = nullptr);
+                     const UpscaleParameters& param = UpscaleParameters());
 
     void MakeFineSolver();
 
@@ -121,11 +95,7 @@ private:
     const mfem::SparseMatrix& edge_boundary_att_;
     const mfem::Array<int>& ess_attr_;
 
-    const bool coarse_components_;
-
-    const SAAMGeParam* saamge_param_;
-
-    bool hybridization_;
+    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg
