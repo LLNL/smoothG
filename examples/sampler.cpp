@@ -271,10 +271,16 @@ int main(int argc, char* argv[])
     double total_fine_time = 0.0;
 
     // Create Upscaler
+    UpscaleParameters param;
+    param.spect_tol = spect_tol;
+    param.max_evects = max_evects;
+    param.dual_target = dual_target;
+    param.scaled_dual = scaled_dual;
+    param.energy_dual = energy_dual;
+    param.hybridization = hybridization;
     auto fvupscale = std::make_shared<FiniteVolumeUpscale>(
                          comm, vertex_edge, weight, W_block, partitioning, *edge_d_td,
-                         edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target, scaled_dual,
-                         energy_dual, hybridization);
+                         edge_boundary_att, ess_attr, param);
 
     fvupscale->MakeFineSolver();
     fvupscale->PrintInfo();

@@ -31,15 +31,12 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::HypreParMatrix& edge_d_td,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
-                                         double spect_tol, int max_evects,
-                                         bool dual_target, bool scaled_dual,
-                                         bool energy_dual, bool hybridization,
-                                         const SAAMGeParam* saamge_param)
+                                         const UpscaleParameters& param)
     : Upscale(comm, vertex_edge.Height()),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
       ess_attr_(ess_attr),
-      hybridization_(hybridization)
+      param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -55,8 +52,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     bool coarse_coefficient = false;
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual,
+                     mixed_laplacians_[0], std::move(graph_topology), param_.spect_tol,
+                     param_.max_evects, param_.dual_target, param_.scaled_dual, param_.energy_dual,
                      coarse_coefficient);
     coarsener_->construct_coarse_subspace();
 
@@ -70,12 +67,12 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                        coarsener_->construct_face_facedof_table(),
                        ess_attr, marker);
 
-    if (hybridization) // Hybridization solver
+    if (param_.hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm, mixed_laplacians_.back(), *coarsener_,
-                             &face_bdratt, &marker, 0, saamge_param);
+                             &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -107,14 +104,12 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::HypreParMatrix& edge_d_td,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
-                                         double spect_tol, int max_evects,
-                                         bool dual_target, bool scaled_dual,
-                                         bool energy_dual, bool hybridization,
-                                         const SAAMGeParam* saamge_param)
+                                         const UpscaleParameters& param)
     : Upscale(comm, vertex_edge.Height()),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
-      ess_attr_(ess_attr)
+      ess_attr_(ess_attr),
+      param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -130,8 +125,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     bool coarse_coefficient = false;
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual, coarse_coefficient);
+                     mixed_laplacians_[0], std::move(graph_topology), param_.spect_tol,
+                     param_.max_evects, param_.dual_target, param_.scaled_dual, param_.energy_dual,
+                     coarse_coefficient);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -144,12 +140,12 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                        coarsener_->construct_face_facedof_table(),
                        ess_attr, marker);
 
-    if (hybridization) // Hybridization solver
+    if (param_.hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
                              comm, mixed_laplacians_.back(), *coarsener_,
-                             &face_bdratt, &marker, 0, saamge_param);
+                             &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -180,7 +176,7 @@ void FiniteVolumeUpscale::MakeFineSolver()
 
     if (!fine_solver_)
     {
-        if (hybridization_) // Hybridization solver
+        if (param_.hybridization) // Hybridization solver
         {
             fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
                                                      &edge_boundary_att_, &marker);

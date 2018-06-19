@@ -51,13 +51,6 @@ public:
                         boundary attribute
        @param ess_attr for edge space, list of boundary attributes to treat
                         as essential boundary conditions
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeUpscale(MPI_Comm comm,
                         const mfem::SparseMatrix& vertex_edge,
@@ -66,10 +59,7 @@ public:
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
-                        double spect_tol = 0.001, int max_evects = 4,
-                        bool dual_target = false, bool scaled_dual = false,
-                        bool energy_dual = false, bool hybridization = false,
-                        const SAAMGeParam* saamge_param = nullptr);
+                        const UpscaleParameters& param = UpscaleParameters());
 
     /**
        @brief Constructor with W block specified
@@ -79,13 +69,6 @@ public:
        @param weight edge weights.
        @param partitioning partition of vertices
        @param w_block W block matrix
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeUpscale(MPI_Comm comm,
                         const mfem::SparseMatrix& vertex_edge,
@@ -95,10 +78,7 @@ public:
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
-                        double spect_tol = 0.001, int max_evects = 4,
-                        bool dual_target = false, bool scaled_dual = false,
-                        bool energy_dual = false, bool hybridization = false,
-                        const SAAMGeParam* saamge_param = nullptr);
+                        const UpscaleParameters& param = UpscaleParameters());
 
     void MakeFineSolver();
 
@@ -108,7 +88,7 @@ private:
     const mfem::Array<int>& ess_attr_;
     //std::vector<double> ess_data;
 
-    bool hybridization_;
+    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg

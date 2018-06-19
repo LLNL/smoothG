@@ -189,9 +189,15 @@ int main(int argc, char* argv[])
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
     // Create Upscaler and Solve
+    UpscaleParameters param;
+    param.spect_tol = spect_tol;
+    param.max_evects = max_evects;
+    param.dual_target = dual_target;
+    param.scaled_dual = scaled_dual;
+    param.energy_dual = energy_dual;
+    param.hybridization = hybridization;
     FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                                  edge_boundary_att, ess_attr, spect_tol, max_evects,
-                                  dual_target, scaled_dual, energy_dual, hybridization);
+                                  edge_boundary_att, ess_attr, param);
 
     fvupscale.MakeFineSolver();
 
