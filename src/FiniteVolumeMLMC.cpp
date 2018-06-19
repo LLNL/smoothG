@@ -53,8 +53,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
-                     param_.spect_tol, param_.max_evects, param_.dual_target, param_.scaled_dual,
-                     param_.energy_dual, param_.coarse_components);
+                     param_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
@@ -96,8 +95,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology),
-                     param_.spect_tol, param_.max_evects, param_.dual_target,
-                     param_.scaled_dual, param_.energy_dual, param_.coarse_components);
+                     param_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());

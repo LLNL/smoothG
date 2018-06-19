@@ -32,42 +32,6 @@ namespace smoothg
 {
 
 /**
-   Collection of parameters for upscaling methods
-
-   @param spect_tol spectral tolerance determines how many eigenvectors to
-          keep per aggregate
-   @param max_evects maximum number of eigenvectors to keep per aggregate
-   @param trace_method methods for getting edge trace samples
-   @param hybridization use hybridization as solver
-   @param coefficient use coarse coefficient rescaling construction
-   @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
-          coarse hybridized system if saamge_param is not nullptr
-*/
-class UpscaleParameters
-{
-public:
-    double spect_tol;
-    int max_evects;
-    bool dual_target;
-    bool scaled_dual;
-    bool energy_dual;
-    bool hybridization;
-    bool coarse_components;
-    SAAMGeParam* saamge_param;
-    // possibly also boundary condition information?
-
-    UpscaleParameters() : spect_tol(0.001),
-        max_evects(4),
-        dual_target(false),
-        scaled_dual(false),
-        energy_dual(false),
-        hybridization(false),
-        coarse_components(false),
-        saamge_param(NULL)
-    {}
-};
-
-/**
    @brief Use upscaling as operator.
 */
 class Upscale : public mfem::Operator

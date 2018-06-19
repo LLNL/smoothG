@@ -32,20 +32,9 @@ namespace smoothg
 
 SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                                                      std::unique_ptr<GraphTopology> gt,
-                                                     double spectral_tol,
-                                                     unsigned int max_evecs_per_agg,
-                                                     bool dual_target,
-                                                     bool scaled_dual,
-                                                     bool energy_dual,
-                                                     bool coarse_components)
+                                                     const UpscaleParameters& param)
     : Mixed_GL_Coarsener(mgL, std::move(gt)),
-      is_hybridization_used_(false),
-      spectral_tol_(spectral_tol),
-      max_evecs_per_agg_(max_evecs_per_agg),
-      dual_target_(dual_target),
-      scaled_dual_(scaled_dual),
-      energy_dual_(energy_dual),
-      coarse_components_(coarse_components)
+      param_(param)
 {
 }
 
@@ -56,12 +45,12 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LMGST localtargets(spectral_tol_, max_evecs_per_agg_, dual_target_,
-                       scaled_dual_, energy_dual_, mgL_.GetM(),
+    LMGST localtargets(param_.spect_tol, param_.max_evects, param_.dual_target,
+                       param_.scaled_dual, param_.energy_dual, mgL_.GetM(),
                        mgL_.GetD(), mgL_.GetW(), *graph_topology_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
-    if (coarse_components_)
+    if (param_.coarse_components)
     {
         coarse_m_builder_ = make_unique<CoefficientMBuilder>(*graph_topology_);
     }

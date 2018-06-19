@@ -46,28 +46,6 @@
 namespace smoothg
 {
 
-/// Container for SAAMGe parameters
-struct SAAMGeParam
-{
-    int num_levels = 2;
-
-    /// Parameters for all levels
-    int nu_relax = 2;
-    bool use_arpack = false;
-    bool correct_nulspace = false;
-    bool do_aggregates = true;
-
-    /// Parameters for the first coarsening
-    int first_coarsen_factor = 64;
-    int first_nu_pro = 1;
-    double first_theta = 1e-3;
-
-    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
-    int coarsen_factor = 8;
-    int nu_pro = 1;
-    double theta = 1e-3;
-};
-
 /**
    @brief Hybridization solver for saddle point problems
 
