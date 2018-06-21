@@ -273,13 +273,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
         if (impose_ess_u_conditions_)
         {
-            MFEM_ASSERT(!w_exists,
-                        "Imposing u boundary conditions when W already built does not make sense!");
-            mfem::Array<int> offsets(3);
-            offsets[0] = 0;
-            offsets[1] = offsets[0] + Dref.Width();
-            offsets[2] = offsets[1] + Dref.Height();
-            ess_u_rhs_correction_ = make_unique<mfem::BlockVector>(offsets);
+            // note well that this is going to bulldoze any W matrix you already had
+            ess_u_rhs_correction_ = make_unique<mfem::BlockVector>(GetFineBlockVector());
             *ess_u_rhs_correction_ = 0.0;
             mfem::SparseMatrix DrefT = smoothg::Transpose(Dref);
             DrefT.EliminateCols(const_cast<mfem::Array<int>& >(ess_u_marker_),
@@ -294,7 +289,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
                     // typically set entries in W to 1 and rhs = data, but here
                     // set the negative in order for solver to be well-defined
                     W.Set(m, m, -1.0);
-                    ess_u_rhs_correction_->GetBlock(1)(m) = -ess_u_data_(m);
+                    ess_u_rhs_correction_->GetBlock(1).Elem(m) = -ess_u_data_(m);
                 }
             }
             W.Finalize();
