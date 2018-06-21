@@ -74,6 +74,19 @@ public:
                      const mfem::Array<int>& ess_attr,
                      const UpscaleParameters& param = UpscaleParameters());
 
+    FiniteVolumeMLMC(MPI_Comm comm,
+                     const mfem::SparseMatrix& vertex_edge,
+                     const mfem::Vector& weight,
+                     const mfem::Array<int>& partitioning,
+                     const mfem::HypreParMatrix& edge_d_td,
+                     const mfem::SparseMatrix& edge_boundary_att,
+                     const mfem::Array<int>& ess_attr,
+                     const mfem::Array<int>& ess_u_marker,
+                     const mfem::Vector& ess_u_data,
+                     const UpscaleParameters& param = UpscaleParameters());
+
+    void ModifyRHSEssential(mfem::BlockVector& rhs);
+
     void MakeFineSolver();
 
     /// coeff should have the size of the number of *vertices* in the fine graph
@@ -96,6 +109,12 @@ private:
     const mfem::Array<int>& ess_attr_;
 
     const UpscaleParameters& param_;
+
+    const mfem::Array<int>& ess_u_marker_;
+    const mfem::Vector& ess_u_data_;
+    bool impose_ess_u_conditions_;
+
+    std::unique_ptr<mfem::BlockVector> ess_u_rhs_correction_;
 };
 
 } // namespace smoothg

@@ -37,7 +37,10 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     edge_d_td_(edge_d_td),
     edge_boundary_att_(edge_boundary_att),
     ess_attr_(ess_attr),
-    param_(param)
+    param_(param),
+    ess_u_marker_(mfem::Array<int>()),
+    ess_u_data_(mfem::Vector()),
+    impose_ess_u_conditions_(false)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -80,7 +83,10 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     edge_d_td_(edge_d_td),
     edge_boundary_att_(edge_boundary_att),
     ess_attr_(ess_attr),
-    param_(param)
+    param_(param),
+    ess_u_marker_(mfem::Array<int>()),
+    ess_u_data_(mfem::Vector()),
+    impose_ess_u_conditions_(false)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -106,6 +112,67 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
+}
+
+FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
+                                   const mfem::SparseMatrix& vertex_edge,
+                                   const mfem::Vector& weight,
+                                   const mfem::Array<int>& partitioning,
+                                   const mfem::HypreParMatrix& edge_d_td,
+                                   const mfem::SparseMatrix& edge_boundary_att,
+                                   const mfem::Array<int>& ess_attr,
+                                   const mfem::Array<int>& ess_u_marker,
+                                   const mfem::Vector& ess_u_data,
+                                   const UpscaleParameters& param)
+    :
+    Upscale(comm, vertex_edge.Height()),
+    weight_(weight),
+    edge_d_td_(edge_d_td),
+    edge_boundary_att_(edge_boundary_att),
+    ess_attr_(ess_attr),
+    param_(param),
+    ess_u_marker_(ess_u_marker),
+    ess_u_data_(ess_u_data),
+    impose_ess_u_conditions_(true)
+{
+    mfem::StopWatch chrono;
+    chrono.Start();
+
+    // Hypre may modify the original vertex_edge, which we seek to avoid
+    mfem::SparseMatrix ve_copy(vertex_edge);
+
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
+                                   MixedMatrix::DistributeWeight::False);
+
+    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
+                                                     &edge_boundary_att_);
+
+    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
+                     mixed_laplacians_[0], std::move(graph_topology),
+                     param_);
+    coarsener_->construct_coarse_subspace();
+
+    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+
+    MakeCoarseSolver();
+
+    MakeCoarseVectors();
+
+    chrono.Stop();
+    setup_time_ += chrono.RealTime();
+}
+
+void FiniteVolumeMLMC::ModifyRHSEssential(mfem::BlockVector& rhs)
+{
+    if (ess_u_marker_.Size() == 0)
+        return;
+
+    rhs.GetBlock(0) += ess_u_rhs_correction_->GetBlock(0);
+    for (int i = 0; i < rhs.GetBlock(1).Size(); ++i)
+    {
+        if (ess_u_marker_[i])
+            rhs.GetBlock(1)(i) = ess_u_rhs_correction_->GetBlock(1)(i);
+    }
 }
 
 /// this implementation is sloppy
@@ -178,13 +245,13 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
 void FiniteVolumeMLMC::ForceMakeFineSolver()
 {
-    mfem::Array<int> marker;
-    BooleanMult(edge_boundary_att_, ess_attr_, marker);
+    mfem::Array<int> ess_sigma_marker;
+    BooleanMult(edge_boundary_att_, ess_attr_, ess_sigma_marker);
 
     if (param_.hybridization) // Hybridization solver
     {
         fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
-                                                 &edge_boundary_att_, &marker);
+                                                 &edge_boundary_att_, &ess_sigma_marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -192,9 +259,9 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
         mfem::SparseMatrix& Dref = GetFineMatrix().GetD();
         const bool w_exists = GetFineMatrix().CheckW();
 
-        for (int mm = 0; mm < marker.Size(); ++mm)
+        for (int mm = 0; mm < ess_sigma_marker.Size(); ++mm)
         {
-            if (marker[mm])
+            if (ess_sigma_marker[mm])
             {
                 //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
 
@@ -202,8 +269,38 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
                 Mref.EliminateRow(mm, set_diag);
             }
         }
-        Dref.EliminateCols(marker);
-        if (!w_exists && myid_ == 0)
+        Dref.EliminateCols(ess_sigma_marker);
+
+        if (impose_ess_u_conditions_)
+        {
+            MFEM_ASSERT(!w_exists,
+                        "Imposing u boundary conditions when W already built does not make sense!");
+            mfem::Array<int> offsets(3);
+            offsets[0] = 0;
+            offsets[1] = offsets[0] + Dref.Width();
+            offsets[2] = offsets[1] + Dref.Height();
+            ess_u_rhs_correction_ = make_unique<mfem::BlockVector>(offsets);
+            *ess_u_rhs_correction_ = 0.0;
+            mfem::SparseMatrix DrefT = smoothg::Transpose(Dref);
+            DrefT.EliminateCols(const_cast<mfem::Array<int>& >(ess_u_marker_),
+                                const_cast<mfem::Vector*>(&ess_u_data_), &ess_u_rhs_correction_->GetBlock(0));
+            mfem::SparseMatrix D_elim = smoothg::Transpose(DrefT);
+            Dref.Swap(D_elim);
+            mfem::SparseMatrix W(Dref.Height());
+            for (int m = 0; m < ess_u_marker_.Size(); ++m)
+            {
+                if (ess_u_marker_[m])
+                {
+                    // typically set entries in W to 1 and rhs = data, but here
+                    // set the negative in order for solver to be well-defined
+                    W.Set(m, m, -1.0);
+                    ess_u_rhs_correction_->GetBlock(1)(m) = -ess_u_data_(m);
+                }
+            }
+            W.Finalize();
+            GetFineMatrix().SetW(W);
+        }
+        else if (!w_exists && myid_ == 0)
         {
             Dref.EliminateRow(0);
         }
@@ -211,6 +308,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
         fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
     }
 
+    // TODO: we can actually delete ess_u_marker_, ess_u_data_ at this point, which
+    // suggests they should be parameters here instead of in the constructor
 }
 
 void FiniteVolumeMLMC::MakeFineSolver()
