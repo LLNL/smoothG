@@ -102,6 +102,9 @@ public:
 
     void MakeCoarseSolver();
 
+    /// hack, for solve with essential vertex boundary conditions
+    void SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const;
+
 private:
     const mfem::Vector& weight_;
     const mfem::HypreParMatrix& edge_d_td_;

@@ -294,6 +294,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             }
             W.Finalize();
             GetFineMatrix().SetW(W);
+            // we only need to do this once, even with repeated solves
+            impose_ess_u_conditions_ = false;
         }
         else if (!w_exists && myid_ == 0)
         {
@@ -305,6 +307,18 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     // TODO: we can actually delete ess_u_marker_, ess_u_data_ at this point, which
     // suggests they should be parameters here instead of in the constructor
+}
+
+/// this is hack, should depend on whether we do ess_u_conditions, should think
+/// about overloading all four versions...
+void FiniteVolumeMLMC::SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(fine_solver_);
+
+    fine_solver_->Solve(x, y);
+    // y *= -1.0;
+
+    // Orthogonalize(y);
 }
 
 void FiniteVolumeMLMC::MakeFineSolver()
