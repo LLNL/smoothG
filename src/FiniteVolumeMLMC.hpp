@@ -104,6 +104,8 @@ public:
 
     /// hack, for solve with essential vertex boundary conditions
     void SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    /// hack
+    void SolveEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const;
 
 private:
     const mfem::Vector& weight_;
@@ -115,9 +117,14 @@ private:
 
     const mfem::Array<int>& ess_u_marker_;
     const mfem::Vector& ess_u_data_;
+    mfem::Array<int> coarse_ess_u_marker_;
+    mfem::Vector coarse_ess_u_data_;
     bool impose_ess_u_conditions_;
 
-    std::unique_ptr<mfem::BlockVector> ess_u_rhs_correction_;
+    std::unique_ptr<mfem::BlockVector> ess_u_finerhs_correction_;
+    std::unique_ptr<mfem::BlockVector> ess_u_coarserhs_correction_;
+
+    void CoarsenEssentialVertexBoundary();
 };
 
 } // namespace smoothg
