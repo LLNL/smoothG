@@ -85,7 +85,8 @@ public:
                      const mfem::Vector& ess_u_data,
                      const UpscaleParameters& param = UpscaleParameters());
 
-    void ModifyRHSEssential(mfem::BlockVector& rhs);
+    void ModifyRHSEssential(mfem::BlockVector& rhs) const;
+    void ModifyCoarseRHSEssential(mfem::BlockVector& coarserhs) const;
 
     void MakeFineSolver();
 
@@ -120,6 +121,7 @@ private:
     mfem::Array<int> coarse_ess_u_marker_;
     mfem::Vector coarse_ess_u_data_;
     bool impose_ess_u_conditions_;
+    bool coarse_impose_ess_u_conditions_;
 
     std::unique_ptr<mfem::BlockVector> ess_u_finerhs_correction_;
     std::unique_ptr<mfem::BlockVector> ess_u_coarserhs_correction_;
