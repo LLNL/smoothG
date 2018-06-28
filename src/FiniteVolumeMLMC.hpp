@@ -83,6 +83,7 @@ public:
                      const mfem::Array<int>& ess_attr,
                      const mfem::Array<int>& ess_u_marker,
                      const mfem::Vector& ess_u_data,
+                     int special_vertex_dofs,
                      const UpscaleParameters& param = UpscaleParameters());
 
     void ModifyRHSEssential(mfem::BlockVector& rhs) const;
@@ -126,7 +127,7 @@ private:
     std::unique_ptr<mfem::BlockVector> ess_u_finerhs_correction_;
     std::unique_ptr<mfem::BlockVector> ess_u_coarserhs_correction_;
 
-    void CoarsenEssentialVertexBoundary();
+    void CoarsenEssentialVertexBoundary(int special_vertex_dofs);
 };
 
 } // namespace smoothg

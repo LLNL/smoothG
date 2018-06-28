@@ -125,6 +125,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::Array<int>& ess_attr,
                                    const mfem::Array<int>& ess_u_marker,
                                    const mfem::Vector& ess_u_data,
+                                   int special_vertex_dofs,
                                    const UpscaleParameters& param)
     :
     Upscale(comm, vertex_edge.Height()),
@@ -157,7 +158,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());
 
-    CoarsenEssentialVertexBoundary();
+    CoarsenEssentialVertexBoundary(special_vertex_dofs);
 
     MakeCoarseSolver();
 
@@ -167,11 +168,8 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
-void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary()
+void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
 {
-    int num_essential_vertices = 0;
-    for (int i = 0; i < ess_u_marker_.Size(); ++i)
-        num_essential_vertices += ess_u_marker_[i];
     const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     int new_size = Dref.Height();
 
@@ -181,7 +179,7 @@ void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary()
     coarse_ess_u_data_ = 0.0;
 
     const int old_size = ess_u_data_.Size();
-    for (int i = 0; i < num_essential_vertices; i++)
+    for (int i = 0; i < special_vertex_dofs; i++)
     {
         if (ess_u_marker_[old_size-1-i])
         {
