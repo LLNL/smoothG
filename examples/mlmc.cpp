@@ -99,6 +99,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
+    UpscaleParameters param;
     mfem::OptionsParser args(argc, argv);
     const char* permFile = "";
     args.AddOption(&permFile, "-p", "--perm",
@@ -109,11 +110,11 @@ int main(int argc, char* argv[])
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
+    param.max_evects = 4;
+    args.AddOption(&param.max_evects, "-m", "--max-evects",
                    "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
+    param.spect_tol = 1.e-3;
+    args.AddOption(&param.spect_tol, "-t", "--spect-tol",
                    "Spectral tolerance for eigenvalue problems.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
@@ -122,17 +123,17 @@ int main(int argc, char* argv[])
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+    param.hybridization = false;
+    args.AddOption(&param.hybridization, "-hb", "--hybridization", "-no-hb",
                    "--no-hybridization", "Enable hybridization.");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+    param.dual_target = false;
+    args.AddOption(&param.dual_target, "-dt", "--dual-target", "-no-dt",
                    "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+    param.scaled_dual = false;
+    args.AddOption(&param.scaled_dual, "-sd", "--scaled-dual", "-no-sd",
                    "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+    param.energy_dual = false;
+    args.AddOption(&param.energy_dual, "-ed", "--energy-dual", "-no-ed",
                    "--no-energy-dual", "Use energy matrix in trace generation.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
@@ -140,8 +141,8 @@ int main(int argc, char* argv[])
     bool elem_mass = false;
     args.AddOption(&elem_mass, "-el-mass", "--element-mass", "-no-el-mass",
                    "--no-element-mass", "Store fine M in element matrices format.");
-    bool coarse_components = true;
-    args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
+    param.coarse_components = true;
+    args.AddOption(&param.coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
                    "--no-coarse-components", "Store trace, bubble components of coarse M.");
     const char* sampler_type = "simple";
     args.AddOption(&sampler_type, "--sampler-type", "--sampler-type",
@@ -273,14 +274,7 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     unique_ptr<FiniteVolumeMLMC> fvupscale;
-    UpscaleParameters param;
-    param.spect_tol = spect_tol;
-    param.max_evects = max_evects;
-    param.dual_target = dual_target;
-    param.scaled_dual = scaled_dual;
-    param.energy_dual = energy_dual;
-    param.hybridization = hybridization;
-    param.coarse_components = coarse_components;
+
     if (elem_mass == false)
     {
         fvupscale = make_unique<FiniteVolumeMLMC>(
