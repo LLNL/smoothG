@@ -181,10 +181,10 @@ void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
     const int old_size = ess_u_data_.Size();
     for (int i = 0; i < special_vertex_dofs; i++)
     {
-        if (ess_u_marker_[old_size-1-i])
+        if (ess_u_marker_[old_size - 1 - i])
         {
-            coarse_ess_u_marker_[new_size-1-i] = 1;
-            coarse_ess_u_data_(new_size-1-i) = ess_u_data_(old_size-1-i);
+            coarse_ess_u_marker_[new_size - 1 - i] = 1;
+            coarse_ess_u_data_(new_size - 1 - i) = ess_u_data_(old_size - 1 - i);
         }
     }
 }
