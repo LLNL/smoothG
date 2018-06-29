@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
-    UpscaleParameters param;
+    UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
     const char* permFile = "";
     args.AddOption(&permFile, "-p", "--perm",
@@ -134,7 +134,8 @@ int main(int argc, char* argv[])
                    "Number of samples to draw and simulate.");
     int argseed = 1;
     args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
-    param.RegisterInOptionsParser(args);
+    upscale_param.coarse_components = true;
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
@@ -259,13 +260,13 @@ int main(int argc, char* argv[])
     {
         fvupscale = make_unique<FiniteVolumeMLMC>(
                         comm, vertex_edge, weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, param);
+                        edge_boundary_att, ess_attr, upscale_param);
     }
     else
     {
         fvupscale = make_unique<FiniteVolumeMLMC>(
                         comm, vertex_edge, local_weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, param);
+                        edge_boundary_att, ess_attr, upscale_param);
     }
     fvupscale->PrintInfo();
     fvupscale->ShowSetupTime();
@@ -294,7 +295,7 @@ int main(int argc, char* argv[])
         sampler = make_unique<PDESampler>(
                       comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
                       vertex_edge, weight, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
-                      param);
+                      upscale_param);
     }
     else
     {
