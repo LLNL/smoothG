@@ -110,12 +110,6 @@ int main(int argc, char* argv[])
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    param.max_evects = 4;
-    args.AddOption(&param.max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    param.spect_tol = 1.e-3;
-    args.AddOption(&param.spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -123,27 +117,12 @@ int main(int argc, char* argv[])
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
-    param.hybridization = false;
-    args.AddOption(&param.hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
-    param.dual_target = false;
-    args.AddOption(&param.dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    param.scaled_dual = false;
-    args.AddOption(&param.scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    param.energy_dual = false;
-    args.AddOption(&param.energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
     bool elem_mass = false;
     args.AddOption(&elem_mass, "-el-mass", "--element-mass", "-no-el-mass",
                    "--no-element-mass", "Store fine M in element matrices format.");
-    param.coarse_components = true;
-    args.AddOption(&param.coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
-                   "--no-coarse-components", "Store trace, bubble components of coarse M.");
     const char* sampler_type = "simple";
     args.AddOption(&sampler_type, "--sampler-type", "--sampler-type",
                    "Which sampler to use for coefficient: simple, pde");
@@ -155,6 +134,7 @@ int main(int argc, char* argv[])
                    "Number of samples to draw and simulate.");
     int argseed = 1;
     args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
+    param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
