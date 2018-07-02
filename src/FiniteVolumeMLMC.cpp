@@ -249,6 +249,35 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     }
 }
 
+/// copied and modified from SparseMatrix::EliminateCols with help
+/// from the EliminateRowCol that has an Ae argument
+/// at the end, mat + Ae == original mat
+void EliminateColsForMultipleBC(mfem::SparseMatrix& mat,
+                                const mfem::Array<int>& ess_u_marker,
+                                const mfem::Vector& ess_u_data,
+                                mfem::Vector& rhs,
+                                mfem::SparseMatrix& Ae)
+{
+    const int height = mat.Height();
+    const int* I = mat.GetI();
+    const int* J = mat.GetJ();
+    double * A = mat.GetData();
+
+    for (int i = 0; i < height; i++)
+    {
+        for (int jpos = I[i]; jpos != I[i+1]; ++jpos)
+        {
+            if (ess_u_marker[ J[jpos]] )
+            {
+                rhs(i) -= A[jpos] * ess_u_data( J[jpos] );
+                Ae.Add(i, J[jpos], A[jpos]);
+                A[jpos] = 0.0;
+            }
+        }
+    }
+    Ae.Finalize();
+}
+
 void FiniteVolumeMLMC::MakeCoarseSolver()
 {
     mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
@@ -283,21 +312,27 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         if (coarse_impose_ess_u_conditions_)
         {
-            if (!coarse_ess_u_matrix_eliminated_)
+            ess_u_coarserhs_correction_ = make_unique<mfem::BlockVector>(GetCoarseBlockVector());
+            *ess_u_coarserhs_correction_ = 0.0;
+            if (coarse_ess_u_matrix_eliminated_)
             {
-                // note well that this is going to bulldoze any W matrix you already had
-                ess_u_coarserhs_correction_ = make_unique<mfem::BlockVector>(GetCoarseBlockVector());
-                *ess_u_coarserhs_correction_ = 0.0;
+                // todo: do not want to do the transpose in this if branch!
                 mfem::SparseMatrix DrefT = smoothg::Transpose(Dref);
-                /// @todo note that coarse_ess_u_data_ will change from sample to sample
-                /// (I don't think I want to do the elimination each time---can I just
-                ///  change the vector, not the matrix? I might need to do the A_e eliminated matrix business)
-                DrefT.EliminateCols(const_cast<mfem::Array<int>& >(coarse_ess_u_marker_),
-                                    const_cast<mfem::Vector*>(&coarse_ess_u_data_),
-                                    &ess_u_coarserhs_correction_->GetBlock(0));
+                coarse_DTelim_trace_->AddMult(coarse_ess_u_data_,
+                                              ess_u_coarserhs_correction_->GetBlock(0),
+                                              -1.0);
+            }
+            else
+            {
+                mfem::SparseMatrix DrefT = smoothg::Transpose(Dref);
+                coarse_DTelim_trace_ = make_unique<mfem::SparseMatrix>(DrefT.Height(), DrefT.Width());
+                EliminateColsForMultipleBC(DrefT, coarse_ess_u_marker_, coarse_ess_u_data_,
+                                           ess_u_coarserhs_correction_->GetBlock(0),
+                                           *coarse_DTelim_trace_);
                 mfem::SparseMatrix D_elim = smoothg::Transpose(DrefT);
                 Dref.Swap(D_elim);
 
+                // note well that this is going to bulldoze any W matrix you already had
                 mfem::SparseMatrix W(Dref.Height());
                 for (int m = 0; m < coarse_ess_u_marker_.Size(); ++m)
                 {
@@ -306,7 +341,6 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
                         // typically set entries in W to 1 and rhs = data, but here
                         // set the negative in order for solver to be well-defined
                         W.Set(m, m, -1.0);
-                        // ess_u_coarserhs_correction_->GetBlock(1).Elem(m) = -coarse_ess_u_data_(m);
                     }
                 }
                 W.Finalize();
@@ -319,13 +353,9 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
             {
                 if (coarse_ess_u_marker_[m])
                 {
-                    // typically set entries in W to 1 and rhs = data, but here
-                    // set the negative in order for solver to be well-defined
                     ess_u_coarserhs_correction_->GetBlock(1).Elem(m) = -coarse_ess_u_data_(m);
                 }
             }
-            // we only need to do this once, even with repeated solves
-            // coarse_impose_ess_u_conditions_ = false;
         }
 
         coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
@@ -362,20 +392,27 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
         if (impose_ess_u_conditions_)
         {
-            if (!ess_u_matrix_eliminated_)
+            ess_u_finerhs_correction_ = make_unique<mfem::BlockVector>(GetFineBlockVector());
+            *ess_u_finerhs_correction_ = 0.0;
+            if (ess_u_matrix_eliminated_)
             {
-                // note well that this is going to bulldoze any W matrix you already had
-                ess_u_finerhs_correction_ = make_unique<mfem::BlockVector>(GetFineBlockVector());
-                *ess_u_finerhs_correction_ = 0.0;
+                // todo: do not want to do the transpose in this if branch!
                 mfem::SparseMatrix DrefT = smoothg::Transpose(Dref);
-                /// see notes above for coarse case
-                DrefT.EliminateCols(const_cast<mfem::Array<int>& >(ess_u_marker_),
-                                    const_cast<mfem::Vector*>(&ess_u_data_),
-                                    &ess_u_finerhs_correction_->GetBlock(0));
+                fine_DTelim_trace_->AddMult(ess_u_data_,
+                                            ess_u_finerhs_correction_->GetBlock(0),
+                                            -1.0);
+            }
+            else
+            {
+                mfem::SparseMatrix DrefT = smoothg::Transpose(Dref);
+                fine_DTelim_trace_ = make_unique<mfem::SparseMatrix>(DrefT.Height(), DrefT.Width());
+                EliminateColsForMultipleBC(DrefT, ess_u_marker_, ess_u_data_,
+                                           ess_u_finerhs_correction_->GetBlock(0),
+                                           *fine_DTelim_trace_);
                 mfem::SparseMatrix D_elim = smoothg::Transpose(DrefT);
                 Dref.Swap(D_elim);
 
-
+                // note well that this is going to bulldoze any W matrix you already had
                 mfem::SparseMatrix W(Dref.Height());
                 for (int m = 0; m < ess_u_marker_.Size(); ++m)
                 {
@@ -384,7 +421,6 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
                         // typically set entries in W to 1 and rhs = data, but here
                         // set the negative in order for solver to be well-defined
                         W.Set(m, m, -1.0);
-                        // ess_u_finerhs_correction_->GetBlock(1).Elem(m) = -ess_u_data_(m);
                     }
                 }
                 W.Finalize();
@@ -396,14 +432,9 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             {
                 if (ess_u_marker_[m])
                 {
-                    // typically set entries in W to 1 and rhs = data, but here
-                    // set the negative in order for solver to be well-defined
                     ess_u_finerhs_correction_->GetBlock(1).Elem(m) = -ess_u_data_(m);
                 }
             }
-
-            // we only need to do this once, even with repeated solves
-            // impose_ess_u_conditions_ = false;
         }
         else if (!w_exists && myid_ == 0)
         {

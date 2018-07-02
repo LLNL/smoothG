@@ -130,6 +130,9 @@ private:
     std::unique_ptr<mfem::BlockVector> ess_u_finerhs_correction_;
     std::unique_ptr<mfem::BlockVector> ess_u_coarserhs_correction_;
 
+    std::unique_ptr<mfem::SparseMatrix> fine_DTelim_trace_;
+    std::unique_ptr<mfem::SparseMatrix> coarse_DTelim_trace_;
+
     void CoarsenEssentialVertexBoundary(int special_vertex_dofs);
 };
 
