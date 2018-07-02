@@ -121,8 +121,11 @@ private:
     const mfem::Vector& ess_u_data_;
     mfem::Array<int> coarse_ess_u_marker_;
     mfem::Vector coarse_ess_u_data_;
+    /// @todo not all of the next four bools are necessary?
     bool impose_ess_u_conditions_;
+    bool ess_u_matrix_eliminated_;
     bool coarse_impose_ess_u_conditions_;
+    bool coarse_ess_u_matrix_eliminated_;
 
     std::unique_ptr<mfem::BlockVector> ess_u_finerhs_correction_;
     std::unique_ptr<mfem::BlockVector> ess_u_coarserhs_correction_;
