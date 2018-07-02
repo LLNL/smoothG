@@ -86,7 +86,6 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     ess_attr_(ess_attr),
     param_(param),
     ess_u_marker_(mfem::Array<int>()),
-    ess_u_data_(mfem::Vector()),
     impose_ess_u_conditions_(false),
     coarse_impose_ess_u_conditions_(false)
 {
@@ -124,7 +123,6 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::SparseMatrix& edge_boundary_att,
                                    const mfem::Array<int>& ess_attr,
                                    const mfem::Array<int>& ess_u_marker,
-                                   const mfem::Vector& ess_u_data,
                                    int special_vertex_dofs,
                                    const UpscaleParameters& param)
     :
@@ -135,7 +133,6 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     ess_attr_(ess_attr),
     param_(param),
     ess_u_marker_(ess_u_marker),
-    ess_u_data_(ess_u_data),
     impose_ess_u_conditions_(true),
     ess_u_matrix_eliminated_(false),
     coarse_impose_ess_u_conditions_(true),
@@ -170,9 +167,9 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
-/// @todo be able to update ess_u_data here
 void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
 {
+    /*
     const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     int new_size = Dref.Height();
 
@@ -187,6 +184,40 @@ void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
         if (ess_u_marker_[old_size - 1 - i])
         {
             coarse_ess_u_marker_[new_size - 1 - i] = 1;
+            coarse_ess_u_data_(new_size - 1 - i) = ess_u_data_(old_size - 1 - i);
+        }
+    }
+    */
+    const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    int new_size = Dref.Height();
+
+    coarse_ess_u_data_.SetSize(new_size);
+    coarse_ess_u_data_ = 0.0;
+    coarse_ess_u_marker_.SetSize(new_size);
+    coarse_ess_u_marker_ = 0;
+    int eu_size = ess_u_marker_.Size();
+    for (int i = 0; i < special_vertex_dofs; ++i)
+    {
+        if (ess_u_marker_[eu_size - 1 - i])
+        {
+            coarse_ess_u_marker_[new_size - 1 - i] = 1;
+        }
+    }    
+}
+
+void FiniteVolumeMLMC::SetEssentialData(const mfem::Vector& new_data,
+                                        int special_vertex_dofs)
+{
+    ess_u_data_ = new_data;
+
+    const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    int new_size = Dref.Height();
+
+    const int old_size = ess_u_data_.Size();
+    for (int i = 0; i < special_vertex_dofs; i++)
+    {
+        if (ess_u_marker_[old_size - 1 - i])
+        {
             coarse_ess_u_data_(new_size - 1 - i) = ess_u_data_(old_size - 1 - i);
         }
     }

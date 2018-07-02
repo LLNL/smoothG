@@ -82,7 +82,6 @@ public:
                      const mfem::SparseMatrix& edge_boundary_att,
                      const mfem::Array<int>& ess_attr,
                      const mfem::Array<int>& ess_u_marker,
-                     const mfem::Vector& ess_u_data,
                      int special_vertex_dofs,
                      const UpscaleParameters& param = UpscaleParameters());
 
@@ -104,6 +103,9 @@ public:
 
     void MakeCoarseSolver();
 
+    void SetEssentialData(const mfem::Vector& new_data,
+                          int special_vertex_dofs);
+
     /// hack, for solve with essential vertex boundary conditions
     void SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     /// hack
@@ -118,7 +120,7 @@ private:
     const UpscaleParameters& param_;
 
     const mfem::Array<int>& ess_u_marker_;
-    const mfem::Vector& ess_u_data_;
+    mfem::Vector ess_u_data_;
     mfem::Array<int> coarse_ess_u_marker_;
     mfem::Vector coarse_ess_u_data_;
     /// @todo not all of the next four bools are necessary?
