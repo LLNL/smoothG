@@ -71,6 +71,7 @@ int main(int argc, char* argv[])
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())

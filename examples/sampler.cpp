@@ -148,6 +148,7 @@ int main(int argc, char* argv[])
     args.AddOption(&save_statistics, "--save-statistics", "--save-statistics",
                    "--no-save-statistics", "--no-save-statistics",
                    "Save images of mean and variance.");
+    // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())

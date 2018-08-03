@@ -135,6 +135,7 @@ int main(int argc, char* argv[])
     int argseed = 1;
     args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
     upscale_param.coarse_components = true;
+    // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())

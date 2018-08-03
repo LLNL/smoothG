@@ -96,6 +96,7 @@ int main(int argc, char* argv[])
     const char* caption = "";
     args.AddOption(&caption, "-cap", "--caption",
                    "Caption for visualization");
+    // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
 
