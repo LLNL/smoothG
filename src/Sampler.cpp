@@ -36,9 +36,9 @@ double NormalDistribution::Sample()
     return out;
 }
 
-SimpleSampler::SimpleSampler(int fine_size, int coarse_size)
+SimpleSampler::SimpleSampler(int fine_size, int coarse_size, int sample)
     :
-    fine_size_(fine_size), coarse_size_(coarse_size), sample_(-1)
+    fine_size_(fine_size), coarse_size_(coarse_size), sample_(sample)
 {
     fine_.SetSize(fine_size_);
     coarse_.SetSize(coarse_size_);
