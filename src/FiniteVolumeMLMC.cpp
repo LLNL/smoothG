@@ -169,25 +169,6 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
 void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
 {
-    /*
-    const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
-    int new_size = Dref.Height();
-
-    coarse_ess_u_marker_.SetSize(new_size);
-    coarse_ess_u_data_.SetSize(new_size);
-    coarse_ess_u_marker_ = 0;
-    coarse_ess_u_data_ = 0.0;
-
-    const int old_size = ess_u_data_.Size();
-    for (int i = 0; i < special_vertex_dofs; i++)
-    {
-        if (ess_u_marker_[old_size - 1 - i])
-        {
-            coarse_ess_u_marker_[new_size - 1 - i] = 1;
-            coarse_ess_u_data_(new_size - 1 - i) = ess_u_data_(old_size - 1 - i);
-        }
-    }
-    */
     const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     int new_size = Dref.Height();
 
@@ -491,7 +472,17 @@ void FiniteVolumeMLMC::SolveEssU(const mfem::BlockVector& x, mfem::BlockVector& 
 
     ModifyCoarseRHSEssential(*rhs_coarse_); // does not match semantics in fine case
 
+    {
+        std::ofstream out("mlmc_fv_coarserhs.vector");
+        rhs_coarse_->Print(out, 1);
+    }
+
     coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
+
+    {
+        std::ofstream out("mlmc_fv_coarsesol.vector");
+        sol_coarse_->Print(out, 1);
+    }
 
     coarsener_->interpolate(*sol_coarse_, y);
 

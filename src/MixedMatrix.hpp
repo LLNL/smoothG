@@ -123,6 +123,7 @@ public:
        @brief Set (or reset) the mass matrix M.
 
        Useful for rescaling coefficients without re-coarsening.
+       Never called? (@deprecated?)
     */
     void SetM(mfem::SparseMatrix& M_in)
     {
@@ -303,6 +304,7 @@ public:
     /// Determine if W block is nonzero
     bool CheckW() const;
 
+    /// only sensible if M is diagonal
     void SetMFromWeightVector(const mfem::Vector& weight);
 
     void ScaleM(const mfem::Vector& weight);

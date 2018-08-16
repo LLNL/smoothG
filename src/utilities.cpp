@@ -715,7 +715,8 @@ void FiniteVolumeMassIntegrator::AssembleElementMatrix(
     // here assume the input is k^{-1};
     mfem::Vector mii(ndof);
     for (int i = 0; i < ndof; i++)
-        // Trans.Weight()/FaceArea(i)=Volume/face area=h (for rectangular grid)
+        // Trans.Weight() is determinant of Jacobian, should be like volume, ie
+        // Trans.Weight()/FaceArea(i) = Volume/face area = h (for rectangular grid)
         mii(i) = (Trans.Weight() / FaceArea(i)) * k(i) / FaceArea(i) / 2;
     elmat.Diag(mii.GetData(), ndof);
 }
