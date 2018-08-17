@@ -48,6 +48,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
+    UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
     int num_partitions = 12;
     args.AddOption(&num_partitions, "-np", "--num-part",
@@ -71,15 +72,6 @@ int main(int argc, char* argv[])
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of loading partition).");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
     bool generate_graph = false;
     args.AddOption(&generate_graph, "-gg", "--generate-graph", "-no-gg",
                    "--no-generate-graph", "Generate a graph at runtime.");
@@ -104,20 +96,8 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
-    bool coarse_coefficient = false;
-    args.AddOption(&coarse_coefficient, "--coarse-coefficient", "--coarse-coefficient",
-                   "--no-coarse-coefficient", "--no-coarse-coefficient",
-                   "Assemble coarse mass matrix so that the coefficients (edge weights) "
-                   "can be rescaled after coarsening.");
+    // Read upscaling options from command line into upscale_param object
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
@@ -134,7 +114,8 @@ int main(int argc, char* argv[])
     }
 
     assert(num_partitions >= num_procs);
-    bool coarse_components = (coarse_coefficient && !hybridization);
+    upscale_param.coarse_components = (upscale_param.coarse_components &&
+                                       !upscale_param.hybridization);
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix vertex_edge_global;
@@ -185,8 +166,7 @@ int main(int argc, char* argv[])
     {
         /// [Upscale]
         GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             spect_tol, max_evects, dual_target, scaled_dual,
-                             energy_dual, hybridization, coarse_components, weight);
+                             upscale_param, weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

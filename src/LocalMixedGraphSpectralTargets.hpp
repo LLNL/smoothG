@@ -34,6 +34,82 @@
 namespace smoothg
 {
 
+/// Container for SAAMGe parameters
+struct SAAMGeParam
+{
+    int num_levels = 2;
+
+    /// Parameters for all levels
+    int nu_relax = 2;
+    bool use_arpack = false;
+    bool correct_nulspace = false;
+    bool do_aggregates = true;
+
+    /// Parameters for the first coarsening
+    int first_coarsen_factor = 64;
+    int first_nu_pro = 1;
+    double first_theta = 1e-3;
+
+    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
+    int coarsen_factor = 8;
+    int nu_pro = 1;
+    double theta = 1e-3;
+};
+
+/**
+   Collection of parameters for upscaling methods
+
+   @param spect_tol spectral tolerance determines how many eigenvectors to
+          keep per aggregate
+   @param max_evects maximum number of eigenvectors to keep per aggregate
+   @param trace_method methods for getting edge trace samples
+   @param hybridization use hybridization as solver
+   @param coefficient use coarse coefficient rescaling construction
+   @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+          coarse hybridized system if saamge_param is not nullptr
+*/
+class UpscaleParameters
+{
+public:
+    double spect_tol;
+    int max_evects;
+    bool dual_target;
+    bool scaled_dual;
+    bool energy_dual;
+    bool hybridization;
+    bool coarse_components;
+    SAAMGeParam* saamge_param;
+    // possibly also boundary condition information?
+
+    UpscaleParameters() : spect_tol(0.001),
+        max_evects(4),
+        dual_target(false),
+        scaled_dual(false),
+        energy_dual(false),
+        hybridization(false),
+        coarse_components(false),
+        saamge_param(NULL)
+    {}
+
+    void RegisterInOptionsParser(mfem::OptionsParser& args)
+    {
+        args.AddOption(&max_evects, "-m", "--max-evects",
+                       "Maximum eigenvectors per aggregate.");
+        args.AddOption(&spect_tol, "-t", "--spect-tol",
+                       "Spectral tolerance for eigenvalue problems.");
+        args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+                       "--no-hybridization", "Enable hybridization.");
+        args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+                       "--no-dual-target", "Use dual graph Laplacian in trace generation.");
+        args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+                       "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
+        args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+                       "--no-energy-dual", "Use energy matrix in trace generation.");
+        args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
+                       "--no-coarse-components", "Store trace, bubble components of coarse M.");
+    }
+};
+
 /**
    @brief Take a mixed form graph Laplacian, do local eigenvalue problems, and
    generate targets in parallel.

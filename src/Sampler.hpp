@@ -144,9 +144,8 @@ public:
                const mfem::Array<int>& partitioning,
                const mfem::HypreParMatrix& edge_d_td,
                const mfem::SparseMatrix& edge_boundary_att,
-               const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
-               bool dual_target, bool scaled_dual, bool energy_dual,
-               bool hybridization);
+               const mfem::Array<int>& ess_attr,
+               const UpscaleParameters& param);
 
     ~PDESampler();
 

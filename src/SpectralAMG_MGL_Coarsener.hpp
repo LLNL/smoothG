@@ -41,30 +41,10 @@ public:
 
        @param mgL the actual mixed graph Laplacian
        @param gt the topology describing how vertices and edges are agglomerated
-       @param spectral_tol number specifying how small eigenvalues must be before they
-              are included in the coarse space. A larger number here leads to a more
-              accurate, more expensive coarse space.
-       @param max_evecs_per_agg cap the number of eigenvectors per aggregate that will
-              be used in the coarse space.
-       @param dual_target get traces from eigenvectors of dual graph Laplacian
-       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
-              Typically coarse problem gets better accuracy but becomes harder
-              to solve when this option is turned on.
-       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
-              (guarantees approximation property in edge energy norm)
-       @param is_hybridization_used whether to prepare the coarse space to use the
-              HybridSolver
-       @param coarse_components whether to store different components of coarse M
-              based on trace extensions and bubbles (for construction of coarse M)
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                               std::unique_ptr<GraphTopology> gt,
-                              double spectral_tol,
-                              unsigned int max_evecs_per_agg,
-                              bool dual_target,
-                              bool scaled_dual,
-                              bool energy_dual,
-                              bool coarse_components);
+                              const UpscaleParameters& param = UpscaleParameters());
 
 private:
     /**
@@ -73,13 +53,7 @@ private:
     void do_construct_coarse_subspace();
 
 private:
-    bool is_hybridization_used_;
-    double spectral_tol_;
-    unsigned int max_evecs_per_agg_;
-    bool dual_target_;
-    bool scaled_dual_;
-    bool energy_dual_;
-    bool coarse_components_;
+    const UpscaleParameters& param_;
 
 }; // SpectralAMG_MGL_Coarsener
 

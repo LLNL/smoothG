@@ -94,12 +94,15 @@ unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& v_e,
                                                      const mfem::SparseMatrix* edge_bdratt)
 {
     auto gt = make_unique<GraphTopology>(v_e, mgL.GetEdgeDofToTrueDof(), partition, edge_bdratt);
-    double spect_tol = 1.0;
-    int max_evects = 3;
-    bool dual_target = false, scaled_dual = false, energy_dual = false, coarse_components = false;
+    UpscaleParameters param;
+    param.spect_tol = 1.0;
+    param.max_evects = 3;
+    param.dual_target = false;
+    param.scaled_dual = false;
+    param.energy_dual = false;
+    param.coarse_components = false;
     auto coarsener = make_unique<SpectralAMG_MGL_Coarsener>(
-                         mgL, std::move(gt), spect_tol, max_evects, dual_target,
-                         scaled_dual, energy_dual, coarse_components);
+                         mgL, std::move(gt), param);
     coarsener->construct_coarse_subspace();
     return coarsener;
 }

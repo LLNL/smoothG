@@ -84,9 +84,8 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
                        const mfem::Array<int>& partitioning,
                        const mfem::HypreParMatrix& edge_d_td,
                        const mfem::SparseMatrix& edge_boundary_att,
-                       const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
-                       bool dual_target, bool scaled_dual, bool energy_dual,
-                       bool hybridization)
+                       const mfem::Array<int>& ess_attr,
+                       const UpscaleParameters& param)
     :
     normal_distribution_(0.0, 1.0, seed),
     fine_vector_size_(vertex_edge.Height()),
@@ -98,8 +97,7 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     W_block *= cell_volume_ * kappa * kappa;
     auto fvupscale_temp = std::make_shared<FiniteVolumeUpscale>(
                               comm, vertex_edge, weight, W_block, partitioning, edge_d_td,
-                              edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
-                              scaled_dual, energy_dual, hybridization);
+                              edge_boundary_att, ess_attr, param);
     fvupscale_temp->MakeFineSolver();
     fvupscale_ = fvupscale_temp;
 
