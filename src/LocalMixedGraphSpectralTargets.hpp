@@ -71,6 +71,7 @@ struct SAAMGeParam
 class UpscaleParameters
 {
 public:
+    int max_levels;
     double spect_tol;
     int max_evects;
     bool dual_target;
@@ -81,7 +82,8 @@ public:
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
 
-    UpscaleParameters() : spect_tol(0.001),
+    UpscaleParameters() : max_levels(2),
+        spect_tol(0.001),
         max_evects(4),
         dual_target(false),
         scaled_dual(false),
@@ -93,6 +95,8 @@ public:
 
     void RegisterInOptionsParser(mfem::OptionsParser& args)
     {
+        args.AddOption(&max_levels, "--max-levels", "--max-levels",
+                       "Number of levels in multilevel hierarchy");
         args.AddOption(&max_evects, "-m", "--max-evects",
                        "Maximum eigenvectors per aggregate.");
         args.AddOption(&spect_tol, "-t", "--spect-tol",

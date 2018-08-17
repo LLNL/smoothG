@@ -31,6 +31,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     : Upscale(comm, vertex_edge_global.Height()),
       global_edges_(vertex_edge_global.Width()),
       global_vertices_(vertex_edge_global.Height()),
+      coarse_factor_(-1), // todo: this shouldd go in UpscaleParameters
       param_(param)
 {
     Init(vertex_edge_global, global_partitioning, global_weight);
@@ -43,6 +44,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     : Upscale(comm, vertex_edge_global.Height()),
       global_edges_(vertex_edge_global.Width()),
       global_vertices_(vertex_edge_global.Height()),
+      coarse_factor_(coarse_factor),
       param_(param)
 {
     mfem::StopWatch chrono;
@@ -87,10 +89,15 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     }
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
 
-    auto graph_topology = make_unique<GraphTopology>(vertex_edge, *edge_e_te_, partitioning);
+    std::vector<GraphTopology> gts;
+    gts.emplace_back(vertex_edge, *edge_e_te_, partitioning);
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
+        gts.emplace_back(gts.back(), coarse_factor_);
+    }
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), param_);
+                     mixed_laplacians_[0], std::move(gts[0]), param_);
     coarsener_->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_->GetCoarse());

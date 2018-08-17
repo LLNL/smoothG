@@ -43,7 +43,7 @@ public:
        @param gt the topology describing how vertices and edges are agglomerated
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                              std::unique_ptr<GraphTopology> gt,
+                              GraphTopology gt,
                               const UpscaleParameters& param = UpscaleParameters());
 
 private:
