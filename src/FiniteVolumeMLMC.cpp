@@ -49,11 +49,11 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    MixedMatrix::DistributeWeight::False);
 
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(gt), param_);
-    coarsener_->construct_coarse_subspace();
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(gt), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
@@ -88,11 +88,11 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, edge_d_td_);
 
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(gt), param_);
-    coarsener_->construct_coarse_subspace();
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(gt), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
@@ -139,8 +139,8 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
-    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
-                       coarsener_->construct_face_facedof_table(),
+    MarkDofsOnBoundary(coarsener_[0]->get_GraphTopology_ref().face_bdratt_,
+                       coarsener_[0]->construct_face_facedof_table(),
                        ess_attr_, marker);
 
     if (param_.hybridization) // Hybridization solver
@@ -148,9 +148,9 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
         // coarse_components method does not store element matrices
         assert(!param_.coarse_components);
 
-        auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
+        auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
         coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_,
+                             comm_, GetCoarseMatrix(), *coarsener_[0],
                              &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner

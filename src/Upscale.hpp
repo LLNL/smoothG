@@ -37,12 +37,18 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
+    /// apply the upscaling at any level
+    virtual void Mult(int level, const mfem::Vector& x, mfem::Vector& y) const;
+
     /// Wrapper for applying the upscaling, in mfem terminology
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const override;
 
     /// Wrapper for applying the upscaling
     virtual void Solve(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Solve(const mfem::Vector& x) const;
+
+    /// Solve at any level in mixed form
+    virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
 
     /// Wrapper for applying the upscaling in mixed form
     virtual void Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const;
@@ -66,18 +72,22 @@ public:
     virtual mfem::BlockVector SolveFine(const mfem::BlockVector& x) const;
 
     /// Interpolate a coarse vector to the fine level
+    virtual void Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const;
     virtual void Interpolate(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Interpolate(const mfem::Vector& x) const;
 
     /// Interpolate a coarse vector to the fine level, in mixed form
+    virtual void Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual void Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Interpolate(const mfem::BlockVector& x) const;
 
     /// Restrict a fine vector to the coarse level
+    virtual void Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const;
     virtual void Restrict(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Restrict(const mfem::Vector& x) const;
 
     /// Restrict a fine vector to the coarse level, in mixed form
+    virtual void Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual void Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Restrict(const mfem::BlockVector& x) const;
 
@@ -197,7 +207,7 @@ protected:
 
     std::vector<smoothg::MixedMatrix> mixed_laplacians_;
 
-    std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
+    std::vector<std::unique_ptr<Mixed_GL_Coarsener> > coarsener_;
     std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
 
     const mfem::HypreParMatrix* edge_e_te_;

@@ -25,22 +25,30 @@
 namespace smoothg
 {
 
-void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
+void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
+    MFEM_ASSERT(level == 1, "TODO: this is a coarse mult, but SolveFine etc. should call it!");
+
     assert(rhs_coarse_);
     assert(sol_coarse_);
-    assert(coarsener_);
+    assert(coarsener_[level]);
     assert(coarse_solver_);
 
-    coarsener_->restrict(x, rhs_coarse_->GetBlock(1));
+    // for levels...
+    coarsener_[level - 1]->restrict(x, rhs_coarse_->GetBlock(1));
     rhs_coarse_->GetBlock(0) = 0.0;
     rhs_coarse_->GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
 
-    coarsener_->interpolate(sol_coarse_->GetBlock(1), y);
+    coarsener_[level - 1]->interpolate(sol_coarse_->GetBlock(1), y);
 
     Orthogonalize(y);
+}
+
+void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
+{
+    Mult(1, x, y);
 }
 
 void Upscale::Solve(const mfem::Vector& x, mfem::Vector& y) const
@@ -57,21 +65,28 @@ mfem::Vector Upscale::Solve(const mfem::Vector& x) const
     return y;
 }
 
-void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
+    MFEM_ASSERT(level == 1, "TODO: this is a coarse mult, but SolveFine etc. should call it!");
+
     assert(rhs_coarse_);
     assert(sol_coarse_);
-    assert(coarsener_);
+    assert(coarsener_[0]);
     assert(coarse_solver_);
 
-    coarsener_->restrict(x, *rhs_coarse_);
+    coarsener_[level - 1]->restrict(x, *rhs_coarse_);
     rhs_coarse_->GetBlock(1) *= -1.0;
 
     coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
 
-    coarsener_->interpolate(*sol_coarse_, y);
+    coarsener_[level - 1]->interpolate(*sol_coarse_, y);
 
     Orthogonalize(y);
+}
+
+void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    Solve(1, x, y);
 }
 
 mfem::BlockVector Upscale::Solve(const mfem::BlockVector& x) const
@@ -155,43 +170,57 @@ mfem::BlockVector Upscale::SolveFine(const mfem::BlockVector& x) const
     return y;
 }
 
+void Upscale::Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    assert(coarsener_[level - 1]);
+    coarsener_[level - 1]->interpolate(x, y);
+}
+
 void Upscale::Interpolate(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->interpolate(x, y);
+    Interpolate(1, x, y);
 }
 
 mfem::Vector Upscale::Interpolate(const mfem::Vector& x) const
 {
     mfem::Vector fine_vect = GetFineVector();
 
-    Interpolate(x, fine_vect);
+    Interpolate(1, x, fine_vect);
 
     return fine_vect;
 }
 
+void Upscale::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->interpolate(x, y);
+}
+
 void Upscale::Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->interpolate(x, y);
+    Interpolate(1, x, y);
 }
 
 mfem::BlockVector Upscale::Interpolate(const mfem::BlockVector& x) const
 {
     mfem::BlockVector fine_vect(GetFineBlockVector());
 
-    Interpolate(x, fine_vect);
+    Interpolate(1, x, fine_vect);
 
     return fine_vect;
 }
 
+void Upscale::Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->restrict(x, y);
+}
+
 void Upscale::Restrict(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->restrict(x, y);
+    Restrict(1, x, y);
 }
 
 mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
@@ -202,11 +231,16 @@ mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
     return coarse_vect;
 }
 
+void Upscale::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->restrict(x, y);
+}
+
 void Upscale::Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->restrict(x, y);
+    Restrict(1, x, y);
 }
 
 mfem::BlockVector Upscale::Restrict(const mfem::BlockVector& x) const

@@ -96,11 +96,11 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         gts.emplace_back(gts.back(), coarse_factor_);
     }
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(gts[0]), param_);
-    coarsener_->construct_coarse_subspace();
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(gts[0]), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     if (param_.hybridization)
     {
@@ -108,7 +108,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         assert(!param_.coarse_components);
 
         coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_,
+                             comm_, GetCoarseMatrix(), *coarsener_[0],
                              nullptr, nullptr, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
