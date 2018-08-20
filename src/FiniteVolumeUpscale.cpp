@@ -42,6 +42,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     chrono.Start();
 
     solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
 
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
@@ -87,7 +89,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
         solver_[1] = make_unique<MinresBlockSolverFalse>(comm, GetCoarseMatrix());
     }
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -112,6 +114,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     chrono.Start();
 
     solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
 
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
@@ -158,7 +162,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
         solver_[1] = make_unique<MinresBlockSolverFalse>(comm, mixed_laplacians_.back());
     }
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();

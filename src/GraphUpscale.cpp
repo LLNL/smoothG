@@ -47,18 +47,12 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
       coarse_factor_(coarse_factor),
       param_(param)
 {
-    mfem::StopWatch chrono;
-    chrono.Start();
-
     // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
     // obtain the same global partition from metis?
     mfem::Array<int> global_partitioning;
     PartitionAAT(vertex_edge_global, global_partitioning, coarse_factor);
 
     Init(vertex_edge_global, global_partitioning, weight);
-
-    chrono.Stop();
-    setup_time_ += chrono.RealTime();
 }
 
 void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
@@ -69,16 +63,16 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     chrono.Start();
 
     solver_.resize(param_.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+    std::vector<GraphTopology> gts;
+
+    // fine level
     pgraph_ = make_unique<smoothg::ParGraph>(comm_, vertex_edge_global, global_partitioning);
-
     const mfem::Array<int>& partitioning = pgraph_->GetLocalPartition();
-
     mfem::SparseMatrix& vertex_edge = pgraph_->GetLocalVertexToEdge();
     Operator::height = vertex_edge.Height();
     Operator::width = vertex_edge.Height();
-
-    edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
-
     mfem::Vector local_weight(vertex_edge.Width());
     if (global_weight.Size() == vertex_edge_global.Width())
     {
@@ -88,43 +82,43 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     {
         local_weight = 1.0;
     }
+    edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
-
-    std::vector<GraphTopology> gts;
     gts.emplace_back(vertex_edge, *edge_e_te_, partitioning);
+
+    // coarser levels
     for (int level = 1; level < param_.max_levels; ++level)
     {
         gts.emplace_back(gts.back(), coarse_factor_);
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                    mixed_laplacians_[level - 1],
+                                    std::move(gts[level - 1]), param_));
+        coarsener_[level - 1]->construct_coarse_subspace();
+        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+
+        if (param_.hybridization)
+        {
+            // coarse_components method does not store element matrices
+            assert(!param_.coarse_components);
+            solver_[level] = make_unique<HybridSolver>(
+                                 comm_, GetMatrix(level), *coarsener_[level - 1],
+                                 nullptr, nullptr, 0, param_.saamge_param);
+        }
+        else // L2-H1 block diagonal preconditioner
+        {
+            GetMatrix(level).BuildM();
+            solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        }
+
+        MakeVectors(level);
     }
 
-    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                mixed_laplacians_[0], std::move(gts[0]), param_));
-    coarsener_[0]->construct_coarse_subspace();
-
-    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
-
-    if (param_.hybridization)
-    {
-        // coarse_components method does not store element matrices
-        assert(!param_.coarse_components);
-
-        solver_[1] = make_unique<HybridSolver>(
-                         comm_, GetCoarseMatrix(), *coarsener_[0],
-                         nullptr, nullptr, 0, param_.saamge_param);
-    }
-    else // L2-H1 block diagonal preconditioner
-    {
-        GetCoarseMatrix().BuildM();
-        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
-    }
-
-    MakeCoarseVectors();
+    // todo: MakeFineSolver() could be optional
+    // also, more disturbingly, moving it above the coarse braces breaks things
+    MakeFineSolver();
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
-
-    // TODO(gelever1): Set for now, should be unset and user can determine if they need a fine solver.
-    MakeFineSolver();
 }
 
 void GraphUpscale::MakeFineSolver()

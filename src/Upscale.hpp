@@ -191,10 +191,10 @@ protected:
         MPI_Comm_rank(comm_, &myid_);
     }
 
-    void MakeCoarseVectors()
+    void MakeVectors(int level)
     {
-        rhs_coarse_ = make_unique<mfem::BlockVector>(GetCoarseMatrix().GetBlockOffsets());
-        sol_coarse_ = make_unique<mfem::BlockVector>(GetCoarseMatrix().GetBlockOffsets());
+        rhs_[level] = make_unique<mfem::BlockVector>(GetMatrix(level).GetBlockOffsets());
+        sol_[level] = make_unique<mfem::BlockVector>(GetMatrix(level).GetBlockOffsets());
     }
 
     std::vector<smoothg::MixedMatrix> mixed_laplacians_;
@@ -209,9 +209,10 @@ protected:
 
     double setup_time_;
 
-    std::unique_ptr<mfem::BlockVector> rhs_coarse_;
-    std::unique_ptr<mfem::BlockVector> sol_coarse_;
+    std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
+    std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
+    /// @todo vector-ize
     mutable mfem::Vector coarse_constant_rep_;
 
 private:

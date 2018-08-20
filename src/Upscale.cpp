@@ -36,18 +36,18 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     }
     else
     {
-        assert(rhs_coarse_);
-        assert(sol_coarse_);
-        assert(coarsener_[level]);
+        assert(rhs_[level]);
+        assert(sol_[level]);
+        assert(coarsener_[level - 1]);
 
         // for levels...
-        coarsener_[level - 1]->restrict(x, rhs_coarse_->GetBlock(1));
-        rhs_coarse_->GetBlock(0) = 0.0;
-        rhs_coarse_->GetBlock(1) *= -1.0;
+        coarsener_[level - 1]->restrict(x, rhs_[level]->GetBlock(1));
+        rhs_[level]->GetBlock(0) = 0.0;
+        rhs_[level]->GetBlock(1) *= -1.0;
 
-        solver_[level]->Solve(*rhs_coarse_, *sol_coarse_);
+        solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
-        coarsener_[level - 1]->interpolate(sol_coarse_->GetBlock(1), y);
+        coarsener_[level - 1]->interpolate(sol_[level]->GetBlock(1), y);
 
         Orthogonalize(y);
     }
@@ -89,16 +89,16 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     }
     else
     {
-        assert(rhs_coarse_);
-        assert(sol_coarse_);
-        assert(coarsener_[0]);
+        assert(rhs_[level]);
+        assert(sol_[level]);
+        assert(coarsener_[level - 1]);
 
-        coarsener_[level - 1]->restrict(x, *rhs_coarse_);
-        rhs_coarse_->GetBlock(1) *= -1.0;
+        coarsener_[level - 1]->restrict(x, *rhs_[level]);
+        rhs_[level]->GetBlock(1) *= -1.0;
 
-        solver_[level]->Solve(*rhs_coarse_, *sol_coarse_);
+        solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
-        coarsener_[level - 1]->interpolate(*sol_coarse_, y);
+        coarsener_[level - 1]->interpolate(*sol_[level], y);
 
         Orthogonalize(y);
     }
@@ -366,21 +366,25 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
     return mixed_laplacians_[level];
 }
 
+/// @deprecated
 MixedMatrix& Upscale::GetFineMatrix()
 {
     return GetMatrix(0);
 }
 
+/// @deprecated
 const MixedMatrix& Upscale::GetFineMatrix() const
 {
     return GetMatrix(0);
 }
 
+/// @deprecated
 MixedMatrix& Upscale::GetCoarseMatrix()
 {
     return GetMatrix(1);
 }
 
+/// @deprecated
 const MixedMatrix& Upscale::GetCoarseMatrix() const
 {
     return GetMatrix(1);
