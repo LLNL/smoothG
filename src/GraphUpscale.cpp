@@ -68,6 +68,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param_.max_levels);
     pgraph_ = make_unique<smoothg::ParGraph>(comm_, vertex_edge_global, global_partitioning);
 
     const mfem::Array<int>& partitioning = pgraph_->GetLocalPartition();
@@ -107,14 +108,14 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         // coarse_components method does not store element matrices
         assert(!param_.coarse_components);
 
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_[0],
-                             nullptr, nullptr, 0, param_.saamge_param);
+        solver_[1] = make_unique<HybridSolver>(
+                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         nullptr, nullptr, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
         GetCoarseMatrix().BuildM();
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 
     MakeCoarseVectors();
@@ -128,15 +129,15 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
 
 void GraphUpscale::MakeFineSolver()
 {
-    if (!fine_solver_)
+    if (!solver_[0])
     {
         if (param_.hybridization)
         {
-            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix());
         }
         else
         {
-            fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
         }
     }
 }

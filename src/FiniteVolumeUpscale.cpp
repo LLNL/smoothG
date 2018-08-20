@@ -41,6 +41,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
@@ -65,9 +67,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     if (param_.hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm, mixed_laplacians_.back(), *coarsener_[0],
-                             &face_bdratt, &marker, 0, param_.saamge_param);
+        solver_[1] = make_unique<HybridSolver>(
+                         comm, mixed_laplacians_.back(), *coarsener_[0],
+                         &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -82,7 +84,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
         Dref.EliminateCols(marker);
 
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm, GetCoarseMatrix());
     }
 
     MakeCoarseVectors();
@@ -109,6 +111,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
@@ -134,9 +138,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     if (param_.hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm, mixed_laplacians_.back(), *coarsener_[0],
-                             &face_bdratt, &marker, 0, param_.saamge_param);
+        solver_[1] = make_unique<HybridSolver>(
+                         comm, mixed_laplacians_.back(), *coarsener_[0],
+                         &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -151,7 +155,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
         Dref.EliminateCols(marker);
 
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm, mixed_laplacians_.back());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm, mixed_laplacians_.back());
     }
 
     MakeCoarseVectors();
@@ -165,12 +169,12 @@ void FiniteVolumeUpscale::MakeFineSolver()
     mfem::Array<int> marker;
     BooleanMult(edge_boundary_att_, ess_attr_, marker);
 
-    if (!fine_solver_)
+    if (!solver_[0])
     {
         if (param_.hybridization) // Hybridization solver
         {
-            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
-                                                     &edge_boundary_att_, &marker);
+            solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+                                                   &edge_boundary_att_, &marker);
         }
         else // L2-H1 block diagonal preconditioner
         {
@@ -194,7 +198,7 @@ void FiniteVolumeUpscale::MakeFineSolver()
                 Dref.EliminateRow(0);
             }
 
-            fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
         }
     }
 }

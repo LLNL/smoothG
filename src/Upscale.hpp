@@ -200,7 +200,7 @@ protected:
     std::vector<smoothg::MixedMatrix> mixed_laplacians_;
 
     std::vector<std::unique_ptr<Mixed_GL_Coarsener> > coarsener_;
-    std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
+    std::vector<std::unique_ptr<MixedLaplacianSolver> > solver_;
 
     const mfem::HypreParMatrix* edge_e_te_;
 
@@ -211,9 +211,6 @@ protected:
 
     std::unique_ptr<mfem::BlockVector> rhs_coarse_;
     std::unique_ptr<mfem::BlockVector> sol_coarse_;
-
-    // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    std::unique_ptr<MixedLaplacianSolver> fine_solver_;
 
     mutable mfem::Vector coarse_constant_rep_;
 

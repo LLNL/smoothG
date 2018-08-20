@@ -42,6 +42,8 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
@@ -82,6 +84,8 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
@@ -102,7 +106,8 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     setup_time_ += chrono.RealTime();
 }
 
-/// this implementation is sloppy
+/// this implementation is sloppy (also, @todo should be combined with
+/// RescaleCoarseCoefficient with int level argument)
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
     GetFineMatrix().UpdateM(coeff);
@@ -112,7 +117,7 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(fine_solver_.get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[0].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
@@ -127,7 +132,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(coarse_solver_.get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[1].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
@@ -149,9 +154,9 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
         assert(!param_.coarse_components);
 
         auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_[0],
-                             &face_bdratt, &marker, 0, param_.saamge_param);
+        solver_[1] = make_unique<HybridSolver>(
+                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -166,7 +171,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         Dref.EliminateCols(marker);
 
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 }
 
@@ -177,8 +182,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     if (param_.hybridization) // Hybridization solver
     {
-        fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
-                                                 &edge_boundary_att_, &marker);
+        solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+                                               &edge_boundary_att_, &marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -202,14 +207,14 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             Dref.EliminateRow(0);
         }
 
-        fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
     }
 
 }
 
 void FiniteVolumeMLMC::MakeFineSolver()
 {
-    if (!fine_solver_)
+    if (!solver_[0])
     {
         ForceMakeFineSolver();
     }
