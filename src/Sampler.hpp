@@ -69,7 +69,7 @@ public:
 class SimpleSampler : public TwoLevelSampler
 {
 public:
-    SimpleSampler(int fine_size, int coarse_size, int starting_sample=-1);
+    SimpleSampler(int fine_size, int coarse_size, int starting_sample = -1);
 
     void NewSample();
 

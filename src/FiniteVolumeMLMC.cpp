@@ -183,7 +183,7 @@ void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
         {
             coarse_ess_u_marker_[new_size - 1 - i] = 1;
         }
-    }    
+    }
 }
 
 void FiniteVolumeMLMC::SetEssentialData(const mfem::Vector& new_data,
@@ -273,11 +273,11 @@ void EliminateColsForMultipleBC(mfem::SparseMatrix& mat,
     const int height = mat.Height();
     const int* I = mat.GetI();
     const int* J = mat.GetJ();
-    double * A = mat.GetData();
+    double* A = mat.GetData();
 
     for (int i = 0; i < height; i++)
     {
-        for (int jpos = I[i]; jpos != I[i+1]; ++jpos)
+        for (int jpos = I[i]; jpos != I[i + 1]; ++jpos)
         {
             if (ess_u_marker[ J[jpos]] )
             {
