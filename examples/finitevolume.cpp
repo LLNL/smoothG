@@ -187,10 +187,10 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
     auto sol_upscaled = fvupscale.Solve(rhs_fine);
-    fvupscale.ShowCoarseSolveInfo();
+    fvupscale.ShowSolveInfo(1);
 
     auto sol_fine = fvupscale.SolveFine(rhs_fine);
-    fvupscale.ShowFineSolveInfo();
+    fvupscale.ShowSolveInfo(0);
 
     auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
 

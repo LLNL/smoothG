@@ -44,6 +44,7 @@ public:
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const override;
 
     /// Wrapper for applying the upscaling
+    virtual void Solve(int level, const mfem::Vector& x, mfem::Vector& y) const;
     virtual void Solve(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Solve(const mfem::Vector& x) const;
 
@@ -158,26 +159,17 @@ public:
     virtual void SetRelTol(double rtol);
     virtual void SetAbsTol(double atol);
 
-    /// Show Total Solve time on the coarse level, negative id will show on all processors
-    void ShowCoarseSolveInfo(std::ostream& out = std::cout) const;
-
-    /// Show Total Solve time on the fine level, negative id will show on all processors
-    void ShowFineSolveInfo(std::ostream& out = std::cout) const;
+    /// Show Total Solve time and other info on the given level
+    void ShowSolveInfo(int level, std::ostream& out = std::cout) const;
 
     /// Show Total setup time, negative id will show on all processors
     void ShowSetupTime(std::ostream& out = std::cout) const;
 
-    /// Get Total Solve time on the coarse level
-    double GetCoarseSolveTime() const;
+    /// Get Total Solve time on the given level
+    double GetSolveTime(int level) const;
 
-    /// Get Total Solve time on the fine level
-    double GetFineSolveTime() const;
-
-    /// Get Total Solve iterations on the coarse level
-    int GetCoarseSolveIters() const;
-
-    /// Get Total Solve iterations on the fine level
-    int GetFineSolveIters() const;
+    /// Get Total Solve iterations on the given level
+    int GetSolveIters(int level) const;
 
     /// Get Total setup time
     double GetSetupTime() const;

@@ -280,9 +280,9 @@ int main(int argc, char* argv[])
         for (int i = 0; i < sol_upscaled.Size(); ++i)
             sol_upscaled(i) = std::log(sol_upscaled(i));
         fvupscale->Orthogonalize(sol_upscaled);
-        int coarse_iterations = fvupscale->GetCoarseSolveIters();
+        int coarse_iterations = fvupscale->GetSolveIters(1);
         total_coarse_iterations += coarse_iterations;
-        double coarse_time = fvupscale->GetCoarseSolveTime();
+        double coarse_time = fvupscale->GetSolveTime(1);
         total_coarse_time += coarse_time;
         for (int i = 0; i < mean_upscaled.Size(); ++i)
         {
@@ -295,9 +295,9 @@ int main(int argc, char* argv[])
         auto sol_fine = pdesampler.GetFineCoefficient();
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
-        int fine_iterations = fvupscale->GetFineSolveIters();
+        int fine_iterations = fvupscale->GetSolveIters(0);
         total_fine_iterations += fine_iterations;
-        double fine_time = fvupscale->GetFineSolveTime();
+        double fine_time = fvupscale->GetSolveTime(0);
         total_fine_time += fine_time;
         for (int i = 0; i < mean_fine.Size(); ++i)
         {
