@@ -90,6 +90,24 @@ public:
         coarse_components(false),
         saamge_param(NULL)
     {}
+
+    void RegisterInOptionsParser(mfem::OptionsParser& args)
+    {
+        args.AddOption(&max_evects, "-m", "--max-evects",
+                       "Maximum eigenvectors per aggregate.");
+        args.AddOption(&spect_tol, "-t", "--spect-tol",
+                       "Spectral tolerance for eigenvalue problems.");
+        args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+                       "--no-hybridization", "Enable hybridization.");
+        args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+                       "--no-dual-target", "Use dual graph Laplacian in trace generation.");
+        args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+                       "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
+        args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+                       "--no-energy-dual", "Use energy matrix in trace generation.");
+        args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
+                       "--no-coarse-components", "Store trace, bubble components of coarse M.");
+    }
 };
 
 /**

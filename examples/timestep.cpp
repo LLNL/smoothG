@@ -54,6 +54,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
+    UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
     const char* permFile = "spe_perm.dat";
     args.AddOption(&permFile, "-p", "--perm",
@@ -64,12 +65,6 @@ int main(int argc, char* argv[])
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -80,9 +75,6 @@ int main(int argc, char* argv[])
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
     int num_refine = 0;
     args.AddOption(&num_refine, "-nr", "--num-refine",
                    "Number of time to refine mesh.");
@@ -101,19 +93,11 @@ int main(int argc, char* argv[])
     int k = 1;
     args.AddOption(&k, "-k", "--level",
                    "Level. Fine = 0, Coarse = 1");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
     const char* caption = "";
     args.AddOption(&caption, "-cap", "--caption",
                    "Caption for visualization");
-
+    // Read upscaling options from command line into upscale_param object
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
 
     if (!args.Good())
@@ -229,17 +213,10 @@ int main(int argc, char* argv[])
     //W_block *= 1.0 / delta_t;
 
     // Time Stepping
-    UpscaleParameters param;
-    param.spect_tol = spect_tol;
-    param.max_evects = max_evects;
-    param.dual_target = dual_target;
-    param.scaled_dual = scaled_dual;
-    param.energy_dual = energy_dual;
-    param.hybridization = hybridization;
     {
         FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
                                       partitioning, *edge_d_td, edge_boundary_att,
-                                      ess_attr, param);
+                                      ess_attr, upscale_param);
 
         fvupscale.PrintInfo();
 
