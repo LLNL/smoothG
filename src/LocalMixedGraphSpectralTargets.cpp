@@ -128,7 +128,7 @@ public:
         mfem::SparseMatrix& D_ext,
         mfem::SparseMatrix& M_ext, mfem::SparseMatrix& W_ext,
         bool scaled_dual, bool energy_dual);
-    
+
     /// returns minimum eigenvalue
     double ComputeEigenvectors(mfem::DenseMatrix& evects);
 
@@ -138,9 +138,9 @@ public:
                            mfem::DenseMatrix& AggExt_sigmaT);
 
 private:
-    void CheckMinimalEigenvalue(double eval_min, std::string entity); 
+    void CheckMinimalEigenvalue(double eval_min, std::string entity);
 
-   std::vector<mfem::SparseMatrix>
+    std::vector<mfem::SparseMatrix>
     BuildEdgeEigenSystem(
         const mfem::SparseMatrix& L,
         const mfem::SparseMatrix& D,
@@ -277,9 +277,6 @@ MixedBlockEigensystem::BuildEdgeEigenSystem(
 
     return EigSys;
 }
-
-//        bool no_edge_eigensystem = (!dual_target_ || use_w || max_evects_ == 1);
-//      bme.ComputeEdgeTraces(evects, !no_edge_eigensystem, AggExt_sigmaT[iAgg]);
 
 void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
                                               bool edge_eigensystem,
@@ -424,10 +421,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     // SET W in eigenvalues
     const bool use_w = false && W_global_;
-    if (use_w)
-    {
-        // std::cout << "Warning: Using W in local eigensolves!\n";
-    }
 
     // ---
     // solve eigenvalue problem on each (extended) extended aggregate, our (3.1)
@@ -482,40 +475,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
                                   scaled_dual_, energy_dual_);
         mbe.ComputeEigenvectors(evects);
 
-/*
-        // extract local D correpsonding to iAgg-th extended aggregate
-        auto Dloc = ExtractRowAndColumns(D_ext, vertex_local_dof_ext,
-                                         edge_local_dof_ext, colMapper_) ;
-        Mloc_diag_inv.SetSize(edge_local_dof_ext.Size());
-        for (int i = 0; i < Dloc.Width(); i++)
-        {
-            Mloc_diag_inv(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
-        }
-
-        // build local (weighted) graph Laplacian (assumed diagonal M, key difference in multilevel setting)
-        mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc);
-        DlocT.ScaleRows(Mloc_diag_inv);
-        mfem::SparseMatrix DMinvDt = smoothg::Mult(Dloc, DlocT);
-
-        // Wloc assumed to be diagonal
-        if (use_w)
-        {
-            auto Wloc = ExtractRowAndColumns(W_ext, vertex_local_dof_ext,
-                                             vertex_local_dof_ext, colMapper_) ;
-            assert(Wloc.NumNonZeroElems() == Wloc.Height());
-            assert(Wloc.Height() == Wloc.Width());
-
-            DMinvDt.Add(-1.0, Wloc);
-        }
-
-        // actually solve (3.1)
-        double eval_min = eigs.Compute(DMinvDt, evects);
-        if (!use_w)
-        {
-            CheckMinimalEigenvalue(eval_min, iAgg, "vertex");
-        }
-*/
-
         int nevects = evects.Width();
         if (use_w)
         {
@@ -526,9 +485,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             constant = 1.0 / std::sqrt(evects.Height());
 
             Concatenate(constant, evects, out);
-
             evects = out;
-
             nevects++;
         }
 
@@ -552,38 +509,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         bool no_edge_eigensystem = (!dual_target_ || use_w || max_evects_ == 1);
         mbe.ComputeEdgeTraces(evects, !no_edge_eigensystem, AggExt_sigmaT[iAgg]);
     }
-
-/*
-        if (!dual_target_ || use_w || max_evects_ == 1)
-        {
-            // Do not consider the first vertex eigenvector, which is constant
-            evects_tmp.UseExternalData(evects.Data() + evects.Height(),
-                                       evects.Height(), nevects - 1);
-
-            // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
-            // transposed for extraction later
-            AggExt_sigmaT[iAgg].SetSize(evects_tmp.Width(), DlocT.Height());
-            MultSparseDenseTranspose(DlocT, evects_tmp, AggExt_sigmaT[iAgg]);
-        }
-        else
-        {
-            // Collect trace samples from eigenvectors of dual graph Laplacian
-            auto EES = BuildEdgeEigenSystem(DMinvDt, Dloc, Mloc_diag_inv);
-            if (energy_dual_)
-            {
-                eval_min = eigs.Compute(EES[0], EES[1], evects);
-            }
-            else
-            {
-                eval_min = eigs.Compute(EES[0], evects);
-            }
-            CheckMinimalEigenvalue(eval_min, iAgg, "edge");
-
-            // Transpose all edge eigenvectors for extraction later
-            AggExt_sigmaT[iAgg].Transpose(evects);
-        }
-    }
-*/
 }
 
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
