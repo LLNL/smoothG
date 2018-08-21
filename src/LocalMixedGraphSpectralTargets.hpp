@@ -234,7 +234,7 @@ private:
     mfem::Array<HYPRE_Int> D_local_rowstart;
     mfem::Array<HYPRE_Int> edge_ext_start;
 
-    mfem::Array<int> colMapper;
+    mfem::Array<int> colMapper_;
 };
 
 } // namespace smoothg

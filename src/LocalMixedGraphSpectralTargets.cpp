@@ -87,7 +87,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     W_local_(W_local),
     graph_topology_(graph_topology),
     zero_eigenvalue_threshold_(1.e-8), // note we also use this for singular values
-    colMapper(0)
+    colMapper_(0)
 {
     // Assemble the parallel global M and D
     graph_topology.GetVertexStart().Copy(D_local_rowstart);
@@ -180,6 +180,16 @@ void LocalMixedGraphSpectralTargets::CheckMinimalEigenvalue(
     }
 }
 
+/*
+/// just extracting some code from ComputeVertexTargets()
+void LocalMixedGraphSpectralTargets::BlockEigensystem(
+    const mfem::Array<int>& vertex_local_dof_ext,
+    const mfem::Array<int>& edge_local_dof_ext,
+    colMapper, eigs, D_ext, M_ext, W_ext, evects)
+{
+}
+*/
+
 void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_vertex_targets)
@@ -268,8 +278,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     face_permedge_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
 
     // Column map for submatrix extraction
-    colMapper.SetSize(std::max(nedges_ext, nvertices_ext));
-    colMapper = -1;
+    colMapper_.SetSize(std::max(nedges_ext, nvertices_ext));
+    colMapper_ = -1;
 
     // The following is used to extract the correct indices when restricting
     // from an extended aggregate to the original aggregate (which is in diag)
@@ -339,17 +349,22 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             continue;
         }
 
+        /*
+                BlockEigensystem(vertex_local_dof_ext, edge_local_dof_ext,
+                                 colMapper_, eigs, D_ext, M_ext, W_ext, evects);
+        */
+
         // extract local D correpsonding to iAgg-th extended aggregate
         auto Dloc = ExtractRowAndColumns(D_ext, vertex_local_dof_ext,
-                                         edge_local_dof_ext, colMapper) ;
-
-        // build local (weighted) graph Laplacian
-        mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc);
+                                         edge_local_dof_ext, colMapper_) ;
         Mloc_diag_inv.SetSize(edge_local_dof_ext.Size());
-        for (int i = 0; i < DlocT.Height(); i++)
+        for (int i = 0; i < Dloc.Width(); i++)
         {
             Mloc_diag_inv(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
         }
+
+        // build local (weighted) graph Laplacian (assumed diagonal M, key difference in multilevel setting)
+        mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc);
         DlocT.ScaleRows(Mloc_diag_inv);
         mfem::SparseMatrix DMinvDt = smoothg::Mult(Dloc, DlocT);
 
@@ -357,7 +372,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         if (use_w)
         {
             auto Wloc = ExtractRowAndColumns(W_ext, vertex_local_dof_ext,
-                                             vertex_local_dof_ext, colMapper) ;
+                                             vertex_local_dof_ext, colMapper_) ;
             assert(Wloc.NumNonZeroElems() == Wloc.Height());
             assert(Wloc.Height() == Wloc.Width());
 
@@ -372,7 +387,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         }
 
         int nevects = evects.Width();
-
         if (use_w)
         {
             // Explicitly add constant vector
@@ -578,7 +592,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             }
 
             auto Dloc = ExtractRowAndColumns(D_local_, vertex_local_dof,
-                                             face_nbh_dofs, colMapper);
+                                             face_nbh_dofs, colMapper_);
             sec_D.ReduceSend(iface, Dloc);
         }
         else // global boundary face or only 1 dof on face
