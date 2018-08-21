@@ -116,8 +116,6 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 
 /// just extracting / modularizing some code from ComputeVertexTargets()
 /// @todo way too many arguments, lots of refactoring possible here
-/// (note that both evects and Mloc_diag_inv are output arguments, the
-///  rest are input)
 class MixedBlockEigensystem
 {
 public:
