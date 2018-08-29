@@ -37,6 +37,9 @@ target_link_libraries(mltopo smoothG)
 add_executable(mlmc mlmc.cpp)
 target_link_libraries(mlmc smoothG)
 
+add_executable(mleigen mleigen.cpp)
+target_link_libraries(mleigen smoothG)
+
 add_executable(sampler sampler.cpp)
 target_link_libraries(sampler smoothG)
 
@@ -63,6 +66,7 @@ add_test(timestep python stest.py timestep)
 add_test(graphupscale graphupscale)
 add_test(mltopo mltopo)
 add_test(mlmc mlmc)
+add_test(mleigen mleigen)
 
 add_test(pareigenvector1 python stest.py pareigenvector1)
 add_test(pareigenvector4 python stest.py pareigenvector4)
@@ -74,6 +78,7 @@ add_test(pargraph-hybridization python stest.py pargraph-hybridization)
 add_test(pargraphupscale mpirun -np ${SMOOTHG_TEST_PROCS} ./graphupscale)
 add_test(parmltopo mpirun -np ${SMOOTHG_TEST_PROCS} ./mltopo)
 add_test(parmlmc mpirun -np ${SMOOTHG_TEST_PROCS} ./mlmc)
+add_test(parmleigen mpirun -np ${SMOOTHG_TEST_PROCS} ./mleigen)
 
 if (APPLE)
   add_test(graph-metis python stest.py graph-metis-mac)

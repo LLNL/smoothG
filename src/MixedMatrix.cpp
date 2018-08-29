@@ -123,6 +123,8 @@ MixedMatrix::MixedMatrix(const MixedMatrix& other) noexcept
       W_global_(other.W_global_),
       offsets_(other.offsets_),
       true_offsets_(other.true_offsets_),
+      M_elem_(other.M_elem_),
+      elem_dof_(other.elem_dof_),
       agg_vertexdof_(other.agg_vertexdof_),
       face_facedof_(other.face_facedof_)
 {
