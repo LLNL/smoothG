@@ -254,9 +254,10 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face
                                        const mfem::SparseMatrix& vert_Agg,
                                        const mfem::SparseMatrix& edge_vert,
                                        const int agg,
-                                       mfem::Vector& Mloc)
+                                       mfem::DenseMatrix& Mloc)
 {
     Mloc.SetSize(edge_dofs_on_face.Size());
+    Mloc = 0.0;
 
     mfem::Array<int> partition(vert_Agg.GetJ(), vert_Agg.Height());
     mfem::Array<int> verts, local_edge_dofs;
@@ -272,7 +273,7 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face
         {
             if (local_edge_dofs[j] == edge_dof)
             {
-                Mloc(i) = M_el_i(j);
+                Mloc(i, i) = M_el_i(j);
                 break;
             }
         }
@@ -496,7 +497,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     auto edge_vert = smoothg::Transpose(D_proc_);
     auto vert_Agg = smoothg::Transpose(Agg_vertex);
 
-    mfem::Vector Mloc_v;
+    mfem::DenseMatrix Mloc_dm;
     mfem::Array<int> Aggs;
     for (unsigned int i = 0; i < nfaces; i++)
     {
@@ -522,19 +523,19 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         GetTableRow(face_Agg, i, Aggs);
         for (int a = 0; a < Aggs.Size(); a++)
         {
-            BuildAggregateFaceM(local_fine_dofs, vert_Agg, edge_vert, Aggs[a], Mloc_v);
+            BuildAggregateFaceM(local_fine_dofs, vert_Agg, edge_vert, Aggs[a], Mloc_dm);
             for (int l = 0; l < facecdofs.Size(); l++)
             {
                 const int row = facecdofs[l];
                 edge_traces_i.GetColumnReference(l, ref_vec1);
-                entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec1);
+                entry_value = Mloc_dm.InnerProduct(ref_vec1, ref_vec1);
                 coarse_mbuilder.AddTraceAcross(row, row, a, entry_value);
 
                 for (int j = l + 1; j < facecdofs.Size(); j++)
                 {
                     const int col = facecdofs[j];
                     edge_traces_i.GetColumnReference(j, ref_vec2);
-                    entry_value = InnerProduct(Mloc_v, ref_vec1, ref_vec2);
+                    entry_value = Mloc_dm.InnerProduct(ref_vec1, ref_vec2);
                     coarse_mbuilder.AddTraceAcross(row, col, a, entry_value);
                     coarse_mbuilder.AddTraceAcross(col, row, a, entry_value);
                 }
