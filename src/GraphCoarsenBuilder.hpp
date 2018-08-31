@@ -63,6 +63,15 @@ protected:
     unsigned int num_aggs_;
 };
 
+class MBuilderWithElementM
+{
+public:
+    virtual ~MBuilderWithElementM() {}
+
+    virtual const std::vector<mfem::DenseMatrix>& GetElementMatrices() const = 0;
+    virtual const mfem::SparseMatrix& GetAggEdgeDofTable() const = 0;
+};
+
 /**
    @brief Abstract base class to help building the coarse mass matrix in
    GraphCoarsen::BuildPEdges()
@@ -121,7 +130,7 @@ protected:
    Used when build_coarse_relation is true, generally when we use
    hybridization solvers.
 */
-class ElementMBuilder : public CoarseMBuilder
+class ElementMBuilder : public CoarseMBuilder, public MBuilderWithElementM
 {
 public:
     ElementMBuilder() {}
@@ -246,7 +255,7 @@ private:
     bool components_built_;
 };
 
-class FineMBuilder : public MBuilder
+class FineMBuilder : public MBuilder, public MBuilderWithElementM
 {
 public:
     FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& Agg_edgedof);
