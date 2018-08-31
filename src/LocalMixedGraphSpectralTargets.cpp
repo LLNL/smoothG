@@ -194,7 +194,7 @@ MixedBlockEigensystem::MixedBlockEigensystem(
     {
         // Wloc assumed to be diagonal
         auto Wloc_tmp = ExtractRowAndColumns(
-            W_ext, vertex_local_dof_ext, vertex_local_dof_ext, colMapper) ;
+                            W_ext, vertex_local_dof_ext, vertex_local_dof_ext, colMapper) ;
         Wloc.Swap(Wloc_tmp);
         assert(Wloc.NumNonZeroElems() == Wloc.Height());
         assert(Wloc.Height() == Wloc.Width());

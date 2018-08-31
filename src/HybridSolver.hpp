@@ -192,15 +192,8 @@ protected:
               const mfem::SparseMatrix* face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
-    /**
-       @todo this method and its cousin share a lot of duplicated code
-    */
     void AssembleHybridSystem(
         const std::vector<mfem::DenseMatrix>& M_el,
-        const mfem::Array<int>& j_multiplier_edgedof);
-
-    void AssembleHybridSystem(
-        const std::vector<mfem::Vector>& M_el,
         const mfem::Array<int>& j_multiplier_edgedof);
 
     // Compute scaling vector and the scaled hybridized system
