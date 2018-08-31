@@ -30,6 +30,7 @@ namespace smoothg
 {
 
 HybridSolver::HybridSolver(MPI_Comm comm,
+                           bool fine_level,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
@@ -63,11 +64,12 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     }
     Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
-    Init(edge_edgedof, mbuilder->GetElementMatrices(),
+    Init(fine_level, edge_edgedof, mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
+                           bool fine_level,
                            const MixedMatrix& mgL,
                            const Mixed_GL_Coarsener& mgLc,
                            const mfem::SparseMatrix* face_bdrattr,
@@ -98,7 +100,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
-    Init(face_edgedof, mbuilder->GetElementMatrices(),
+    Init(fine_level, face_edgedof, mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
@@ -114,14 +116,16 @@ HybridSolver::~HybridSolver()
 }
 
 template<typename T>
-void HybridSolver::Init(const mfem::SparseMatrix& face_edgedof,
-                        const std::vector<T>& M_el,
-                        const mfem::HypreParMatrix& edgedof_d_td,
-                        const mfem::SparseMatrix* face_bdrattr,
-                        const mfem::Array<int>* ess_edge_dofs)
+void HybridSolver::Init(
+    bool fine_level,
+    const mfem::SparseMatrix& face_edgedof,
+    const std::vector<T>& M_el,
+    const mfem::HypreParMatrix& edgedof_d_td,
+    const mfem::SparseMatrix* face_bdrattr,
+    const mfem::Array<int>* ess_edge_dofs)
 {
     // Determine if we are solving fine level graph Laplacian problem
-    bool fine_level = (typeid(T) == typeid(mfem::Vector)) ? true : false;
+    // bool fine_level = (typeid(T) == typeid(mfem::Vector)) ? true : false;
 
     mfem::StopWatch chrono;
     chrono.Clear();

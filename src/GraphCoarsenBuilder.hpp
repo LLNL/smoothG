@@ -255,10 +255,10 @@ public:
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
-    const std::vector<mfem::Vector>& GetElementMatrices() const { return M_el_; }
+    const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return M_el_; }
     const mfem::SparseMatrix& GetAggEdgeDofTable() const { return Agg_edgedof_; }
 private:
-    std::vector<mfem::Vector> M_el_;
+    std::vector<mfem::DenseMatrix> M_el_;
     const mfem::SparseMatrix& Agg_edgedof_;
 };
 

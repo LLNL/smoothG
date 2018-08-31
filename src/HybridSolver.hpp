@@ -98,6 +98,7 @@ public:
               BoomerAMG is used instead.
     */
     HybridSolver(MPI_Comm comm,
+                 bool fine_level,
                  const MixedMatrix& mgL,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
@@ -119,6 +120,7 @@ public:
               BoomerAMG is used instead.
     */
     HybridSolver(MPI_Comm comm,
+                 bool fine_level,
                  const MixedMatrix& mgL,
                  const Mixed_GL_Coarsener& mgLc,
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
@@ -183,7 +185,8 @@ public:
 
 protected:
     template<typename T>
-    void Init(const mfem::SparseMatrix& face_edgedof,
+    void Init(bool fine_level,
+              const mfem::SparseMatrix& face_edgedof,
               const std::vector<T>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
               const mfem::SparseMatrix* face_bdrattr,

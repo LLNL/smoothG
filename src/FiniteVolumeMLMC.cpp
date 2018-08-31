@@ -159,7 +159,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
         solver_[1] = make_unique<HybridSolver>(
-                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         comm_, false, GetCoarseMatrix(), *coarsener_[0],
                          &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
@@ -186,7 +186,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     if (param_.hybridization) // Hybridization solver
     {
-        solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+        solver_[0] = make_unique<HybridSolver>(comm_, true, GetFineMatrix(),
                                                &edge_boundary_att_, &marker);
     }
     else // L2-H1 block diagonal preconditioner

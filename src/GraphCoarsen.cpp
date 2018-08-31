@@ -267,13 +267,13 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face
         int edge_dof = edge_dofs_on_face[i];
         GetTableRow(edge_vert, edge_dof, verts);
         int vert = (partition[verts[0]] == agg) ? verts[0] : verts[1];
-        const mfem::Vector& M_el_i = fine_mbuilder_->GetElementMatrices()[vert];
+        const mfem::DenseMatrix& M_el_i = fine_mbuilder_->GetElementMatrices()[vert];
         GetTableRow(fine_mbuilder_->GetAggEdgeDofTable(), vert, local_edge_dofs);
         for (j = 0; j < local_edge_dofs.Size(); j++)
         {
             if (local_edge_dofs[j] == edge_dof)
             {
-                Mloc(i, i) = M_el_i(j);
+                Mloc(i, i) = M_el_i(j, j);
                 break;
             }
         }

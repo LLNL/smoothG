@@ -70,7 +70,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     {
         auto face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
         solver_[1] = make_unique<HybridSolver>(
-                         comm, mixed_laplacians_.back(), *coarsener_[0],
+                         comm, false, mixed_laplacians_.back(), *coarsener_[0],
                          &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
@@ -143,7 +143,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     {
         auto face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
         solver_[1] = make_unique<HybridSolver>(
-                         comm, mixed_laplacians_.back(), *coarsener_[0],
+                         comm, false, mixed_laplacians_.back(), *coarsener_[0],
                          &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
@@ -177,7 +177,7 @@ void FiniteVolumeUpscale::MakeFineSolver()
     {
         if (param_.hybridization) // Hybridization solver
         {
-            solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+            solver_[0] = make_unique<HybridSolver>(comm_, true, GetFineMatrix(),
                                                    &edge_boundary_att_, &marker);
         }
         else // L2-H1 block diagonal preconditioner

@@ -386,13 +386,14 @@ FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMa
     for (unsigned int agg = 0; agg < num_aggs_; agg++)
     {
         GetTableRow(Agg_edgedof, agg, edofs);
-        mfem::Vector& agg_M = M_el_[agg];
+        mfem::DenseMatrix& agg_M = M_el_[agg];
         agg_M.SetSize(edofs.Size());
+        agg_M = 0.0;
         for (int i = 0; i < agg_M.Size(); i++)
         {
             const int edof = edofs[i];
             const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
-            agg_M[i] = ratio / edge_weight[edof];
+            agg_M(i, i) = ratio / edge_weight[edof];
         }
     }
 }
@@ -407,11 +408,12 @@ FineMBuilder::FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
     for (unsigned int agg = 0; agg < num_aggs_; agg++)
     {
         const mfem::Vector& Agg_edge_weight = local_edge_weight[agg];
-        mfem::Vector& agg_M = M_el_[agg];
+        mfem::DenseMatrix& agg_M = M_el_[agg];
         agg_M.SetSize(Agg_edge_weight.Size());
+        agg_M = 0.0;
         for (int i = 0; i < agg_M.Size(); i++)
         {
-            agg_M[i] = 1.0 / Agg_edge_weight[i];
+            agg_M(i, i) = 1.0 / Agg_edge_weight[i];
         }
     }
 }
@@ -425,12 +427,12 @@ std::unique_ptr<mfem::SparseMatrix> FineMBuilder::BuildAssembledM(
     for (int Agg = 0; Agg < Agg_edgedof_.Height(); Agg++)
     {
         GetTableRow(Agg_edgedof_, Agg, edofs);
-        const mfem::Vector& agg_M = M_el_[Agg];
+        const mfem::DenseMatrix& agg_M = M_el_[Agg];
 
         const double agg_weight = 1. / agg_weights_inverse(Agg);
         for (int i = 0; i < agg_M.Size(); i++)
         {
-            const double M_ii = agg_M[i] * agg_weight;
+            const double M_ii = agg_M(i, i) * agg_weight;
             M->Add(edofs[i], edofs[i], M_ii);
         }
     }
