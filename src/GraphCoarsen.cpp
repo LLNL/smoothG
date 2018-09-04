@@ -250,6 +250,10 @@ double GraphCoarsen::DTTraceProduct(const mfem::SparseMatrix& DtransferT,
     return smoothg::InnerProduct(ref_vec3, trace);
 }
 
+/**
+   @todo: modify this to if/else (or have another method) so that we
+   do a 1/2, 1/2 split if element matrices are not available.
+ */
 void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face,
                                        const mfem::SparseMatrix& vert_Agg,
                                        const mfem::SparseMatrix& edge_vert,
@@ -258,27 +262,46 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face
 {
     Mloc.SetSize(edge_dofs_on_face.Size());
     Mloc = 0.0;
-
     mfem::Array<int> partition(vert_Agg.GetJ(), vert_Agg.Height());
-    mfem::Array<int> verts, local_edge_dofs;
-    int j;
+    mfem::Array<int> verts, elmat_edge_dofs;
+    mfem::Array<int> kmap(edge_dofs_on_face.Size());
+
     for (int i = 0; i < edge_dofs_on_face.Size(); i++)
     {
-        int edge_dof = edge_dofs_on_face[i];
-        GetTableRow(edge_vert, edge_dof, verts);
-        int vert = (partition[verts[0]] == agg) ? verts[0] : verts[1];
-        const mfem::DenseMatrix& M_el_i = fine_mbuilder_->GetElementMatrices()[vert];
-        GetTableRow(fine_mbuilder_->GetAggEdgeDofTable(), vert, local_edge_dofs);
-        for (j = 0; j < local_edge_dofs.Size(); j++)
+        int face_edge_dof_i = edge_dofs_on_face[i];
+        GetTableRow(edge_vert, face_edge_dof_i, verts);
+        int vert_i = (partition[verts[0]] == agg) ? verts[0] : verts[1];
+        GetTableRow(fine_mbuilder_->GetAggEdgeDofTable(), vert_i, elmat_edge_dofs);
+        int k;
+        // this loop is a search
+        for (k = 0; k < elmat_edge_dofs.Size(); k++)
         {
-            if (local_edge_dofs[j] == edge_dof)
+            if (elmat_edge_dofs[k] == face_edge_dof_i)
             {
-                Mloc(i, i) = M_el_i(j, j);
+                kmap[i] = k;
                 break;
             }
         }
-        // local_edge_dofs should contain edge_dof
-        assert(j < local_edge_dofs.Size());
+        assert(k < elmat_edge_dofs.Size());
+    }
+
+    for (int i = 0; i < edge_dofs_on_face.Size(); i++)
+    {
+        int face_edge_dof_i = edge_dofs_on_face[i];
+        GetTableRow(edge_vert, face_edge_dof_i, verts);
+        int vert_i = (partition[verts[0]] == agg) ? verts[0] : verts[1];
+        for (int j = 0; j < edge_dofs_on_face.Size(); j++)
+        {
+            int face_edge_dof_j = edge_dofs_on_face[j];
+            GetTableRow(edge_vert, face_edge_dof_j, verts);
+            int vert_j = (partition[verts[0]] == agg) ? verts[0] : verts[1];
+            if (vert_i == vert_j)
+            {
+                const mfem::DenseMatrix& M_el =
+                    fine_mbuilder_->GetElementMatrices()[vert_i];
+                Mloc(i, j) += M_el(kmap[i], kmap[j]);
+            }
+        }
     }
 }
 
