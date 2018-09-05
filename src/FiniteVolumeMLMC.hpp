@@ -41,6 +41,20 @@ class FiniteVolumeMLMC : public Upscale
 {
 public:
     /**
+       @brief A constructor with no boundary conditions, for general graph
+
+       This should arguably be a different object (or this object name
+       should be changed, maybe to GraphMLMC, from which FiniteVolumeMLMC
+       can inherit).
+    */
+    FiniteVolumeMLMC(MPI_Comm comm,
+                     const mfem::SparseMatrix& vertex_edge,
+                     const mfem::Vector& weight,
+                     const mfem::Array<int>& partitioning,
+                     const mfem::HypreParMatrix& edge_d_td,
+                     const UpscaleParameters& param = UpscaleParameters());
+
+    /**
        @brief Constructor
 
        @param comm MPI communicator

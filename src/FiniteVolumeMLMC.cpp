@@ -28,6 +28,49 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::Vector& weight,
                                    const mfem::Array<int>& partitioning,
                                    const mfem::HypreParMatrix& edge_d_td,
+                                   const UpscaleParameters& param)
+    :
+    Upscale(comm, vertex_edge.Height()),
+    weight_(weight),
+    edge_d_td_(edge_d_td),
+    edge_boundary_att_(mfem::SparseMatrix()),
+    ess_attr_(mfem::Array<int>()),
+    param_(param),
+    ess_u_marker_(mfem::Array<int>()),
+    ess_u_data_(mfem::Vector()),
+    impose_ess_u_conditions_(false),
+    coarse_impose_ess_u_conditions_(false)
+{
+    mfem::StopWatch chrono;
+    chrono.Start();
+
+    // Hypre may modify the original vertex_edge, which we seek to avoid
+    mfem::SparseMatrix ve_copy(vertex_edge);
+
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
+                                   MixedMatrix::DistributeWeight::False);
+
+    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning);
+
+    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
+                     mixed_laplacians_[0], std::move(graph_topology), param_);
+    coarsener_->construct_coarse_subspace();
+
+    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+
+    MakeCoarseSolver();
+
+    MakeCoarseVectors();
+
+    chrono.Stop();
+    setup_time_ += chrono.RealTime();
+}
+
+FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
+                                   const mfem::SparseMatrix& vertex_edge,
+                                   const mfem::Vector& weight,
+                                   const mfem::Array<int>& partitioning,
+                                   const mfem::HypreParMatrix& edge_d_td,
                                    const mfem::SparseMatrix& edge_boundary_att,
                                    const mfem::Array<int>& ess_attr,
                                    const UpscaleParameters& param)
