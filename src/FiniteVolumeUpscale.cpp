@@ -191,7 +191,10 @@ void FiniteVolumeUpscale::MakeFineSolver()
                     Mref.EliminateRow(mm, set_diag);
                 }
             }
-            Dref.EliminateCols(marker);
+            if (marker.Size() > 0)
+            {
+                Dref.EliminateCols(marker);
+            }
             if (!w_exists && myid_ == 0)
             {
                 Dref.EliminateRow(0);

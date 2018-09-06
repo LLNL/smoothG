@@ -95,8 +95,17 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                     &edge_boundary_att_);
+    std::unique_ptr<GraphTopology> graph_topology;
+    if (edge_boundary_att_.Height() == 0)
+    {
+        graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
+                                                    nullptr);
+    }
+    else
+    {
+        graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
+                                                    &edge_boundary_att_);
+    }
 
     coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
                      mixed_laplacians_[0], std::move(graph_topology), param_);
@@ -441,7 +450,10 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
                 Mref.EliminateRow(mm, set_diag);
             }
         }
-        Dref.EliminateCols(ess_sigma_marker);
+        if (ess_sigma_marker.Size() > 0)
+        {
+            Dref.EliminateCols(ess_sigma_marker);
+        }
 
         if (impose_ess_u_conditions_)
         {

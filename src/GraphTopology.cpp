@@ -161,7 +161,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     // nfaces_bdr = number of global boundary faces in this processor
     int nfaces_bdr = 0;
     mfem::SparseMatrix aggregate_boundaryattr;
-    if (edge_boundaryattr)
+    if (edge_boundaryattr && edge_boundaryattr->Height() > 0)
     {
         mfem::SparseMatrix tmp = smoothg::Mult(aggregate_edge, *edge_boundaryattr);
         aggregate_boundaryattr.Swap(tmp);
@@ -220,7 +220,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     // Counting the coarse faces on the global boundary
     int* agg_edge_i = aggregate_edge.GetI();
     int* agg_edge_j = aggregate_edge.GetJ();
-    if (edge_boundaryattr)
+    if (edge_boundaryattr && edge_boundaryattr->Height() > 0)
     {
         int* agg_bdr_i = aggregate_boundaryattr.GetI();
         int* agg_bdr_j = aggregate_boundaryattr.GetJ();
@@ -277,7 +277,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
                 face_edge_j[face_edge_nnz++] = intface_Agg_edge_j[j];
 
     // Insert edges to the coarse faces on the global boundary
-    if (edge_boundaryattr)
+    if (edge_boundaryattr && edge_boundaryattr->Height() > 0)
     {
         int* agg_bdr_i = aggregate_boundaryattr.GetI();
         int* agg_bdr_j = aggregate_boundaryattr.GetJ();
@@ -312,7 +312,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     face_edge_.Swap(face_edge_tmp);
 
     // TODO: face_bdratt can be built when counting boundary faces
-    if (edge_boundaryattr)
+    if (edge_boundaryattr && edge_boundaryattr->Height() > 0)
     {
         mfem::SparseMatrix face_bdr = smoothg::Mult(face_edge_, *edge_boundaryattr);
         face_bdratt_.Swap(face_bdr);
