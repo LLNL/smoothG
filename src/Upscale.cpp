@@ -403,20 +403,8 @@ const mfem::Vector& Upscale::GetCoarseConstantRep() const
 
 void Upscale::PrintInfo(std::ostream& out) const
 {
-    // Matrix sizes, not solvers
-    int nnz_coarse = GetCoarseMatrix().GlobalNNZ();
-    int nnz_fine = GetFineMatrix().GlobalNNZ();
-
-    // True dof size
-    auto size_fine = GetFineMatrix().GetDrowStart().Last() +
-                     GetFineMatrix().GetEdgeDofToTrueDof().N();
-    auto size_coarse = GetCoarseMatrix().GetDrowStart().Last() +
-                       GetCoarseMatrix().GetEdgeDofToTrueDof().N();
-
     int num_procs;
     MPI_Comm_size(comm_, &num_procs);
-
-    auto op_comp = OperatorComplexity();
 
     if (myid_ == 0)
     {
@@ -431,17 +419,26 @@ void Upscale::PrintInfo(std::ostream& out) const
             out << "---------------------\n";
         }
 
-        out << "Fine Matrix\n";
-        out << "---------------------\n";
-        out << "Size\t\t" << size_fine << "\n";
-        out << "NonZeros:\t" << nnz_fine << "\n";
         out << "\n";
-        out << "Coarse Matrix\n";
-        out << "---------------------\n";
-        out << "Size\t\t" << size_coarse << "\n";
-        out << "NonZeros:\t" << nnz_coarse << "\n";
-        out << "\n";
-        out << "Op Comp:\t" << op_comp << "\n";
+
+        for (unsigned int i = 0; i < mixed_laplacians_.size(); ++i)
+        {
+            out << "Level " << i << " Matrix\n";
+            out << "---------------------\n";
+            out << "M Size\t\t" << GetMatrix(i).GetParallelM().M() << "\n";
+            out << "D Size\t\t" << GetMatrix(i).GetParallelD().M() << "\n";
+            // out << "+ Size\t\t" << GetMatrix(i).GlobalRows() << "\n";
+            out << "NonZeros:\t" << GetMatrix(i).GlobalNNZ() << "\n";
+            out << "\n";
+
+            if (i != 0)
+            {
+                double op_comp = 1.0 + (solver_[i]->GetNNZ() / (double) solver_[0]->GetNNZ());
+
+                out << "Op Comp:\t" << op_comp << "\n";
+                out << "\n";
+            }
+        }
 
         out.precision(old_precision);
     }
