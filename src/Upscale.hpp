@@ -37,12 +37,19 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
+    /// apply the upscaling at any level
+    virtual void Mult(int level, const mfem::Vector& x, mfem::Vector& y) const;
+
     /// Wrapper for applying the upscaling, in mfem terminology
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const override;
 
     /// Wrapper for applying the upscaling
+    virtual void Solve(int level, const mfem::Vector& x, mfem::Vector& y) const;
     virtual void Solve(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Solve(const mfem::Vector& x) const;
+
+    /// Solve at any level in mixed form
+    virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
 
     /// Wrapper for applying the upscaling in mixed form
     virtual void Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const;
@@ -66,18 +73,22 @@ public:
     virtual mfem::BlockVector SolveFine(const mfem::BlockVector& x) const;
 
     /// Interpolate a coarse vector to the fine level
+    virtual void Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const;
     virtual void Interpolate(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Interpolate(const mfem::Vector& x) const;
 
     /// Interpolate a coarse vector to the fine level, in mixed form
+    virtual void Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual void Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Interpolate(const mfem::BlockVector& x) const;
 
     /// Restrict a fine vector to the coarse level
+    virtual void Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const;
     virtual void Restrict(const mfem::Vector& x, mfem::Vector& y) const;
     virtual mfem::Vector Restrict(const mfem::Vector& x) const;
 
     /// Restrict a fine vector to the coarse level, in mixed form
+    virtual void Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual void Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Restrict(const mfem::BlockVector& x) const;
 
@@ -148,26 +159,17 @@ public:
     virtual void SetRelTol(double rtol);
     virtual void SetAbsTol(double atol);
 
-    /// Show Total Solve time on the coarse level, negative id will show on all processors
-    void ShowCoarseSolveInfo(std::ostream& out = std::cout) const;
-
-    /// Show Total Solve time on the fine level, negative id will show on all processors
-    void ShowFineSolveInfo(std::ostream& out = std::cout) const;
+    /// Show Total Solve time and other info on the given level
+    void ShowSolveInfo(int level, std::ostream& out = std::cout) const;
 
     /// Show Total setup time, negative id will show on all processors
     void ShowSetupTime(std::ostream& out = std::cout) const;
 
-    /// Get Total Solve time on the coarse level
-    double GetCoarseSolveTime() const;
+    /// Get Total Solve time on the given level
+    double GetSolveTime(int level) const;
 
-    /// Get Total Solve time on the fine level
-    double GetFineSolveTime() const;
-
-    /// Get Total Solve iterations on the coarse level
-    int GetCoarseSolveIters() const;
-
-    /// Get Total Solve iterations on the fine level
-    int GetFineSolveIters() const;
+    /// Get Total Solve iterations on the given level
+    int GetSolveIters(int level) const;
 
     /// Get Total setup time
     double GetSetupTime() const;
@@ -189,16 +191,16 @@ protected:
         MPI_Comm_rank(comm_, &myid_);
     }
 
-    void MakeCoarseVectors()
+    void MakeVectors(int level)
     {
-        rhs_coarse_ = make_unique<mfem::BlockVector>(GetCoarseMatrix().GetBlockOffsets());
-        sol_coarse_ = make_unique<mfem::BlockVector>(GetCoarseMatrix().GetBlockOffsets());
+        rhs_[level] = make_unique<mfem::BlockVector>(GetMatrix(level).GetBlockOffsets());
+        sol_[level] = make_unique<mfem::BlockVector>(GetMatrix(level).GetBlockOffsets());
     }
 
     std::vector<smoothg::MixedMatrix> mixed_laplacians_;
 
-    std::unique_ptr<Mixed_GL_Coarsener> coarsener_;
-    std::unique_ptr<MixedLaplacianSolver> coarse_solver_;
+    std::vector<std::unique_ptr<Mixed_GL_Coarsener> > coarsener_;
+    std::vector<std::unique_ptr<MixedLaplacianSolver> > solver_;
 
     const mfem::HypreParMatrix* edge_e_te_;
 
@@ -207,12 +209,10 @@ protected:
 
     double setup_time_;
 
-    std::unique_ptr<mfem::BlockVector> rhs_coarse_;
-    std::unique_ptr<mfem::BlockVector> sol_coarse_;
+    std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
+    std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
-    // Optional Fine Level Solver, this must be created if needing to solve the fine level
-    std::unique_ptr<MixedLaplacianSolver> fine_solver_;
-
+    /// @todo vector-ize
     mutable mfem::Vector coarse_constant_rep_;
 
 private:

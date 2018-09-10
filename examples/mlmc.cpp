@@ -315,12 +315,12 @@ int main(int argc, char* argv[])
         auto coarse_coefficient = sampler->GetCoarseCoefficient();
         fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = fvupscale->Solve(rhs_fine);
-        fvupscale->ShowCoarseSolveInfo();
+        fvupscale->ShowSolveInfo(1);
 
         auto fine_coefficient = sampler->GetFineCoefficient();
         fvupscale->RescaleFineCoefficient(fine_coefficient);
         auto sol_fine = fvupscale->SolveFine(rhs_fine);
-        fvupscale->ShowFineSolveInfo();
+        fvupscale->ShowSolveInfo(0);
 
         auto error_info = fvupscale->ComputeErrors(sol_upscaled, sol_fine);
 

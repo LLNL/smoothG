@@ -42,24 +42,26 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
     mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                     &edge_boundary_att_);
+    GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(gt), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), param_);
-    coarsener_->construct_coarse_subspace();
-
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -84,29 +86,32 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, edge_d_td_);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                     &edge_boundary_att_);
+    GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(gt), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), param_);
-    coarsener_->construct_coarse_subspace();
-
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
-/// this implementation is sloppy
+/// this implementation is sloppy (also, @todo should be combined with
+/// RescaleCoarseCoefficient with int level argument)
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
     GetFineMatrix().UpdateM(coeff);
@@ -116,7 +121,7 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(fine_solver_.get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[0].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
@@ -131,7 +136,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(coarse_solver_.get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[1].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
@@ -143,8 +148,8 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
-    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
-                       coarsener_->construct_face_facedof_table(),
+    MarkDofsOnBoundary(coarsener_[0]->get_GraphTopology_ref().face_bdratt_,
+                       coarsener_[0]->construct_face_facedof_table(),
                        ess_attr_, marker);
 
     if (param_.hybridization) // Hybridization solver
@@ -152,10 +157,10 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
         // coarse_components method does not store element matrices
         assert(!param_.coarse_components);
 
-        auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_,
-                             &face_bdratt, &marker, 0, param_.saamge_param);
+        auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
+        solver_[1] = make_unique<HybridSolver>(
+                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -170,7 +175,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         Dref.EliminateCols(marker);
 
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 }
 
@@ -181,8 +186,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     if (param_.hybridization) // Hybridization solver
     {
-        fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
-                                                 &edge_boundary_att_, &marker);
+        solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+                                               &edge_boundary_att_, &marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -206,14 +211,14 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             Dref.EliminateRow(0);
         }
 
-        fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
     }
 
 }
 
 void FiniteVolumeMLMC::MakeFineSolver()
 {
-    if (!fine_solver_)
+    if (!solver_[0])
     {
         ForceMakeFineSolver();
     }
