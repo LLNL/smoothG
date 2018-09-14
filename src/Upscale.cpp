@@ -406,41 +406,42 @@ void Upscale::PrintInfo(std::ostream& out) const
     int num_procs;
     MPI_Comm_size(comm_, &num_procs);
 
-    if (myid_ == 0)
+    std::stringstream tout;
     {
-        int old_precision = out.precision();
-        out.precision(3);
+        tout.precision(3);
 
-        out << "\n";
+        tout << "\n";
 
         if (num_procs > 1)
         {
-            out << "Processors: " << num_procs << "\n";
-            out << "---------------------\n";
+            tout << "Processors: " << num_procs << "\n";
+            tout << "---------------------\n";
         }
 
-        out << "\n";
+        tout << "\n";
 
         for (unsigned int i = 0; i < mixed_laplacians_.size(); ++i)
         {
-            out << "Level " << i << " Matrix\n";
-            out << "---------------------\n";
-            out << "M Size\t\t" << GetMatrix(i).GetParallelM().M() << "\n";
-            out << "D Size\t\t" << GetMatrix(i).GetParallelD().M() << "\n";
-            // out << "+ Size\t\t" << GetMatrix(i).GlobalRows() << "\n";
-            out << "NonZeros:\t" << GetMatrix(i).GlobalNNZ() << "\n";
-            out << "\n";
+            tout << "Level " << i << " Matrix\n";
+            tout << "---------------------\n";
+            tout << "M Size\t\t" << GetMatrix(i).GetParallelD().N() << "\n";
+            tout << "D Size\t\t" << GetMatrix(i).GetParallelD().M() << "\n";
+            // tout << "+ Size\t\t" << GetMatrix(i).GlobalRows() << "\n";
+            tout << "NonZeros:\t" << GetMatrix(i).GlobalNNZ() << "\n";
+            tout << "\n";
 
-            if (i != 0)
+            if (i != 0 && solver_[i] && solver_[0])
             {
                 double op_comp = 1.0 + (solver_[i]->GetNNZ() / (double) solver_[0]->GetNNZ());
 
-                out << "Op Comp:\t" << op_comp << "\n";
-                out << "\n";
+                tout << "Op Comp:\t" << op_comp << "\n";
+                tout << "\n";
             }
         }
-
-        out.precision(old_precision);
+    }
+    if (myid_ == 0)
+    {
+        out << tout.str();
     }
 }
 
