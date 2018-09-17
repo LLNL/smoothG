@@ -393,6 +393,7 @@ FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMa
         {
             const int edof = edofs[i];
             const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
+            MFEM_ASSERT(edge_weight[edof] != 0.0, "divide by zero!");
             agg_M(i, i) = ratio / edge_weight[edof];
         }
     }
@@ -430,6 +431,8 @@ std::unique_ptr<mfem::SparseMatrix> FineMBuilder::BuildAssembledM(
         const mfem::DenseMatrix& agg_M = M_el_[Agg];
 
         const double agg_weight = 1. / agg_weights_inverse(Agg);
+        MFEM_ASSERT(std::isfinite(agg_weight),
+                    "FineMBuilder: Bad aggregate weight!");
         for (int i = 0; i < agg_M.Size(); i++)
         {
             const double M_ii = agg_M(i, i) * agg_weight;
