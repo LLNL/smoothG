@@ -89,6 +89,8 @@ void GraphCoarsen::BuildPVertices(
         GetTableRow(Agg_vertex, i, local_fine_dofs);
         nlocal_fine_dofs = local_fine_dofs.Size();
         mfem::DenseMatrix& target_i = vertex_target[i];
+        MFEM_ASSERT(nlocal_fine_dofs == target_i.Height(),
+                    "target_i has wrong size!");
         for (int j = 0; j < nlocal_fine_dofs; ++j)
         {
             ptr = Pvertices_i[local_fine_dofs[j]];
