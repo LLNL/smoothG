@@ -40,26 +40,32 @@ public:
 
     const mfem::SparseMatrix& GetM() const {return M_;}
     const mfem::SparseMatrix& GetD() const {return D_;}
+    const mfem::SparseMatrix& GetVertexEdge() const {return vertex_edge_;}
 
 private:
     int n_;
     mfem::SparseMatrix M_;
     mfem::SparseMatrix D_;
+    mfem::SparseMatrix vertex_edge_;
 };
 
 LinearGraph::LinearGraph(int n) :
     n_(n),
     M_(n - 1, n - 1),
-    D_(n, n - 1)
+    D_(n, n - 1),
+    vertex_edge_(n, n - 1)
 {
     for (int i = 0; i < n - 1; ++i)
     {
         M_.Add(i, i, 1.0);
         D_.Add(i, i, -1.0);
         D_.Add(i + 1, i, 1.0);
+        vertex_edge_.Add(i, i, 1.0);
+        vertex_edge_.Add(i + 1, i, 1.0);
     }
     M_.Finalize();
     D_.Finalize();
+    vertex_edge_.Finalize();
 }
 
 int main(int argc, char* argv[])
@@ -80,7 +86,7 @@ int main(int argc, char* argv[])
     upscale_param.RegisterInOptionsParser(args);
     // const int num_partitions = 2;
     args.Parse();
-    // force for simplicity
+    // force three levels for simplicity
     upscale_param.max_levels = 3;
     if (myid == 0)
     {
@@ -96,9 +102,11 @@ int main(int argc, char* argv[])
     }
     mfem::Vector weight(global_size - 1);
     weight = 1.0;
-    
-    GraphUpscale upscale(comm, graph.GetD(), global_partitioning,
+
+    GraphUpscale upscale(comm, graph.GetVertexEdge(), global_partitioning,
                          upscale_param, weight);
+
+    std::cout << "Finished constructing GraphUpscale." << std::endl;
 
     MPI_Finalize();
     return result;
