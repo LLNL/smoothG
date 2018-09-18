@@ -83,6 +83,9 @@ int main(int argc, char* argv[])
     mfem::OptionsParser args(argc, argv);
     int global_size = 4;
     args.AddOption(&global_size, "-s", "--size", "Size of fine linear graph.");
+    int partitions = 2;
+    args.AddOption(&partitions, "--partitions", "--partitions",
+                   "Number of partitions to use at first coarse level.");
     upscale_param.RegisterInOptionsParser(args);
     // const int num_partitions = 2;
     args.Parse();
@@ -95,18 +98,38 @@ int main(int argc, char* argv[])
 
     LinearGraph graph(global_size);
     mfem::Array<int> global_partitioning(global_size);
-    global_partitioning = 1;
-    for (int i = 0; i < global_size / 2; ++i)
+    global_partitioning = 0;
+    for (int p = 0; p < partitions; ++p)
     {
-        global_partitioning[i] = 0;
+        for (int i = p * (global_size / partitions); i < (p + 1) * (global_size / partitions); ++i)
+        {
+            global_partitioning[i] = p;
+        }
     }
+
     mfem::Vector weight(global_size - 1);
     weight = 1.0;
 
     GraphUpscale upscale(comm, graph.GetVertexEdge(), global_partitioning,
                          upscale_param, weight);
-
     std::cout << "Finished constructing GraphUpscale." << std::endl;
+    upscale.PrintInfo();
+
+    mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+    fine_rhs.GetBlock(0) = 0.0;
+    fine_rhs.GetBlock(1) = 1.0; // ?
+
+    mfem::BlockVector sol1;
+    upscale.Solve(1, fine_rhs, sol1);
+    upscale.ShowSolveInfo(1);
+
+    mfem::BlockVector sol0;
+    upscale.Solve(1, fine_rhs, sol0);
+    upscale.ShowSolveInfo(0);
+
+    mfem::BlockVector sol2;
+    upscale.Solve(2, fine_rhs, sol0);
+    upscale.ShowSolveInfo(2);
 
     MPI_Finalize();
     return result;
