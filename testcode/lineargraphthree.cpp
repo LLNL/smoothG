@@ -91,6 +91,7 @@ int main(int argc, char* argv[])
     args.Parse();
     // force three levels for simplicity
     upscale_param.max_levels = 3;
+    // upscale_param.hybridization = true; // tempted to do this, may make more sense for three level
     if (myid == 0)
     {
         args.PrintOptions(std::cout);
@@ -119,16 +120,16 @@ int main(int argc, char* argv[])
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = 1.0; // ?
 
-    mfem::BlockVector sol1;
+    mfem::BlockVector sol0(fine_rhs);
+    upscale.Solve(0, fine_rhs, sol0);
+    upscale.ShowSolveInfo(0);
+
+    mfem::BlockVector sol1(fine_rhs);
     upscale.Solve(1, fine_rhs, sol1);
     upscale.ShowSolveInfo(1);
 
-    mfem::BlockVector sol0;
-    upscale.Solve(1, fine_rhs, sol0);
-    upscale.ShowSolveInfo(0);
-
-    mfem::BlockVector sol2;
-    upscale.Solve(2, fine_rhs, sol0);
+    mfem::BlockVector sol2(fine_rhs);
+    upscale.Solve(2, fine_rhs, sol2);
     upscale.ShowSolveInfo(2);
 
     MPI_Finalize();
