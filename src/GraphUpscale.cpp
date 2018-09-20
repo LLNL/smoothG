@@ -85,6 +85,12 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     edge_e_te_ = &pgraph_->GetEdgeToTrueEdge();
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
 
+    gts.emplace_back(vertex_edge, *edge_e_te_, partitioning);
+    for (int level = 2; level < param_.max_levels; ++level)
+    {
+        gts.emplace_back(gts.back(), coarse_factor_);
+    }
+
     // coarser levels
     for (int level = 1; level < param_.max_levels; ++level)
     {
@@ -92,14 +98,6 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         // something very basic is going wrong at level 2, empty matrices, 0s, nans, nonsense
 
         std::cout << "Begin level " << level << " coarsening." << std::endl;
-        if (level == 1)
-        {
-            gts.emplace_back(vertex_edge, *edge_e_te_, partitioning);
-        }
-        else
-        {
-            gts.emplace_back(gts.back(), coarse_factor_);
-        }
         coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                     mixed_laplacians_[level - 1],
                                     std::move(gts[level - 1]), param_));
@@ -107,7 +105,6 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         coarsener_[level - 1]->construct_coarse_subspace();
         std::cout << "  construct_coarse_subspace complete." << std::endl;
         mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
-        /// mixed_laplacians_[level].BuildM(); // ???? might be a mistake // try to get hybridization to get further...
 
         if (param_.hybridization)
         {
