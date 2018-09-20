@@ -94,18 +94,24 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     // coarser levels
     for (int level = 1; level < param_.max_levels; ++level)
     {
-
-        // something very basic is going wrong at level 2, empty matrices, 0s, nans, nonsense
-
-        std::cout << "Begin level " << level << " coarsening." << std::endl;
         coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                     mixed_laplacians_[level - 1],
                                     std::move(gts[level - 1]), param_));
-        std::cout << "  coarsener built." << std::endl;
         coarsener_[level - 1]->construct_coarse_subspace();
-        std::cout << "  construct_coarse_subspace complete." << std::endl;
-        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+        // if (level < param_.max_levels - 1)
+        {
+            mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+            if (!param_.hybridization)
+            {
+                mixed_laplacians_.back().BuildM();
+            }
+        }
+    }
 
+    MakeFineSolver();
+    MakeVectors(0);
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
         if (param_.hybridization)
         {
             // coarse_components method does not store element matrices
@@ -116,16 +122,11 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         }
         else // L2-H1 block diagonal preconditioner
         {
-            GetMatrix(level).BuildM();
-            solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+            // GetMatrix(level).BuildM();
+            solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level));
         }
-
         MakeVectors(level);
     }
-
-    // todo: MakeFineSolver() could be optional
-    // also, more disturbingly, moving it above the coarse braces breaks things
-    MakeFineSolver();
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
