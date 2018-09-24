@@ -530,7 +530,17 @@ void Upscale::ShowErrors(const mfem::BlockVector& upscaled_sol,
 void Upscale::ShowSolveInfo(int level, std::ostream& out) const
 {
     assert(solver_[level]);
-    std::string tag = (level == 0 ? "Fine" : "Coarse");
+    std::string tag;
+    if (level == 0)
+        tag = "Fine";
+    else if (level == 1)
+        tag = "Coarse1";
+    else
+    {
+        std::stringstream out;
+        out << "Level" << level;
+        tag = out.str();
+    }
     if (myid_ == 0)
     {
         out << "\n";

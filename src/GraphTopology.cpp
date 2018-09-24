@@ -70,7 +70,6 @@ void GraphTopology::AggregateEdge2AggregateEdgeInt(
     aggregate_edge_int.Swap(tmp);
 }
 
-// TODO: allow aggregate to be shared by more than one processor
 GraphTopology::GraphTopology(
     mfem::SparseMatrix& vertex_edge,
     const mfem::HypreParMatrix& edge_d_td,
@@ -329,6 +328,10 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
         face_bdratt_.Swap(face_bdr);
     }
     face_bdratt_.Finalize(0);
+    // TODO: valgrind is reporting a memory leak for the I, J, A pointers
+    // built in the above Finalize(). I suspect some ownsGraph, ownsData
+    // members for the relevant SparseMatrix (and face_edge_, edge_boundaryattr)
+    // are set wrong
 
     // Complete face to aggregate table
     mfem::SparseMatrix face_agg_tmp(face_Agg_i, face_Agg_j,
