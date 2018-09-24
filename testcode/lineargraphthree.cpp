@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     int result = 0;
 
     // 1. Initialize MPI
-    MPI_Init(&argc, &argv);
+    mpi_session session(argc, argv);
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
@@ -132,6 +132,5 @@ int main(int argc, char* argv[])
     upscale.Solve(2, fine_rhs, sol2);
     upscale.ShowSolveInfo(2);
 
-    MPI_Finalize();
     return result;
 }

@@ -92,6 +92,7 @@ public:
         energy_dual(false),
         hybridization(false),
         coarse_components(false),
+        coarse_factor(64),
         saamge_param(NULL)
     {}
 

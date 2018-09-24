@@ -27,30 +27,32 @@ namespace smoothg
 
 void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(solver_[level]);
+    // restrict right-hand-side x
+    rhs_[0]->GetBlock(1) = x;
+    for (int i = 0; i < level; ++i)
+    {
+        coarsener_[i]->restrict(rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
+    }
+
+    // solve
+    if (level > 0)
+    {
+        rhs_[level]->GetBlock(1) *= -1.0;
+    }
+    solver_[level]->Solve(rhs_[level]->GetBlock(1), sol_[level]->GetBlock(1));
     if (level == 0)
     {
-        solver_[level]->Solve(x, y);
-        y *= -1.0;
-        Orthogonalize(y);
+        sol_[level]->GetBlock(1) *= -1.0;
     }
-    else
+    // orthogonalize at coarse level, every level, or fine level?
+
+    // interpolate solution
+    for (int i = level - 1; i >= 0; --i)
     {
-        assert(rhs_[level]);
-        assert(sol_[level]);
-        assert(coarsener_[level - 1]);
-
-        // for levels...
-        coarsener_[level - 1]->restrict(x, rhs_[level]->GetBlock(1));
-        rhs_[level]->GetBlock(0) = 0.0;
-        rhs_[level]->GetBlock(1) *= -1.0;
-
-        solver_[level]->Solve(*rhs_[level], *sol_[level]);
-
-        coarsener_[level - 1]->interpolate(sol_[level]->GetBlock(1), y);
-
-        Orthogonalize(y);
+        coarsener_[i]->interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
+    y = sol_[0]->GetBlock(1);
+    Orthogonalize(y);
 }
 
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
@@ -79,29 +81,35 @@ mfem::Vector Upscale::Solve(const mfem::Vector& x) const
 
 void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(solver_[level]);
+    MFEM_ASSERT(
+        rhs_[0], "Multilevel vectors not built, probably because MakeVectors() not called!");
+
+    // restrict right-hand-side x
+    *rhs_[0] = x;
+    for (int i = 0; i < level; ++i)
+    {
+        coarsener_[i]->restrict(*rhs_[i], * rhs_[i + 1]);
+    }
+
+    // solve
+    if (level > 0)
+    {
+        rhs_[level]->GetBlock(1) *= -1.0;
+    }
+    solver_[level]->Solve(*rhs_[level], *sol_[level]);
     if (level == 0)
     {
-        solver_[level]->Solve(x, y);
-        y *= -1.0;
-
-        Orthogonalize(y);
+        *sol_[level] *= -1.0;
     }
-    else
+    // orthogonalize at coarse level, every level, or fine level?
+
+    // interpolate solution
+    for (int i = level - 1; i >= 0; --i)
     {
-        assert(rhs_[level]);
-        assert(sol_[level]);
-        assert(coarsener_[level - 1]);
-
-        coarsener_[level - 1]->restrict(x, *rhs_[level]);
-        rhs_[level]->GetBlock(1) *= -1.0;
-
-        solver_[level]->Solve(*rhs_[level], *sol_[level]);
-
-        coarsener_[level - 1]->interpolate(*sol_[level], y);
-
-        Orthogonalize(y);
+        coarsener_[i]->interpolate(*sol_[i + 1], *sol_[i]);
     }
+    y = *sol_[0];
+    Orthogonalize(y);
 }
 
 void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const

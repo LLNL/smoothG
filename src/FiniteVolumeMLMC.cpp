@@ -58,9 +58,9 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     coarsener_[0]->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
+    MakeVectors(0);
 
     MakeCoarseSolver();
-
     MakeVectors(1);
 
     chrono.Stop();
@@ -99,11 +99,10 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param_));
     coarsener_[0]->construct_coarse_subspace();
-
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
+    MakeVectors(0);
 
     MakeCoarseSolver();
-
     MakeVectors(1);
 
     chrono.Stop();
