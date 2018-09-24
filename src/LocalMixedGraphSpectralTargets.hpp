@@ -80,6 +80,7 @@ public:
     bool energy_dual;
     bool hybridization;
     bool coarse_components;
+    int coarse_factor;
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
 
@@ -112,6 +113,8 @@ public:
                        "--no-energy-dual", "Use energy matrix in trace generation.");
         args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
                        "--no-coarse-components", "Store trace, bubble components of coarse M.");
+        args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
+                       "Coarsening factor for metis agglomeration.");
     }
 };
 
