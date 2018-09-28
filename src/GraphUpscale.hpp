@@ -82,7 +82,7 @@ public:
     /// Write permuted edge vector
     void WriteEdgeVector(const mfem::Vector& vect, const std::string& filename) const;
 
-    // Create Fine Level Solver
+    /// Create Fine Level Solver
     void MakeFineSolver();
 
 private:

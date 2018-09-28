@@ -79,6 +79,20 @@ mfem::Vector Upscale::Solve(const mfem::Vector& x) const
     return y;
 }
 
+void OutputVec(const mfem::BlockVector& vec, int level, const std::string& name)
+{
+    const std::string prefix = "debug/";
+    std::stringstream s;
+    s << prefix << name << "_sigma" << level << ".vector";
+    std::ofstream outsigma(s.str().c_str());
+    vec.GetBlock(0).Print(outsigma, 1);
+
+    s.str("");
+    s << prefix << name << "_u" << level << ".vector";
+    std::ofstream outu(s.str().c_str());
+    vec.GetBlock(1).Print(outu, 1);
+}
+
 void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
     MFEM_ASSERT(
@@ -96,7 +110,9 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     {
         rhs_[level]->GetBlock(1) *= -1.0;
     }
+    OutputVec(*rhs_[level], level, "rawrhs");
     solver_[level]->Solve(*rhs_[level], *sol_[level]);
+    OutputVec(*sol_[level], level, "rawsol");
     if (level == 0)
     {
         *sol_[level] *= -1.0;
@@ -581,6 +597,39 @@ int Upscale::GetSolveIters(int level) const
 double Upscale::GetSetupTime() const
 {
     return setup_time_;
+}
+
+void Upscale::DumpDebug(const std::string& prefix) const
+{
+    int counter = 0;
+    for (auto& ml : mixed_laplacians_)
+    {
+        std::stringstream s;
+        s << prefix << "M" << counter << ".sparsematrix";
+        std::ofstream outM(s.str().c_str());
+        outM << std::scientific << std::setprecision(15);
+        ml.GetM().Print(outM, 1);
+        s.str("");
+        s << prefix << "D" << counter++ << ".sparsematrix";
+        std::ofstream outD(s.str().c_str());
+        outD << std::scientific << std::setprecision(15);
+        ml.GetD().Print(outD, 1);
+    }
+
+    counter = 0;
+    for (auto& c : coarsener_)
+    {
+        std::stringstream s;
+        s << prefix << "Psigma" << counter << ".sparsematrix";
+        std::ofstream outPsigma(s.str().c_str());
+        outPsigma << std::scientific << std::setprecision(15);
+        c->get_Psigma().Print(outPsigma, 1);
+        s.str("");
+        s << prefix << "Pu" << counter++ << ".sparsematrix";
+        std::ofstream outPu(s.str().c_str());
+        outPu << std::scientific << std::setprecision(15);
+        c->get_Pu().Print(outPu, 1);
+    }
 }
 
 } // namespace smoothg

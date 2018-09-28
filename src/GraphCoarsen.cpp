@@ -167,6 +167,11 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                                               facefdofs, colMapper_);
 
         mfem::DenseMatrix& edge_traces_f(edge_traces[iface]);
+        if (iface == nfaces / 2)
+        {
+            std::cout << "    NormalizeTraces, iface " << iface << " before:" << std::endl;
+            edge_traces_f.Print(std::cout);
+        }
         int num_traces = edge_traces_f.Width();
         mfem::Vector allone(Dtransfer.Height());
         allone = 1.;
@@ -196,6 +201,12 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
             ScaledPV.Set(alpha, PV_trace);
             trace -= ScaledPV;
         }
+        if (iface == nfaces / 2)
+        {
+            std::cout << "    NormalizeTraces, iface " << iface << " after:" << std::endl;
+            edge_traces_f.Print(std::cout);
+        }
+
     }
 }
 
@@ -345,7 +356,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                                total_num_traces + ncoarse_vertexdofs - nAggs);
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
-    NormalizeTraces(edge_traces, Agg_vertex, face_edge);
+    // Ah-hA! (nope...)
+    NormalizeTraces(edge_traces, Agg_vertex, face_edge); //commenting out VERY BAD IDEA!
 
     coarse_mbuilder.Setup(edge_traces, vertex_target, Agg_face, total_num_traces,
                           ncoarse_vertexdofs);
@@ -424,6 +436,12 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 const int cdof_loc = num_bubbles_i + nlocal_traces;
                 coarse_mbuilder.RegisterRow(i, row, cdof_loc, bubble_counter);
                 edge_traces_f.GetColumnReference(k, trace);
+                if (i == nAggs / 2)
+                {
+                    // here it is 1.414, I expect 1.0
+                    std::cout << "B: agg " << i << " face " << j << " trace: " << std::endl;
+                    trace.Print(std::cout, 1);
+                }
                 Dtransfer.Mult(trace, local_rhs_trace);
 
                 // compute and store local coarse D
@@ -440,6 +458,12 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                     traces_extensions.GetColumnReference(nlocal_traces, local_sol);
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     solver.Mult(local_rhs_trace, local_sol, F_potential);
+
+                    if (i == nAggs / 2)
+                    {
+                        std::cout << "agg " << i << " face " << j << " trace_extension: " << std::endl;
+                        local_sol.Print(std::cout, 1);
+                    }
 
                     // compute and store off diagonal block of coarse M
                     for (int l = 0; l < num_bubbles_i; l++)
@@ -539,6 +563,11 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
             {
                 Pedges_j[ptr] = facecdofs[k];
                 // since we did not do local_rhs *= -1, we store -trace here
+                if (i == nfaces / 2)
+                {
+                    std::cout << "face " << i << ", edge_traces_i:" << std::endl;
+                    edge_traces_i.Print(std::cout);
+                }
                 Pedges_data[ptr++] = -edge_traces_i(j, k);
             }
         }

@@ -201,6 +201,7 @@ MixedBlockEigensystem::MixedBlockEigensystem(
     }
 
     // build local (weighted) graph Laplacian
+
     if (M_ext.NumNonZeroElems() == M_ext.Height())
     {
         // M is diagonal (we assume---the check in the if is not great
@@ -328,7 +329,11 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later
         AggExt_sigmaT.SetSize(evects_tmp.Width(), DlocT_.Height());
-        MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
+        // the new if below is suspicious; this thing's Height should probably not be 0?
+        if (AggExt_sigmaT.Height() > 0)
+        {
+            MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
+        }
     }
     else
     {
@@ -625,6 +630,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 }
 
                 const mfem::DenseMatrix& sigmaT(AggExt_sigmaT[iAgg]);
+                // this sigmaT has size 0 sometimes? ??
                 ExtractColumns(sigmaT, edge_dof_marker, face_edge_dof,
                                face_sigma_tmp, start);
                 start += sigmaT.Height();
@@ -798,6 +804,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 int nvertex_local_dofs = nvertex_neighbor0 + Dloc_1.Height();
 
                 // set up an average zero vector (so no need to Normalize)
+
+                OneNegOne needs to take constant_rep from previous level!
+                    (see gelever ComputeEdgeTargets etc.)
+
                 OneNegOne.SetSize(nvertex_local_dofs);
                 double Dsigma = 1.0 / nvertex_neighbor0;
                 for (int i = 0; i < nvertex_neighbor0; i++)
@@ -897,6 +907,12 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
             // add PV vector to other vectors and orthogonalize
             Orthogonalize(collected_sigma, PV_sigma_on_face, 0, local_edge_trace_targets[iface]);
+
+            if (iface == nfaces / 2)
+            {
+                std::cout << "A: iface " << iface << " local_edge_trace_targets:" << std::endl;
+                local_edge_trace_targets[iface].Print(std::cout, 1);
+            }
 
             delete [] shared_sigma_f;
         }

@@ -116,6 +116,8 @@ int main(int argc, char* argv[])
     std::cout << "Finished constructing GraphUpscale." << std::endl;
     upscale.PrintInfo();
 
+    upscale.DumpDebug("debug/");
+
     mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = 1.0; // ?
@@ -131,6 +133,16 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol2(fine_rhs);
     upscale.Solve(2, fine_rhs, sol2);
     upscale.ShowSolveInfo(2);
+
+    {
+        for (int i = 0; i < sol0.GetBlock(1).Size(); ++i)
+        {
+            std::cout << i << ": "
+                      << sol0.GetBlock(1)(i) << "   "
+                      << sol1.GetBlock(1)(i) << "   "
+                      << sol2.GetBlock(1)(i) << std::endl;
+        }
+    }
 
     return result;
 }

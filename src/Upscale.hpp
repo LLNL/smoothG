@@ -184,6 +184,9 @@ public:
     void ShowErrors(const mfem::BlockVector& upscaled_sol,
                     const mfem::BlockVector& fine_sol) const;
 
+    /// Dump some debug data
+    void DumpDebug(const std::string& prefix) const;
+
 protected:
     Upscale(MPI_Comm comm, int size)
         : Operator(size), comm_(comm), setup_time_(0.0)
