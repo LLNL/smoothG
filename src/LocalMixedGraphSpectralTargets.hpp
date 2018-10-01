@@ -221,6 +221,10 @@ private:
     /// given an assembled vector on vertices, return extracted value on (possibly shared) faces
     mfem::Vector** CollectConstant(const mfem::Vector& constant_vect);
 
+    /// shared_constant expected to be an array of legth 2, just returns them
+    /// stacked on top of each other
+    mfem::Vector ConstantLocal(mfem::Vector* shared_constant);
+
     MPI_Comm comm_;
 
     const double rel_tol_;

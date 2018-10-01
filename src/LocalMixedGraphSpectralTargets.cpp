@@ -630,6 +630,22 @@ mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
     return sec_constant.Collect();
 }
 
+mfem::Vector LocalMixedGraphSpectralTargets::ConstantLocal(
+    mfem::Vector* shared_constant)
+{
+    int split = shared_constant[0].Size();
+    int size = shared_constant[0].Size() + shared_constant[1].Size();
+
+    mfem::Vector vect(size);
+
+    for (int i = 0; i < split; ++i)
+        vect(i) = shared_constant[0](i);
+    for (int i = split; i < size; ++i)
+        vect(i) = shared_constant[1](i - split);
+
+    return vect;
+}
+
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
@@ -881,8 +897,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 int nvertex_neighbor0 = Dloc_0.Height();
                 int nvertex_local_dofs = nvertex_neighbor0 + Dloc_1.Height();
-                mfem::Vector local_constant(nvertex_local_dofs);
-                local_constant = 1.0; // TODO!
+                mfem::Vector local_constant = ConstantLocal(shared_constant[iface]);
                 mfem::Vector OneNegOne = MakeOneNegOne(
                                              local_constant, nvertex_neighbor0);
 
@@ -951,10 +966,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 // set up an average zero vector (so no need to Normalize)
                 const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
                 int nvertex_neighbor0 = Agg_vertex.RowSize(neighbor_aggs[0]);
-                // mfem::Vector local_constant(Dloc_0.Height());
-                // local_constant = 1.0;
-                mfem::Vector OneNegOne = MakeOneNegOne(*shared_constant[iface], nvertex_neighbor0);
-                // mfem::Vector OneNegOne = MakeOneNegOne(local_constant, nvertex_neighbor0);
+                mfem::Vector OneNegOne = MakeOneNegOne(shared_constant[iface][0], nvertex_neighbor0);
 
                 // solve saddle point problem for PV and restrict to face
                 PV_sigma.SetSize(Mloc_0.Size());
@@ -967,10 +979,12 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             {
                 // global boundary face or only 1 dof on face
                 PV_sigma_on_face.SetSize(num_iface_edge_dof);
-                PV_sigma_on_face = 1.;
+                PV_sigma_on_face = 1.; // should inherit something from contant_rep?
             }
 
             // add PV vector to other vectors and orthogonalize
+            // TODO: this orthogonalization should be done with respect to constant_rep,
+            // not ones?
             Orthogonalize(collected_sigma, PV_sigma_on_face, 0, local_edge_trace_targets[iface]);
 
             if (iface == nfaces / 2)
