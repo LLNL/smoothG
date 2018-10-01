@@ -54,7 +54,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param));
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);
@@ -128,7 +128,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param_));
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);

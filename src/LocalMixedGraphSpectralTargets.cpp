@@ -593,7 +593,8 @@ mfem::Vector LocalMixedGraphSpectralTargets::MakeOneNegOne(
 
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
-    std::vector<mfem::DenseMatrix>& local_edge_trace_targets)
+    std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+    const mfem::Vector& constant_rep)
 {
     const mfem::SparseMatrix& face_Agg(graph_topology_.face_Agg_);
     const mfem::SparseMatrix& face_edge(graph_topology_.face_edge_);
@@ -845,7 +846,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 //         which uses MakeOneNegOne()
                 //    (see gelever ComputeEdgeTargets etc.)
                 // this call stack:
-                //
+                //   GraphUpscale::Init()
+                //     calls SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
+                //       calls LMGST::Compute()
+                //         calls this
 
                 // set up an average zero vector (so no need to Normalize)
                 int nvertex_neighbor0 = Dloc_0.Height();
@@ -972,13 +976,15 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     delete [] shared_Mloc;
 }
 
-void LocalMixedGraphSpectralTargets::Compute(std::vector<mfem::DenseMatrix>&
-                                             local_edge_trace_targets,
-                                             std::vector<mfem::DenseMatrix>& local_vertex_targets)
+void LocalMixedGraphSpectralTargets::Compute(
+    std::vector<mfem::DenseMatrix>&
+    local_edge_trace_targets,
+    std::vector<mfem::DenseMatrix>& local_vertex_targets,
+    const mfem::Vector& constant_rep)
 {
     std::vector<mfem::DenseMatrix> AggExt_sigmaT;
     ComputeVertexTargets(AggExt_sigmaT, local_vertex_targets);
-    ComputeEdgeTargets(AggExt_sigmaT, local_edge_trace_targets);
+    ComputeEdgeTargets(AggExt_sigmaT, local_edge_trace_targets, constant_rep);
 }
 
 } // namespace smoothg

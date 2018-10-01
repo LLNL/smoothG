@@ -175,9 +175,12 @@ public:
        @param local_edge_trace_targets traces of the vertex targets
        @param local_vertex_targets vectors corresponding to smallest eigenvalues
                                    on the vertex space.
+       @param constant_rep representation of constant vertex vector on finer
+                           space
     */
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
+                 std::vector<mfem::DenseMatrix>& local_vertex_targets,
+                 const mfem::Vector& constant_rep);
 private:
     /**
        @brief Solve an eigenvalue problem on each agglomerate, put the result in
@@ -200,7 +203,8 @@ private:
        @param local_edge_trace_targets (OUT)
     */
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
-                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
+                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+                            const mfem::Vector& constant_rep);
 
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);

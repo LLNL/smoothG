@@ -49,8 +49,10 @@ public:
 private:
     /**
        @brief Coarsen the graph, constructing projectors, coarse operators, etc.
+
+       @param constant_rep representation of constant on finer level
     */
-    void do_construct_coarse_subspace();
+    void do_construct_coarse_subspace(const mfem::Vector& constant_rep);
 
 private:
     const UpscaleParameters& param_;

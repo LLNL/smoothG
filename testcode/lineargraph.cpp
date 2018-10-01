@@ -230,7 +230,10 @@ int main(int argc, char* argv[])
         spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
         graph.GetM(), graph.GetD(), graph_topology);
 
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
+    mfem::Vector constant_rep(graph.GetD().Height());
+    constant_rep = 1.0;
+    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets,
+                         constant_rep);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
         throw std::logic_error(
