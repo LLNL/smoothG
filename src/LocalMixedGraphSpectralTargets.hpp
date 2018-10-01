@@ -212,8 +212,7 @@ private:
        @todo on coarser levels this is not quite what we want, it depends on the
        coarse constant representation.
     */
-    void BuildOneNegOne(mfem::Vector& onenegone,
-                        int size, int splitpoint);
+    mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
 
     MPI_Comm comm_;
 
