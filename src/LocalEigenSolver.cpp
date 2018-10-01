@@ -157,7 +157,7 @@ int LocalEigenSolver::Compute(
     int n, double* a, mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     evals.SetSize(n);
-    assert(n <= d_.size());
+    assert(n <= (int) d_.size());
 
     // Triangularize A = Q * T * Q^T
     dsytrd_(&uplo_, &n, a, &n, d_.data(), e_.data(), tau_.data(), work_.data(),

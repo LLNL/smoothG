@@ -63,7 +63,7 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(const mfem::Vector&
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
-                                       *coarse_m_builder_);
+                                       *coarse_m_builder_, constant_rep);
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
     CoarseW_ = graph_coarsen_->GetCoarseW();

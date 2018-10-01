@@ -827,6 +827,14 @@ void orthogonalize_from_constant(mfem::Vector& vec)
     vec -= vec.Sum() / vec.Size();
 }
 
+/// scaling chosen to match orthogonalize_from_constant, not sure it
+/// actually makes sense
+void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt)
+{
+    double dot = (vec * wrt) / wrt.Norml1();
+    vec.Add(-dot, wrt);
+}
+
 /// @todo MPI_COMM_WORLD should be more generic
 void par_orthogonalize_from_constant(mfem::Vector& vec, int globalsize)
 {

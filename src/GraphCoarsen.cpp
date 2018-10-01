@@ -174,6 +174,7 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
         }
         int num_traces = edge_traces_f.Width();
         mfem::Vector allone(Dtransfer.Height());
+        // should be constant_rep, see Gelever OrthoConstant (I don't really understand?)
         allone = 1.;
 
         edge_traces_f.GetColumnReference(0, PV_trace);
@@ -322,7 +323,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                std::vector<mfem::DenseMatrix>& vertex_target,
                                mfem::SparseMatrix& face_cdof,
                                mfem::SparseMatrix& Pedges,
-                               CoarseMBuilder& coarse_mbuilder)
+                               CoarseMBuilder& coarse_mbuilder,
+                               const mfem::Vector& constant_rep)
 {
     // put trace_extensions and bubble_functions in Pedges
     // the coarse dof numbering is as follows: first loop over each face, count
@@ -356,7 +358,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                                total_num_traces + ncoarse_vertexdofs - nAggs);
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
-    // Ah-hA! (nope...)
+    // maybe?! use constant_rep here, but I think not
     NormalizeTraces(edge_traces, Agg_vertex, face_edge); //commenting out VERY BAD IDEA!
 
     coarse_mbuilder.Setup(edge_traces, vertex_target, Agg_face, total_num_traces,
@@ -370,6 +372,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::Vector local_rhs_trace, local_rhs_bubble, local_sol, trace;
     mfem::Array<int> local_verts, facefdofs, local_fine_dofs, faces;
     mfem::Array<int> facecdofs, local_facecdofs;
+    mfem::Vector one;
     for (unsigned int i = 0; i < nAggs; i++)
     {
         // extract local matrices and build local solver
@@ -380,6 +383,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                          local_fine_dofs, colMapper_);
         auto Dloc = ExtractRowAndColumns(D_proc_, local_verts,
                                          local_fine_dofs, colMapper_);
+        constant_rep.GetSubVector(local_verts, one);
+
         // next line does *not* assume M_proc_ is diagonal
         LocalGraphEdgeSolver solver(Mloc, Dloc);
 
@@ -454,7 +459,9 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 // instead of doing local_rhs *= -1, we store -trace later
                 if (nlocal_fine_dofs)
                 {
-                    orthogonalize_from_constant(local_rhs_trace);
+                    // TODO: line below should involve constant_rep, not always 1
+                    // (see Gelever's OrthoConstant)
+                    orthogonalize_from_vector(local_rhs_trace, one);
                     traces_extensions.GetColumnReference(nlocal_traces, local_sol);
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     solver.Mult(local_rhs_trace, local_sol, F_potential);
@@ -626,12 +633,12 @@ void GraphCoarsen::BuildInterpolation(
     std::vector<mfem::DenseMatrix>& vertex_targets,
     mfem::SparseMatrix& Pvertices, mfem::SparseMatrix& Pedges,
     mfem::SparseMatrix& face_cdof,
-    CoarseMBuilder& coarse_m_builder)
+    CoarseMBuilder& coarse_m_builder, const mfem::Vector& constant_rep)
 {
     BuildPVertices(vertex_targets, Pvertices, coarse_m_builder);
 
     BuildPEdges(edge_traces, vertex_targets, face_cdof, Pedges,
-                coarse_m_builder);
+                coarse_m_builder, constant_rep);
 
     BuildW(Pvertices);
 }

@@ -254,6 +254,8 @@ void Deflate(mfem::DenseMatrix& a, const mfem::Vector& v);
 */
 void orthogonalize_from_constant(mfem::Vector& vec);
 
+void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt);
+
 /**
    @brief Orthogonalize this vector from the constant vector.
 

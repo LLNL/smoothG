@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
     GraphCoarsen graph_coarsen(mgL, graph_topology);
     ElementMBuilder builder;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, face_dof, builder);
+                                     Pp, Pu, face_dof, builder, constant_rep);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;

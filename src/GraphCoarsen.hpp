@@ -96,7 +96,8 @@ public:
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,
         mfem::SparseMatrix& face_dof,
-        CoarseMBuilder& coarse_m_builder);
+        CoarseMBuilder& coarse_m_builder,
+        const mfem::Vector& constant_rep);
 
     /**
        @brief Get the aggregate to coarse vertex dofs relation table
@@ -232,13 +233,15 @@ private:
                    (coarse faces, coarse dofs)
        @param[out] Pedges the interpolation
        @param[out] CM_el the coarse element mass matrices in case build_coarse_relation is true
+       @param[in] constant_rep representation of vertex constants on finer level
     */
     void BuildPEdges(
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         mfem::SparseMatrix& face_cdof,
         mfem::SparseMatrix& Pedges,
-        CoarseMBuilder& coarse_mbuilder);
+        CoarseMBuilder& coarse_mbuilder,
+        const mfem::Vector& constant_rep);
 
     void BuildW(const mfem::SparseMatrix& Pvertices);
 
