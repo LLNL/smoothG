@@ -597,6 +597,7 @@ mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
 {
     // Gelever uses face_trueface rather than facedof_truedof (?) (I think one of us is just labeling it wrong)
     SharedEntityCommunication<mfem::Vector> sec_constant(comm_, *graph_topology_.face_d_td_.get());
+    sec_constant.ReducePrepare();
 
     unsigned int num_faces = graph_topology_.get_num_faces();
 
@@ -832,9 +833,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     // Add the "1, -1" divergence function to local trace targets
     // (paper calls this the "particular vector" which serves the
     // same purpose as the Pasciak-Vassilevski vector)
+    // (it is only really 1, -1 for the first coarsening)
     // Perform SVD on the collected traces sigma for shared faces
     int capacity;
     mfem::Vector PV_sigma, Mloc_neighbor;
+    mfem::Vector** shared_constant = CollectConstant(constant_rep);
     for (int iface = 0; iface < nfaces; ++iface)
     {
         int num_iface_edge_dof = face_edge.RowSize(iface);
@@ -948,9 +951,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 // set up an average zero vector (so no need to Normalize)
                 const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
                 int nvertex_neighbor0 = Agg_vertex.RowSize(neighbor_aggs[0]);
-                mfem::Vector local_constant(Dloc_0.Height());
-                local_constant = 1.0;
-                mfem::Vector OneNegOne = MakeOneNegOne(local_constant, nvertex_neighbor0);
+                // mfem::Vector local_constant(Dloc_0.Height());
+                // local_constant = 1.0;
+                mfem::Vector OneNegOne = MakeOneNegOne(*shared_constant[iface], nvertex_neighbor0);
+                // mfem::Vector OneNegOne = MakeOneNegOne(local_constant, nvertex_neighbor0);
 
                 // solve saddle point problem for PV and restrict to face
                 PV_sigma.SetSize(Mloc_0.Size());
@@ -995,9 +999,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     {
         delete [] shared_Dloc[iface];
         delete [] shared_Mloc[iface];
+        delete [] shared_constant[iface];
     }
     delete [] shared_Dloc;
     delete [] shared_Mloc;
+    delete [] shared_constant;
 }
 
 void LocalMixedGraphSpectralTargets::Compute(
