@@ -135,7 +135,7 @@ void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
 
 mfem::BlockVector Upscale::Solve(const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetFineBlockVector());
+    mfem::BlockVector y(GetBlockVector(0));
 
     Solve(x, y);
 
@@ -153,7 +153,7 @@ void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
 
 mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const
 {
-    mfem::Vector coarse_vect = GetCoarseVector();
+    mfem::Vector coarse_vect = GetVector(1);
     SolveCoarse(x, coarse_vect);
 
     return coarse_vect;
@@ -170,7 +170,7 @@ void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) cons
 
 mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetCoarseBlockVector());
+    mfem::BlockVector coarse_vect(GetBlockVector(1));
     SolveCoarse(x, coarse_vect);
 
     return coarse_vect;
@@ -197,7 +197,7 @@ void Upscale::SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const
 
 mfem::BlockVector Upscale::SolveFine(const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetFineBlockVector());
+    mfem::BlockVector y(GetBlockVector(0));
 
     SolveFine(x, y);
 
@@ -217,7 +217,7 @@ void Upscale::Interpolate(const mfem::Vector& x, mfem::Vector& y) const
 
 mfem::Vector Upscale::Interpolate(const mfem::Vector& x) const
 {
-    mfem::Vector fine_vect = GetFineVector();
+    mfem::Vector fine_vect = GetVector(0);
 
     Interpolate(1, x, fine_vect);
 
@@ -238,7 +238,7 @@ void Upscale::Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) cons
 
 mfem::BlockVector Upscale::Interpolate(const mfem::BlockVector& x) const
 {
-    mfem::BlockVector fine_vect(GetFineBlockVector());
+    mfem::BlockVector fine_vect(GetBlockVector(0));
 
     Interpolate(1, x, fine_vect);
 
@@ -259,7 +259,7 @@ void Upscale::Restrict(const mfem::Vector& x, mfem::Vector& y) const
 
 mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
 {
-    mfem::Vector coarse_vect = GetCoarseVector();
+    mfem::Vector coarse_vect = GetVector(1);
     Restrict(x, coarse_vect);
 
     return coarse_vect;
@@ -279,35 +279,39 @@ void Upscale::Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const
 
 mfem::BlockVector Upscale::Restrict(const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetCoarseBlockVector());
+    mfem::BlockVector coarse_vect(GetBlockVector(1));
     Restrict(x, coarse_vect);
 
     return coarse_vect;
 }
 
+/// @todo deprecated, add with level argument
 void Upscale::FineBlockOffsets(mfem::Array<int>& offsets) const
 {
-    GetFineMatrix().GetBlockOffsets().Copy(offsets);
+    GetMatrix(0).GetBlockOffsets().Copy(offsets);
 }
 
+/// @todo deprecated, add with level argument
 void Upscale::CoarseBlockOffsets(mfem::Array<int>& offsets) const
 {
-    GetCoarseMatrix().GetBlockOffsets().Copy(offsets);
+    GetMatrix(1).GetBlockOffsets().Copy(offsets);
 }
 
+/// @todo deprecated, add with level argument
 void Upscale::FineTrueBlockOffsets(mfem::Array<int>& offsets) const
 {
-    GetFineMatrix().GetBlockTrueOffsets().Copy(offsets);
+    GetMatrix(0).GetBlockTrueOffsets().Copy(offsets);
 }
 
+/// @todo deprecated, add with level argument
 void Upscale::CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const
 {
-    GetCoarseMatrix().GetBlockTrueOffsets().Copy(offsets);
+    GetMatrix(1).GetBlockTrueOffsets().Copy(offsets);
 }
 
 void Upscale::Orthogonalize(mfem::Vector& vect) const
 {
-    par_orthogonalize_from_constant(vect, GetFineMatrix().GetDrowStart().Last());
+    par_orthogonalize_from_constant(vect, GetMatrix(0).GetDrowStart().Last());
 }
 
 void Upscale::Orthogonalize(mfem::BlockVector& vect) const
@@ -317,7 +321,17 @@ void Upscale::Orthogonalize(mfem::BlockVector& vect) const
 
 void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
 {
-    const mfem::Vector coarse_constant_rep = GetCoarseConstantRep();
+    OrthogonalizeLevel(1, vect);
+}
+
+void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
+{
+    OrthogonalizeCoarse(vect.GetBlock(1));
+}
+
+void Upscale::OrthogonalizeLevel(int level, mfem::Vector& vect) const
+{
+    const mfem::Vector coarse_constant_rep = GetConstantRep(level);
     double local_dot = (vect * coarse_constant_rep);
     double global_dot;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
@@ -329,51 +343,24 @@ void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
     vect.Add(-global_dot / global_scale, coarse_constant_rep);
 }
 
-void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
+mfem::Vector Upscale::GetVector(int level) const
 {
-    OrthogonalizeCoarse(vect.GetBlock(1));
+    const auto& offsets = GetMatrix(level).GetBlockOffsets();
+    const int vsize = offsets[2] - offsets[1];
+
+    return mfem::Vector(vsize);
 }
 
-mfem::Vector Upscale::GetCoarseVector() const
+mfem::BlockVector Upscale::GetBlockVector(int level) const
 {
-    const auto& offsets = GetCoarseMatrix().GetBlockOffsets();
-    const int coarse_vsize = offsets[2] - offsets[1];
-
-    return mfem::Vector(coarse_vsize);
-}
-
-mfem::Vector Upscale::GetFineVector() const
-{
-    const auto& offsets = GetFineMatrix().GetBlockOffsets();
-    const int fine_vsize = offsets[2] - offsets[1];
-
-    return mfem::Vector(fine_vsize);
-}
-
-mfem::BlockVector Upscale::GetCoarseBlockVector() const
-{
-    const auto& offsets = GetCoarseMatrix().GetBlockOffsets();
+    const auto& offsets = GetMatrix(level).GetBlockOffsets();
 
     return mfem::BlockVector(offsets);
 }
 
-mfem::BlockVector Upscale::GetFineBlockVector() const
+mfem::BlockVector Upscale::GetTrueBlockVector(int level) const
 {
-    const auto& offsets = GetFineMatrix().GetBlockOffsets();
-
-    return mfem::BlockVector(offsets);
-}
-
-mfem::BlockVector Upscale::GetCoarseTrueBlockVector() const
-{
-    const auto& offsets = GetCoarseMatrix().GetBlockTrueOffsets();
-
-    return mfem::BlockVector(offsets);
-}
-
-mfem::BlockVector Upscale::GetFineTrueBlockVector() const
-{
-    const auto& offsets = GetFineMatrix().GetBlockTrueOffsets();
+    const auto& offsets = GetMatrix(level).GetBlockTrueOffsets();
 
     return mfem::BlockVector(offsets);
 }
@@ -390,39 +377,21 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
     return mixed_laplacians_[level];
 }
 
-/// @deprecated
-MixedMatrix& Upscale::GetFineMatrix()
+const mfem::Vector& Upscale::GetConstantRep(unsigned int level) const
 {
-    return GetMatrix(0);
-}
-
-/// @deprecated
-const MixedMatrix& Upscale::GetFineMatrix() const
-{
-    return GetMatrix(0);
-}
-
-/// @deprecated
-MixedMatrix& Upscale::GetCoarseMatrix()
-{
-    return GetMatrix(1);
-}
-
-/// @deprecated
-const MixedMatrix& Upscale::GetCoarseMatrix() const
-{
-    return GetMatrix(1);
-}
-
-const mfem::Vector& Upscale::GetCoarseConstantRep() const
-{
-    if (coarse_constant_rep_.Size() == 0)
+    for (unsigned int i = constant_rep_.size(); i < level + 1; ++i)
     {
-        mfem::Vector fine_ones = GetFineVector();
-        fine_ones = 1.0;
-        coarse_constant_rep_ = Restrict(fine_ones);
+        constant_rep_.emplace_back(GetVector(i));
+        if (i == 0)
+        {
+            constant_rep_.back() = 1.0;
+        }
+        else
+        {
+            Restrict(i, constant_rep_[i - 1], constant_rep_.back());
+        }
     }
-    return coarse_constant_rep_;
+    return constant_rep_[level];
 }
 
 void Upscale::PrintInfo(std::ostream& out) const
@@ -483,7 +452,7 @@ double Upscale::OperatorComplexity() const
     }
     else
     {
-        nnz_fine = GetFineMatrix().GlobalNNZ();
+        nnz_fine = GetMatrix(0).GlobalNNZ();
     }
 
 
@@ -531,8 +500,8 @@ void Upscale::SetAbsTol(double atol)
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,
                                            const mfem::BlockVector& fine_sol) const
 {
-    const mfem::SparseMatrix& M = GetFineMatrix().GetM();
-    const mfem::SparseMatrix& D = GetFineMatrix().GetD();
+    const mfem::SparseMatrix& M = GetMatrix(0).GetM();
+    const mfem::SparseMatrix& D = GetMatrix(0).GetD();
 
     auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
     info.push_back(OperatorComplexity());

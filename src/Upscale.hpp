@@ -107,39 +107,25 @@ public:
     virtual void OrthogonalizeCoarse(mfem::Vector& vect) const;
     virtual void OrthogonalizeCoarse(mfem::BlockVector& vect) const;
 
-    /// Create a coarse vertex space vector
-    virtual mfem::Vector GetCoarseVector() const;
+    virtual void OrthogonalizeLevel(int level, mfem::Vector& vect) const;
 
-    /// Create a fine vertex space vector
-    virtual mfem::Vector GetFineVector() const;
+    /// Create an appropriately sized vertex-space vector
+    virtual mfem::Vector GetVector(int level) const;
 
-    /// Create a coarse mixed form vector
-    virtual mfem::BlockVector GetCoarseBlockVector() const;
-
-    /// Create a fine mixed form vector
-    virtual mfem::BlockVector GetFineBlockVector() const;
+    /// Create an approritately sized mixed form vector
+    virtual mfem::BlockVector GetBlockVector(int level) const;
 
     /// Create a coarse mixed form vector on true dofs
-    virtual mfem::BlockVector GetCoarseTrueBlockVector() const;
-
-    /// Create a fine mixed form vector on true dofs
-    virtual mfem::BlockVector GetFineTrueBlockVector() const;
+    virtual mfem::BlockVector GetTrueBlockVector(int level) const;
 
     // Get Mixed Matrix
     virtual MixedMatrix& GetMatrix(int level);
     virtual const MixedMatrix& GetMatrix(int level) const;
 
-    /// Get Fine level Mixed Matrix
-    virtual MixedMatrix& GetFineMatrix();
-    virtual const MixedMatrix& GetFineMatrix() const;
-
-    /// Get Coarse level Mixed Matrix
-    virtual MixedMatrix& GetCoarseMatrix();
-    virtual const MixedMatrix& GetCoarseMatrix() const;
-
     /// Get a vector of coefficients that represents a constant vector on
-    /// the coarse graph; that is, return a vector v such that P_{vertices} v = 1
-    const mfem::Vector& GetCoarseConstantRep() const;
+    /// the graph; that is, return a vector v such that P_{vertices} v = 1
+    /// GetConstantRep(0) will normally return a vector of all 1s
+    const mfem::Vector& GetConstantRep(unsigned int level) const;
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
@@ -148,7 +134,7 @@ public:
     double OperatorComplexity() const;
 
     /// Get Row Starts
-    virtual mfem::Array<HYPRE_Int>& GetDrowStart() const { return GetFineMatrix().GetDrowStart();}
+    virtual mfem::Array<HYPRE_Int>& GetDrowStart() const { return GetMatrix(0).GetDrowStart();}
 
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
@@ -215,8 +201,8 @@ protected:
     std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
-    /// @todo vector-ize
-    mutable mfem::Vector coarse_constant_rep_;
+    /// why exactly is this mutable?
+    mutable std::vector<mfem::Vector> constant_rep_;
 
 private:
     void SetOperator(const mfem::Operator& op) {};

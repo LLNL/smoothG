@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
 
     upscale.DumpDebug("debug/");
 
-    mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+    mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
     fine_rhs.GetBlock(0) = 0.0;
     fine_rhs.GetBlock(1) = 1.0; // ?
 

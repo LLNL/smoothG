@@ -844,6 +844,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 //       calls ComputeEdgeTargets(constan_rep)
                 //         which uses MakeOneNegOne()
                 //    (see gelever ComputeEdgeTargets etc.)
+                // this call stack:
+                //
 
                 // set up an average zero vector (so no need to Normalize)
                 int nvertex_neighbor0 = Dloc_0.Height();

@@ -59,7 +59,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);
 
-    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    mfem::SparseMatrix& Dref = GetMatrix(1).GetD();
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -76,8 +76,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     }
     else // L2-H1 block diagonal preconditioner
     {
-        GetCoarseMatrix().BuildM();
-        mfem::SparseMatrix& Mref = GetCoarseMatrix().GetM();
+        GetMatrix(1).BuildM();
+        mfem::SparseMatrix& Mref = GetMatrix(1).GetM();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -87,7 +87,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
         Dref.EliminateCols(marker);
 
-        solver_[1] = make_unique<MinresBlockSolverFalse>(comm, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm, GetMatrix(1));
     }
 
     MakeVectors(1);
@@ -133,7 +133,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);
 
-    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    mfem::SparseMatrix& Dref = GetMatrix(1).GetD();
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -150,8 +150,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     }
     else // L2-H1 block diagonal preconditioner
     {
-        GetCoarseMatrix().BuildM();
-        mfem::SparseMatrix& Mref = GetCoarseMatrix().GetM();
+        GetMatrix(1).BuildM();
+        mfem::SparseMatrix& Mref = GetMatrix(1).GetM();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -179,14 +179,14 @@ void FiniteVolumeUpscale::MakeFineSolver()
     {
         if (param_.hybridization) // Hybridization solver
         {
-            solver_[0] = make_unique<HybridSolver>(comm_, true, GetFineMatrix(),
+            solver_[0] = make_unique<HybridSolver>(comm_, true, GetMatrix(0),
                                                    &edge_boundary_att_, &marker);
         }
         else // L2-H1 block diagonal preconditioner
         {
-            mfem::SparseMatrix& Mref = GetFineMatrix().GetM();
-            mfem::SparseMatrix& Dref = GetFineMatrix().GetD();
-            const bool w_exists = GetFineMatrix().CheckW();
+            mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
+            mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
+            const bool w_exists = GetMatrix(0).CheckW();
 
             for (int mm = 0; mm < marker.Size(); ++mm)
             {
@@ -204,7 +204,7 @@ void FiniteVolumeUpscale::MakeFineSolver()
                 Dref.EliminateRow(0);
             }
 
-            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
         }
     }
 }

@@ -183,7 +183,7 @@ mfem::BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filenam
     mfem::Vector vertex_vect = ReadVector(filename, global_vertices_,
                                           pgraph_->GetVertexLocalToGlobalMap());
 
-    mfem::BlockVector vect = GetFineBlockVector();
+    mfem::BlockVector vect = GetBlockVector(0);
     vect.GetBlock(0) = 0.0;
     vect.GetBlock(1) = vertex_vect;
 
@@ -195,7 +195,7 @@ mfem::BlockVector GraphUpscale::ReadEdgeBlockVector(const std::string& filename)
     assert(pgraph_);
     mfem::Vector edge_vect = ReadVector(filename, global_edges_, pgraph_->GetEdgeLocalToGlobalMap());
 
-    mfem::BlockVector vect = GetFineBlockVector();
+    mfem::BlockVector vect = GetBlockVector(0);
     vect.GetBlock(0) = edge_vect;
     vect.GetBlock(1) = 0.0;
 

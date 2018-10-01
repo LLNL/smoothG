@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
+    mfem::BlockVector rhs_fine(fvupscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 

@@ -177,14 +177,14 @@ int main(int argc, char* argv[])
         /// [Right Hand Side]
         if (generate_graph || generate_fiedler)
         {
-            rhs_u_fine = ComputeFiedlerVector(upscale.GetFineMatrix());
+            rhs_u_fine = ComputeFiedlerVector(upscale.GetMatrix(0));
         }
         else
         {
             rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
         }
 
-        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+        mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
