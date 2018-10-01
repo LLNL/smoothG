@@ -218,6 +218,9 @@ private:
     */
     mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
 
+    /// given an assembled vector on vertices, return extracted value on (possibly shared) faces
+    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect);
+
     MPI_Comm comm_;
 
     const double rel_tol_;

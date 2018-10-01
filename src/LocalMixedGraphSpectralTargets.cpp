@@ -591,6 +591,44 @@ mfem::Vector LocalMixedGraphSpectralTargets::MakeOneNegOne(
     return vect;
 }
 
+/// implementation copied from Stephan Gelever's GraphCoarsen::CollectConstant
+mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
+    const mfem::Vector& constant_vect)
+{
+    // Gelever uses face_trueface rather than facedof_truedof (?) (I think one of us is just labeling it wrong)
+    SharedEntityCommunication<mfem::Vector> sec_constant(comm_, *graph_topology_.face_d_td_.get());
+
+    unsigned int num_faces = graph_topology_.get_num_faces();
+
+    for (unsigned int face = 0; face < num_faces; ++face)
+    {
+        const int* neighbors = graph_topology_.face_Agg_.GetRowColumns(face);
+        std::vector<double> constant_data;
+
+        for (int k = 0; k < graph_topology_.face_Agg_.RowSize(face); ++k) //  agg : neighbors)
+        {
+            int agg = neighbors[k];
+            // std::vector<int> agg_vertices = agg_vertexdof_.GetIndices(agg);
+            mfem::Array<int> agg_vertices;
+            mfem::Vector vals_dummy;
+            graph_topology_.Agg_vertex_.GetRow(agg, agg_vertices, vals_dummy);
+            mfem::Vector sub_vect;
+            constant_vect.GetSubVector(agg_vertices, sub_vect);
+            // auto sub_vect = constant_vect.GetSubVector(agg_vertices);
+
+            // constant_data.insert(std::end(constant_data), std::begin(sub_vect),
+            //  std::end(sub_vect));
+            for (int l = 0; l < sub_vect.Size(); ++l)
+                constant_data.push_back(sub_vect(l));
+        }
+
+        mfem::Vector sendbuffer(&constant_data[0], constant_data.size());
+        sec_constant.ReduceSend(face, sendbuffer);
+    }
+
+    return sec_constant.Collect();
+}
+
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
@@ -838,20 +876,6 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 mfem::SparseMatrix& Dloc_0 = shared_Dloc_f[0];
                 mfem::SparseMatrix& Dloc_1 = shared_Dloc_f[1];
 
-                // OneNegOne needs to take constant_rep from previous level!
-                // gelever call stack:
-                //   GraphUpscale constructor [each Level gets a constant_rep]
-                //     calls GraphCoarsen constructor [with finer levels constant_rep as argument]
-                //       calls ComputeEdgeTargets(constan_rep)
-                //         which uses MakeOneNegOne()
-                //    (see gelever ComputeEdgeTargets etc.)
-                // this call stack:
-                //   GraphUpscale::Init()
-                //     calls SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
-                //       calls LMGST::Compute()
-                //         calls this
-
-                // set up an average zero vector (so no need to Normalize)
                 int nvertex_neighbor0 = Dloc_0.Height();
                 int nvertex_local_dofs = nvertex_neighbor0 + Dloc_1.Height();
                 mfem::Vector local_constant(nvertex_local_dofs);
