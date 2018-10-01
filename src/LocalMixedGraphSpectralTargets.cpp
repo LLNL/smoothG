@@ -554,6 +554,19 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     }
 }
 
+void LocalMixedGraphSpectralTargets::BuildOneNegOne(mfem::Vector& onenegone,
+                                                    int size, int splitpoint)
+{
+    onenegone.SetSize(size);
+    double Dsigma = 1.0 / splitpoint;
+    for (int i = 0; i < splitpoint; i++)
+        onenegone(i) = Dsigma;
+    // Dsigma = -1.0 / Dloc_1.Height();
+    Dsigma = -1.0 / (size - splitpoint);
+    for (int i = splitpoint; i < size; i++)
+        onenegone(i) = Dsigma;
+}
+
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets)
@@ -800,21 +813,13 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 mfem::SparseMatrix& Dloc_0 = shared_Dloc_f[0];
                 mfem::SparseMatrix& Dloc_1 = shared_Dloc_f[1];
 
-                int nvertex_neighbor0 = Dloc_0.Height();
-                int nvertex_local_dofs = nvertex_neighbor0 + Dloc_1.Height();
+                // OneNegOne needs to take constant_rep from previous level!
+                //    (see gelever ComputeEdgeTargets etc.)
 
                 // set up an average zero vector (so no need to Normalize)
-
-                OneNegOne needs to take constant_rep from previous level!
-                    (see gelever ComputeEdgeTargets etc.)
-
-                OneNegOne.SetSize(nvertex_local_dofs);
-                double Dsigma = 1.0 / nvertex_neighbor0;
-                for (int i = 0; i < nvertex_neighbor0; i++)
-                    OneNegOne(i) = Dsigma;
-                Dsigma = -1.0 / Dloc_1.Height();
-                for (int i = nvertex_neighbor0; i < nvertex_local_dofs; i++)
-                    OneNegOne(i) = Dsigma;
+                int nvertex_neighbor0 = Dloc_0.Height();
+                int nvertex_local_dofs = nvertex_neighbor0 + Dloc_1.Height();
+                BuildOneNegOne(OneNegOne, nvertex_local_dofs, nvertex_neighbor0);
 
                 // each shared_Mloc_f[i] contains edge dofs on the face
                 int nedge_local_dofs =
@@ -878,18 +883,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 mfem::Vector& Mloc_0 = shared_Mloc_f[0];
                 mfem::SparseMatrix& Dloc_0 = shared_Dloc_f[0];
 
-                const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
-                int nvertex_local_dofs = Dloc_0.Height();
-                int nvertex_neighbor0 = Agg_vertex.RowSize(neighbor_aggs[0]);
-
                 // set up an average zero vector (so no need to Normalize)
-                OneNegOne.SetSize(nvertex_local_dofs);
-                double Dsigma = 1.0 / nvertex_neighbor0;
-                for (int i = 0; i < nvertex_neighbor0; i++)
-                    OneNegOne(i) = Dsigma;
-                Dsigma = -1.0 / (nvertex_local_dofs - nvertex_neighbor0);
-                for (int i = nvertex_neighbor0; i < nvertex_local_dofs; i++)
-                    OneNegOne(i) = Dsigma;
+                const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
+                int nvertex_neighbor0 = Agg_vertex.RowSize(neighbor_aggs[0]);
+                BuildOneNegOne(OneNegOne, Dloc_0.Height(), nvertex_neighbor0);
 
                 // solve saddle point problem for PV and restrict to face
                 PV_sigma.SetSize(Mloc_0.Size());

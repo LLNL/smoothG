@@ -205,6 +205,16 @@ private:
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
+    /**
+       @brief Fill onenegone partly with a constant positive value, partly with
+       a constant negative value, so that it has zero average
+
+       @todo on coarser levels this is not quite what we want, it depends on the
+       coarse constant representation.
+    */
+    void BuildOneNegOne(mfem::Vector& onenegone,
+                        int size, int splitpoint);
+
     MPI_Comm comm_;
 
     const double rel_tol_;
