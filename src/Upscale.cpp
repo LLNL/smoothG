@@ -106,17 +106,12 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     }
 
     // solve
-    if (level > 0)
-    {
-        rhs_[level]->GetBlock(1) *= -1.0;
-    }
+    rhs_[level]->GetBlock(1) *= -1.0; // for reasons I do not fully understand
+
     OutputVec(*rhs_[level], level, "rawrhs");
     solver_[level]->Solve(*rhs_[level], *sol_[level]);
     OutputVec(*sol_[level], level, "rawsol");
-    if (level == 0)
-    {
-        *sol_[level] *= -1.0;
-    }
+
     // orthogonalize at coarse level, every level, or fine level?
 
     // interpolate solution
