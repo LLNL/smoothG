@@ -454,7 +454,6 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 edge_traces_f.GetColumnReference(k, trace);
                 if (i == nAggs / 2)
                 {
-                    // here it is 1.414, I expect 1.0
                     std::cout << "B: agg " << i << " face " << j << " trace: " << std::endl;
                     trace.Print(std::cout, 1);
                 }
@@ -470,9 +469,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 // instead of doing local_rhs *= -1, we store -trace later
                 if (nlocal_fine_dofs)
                 {
-                    // TODO: line below should involve constant_rep, not always 1
-                    // (see Gelever's OrthoConstant)
                     orthogonalize_from_vector(local_rhs_trace, one);
+                    // orthogonalize_from_constant(local_rhs_trace);
                     traces_extensions.GetColumnReference(nlocal_traces, local_sol);
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     solver.Mult(local_rhs_trace, local_sol, F_potential);

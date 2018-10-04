@@ -831,7 +831,7 @@ void orthogonalize_from_constant(mfem::Vector& vec)
 /// actually makes sense
 void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt)
 {
-    double dot = (vec * wrt) / wrt.Norml1();
+    double dot = (vec * wrt) / (wrt * wrt);
     vec.Add(-dot, wrt);
 }
 
