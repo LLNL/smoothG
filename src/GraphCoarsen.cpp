@@ -150,7 +150,8 @@ int GraphCoarsen::BuildCoarseFaceCoarseDof(unsigned int nfaces,
 
 void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                                    const mfem::SparseMatrix& Agg_vertex,
-                                   const mfem::SparseMatrix& face_edge)
+                                   const mfem::SparseMatrix& face_edge,
+                                   const mfem::Vector& constant_rep)
 {
     const unsigned int nfaces = face_edge.Height();
     bool sign_flip;
@@ -173,12 +174,17 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
             edge_traces_f.Print(std::cout);
         }
         int num_traces = edge_traces_f.Width();
-        mfem::Vector allone(Dtransfer.Height());
-        // should be constant_rep, see Gelever OrthoConstant (I don't really understand?)
-        allone = 1.;
+
+        mfem::Vector localconstant;
+        constant_rep.GetSubVector(local_verts, localconstant);
+
+        /*
+        mfem::Vector localconstant(Dtransfer.Height());
+        localconstant = 1.;
+        */
 
         edge_traces_f.GetColumnReference(0, PV_trace);
-        double oneDpv = Dtransfer.InnerProduct(PV_trace, allone);
+        double oneDpv = Dtransfer.InnerProduct(PV_trace, localconstant);
 
         if (oneDpv < 0)
         {
@@ -186,14 +192,16 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
             oneDpv *= -1.;
         }
         else
+        {
             sign_flip = false;
+        }
 
         PV_trace /= oneDpv;
 
         for (int k = 1; k < num_traces; k++)
         {
             edge_traces_f.GetColumnReference(k, trace);
-            double alpha = Dtransfer.InnerProduct(trace, allone);
+            double alpha = Dtransfer.InnerProduct(trace, localconstant);
 
             if (sign_flip)
                 alpha *= -1.;
@@ -202,6 +210,9 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
             ScaledPV.Set(alpha, PV_trace);
             trace -= ScaledPV;
         }
+
+        // might need to SVD
+
         if (iface == nfaces / 2)
         {
             std::cout << "    NormalizeTraces, iface " << iface << " after:" << std::endl;
@@ -358,8 +369,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                                total_num_traces + ncoarse_vertexdofs - nAggs);
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
-    // maybe?! use constant_rep here, but I think not
-    NormalizeTraces(edge_traces, Agg_vertex, face_edge); //commenting out VERY BAD IDEA!
+    // this is Gelever's "ScaleEdgeTargets"
+    NormalizeTraces(edge_traces, Agg_vertex, face_edge, constant_rep);
 
     coarse_mbuilder.Setup(edge_traces, vertex_target, Agg_face, total_num_traces,
                           ncoarse_vertexdofs);

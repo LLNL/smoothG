@@ -180,7 +180,8 @@ private:
     */
     void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                          const mfem::SparseMatrix& Agg_vertex,
-                         const mfem::SparseMatrix& face_edge);
+                         const mfem::SparseMatrix& face_edge,
+                         const mfem::Vector& constant_rep);
 
     /**
        Figure out NNZ for each row of PEdges, which is to say, for each fine
