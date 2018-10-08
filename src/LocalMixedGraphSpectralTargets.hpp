@@ -213,8 +213,7 @@ private:
        @brief Fill onenegone partly with a constant positive value, partly with
        a constant negative value, so that it has zero average
 
-       @todo on coarser levels this is not quite what we want, it depends on the
-       coarse constant representation.
+       (on coarser levels this does something different)
     */
     mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
 
