@@ -127,11 +127,11 @@ void GraphUpscale::MakeFineSolver()
     {
         if (param_.hybridization)
         {
-            solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0));
         }
         else
         {
-            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
         }
     }
 }
