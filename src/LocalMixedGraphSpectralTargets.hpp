@@ -30,6 +30,7 @@
 
 #include "mfem.hpp"
 #include "GraphTopology.hpp"
+#include "LocalEigenSolver.hpp"
 
 namespace smoothg
 {
@@ -71,6 +72,7 @@ struct SAAMGeParam
 class UpscaleParameters
 {
 public:
+    int max_levels;
     double spect_tol;
     int max_evects;
     bool dual_target;
@@ -81,7 +83,8 @@ public:
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
 
-    UpscaleParameters() : spect_tol(0.001),
+    UpscaleParameters() : max_levels(2),
+        spect_tol(0.001),
         max_evects(4),
         dual_target(false),
         scaled_dual(false),
@@ -93,6 +96,8 @@ public:
 
     void RegisterInOptionsParser(mfem::OptionsParser& args)
     {
+        args.AddOption(&max_levels, "--max-levels", "--max-levels",
+                       "Number of levels in multilevel hierarchy");
         args.AddOption(&max_evects, "-m", "--max-evects",
                        "Maximum eigenvectors per aggregate.");
         args.AddOption(&spect_tol, "-t", "--spect-tol",
@@ -193,16 +198,8 @@ private:
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
-    std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
-        const mfem::SparseMatrix& Lloc,
-        const mfem::SparseMatrix& Dloc,
-        const mfem::Vector& Mloc_diag_inv);
-
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
-
-    void CheckMinimalEigenvalue(
-        double eval_min, int aggregate_id, std::string entity);
 
     MPI_Comm comm_;
 
@@ -230,7 +227,7 @@ private:
     mfem::Array<HYPRE_Int> D_local_rowstart;
     mfem::Array<HYPRE_Int> edge_ext_start;
 
-    mfem::Array<int> colMapper;
+    mfem::Array<int> colMapper_;
 };
 
 } // namespace smoothg

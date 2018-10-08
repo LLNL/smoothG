@@ -50,17 +50,17 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning);
+    GraphTopology graph_topology(ve_copy, edge_d_td_, partitioning);
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), param_);
-    coarsener_->construct_coarse_subspace();
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(graph_topology), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -89,6 +89,10 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
@@ -98,24 +102,24 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     std::unique_ptr<GraphTopology> graph_topology;
     if (edge_boundary_att_.Height() == 0)
     {
-        graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                    nullptr);
+        GraphTopology graph_topology(ve_copy, edge_d_td_, partitioning, nullptr);
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                    mixed_laplacians_[0], std::move(graph_topology), param_));
     }
     else
     {
-        graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                    &edge_boundary_att_);
+        GraphTopology graph_topology(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                    mixed_laplacians_[0], std::move(graph_topology), param_));
     }
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), param_);
-    coarsener_->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace();
 
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -143,23 +147,25 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, edge_d_td_);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                     &edge_boundary_att_);
+    GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(gt), param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology), param_);
-    coarsener_->construct_coarse_subspace();
-
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     MakeCoarseSolver();
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -191,27 +197,31 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
     mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    auto graph_topology = make_unique<GraphTopology>(ve_copy, edge_d_td_, partitioning,
-                                                     &edge_boundary_att_);
+    GraphTopology graph_topology(ve_copy, edge_d_td_, partitioning,
+                                 &edge_boundary_att_);
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], std::move(graph_topology),
-                     param_);
-    coarsener_->construct_coarse_subspace();
+    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                mixed_laplacians_[0], std::move(graph_topology),
+                                param_));
+    coarsener_[0]->construct_coarse_subspace();
 
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
+    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
     CoarsenEssentialVertexBoundary(special_vertex_dofs);
 
     MakeCoarseSolver();
 
-    MakeCoarseVectors();
+    MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -280,7 +290,8 @@ void FiniteVolumeMLMC::ModifyCoarseRHSEssential(mfem::BlockVector& coarserhs) co
     }
 }
 
-/// this implementation is sloppy
+/// this implementation is sloppy (also, @todo should be combined with
+/// RescaleCoarseCoefficient with int level argument)
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
     GetFineMatrix().UpdateM(coeff);
@@ -290,7 +301,7 @@ void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(fine_solver_.get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[0].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
@@ -305,7 +316,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(coarse_solver_.get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[1].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
@@ -346,8 +357,8 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
     mfem::Array<int> ess_sigma_marker(Dref.Width());
     ess_sigma_marker = 0;
 
-    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
-                       coarsener_->construct_face_facedof_table(),
+    MarkDofsOnBoundary(coarsener_[0]->get_GraphTopology_ref().face_bdratt_,
+                       coarsener_[0]->construct_face_facedof_table(),
                        ess_attr_, ess_sigma_marker);
 
     if (param_.hybridization) // Hybridization solver
@@ -355,10 +366,10 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
         // coarse_components method does not store element matrices
         assert(!param_.coarse_components);
 
-        auto& face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm_, GetCoarseMatrix(), *coarsener_,
-                             &face_bdratt, &ess_sigma_marker, 0, param_.saamge_param);
+        auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
+        solver_[1] = make_unique<HybridSolver>(
+                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         &face_bdratt, &ess_sigma_marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -420,7 +431,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
             }
         }
 
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
     }
 }
 
@@ -431,8 +442,8 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     if (param_.hybridization) // Hybridization solver
     {
-        fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
-                                                 &edge_boundary_att_, &ess_sigma_marker);
+        solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+                                               &edge_boundary_att_, &ess_sigma_marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -506,7 +517,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             Dref.EliminateRow(0);
         }
 
-        fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
     }
 
     // TODO: we can actually delete ess_u_marker_, ess_u_data_ at this point, which
@@ -515,29 +526,29 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
 void FiniteVolumeMLMC::SolveEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(rhs_coarse_);
-    assert(sol_coarse_);
-    assert(coarsener_);
-    assert(coarse_solver_);
+    assert(rhs_[1]);
+    assert(sol_[1]);
+    assert(coarsener_[0]);
+    assert(solver_[1]);
 
-    coarsener_->restrict(x, *rhs_coarse_);
-    // rhs_coarse_->GetBlock(1) *= -1.0;
+    coarsener_[0]->restrict(x, *rhs_[1]);
+    // rhs_[1]->GetBlock(1) *= -1.0;
 
-    ModifyCoarseRHSEssential(*rhs_coarse_); // does not match semantics in fine case
+    ModifyCoarseRHSEssential(*rhs_[1]); // does not match semantics in fine case
 
     {
         std::ofstream out("mlmc_fv_coarserhs.vector");
-        rhs_coarse_->Print(out, 1);
+        rhs_[1]->Print(out, 1);
     }
 
-    coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
+    solver_[1]->Solve(*rhs_[1], *sol_[1]);
 
     {
         std::ofstream out("mlmc_fv_coarsesol.vector");
-        sol_coarse_->Print(out, 1);
+        sol_[1]->Print(out, 1);
     }
 
-    coarsener_->interpolate(*sol_coarse_, y);
+    coarsener_[0]->interpolate(*sol_[1], y);
 
     // Orthogonalize(y);
 }
@@ -546,9 +557,9 @@ void FiniteVolumeMLMC::SolveEssU(const mfem::BlockVector& x, mfem::BlockVector& 
 /// about overloading all four versions...
 void FiniteVolumeMLMC::SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(fine_solver_);
+    assert(solver_[0]);
 
-    fine_solver_->Solve(x, y);
+    solver_[0]->Solve(x, y);
     // y *= -1.0;
 
     // Orthogonalize(y);
@@ -556,7 +567,7 @@ void FiniteVolumeMLMC::SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVect
 
 void FiniteVolumeMLMC::MakeFineSolver()
 {
-    if (!fine_solver_)
+    if (!solver_[0])
     {
         ForceMakeFineSolver();
     }

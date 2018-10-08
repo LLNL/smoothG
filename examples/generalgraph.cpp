@@ -191,10 +191,10 @@ int main(int argc, char* argv[])
 
         /// [Solve]
         mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        upscale.ShowCoarseSolveInfo();
+        upscale.ShowSolveInfo(1);
 
         mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        upscale.ShowFineSolveInfo();
+        upscale.ShowSolveInfo(0);
         /// [Solve]
 
         /// [Check Error]

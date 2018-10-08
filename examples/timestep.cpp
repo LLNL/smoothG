@@ -316,7 +316,7 @@ int main(int argc, char* argv[])
 
         chrono.Stop();
 
-        fvupscale.ShowCoarseSolveInfo();
+        fvupscale.ShowSolveInfo(1);
 
         if (myid == 0)
         {

@@ -25,22 +25,42 @@
 namespace smoothg
 {
 
+void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    assert(solver_[level]);
+    if (level == 0)
+    {
+        solver_[level]->Solve(x, y);
+        y *= -1.0;
+        Orthogonalize(y);
+    }
+    else
+    {
+        assert(rhs_[level]);
+        assert(sol_[level]);
+        assert(coarsener_[level - 1]);
+
+        // for levels...
+        coarsener_[level - 1]->restrict(x, rhs_[level]->GetBlock(1));
+        rhs_[level]->GetBlock(0) = 0.0;
+        rhs_[level]->GetBlock(1) *= -1.0;
+
+        solver_[level]->Solve(*rhs_[level], *sol_[level]);
+
+        coarsener_[level - 1]->interpolate(sol_[level]->GetBlock(1), y);
+
+        Orthogonalize(y);
+    }
+}
+
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(rhs_coarse_);
-    assert(sol_coarse_);
-    assert(coarsener_);
-    assert(coarse_solver_);
+    Mult(1, x, y);
+}
 
-    coarsener_->restrict(x, rhs_coarse_->GetBlock(1));
-    rhs_coarse_->GetBlock(0) = 0.0;
-    rhs_coarse_->GetBlock(1) *= -1.0;
-
-    coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
-
-    coarsener_->interpolate(sol_coarse_->GetBlock(1), y);
-
-    Orthogonalize(y);
+void Upscale::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    Mult(level, x, y);
 }
 
 void Upscale::Solve(const mfem::Vector& x, mfem::Vector& y) const
@@ -57,21 +77,36 @@ mfem::Vector Upscale::Solve(const mfem::Vector& x) const
     return y;
 }
 
+void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(solver_[level]);
+    if (level == 0)
+    {
+        solver_[level]->Solve(x, y);
+        y *= -1.0;
+
+        Orthogonalize(y);
+    }
+    else
+    {
+        assert(rhs_[level]);
+        assert(sol_[level]);
+        assert(coarsener_[level - 1]);
+
+        coarsener_[level - 1]->restrict(x, *rhs_[level]);
+        rhs_[level]->GetBlock(1) *= -1.0;
+
+        solver_[level]->Solve(*rhs_[level], *sol_[level]);
+
+        coarsener_[level - 1]->interpolate(*sol_[level], y);
+
+        Orthogonalize(y);
+    }
+}
+
 void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(rhs_coarse_);
-    assert(sol_coarse_);
-    assert(coarsener_);
-    assert(coarse_solver_);
-
-    coarsener_->restrict(x, *rhs_coarse_);
-    rhs_coarse_->GetBlock(1) *= -1.0;
-
-    coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
-
-    coarsener_->interpolate(*sol_coarse_, y);
-
-    Orthogonalize(y);
+    Solve(1, x, y);
 }
 
 mfem::BlockVector Upscale::Solve(const mfem::BlockVector& x) const
@@ -85,9 +120,9 @@ mfem::BlockVector Upscale::Solve(const mfem::BlockVector& x) const
 
 void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarse_solver_);
+    assert(solver_[1]);
 
-    coarse_solver_->Solve(x, y);
+    solver_[1]->Solve(x, y);
     y *= -1.0;
     OrthogonalizeCoarse(y);
 }
@@ -102,9 +137,9 @@ mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const
 
 void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarse_solver_);
+    assert(solver_[1]);
 
-    coarse_solver_->Solve(x, y);
+    solver_[1]->Solve(x, y);
     y *= -1.0;
     OrthogonalizeCoarse(y);
 }
@@ -119,12 +154,7 @@ mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
 
 void Upscale::SolveFine(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(fine_solver_);
-
-    fine_solver_->Solve(x, y);
-    y *= -1.0;
-
-    Orthogonalize(y);
+    Solve(0, x, y);
 }
 
 mfem::Vector Upscale::SolveFine(const mfem::Vector& x) const
@@ -138,12 +168,7 @@ mfem::Vector Upscale::SolveFine(const mfem::Vector& x) const
 
 void Upscale::SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(fine_solver_);
-
-    fine_solver_->Solve(x, y);
-    y *= -1.0;
-
-    Orthogonalize(y);
+    Solve(0, x, y);
 }
 
 mfem::BlockVector Upscale::SolveFine(const mfem::BlockVector& x) const
@@ -155,43 +180,57 @@ mfem::BlockVector Upscale::SolveFine(const mfem::BlockVector& x) const
     return y;
 }
 
+void Upscale::Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    assert(coarsener_[level - 1]);
+    coarsener_[level - 1]->interpolate(x, y);
+}
+
 void Upscale::Interpolate(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->interpolate(x, y);
+    Interpolate(1, x, y);
 }
 
 mfem::Vector Upscale::Interpolate(const mfem::Vector& x) const
 {
     mfem::Vector fine_vect = GetFineVector();
 
-    Interpolate(x, fine_vect);
+    Interpolate(1, x, fine_vect);
 
     return fine_vect;
 }
 
+void Upscale::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->interpolate(x, y);
+}
+
 void Upscale::Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->interpolate(x, y);
+    Interpolate(1, x, y);
 }
 
 mfem::BlockVector Upscale::Interpolate(const mfem::BlockVector& x) const
 {
     mfem::BlockVector fine_vect(GetFineBlockVector());
 
-    Interpolate(x, fine_vect);
+    Interpolate(1, x, fine_vect);
 
     return fine_vect;
 }
 
+void Upscale::Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->restrict(x, y);
+}
+
 void Upscale::Restrict(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->restrict(x, y);
+    Restrict(1, x, y);
 }
 
 mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
@@ -202,11 +241,16 @@ mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
     return coarse_vect;
 }
 
+void Upscale::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->restrict(x, y);
+}
+
 void Upscale::Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarsener_);
-
-    coarsener_->restrict(x, y);
+    Restrict(1, x, y);
 }
 
 mfem::BlockVector Upscale::Restrict(const mfem::BlockVector& x) const
@@ -322,21 +366,25 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
     return mixed_laplacians_[level];
 }
 
+/// @deprecated
 MixedMatrix& Upscale::GetFineMatrix()
 {
     return GetMatrix(0);
 }
 
+/// @deprecated
 const MixedMatrix& Upscale::GetFineMatrix() const
 {
     return GetMatrix(0);
 }
 
+/// @deprecated
 MixedMatrix& Upscale::GetCoarseMatrix()
 {
     return GetMatrix(1);
 }
 
+/// @deprecated
 const MixedMatrix& Upscale::GetCoarseMatrix() const
 {
     return GetMatrix(1);
@@ -399,16 +447,17 @@ void Upscale::PrintInfo(std::ostream& out) const
     }
 }
 
+/// @todo multilevel this implementation (relatively easy)
 double Upscale::OperatorComplexity() const
 {
-    assert(coarse_solver_);
+    assert(solver_[1]);
 
-    int nnz_coarse = coarse_solver_->GetNNZ();
+    int nnz_coarse = solver_[1]->GetNNZ();
     int nnz_fine;
 
-    if (fine_solver_)
+    if (solver_[0])
     {
-        nnz_fine = fine_solver_->GetNNZ();
+        nnz_fine = solver_[0]->GetNNZ();
     }
     else
     {
@@ -423,45 +472,37 @@ double Upscale::OperatorComplexity() const
 
 void Upscale::SetPrintLevel(int print_level)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetPrintLevel(print_level);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetPrintLevel(print_level);
+        if (solver)
+            solver->SetPrintLevel(print_level);
     }
 }
 
 void Upscale::SetMaxIter(int max_num_iter)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetMaxIter(max_num_iter);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetMaxIter(max_num_iter);
+        if (solver)
+            solver->SetMaxIter(max_num_iter);
     }
 }
 
 void Upscale::SetRelTol(double rtol)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetRelTol(rtol);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetRelTol(rtol);
+        if (solver)
+            solver->SetRelTol(rtol);
     }
 }
 
 void Upscale::SetAbsTol(double atol)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetAbsTol(atol);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetAbsTol(atol);
+        if (solver)
+            solver->SetAbsTol(atol);
     }
 }
 
@@ -488,27 +529,15 @@ void Upscale::ShowErrors(const mfem::BlockVector& upscaled_sol,
     }
 }
 
-void Upscale::ShowCoarseSolveInfo(std::ostream& out) const
+void Upscale::ShowSolveInfo(int level, std::ostream& out) const
 {
-    assert(coarse_solver_);
-
+    assert(solver_[level]);
+    std::string tag = (level == 0 ? "Fine" : "Coarse");
     if (myid_ == 0)
     {
         out << "\n";
-        out << "Coarse Solve Time:       " << coarse_solver_->GetTiming() << "\n";
-        out << "Coarse Solve Iterations: " << coarse_solver_->GetNumIterations() << "\n";
-    }
-}
-
-void Upscale::ShowFineSolveInfo(std::ostream& out) const
-{
-    assert(fine_solver_);
-
-    if (myid_ == 0)
-    {
-        out << "\n";
-        out << "Fine Solve Time:         " << fine_solver_->GetTiming() << "\n";
-        out << "Fine Solve Iterations:   " << fine_solver_->GetNumIterations() << "\n";
+        out << tag << " Solve Time:         " << solver_[level]->GetTiming() << "\n";
+        out << tag << " Solve Iterations:   " << solver_[level]->GetNumIterations() << "\n";
     }
 }
 
@@ -521,32 +550,16 @@ void Upscale::ShowSetupTime(std::ostream& out) const
     }
 }
 
-double Upscale::GetCoarseSolveTime() const
+double Upscale::GetSolveTime(int level) const
 {
-    assert(coarse_solver_);
-
-    return coarse_solver_->GetTiming();
+    assert(solver_[level]);
+    return solver_[level]->GetTiming();
 }
 
-double Upscale::GetFineSolveTime() const
+int Upscale::GetSolveIters(int level) const
 {
-    assert(fine_solver_);
-
-    return fine_solver_->GetTiming();
-}
-
-int Upscale::GetCoarseSolveIters() const
-{
-    assert(coarse_solver_);
-
-    return coarse_solver_->GetNumIterations();
-}
-
-int Upscale::GetFineSolveIters() const
-{
-    assert(fine_solver_);
-
-    return fine_solver_->GetNumIterations();
+    assert(solver_[level]);
+    return solver_[level]->GetNumIterations();
 }
 
 double Upscale::GetSetupTime() const

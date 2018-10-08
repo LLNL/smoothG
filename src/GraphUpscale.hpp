@@ -101,6 +101,7 @@ private:
 
     const int global_edges_;
     const int global_vertices_;
+    const int coarse_factor_;
     const UpscaleParameters& param_;
 };
 
