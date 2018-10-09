@@ -329,11 +329,7 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later
         AggExt_sigmaT.SetSize(evects_tmp.Width(), DlocT_.Height());
-        // the new if below is suspicious; this thing's Height should probably not be 0?
-        if (AggExt_sigmaT.Height() > 0)
-        {
-            MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
-        }
+        MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
     }
     else
     {
@@ -983,15 +979,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             }
 
             // add PV vector to other vectors and orthogonalize
-            // TODO: this orthogonalization should be done with respect to constant_rep,
-            // not ones?
             Orthogonalize(collected_sigma, PV_sigma_on_face, 0, local_edge_trace_targets[iface]);
-
-            if (iface == nfaces / 2)
-            {
-                std::cout << "A: iface " << iface << " local_edge_trace_targets:" << std::endl;
-                local_edge_trace_targets[iface].Print(std::cout, 1);
-            }
 
             delete [] shared_sigma_f;
         }

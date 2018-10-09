@@ -88,14 +88,7 @@ GraphTopology::GraphTopology(GraphTopology& finer_graph_topology, int coarsening
                                    &(finer_graph_topology.face_bdratt_) : nullptr;
 
     mfem::Array<int> partitioning;
-    // TODO temporary half partitioning...
-    // PartitionAAT(vertex_edge, partitioning, coarsening_factor); // actual partition happens
-    partitioning.SetSize(vertex_edge.Height());
-    for (int i = 0; i < vertex_edge.Height(); ++i)
-    {
-        partitioning[i] = i / 2;
-        // partitioning[i] = i / 4;
-    }
+    PartitionAAT(vertex_edge, partitioning, coarsening_factor); // actual partition happens
 
     const auto edge_d_td_d_ptr = finer_graph_topology.face_d_td_d_.get();
     Init(vertex_edge, partitioning, edge_boundaryattr, edge_d_td_d_ptr);
