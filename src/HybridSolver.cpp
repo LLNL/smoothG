@@ -173,8 +173,8 @@ void HybridSolver::Init(
     double* data_edgedof_multiplier = new double[num_multiplier_dofs_];
     std::fill_n(data_edgedof_multiplier, num_multiplier_dofs_, 1.0);
     mfem::SparseMatrix edgedof_multiplier(
-                i_edgedof_multiplier, j_edgedof_multiplier,
-                data_edgedof_multiplier, num_edge_dofs_, num_multiplier_dofs_);
+        i_edgedof_multiplier, j_edgedof_multiplier,
+        data_edgedof_multiplier, num_edge_dofs_, num_multiplier_dofs_);
     mfem::SparseMatrix multiplier_edgedof(smoothg::Transpose(edgedof_multiplier) );
 
     mfem::Array<int> j_array(multiplier_edgedof.GetJ(), multiplier_edgedof.NumNonZeroElems());
@@ -187,13 +187,13 @@ void HybridSolver::Init(
     GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
 
     auto edgedof_multiplier_d = make_unique<mfem::HypreParMatrix>(
-                comm_, edgedof_d_td_.GetGlobalNumRows(),
-                multiplier_start_.Last(), edgedof_d_td_.RowPart(),
-                multiplier_start_, &edgedof_multiplier);
+                                    comm_, edgedof_d_td_.GetGlobalNumRows(),
+                                    multiplier_start_.Last(), edgedof_d_td_.RowPart(),
+                                    multiplier_start_, &edgedof_multiplier);
 
     assert(edgedof_d_td_d && edgedof_multiplier_d);
     unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(
-                smoothg::RAP(*edgedof_d_td_d, *edgedof_multiplier_d) );
+        smoothg::RAP(*edgedof_d_td_d, *edgedof_multiplier_d) );
 
     // Construct multiplier "dof to true dof" table
     multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
