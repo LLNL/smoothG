@@ -43,7 +43,7 @@ GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_to
     M_proc_(mgL.GetM()),
     D_proc_(mgL.GetD()),
     W_proc_(mgL.GetW()),
-    fine_mbuilder_(dynamic_cast<const MBuilderWithElementM*>(&(mgL.GetMBuilder()))),
+    fine_mbuilder_(dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()))),
     graph_topology_(graph_topology),
     colMapper_(D_proc_.Width())
 {

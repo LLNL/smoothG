@@ -53,7 +53,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     const mfem::SparseMatrix edge_edgedof = SparseIdentity(D_.Width());
 
-    auto mbuilder = dynamic_cast<const FineMBuilder*>(&(mgL.GetMBuilder()));
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
     {
         std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
