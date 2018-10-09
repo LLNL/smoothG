@@ -136,6 +136,7 @@ public:
                            mfem::DenseMatrix& AggExt_sigmaT);
 
 private:
+    /// called only from ComputeEdgeTraces()
     void CheckMinimalEigenvalue(double eval_min, std::string entity);
 
     std::vector<mfem::SparseMatrix>
@@ -150,6 +151,8 @@ private:
     mfem::SparseMatrix DlocT_;
     mfem::SparseMatrix DMinvDt_;
     mfem::Vector Mloc_diag_inv_;
+    mfem::DenseMatrix evects_;
+    double eval_min_;
     bool scaled_dual_;
     bool energy_dual_;
     double zero_eigenvalue_threshold_;
@@ -181,46 +184,80 @@ MixedBlockEigensystem::MixedBlockEigensystem(
     energy_dual_(energy_dual),
     zero_eigenvalue_threshold_(1.e-8)
 {
-    const double* M_diag_data = M_ext.GetData();
-
     // extract local D corresponding to iAgg-th extended aggregate
     mfem::SparseMatrix Dloc_tmp =
         ExtractRowAndColumns(D_ext, vertex_local_dof_ext, edge_local_dof_ext, colMapper);
     Dloc_.Swap(Dloc_tmp);
-    Mloc_diag_inv_.SetSize(edge_local_dof_ext.Size());
-    for (int i = 0; i < Dloc_.Width(); i++)
-    {
-        Mloc_diag_inv_(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
-    }
+    mfem::SparseMatrix Wloc;
 
-    // build local (weighted) graph Laplacian (assumed diagonal M, key difference in multilevel setting)
-    mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
-    DlocT_.Swap(DlocT_tmp);
-    DlocT_.ScaleRows(Mloc_diag_inv_);
-    mfem::SparseMatrix DMinvDt_tmp = smoothg::Mult(Dloc_, DlocT_);
-    DMinvDt_.Swap(DMinvDt_tmp);
-
-    // Wloc assumed to be diagonal
     if (use_w_)
     {
-        auto Wloc = ExtractRowAndColumns(W_ext, vertex_local_dof_ext,
-                                         vertex_local_dof_ext, colMapper) ;
+        // Wloc assumed to be diagonal
+        auto Wloc_tmp = ExtractRowAndColumns(
+                            W_ext, vertex_local_dof_ext, vertex_local_dof_ext, colMapper) ;
+        Wloc.Swap(Wloc_tmp);
         assert(Wloc.NumNonZeroElems() == Wloc.Height());
         assert(Wloc.Height() == Wloc.Width());
+    }
 
-        DMinvDt_.Add(-1.0, Wloc);
+    // build local (weighted) graph Laplacian
+    if (M_ext.NumNonZeroElems() == M_ext.Height())
+    {
+        // M is diagonal (we assume---the check in the if is not great
+        const double* M_diag_data = M_ext.GetData();
+
+        Mloc_diag_inv_.SetSize(edge_local_dof_ext.Size());
+        for (int i = 0; i < Dloc_.Width(); i++)
+        {
+            Mloc_diag_inv_(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
+        }
+
+        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
+        DlocT_.Swap(DlocT_tmp);
+        DlocT_.ScaleRows(Mloc_diag_inv_);
+        mfem::SparseMatrix DMinvDt_tmp = smoothg::Mult(Dloc_, DlocT_);
+        DMinvDt_.Swap(DMinvDt_tmp);
+        if (use_w_)
+        {
+            DMinvDt_.Add(-1.0, Wloc);
+        }
+        eval_min_ = eigs_.Compute(DMinvDt_, evects_);
+    }
+    else
+    {
+        // general M (explicit dense inverse for now, which is a mistake) (@todo)
+        mfem::DenseMatrix denseD(Dloc_.Height(), Dloc_.Width());
+        Full(Dloc_, denseD);
+        mfem::DenseMatrix denseMinv(denseD.Width());
+        M_ext.GetSubMatrix(edge_local_dof_ext, edge_local_dof_ext, denseMinv);
+        denseMinv.Invert();
+
+        mfem::DenseMatrix DMinv(denseD.Height(), denseMinv.Width());
+        Mult(denseD, denseMinv, DMinv);
+        mfem::DenseMatrix DMinvDt_dense(denseD.Height());
+        MultABt(DMinv, denseD, DMinvDt_dense);
+        if (use_w_)
+        {
+            for (int i = 0; i < Wloc.Height(); ++i)
+            {
+                DMinvDt_dense(i, i) += Wloc.GetData()[i];
+            }
+        }
+        mfem::Vector evals;
+        eigs_.Compute(DMinvDt_dense, evals, evects_);
+        eval_min_ = evals.Min();
+    }
+
+    if (!use_w_)
+    {
+        CheckMinimalEigenvalue(eval_min_, "vertex");
     }
 }
 
 double MixedBlockEigensystem::ComputeEigenvectors(mfem::DenseMatrix& evects)
 {
-    // actually solve (3.1)
-    double eval_min = eigs_.Compute(DMinvDt_, evects);
-    if (!use_w_)
-    {
-        CheckMinimalEigenvalue(eval_min, "vertex");
-    }
-    return eval_min;
+    evects = evects_;
+    return eval_min_;
 }
 
 std::vector<mfem::SparseMatrix>
@@ -295,6 +332,9 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
     }
     else
     {
+        /// @todo
+        MFEM_ASSERT(DMinvDt_.Height() > 0,
+                    "Edge eigensystem only works with diagonal M! (ie, two-level)");
         double eval_min = 0.0;
         // Collect trace samples from eigenvectors of dual graph Laplacian
         auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_, Mloc_diag_inv_);

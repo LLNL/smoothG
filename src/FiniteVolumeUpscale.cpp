@@ -57,6 +57,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     coarsener_[0]->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
+    MakeVectors(0);
 
     mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     mfem::Array<int> marker(Dref.Width());
@@ -130,6 +131,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     coarsener_[0]->construct_coarse_subspace();
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
+    MakeVectors(0);
 
     mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
     mfem::Array<int> marker(Dref.Width());

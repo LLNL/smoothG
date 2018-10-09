@@ -19,6 +19,9 @@
 add_executable(lineargraph lineargraph.cpp)
 target_link_libraries(lineargraph smoothg ${TPL_LIBRARIES})
 
+add_executable(lineargraphthree lineargraphthree.cpp)
+target_link_libraries(lineargraphthree smoothg ${TPL_LIBRARIES})
+
 add_executable(tinygraphsolver tinygraphsolver.cpp)
 target_link_libraries(tinygraphsolver smoothg ${TPL_LIBRARIES})
 

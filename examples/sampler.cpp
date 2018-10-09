@@ -27,8 +27,8 @@
 
    I like the following runs:
 
-   examples/sampler --visualization --kappa 0.001 --coarsening-factor 3
-   examples/sampler --visualization --kappa 0.001 --coarsening-factor 2
+   examples/sampler --visualization --kappa 0.001 --cartesian-factor 3
+   examples/sampler --visualization --kappa 0.001 --cartesian-factor 2
 */
 
 #include <fstream>
@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
     args.AddOption(&kappa, "--kappa", "--kappa",
                    "Correlation length for Gaussian samples.");
     int coarsening_factor = 2;
-    args.AddOption(&coarsening_factor, "--coarsening-factor", "--coarsening-factor",
+    args.AddOption(&coarsening_factor, "--cartesian-factor", "--cartesian-factor",
                    "Coarsening factor for Cartesian agglomeration");
     int seed = 0;
     args.AddOption(&seed, "--seed", "--seed",

@@ -41,14 +41,17 @@ void GraphTopology::AggregateEdge2AggregateEdgeInt(
     int* tmp_i = new int [aggregate_edge.Height() + 1];
 
     // this removal of entries that have data value != 2 has something to do
-    // with orientation of the dofs/elements (may not valid for parallel)
+    // with orientation of the dofs/elements, as a result of
+    // smoothg::Mult(Agg_vertex_, vertex_edge) (or a parallel variant)
     int tmp_nnz = 0;
     for (int i = 0; i < aggregate_edge.Height(); i++)
     {
         tmp_i[i] = tmp_nnz;
         for (int j = aggregate_edge_i[i]; j < aggregate_edge_i[i + 1]; j++)
+        {
             if (aggregate_edge_data[j] == 2)
                 tmp_nnz++;
+        }
     }
     tmp_i[aggregate_edge.Height()] = tmp_nnz;
 
@@ -67,7 +70,6 @@ void GraphTopology::AggregateEdge2AggregateEdgeInt(
     aggregate_edge_int.Swap(tmp);
 }
 
-// TODO: allow aggregate to be shared by more than one processor
 GraphTopology::GraphTopology(
     mfem::SparseMatrix& vertex_edge,
     const mfem::HypreParMatrix& edge_d_td,
@@ -184,13 +186,17 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
     face_Agg_i[0] = 0;
     int count = 0;
     for (int i = 0; i < Agg_Agg_d->num_rows - 1; i++)
+    {
         for (int j = Agg_Agg_d_i[i]; j < Agg_Agg_d_i[i + 1]; j++)
+        {
             if (Agg_Agg_d_j[j] > i)
             {
                 face_Agg_j[count * 2] = i;
                 face_Agg_j[(count++) * 2 + 1] = Agg_Agg_d_j[j];
                 face_Agg_i[count] = count * 2;
             }
+        }
+    }
     assert(count == nfaces_int);
 
     // Interior face to aggregate table, to be used to construct face_edge
@@ -246,6 +252,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
 
     int sharedattr, edge, edge_shareattr_loc;
     for (int i = 0; i < Agg_Agg_o->num_rows; i++)
+    {
         for (int j = Agg_Agg_o_i[i]; j < Agg_Agg_o_i[i + 1]; j++)
         {
             sharedattr = Agg_shareattr_map[Agg_Agg_o_j[j]];
@@ -264,6 +271,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
             face_Agg_j[nfaces_int + (count++)] = i;
             face_Agg_i[count] = nfaces_int + count;
         }
+    }
     face_edge_i[nfaces] = face_edge_nnz;
     assert(count == nfaces);
 
@@ -290,6 +298,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
 
     // Insert edges to the faces shared between processors
     for (int i = 0; i < Agg_Agg_o->num_rows; i++)
+    {
         for (int j = Agg_Agg_o_i[i]; j < Agg_Agg_o_i[i + 1]; j++)
         {
             sharedattr = Agg_shareattr_map[Agg_Agg_o_j[j]];
@@ -305,6 +314,7 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
                 }
             }
         }
+    }
     double* face_edge_data = new double [face_edge_nnz];
     std::fill_n(face_edge_data, face_edge_nnz, 1.0);
     mfem::SparseMatrix face_edge_tmp(face_edge_i, face_edge_j, face_edge_data,
@@ -318,6 +328,10 @@ void GraphTopology::Init(mfem::SparseMatrix& vertex_edge,
         face_bdratt_.Swap(face_bdr);
     }
     face_bdratt_.Finalize(0);
+    // TODO: valgrind is reporting a memory leak for the I, J, A pointers
+    // built in the above Finalize(). I suspect some ownsGraph, ownsData
+    // members for the relevant SparseMatrix (and face_edge_, edge_boundaryattr)
+    // are set wrong
 
     // Complete face to aggregate table
     mfem::SparseMatrix face_agg_tmp(face_Agg_i, face_Agg_j,
