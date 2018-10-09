@@ -59,7 +59,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
         std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
         std::abort();
     }
-    Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
+    Agg_edgedof_.MakeRef(mbuilder->GetElemEdgeDofTable());
 
     Init(edge_edgedof, mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
@@ -94,7 +94,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
         std::abort();
     }
 
-    Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
+    Agg_edgedof_.MakeRef(mbuilder->GetElemEdgeDofTable());
 
     Init(face_edgedof, mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
