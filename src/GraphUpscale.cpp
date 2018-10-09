@@ -118,7 +118,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
             // coarse_components method does not store element matrices
             assert(!param_.coarse_components);
             solver_[level] = make_unique<HybridSolver>(
-                                 comm_, false, GetMatrix(level), *coarsener_[level - 1],
+                                 comm_, GetMatrix(level), *coarsener_[level - 1],
                                  nullptr, nullptr, 0, param_.saamge_param);
         }
         else // L2-H1 block diagonal preconditioner
@@ -139,7 +139,7 @@ void GraphUpscale::MakeFineSolver()
     {
         if (param_.hybridization)
         {
-            solver_[0] = make_unique<HybridSolver>(comm_, true, GetMatrix(0));
+            solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0));
         }
         else
         {

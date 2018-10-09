@@ -30,7 +30,6 @@ namespace smoothg
 {
 
 HybridSolver::HybridSolver(MPI_Comm comm,
-                           bool fine_level,
                            const MixedMatrix& mgL,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
@@ -48,13 +47,11 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 {
     MPI_Comm_rank(comm, &myid_);
 
-    const int nvertices = D_.Height();
-
     // TODO(gelever1): use operator= when mfem version is updated
-    mfem::SparseMatrix tmp = SparseIdentity(nvertices);
+    mfem::SparseMatrix tmp = SparseIdentity(D_.Height());
     Agg_vertexdof_.Swap(tmp);
 
-    const mfem::SparseMatrix edge_edgedof;
+    const mfem::SparseMatrix edge_edgedof = SparseIdentity(D_.Width());
 
     auto mbuilder = dynamic_cast<const FineMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
@@ -64,12 +61,11 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     }
     Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
-    Init(fine_level, edge_edgedof, mbuilder->GetElementMatrices(),
+    Init(edge_edgedof, mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
-                           bool fine_level,
                            const MixedMatrix& mgL,
                            const Mixed_GL_Coarsener& mgLc,
                            const mfem::SparseMatrix* face_bdrattr,
@@ -100,7 +96,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 
     Agg_edgedof_.MakeRef(mbuilder->GetAggEdgeDofTable());
 
-    Init(fine_level, face_edgedof, mbuilder->GetElementMatrices(),
+    Init(face_edgedof, mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
 }
 
@@ -115,18 +111,13 @@ HybridSolver::~HybridSolver()
 #endif
 }
 
-template<typename T>
 void HybridSolver::Init(
-    bool fine_level,
     const mfem::SparseMatrix& face_edgedof,
-    const std::vector<T>& M_el,
+    const std::vector<mfem::DenseMatrix>& M_el,
     const mfem::HypreParMatrix& edgedof_d_td,
     const mfem::SparseMatrix* face_bdrattr,
     const mfem::Array<int>* ess_edge_dofs)
 {
-    // Determine if we are solving fine level graph Laplacian problem
-    // bool fine_level = (typeid(T) == typeid(mfem::Vector)) ? true : false;
-
     mfem::StopWatch chrono;
     chrono.Clear();
     chrono.Start();
@@ -149,16 +140,9 @@ void HybridSolver::Init(
     mfem::SparseMatrix edgedof_bdrattr;
     if (face_bdrattr)
     {
-        if (fine_level)
-        {
-            edgedof_bdrattr.MakeRef(*face_bdrattr);
-        }
-        else
-        {
-            mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
-            mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, *face_bdrattr);
-            edgedof_bdrattr.Swap(tmp);
-        }
+        mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
+        mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, *face_bdrattr);
+        edgedof_bdrattr.Swap(tmp);
     }
 
     mfem::HypreParMatrix edgedof_d_td_;
@@ -171,63 +155,48 @@ void HybridSolver::Init(
     mfem::Array<int> j_multiplier_edgedof;
 
     // construct multiplier dof to true dof table
-    if (fine_level)
-    {
-        num_multiplier_dofs_ = num_edge_dofs_;
-        j_multiplier_edgedof.SetSize(num_edge_dofs_);
-        std::iota(j_multiplier_edgedof.GetData(), j_multiplier_edgedof.GetData() + num_edge_dofs_, 0);
-        Agg_multiplier_.MakeRef(Agg_edgedof_);
+    unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
+    unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
 
-        GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
+    num_multiplier_dofs_ = face_edgedof.Width();
 
-        multiplier_d_td_ = make_unique<mfem::HypreParMatrix>();
-        multiplier_d_td_->MakeRef(edgedof_d_td_);
-    }
-    else
-    {
-        unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
-        unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
+    int* i_edgedof_multiplier = new int[num_edge_dofs_ + 1];
+    std::iota(i_edgedof_multiplier,
+              i_edgedof_multiplier + num_multiplier_dofs_ + 1, 0);
+    std::fill_n(i_edgedof_multiplier + num_multiplier_dofs_ + 1,
+                num_edge_dofs_ - num_multiplier_dofs_,
+                i_edgedof_multiplier[num_multiplier_dofs_]);
 
-        num_multiplier_dofs_ = face_edgedof.Width();
+    int* j_edgedof_multiplier = new int[num_multiplier_dofs_];
+    std::iota(j_edgedof_multiplier,
+              j_edgedof_multiplier + num_multiplier_dofs_, 0);
+    double* data_edgedof_multiplier = new double[num_multiplier_dofs_];
+    std::fill_n(data_edgedof_multiplier, num_multiplier_dofs_, 1.0);
+    mfem::SparseMatrix edgedof_multiplier(
+                i_edgedof_multiplier, j_edgedof_multiplier,
+                data_edgedof_multiplier, num_edge_dofs_, num_multiplier_dofs_);
+    mfem::SparseMatrix multiplier_edgedof(smoothg::Transpose(edgedof_multiplier) );
 
-        int* i_edgedof_multiplier = new int[num_edge_dofs_ + 1];
-        std::iota(i_edgedof_multiplier,
-                  i_edgedof_multiplier + num_multiplier_dofs_ + 1, 0);
-        std::fill_n(i_edgedof_multiplier + num_multiplier_dofs_ + 1,
-                    num_edge_dofs_ - num_multiplier_dofs_,
-                    i_edgedof_multiplier[num_multiplier_dofs_]);
+    mfem::Array<int> j_array(multiplier_edgedof.GetJ(), multiplier_edgedof.NumNonZeroElems());
+    j_array.Copy(j_multiplier_edgedof);
 
-        int* j_edgedof_multiplier = new int[num_multiplier_dofs_];
-        std::iota(j_edgedof_multiplier,
-                  j_edgedof_multiplier + num_multiplier_dofs_, 0);
-        double* data_edgedof_multiplier = new double[num_multiplier_dofs_];
-        std::fill_n(data_edgedof_multiplier, num_multiplier_dofs_, 1.0);
-        mfem::SparseMatrix edgedof_multiplier(
-            i_edgedof_multiplier, j_edgedof_multiplier,
-            data_edgedof_multiplier, num_edge_dofs_, num_multiplier_dofs_);
-        mfem::SparseMatrix multiplier_edgedof(smoothg::Transpose(edgedof_multiplier) );
+    Agg_multiplier_.Clear();
+    mfem::SparseMatrix Agg_m_tmp(smoothg::Mult(Agg_edgedof_, edgedof_multiplier));
+    Agg_multiplier_.Swap(Agg_m_tmp);
 
-        mfem::Array<int> j_array(multiplier_edgedof.GetJ(), multiplier_edgedof.NumNonZeroElems());
-        j_array.Copy(j_multiplier_edgedof);
+    GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
 
-        Agg_multiplier_.Clear();
-        mfem::SparseMatrix Agg_m_tmp(smoothg::Mult(Agg_edgedof_, edgedof_multiplier));
-        Agg_multiplier_.Swap(Agg_m_tmp);
+    auto edgedof_multiplier_d = make_unique<mfem::HypreParMatrix>(
+                comm_, edgedof_d_td_.GetGlobalNumRows(),
+                multiplier_start_.Last(), edgedof_d_td_.RowPart(),
+                multiplier_start_, &edgedof_multiplier);
 
-        GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
+    assert(edgedof_d_td_d && edgedof_multiplier_d);
+    unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(
+                smoothg::RAP(*edgedof_d_td_d, *edgedof_multiplier_d) );
 
-        auto edgedof_multiplier_d = make_unique<mfem::HypreParMatrix>(
-                                        comm_, edgedof_d_td_.GetGlobalNumRows(),
-                                        multiplier_start_.Last(), edgedof_d_td_.RowPart(),
-                                        multiplier_start_, &edgedof_multiplier);
-
-        assert(edgedof_d_td_d && edgedof_multiplier_d);
-        unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(
-            smoothg::RAP(*edgedof_d_td_d, *edgedof_multiplier_d) );
-
-        // Construct multiplier "dof to true dof" table
-        multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
-    }
+    // Construct multiplier "dof to true dof" table
+    multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
 
     // Assemble the hybridized system
     HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
