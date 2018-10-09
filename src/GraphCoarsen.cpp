@@ -43,7 +43,7 @@ GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_to
     M_proc_(mgL.GetM()),
     D_proc_(mgL.GetD()),
     W_proc_(mgL.GetW()),
-    fine_mbuilder_(dynamic_cast<const MBuilderWithElementM*>(&(mgL.GetMBuilder()))),
+    fine_mbuilder_(dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()))),
     graph_topology_(graph_topology),
     colMapper_(D_proc_.Width())
 {
@@ -280,7 +280,7 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face
         int face_edge_dof_i = edge_dofs_on_face[i];
         GetTableRow(edge_vert, face_edge_dof_i, verts);
         int vert_i = (partition[verts[0]] == agg) ? verts[0] : verts[1];
-        GetTableRow(fine_mbuilder_->GetAggEdgeDofTable(), vert_i, elmat_edge_dofs);
+        GetTableRow(fine_mbuilder_->GetElemEdgeDofTable(), vert_i, elmat_edge_dofs);
         int k;
         // this loop is a search
         for (k = 0; k < elmat_edge_dofs.Size(); k++)

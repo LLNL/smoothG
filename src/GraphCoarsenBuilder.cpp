@@ -27,6 +27,51 @@ std::unique_ptr<mfem::SparseMatrix> MBuilder::BuildAssembledM() const
     return BuildAssembledM(agg_weights_inverse);
 }
 
+ElementMBuilder::ElementMBuilder(const mfem::Vector& edge_weight,
+                                 const mfem::SparseMatrix& elem_edgedof)
+    : elem_edgedof_(elem_edgedof)
+{
+    const mfem::SparseMatrix edgedof_Agg = smoothg::Transpose(elem_edgedof);
+    num_aggs_ = elem_edgedof_.Height();
+    M_el_.resize(num_aggs_);
+
+    mfem::Array<int> edofs;
+    for (unsigned int agg = 0; agg < num_aggs_; agg++)
+    {
+        GetTableRow(elem_edgedof, agg, edofs);
+        mfem::DenseMatrix& agg_M = M_el_[agg];
+        agg_M.SetSize(edofs.Size());
+        agg_M = 0.0;
+        for (int i = 0; i < agg_M.Size(); i++)
+        {
+            const int edof = edofs[i];
+            const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
+            MFEM_ASSERT(edge_weight[edof] != 0.0, "divide by zero!");
+            agg_M(i, i) = ratio / edge_weight[edof];
+        }
+    }
+}
+
+ElementMBuilder::ElementMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
+                                 const mfem::SparseMatrix& elem_edgedof)
+    : elem_edgedof_(elem_edgedof)
+{
+    num_aggs_ = elem_edgedof_.Height();
+    M_el_.resize(num_aggs_);
+
+    for (unsigned int agg = 0; agg < num_aggs_; agg++)
+    {
+        const mfem::Vector& Agg_edge_weight = local_edge_weight[agg];
+        mfem::DenseMatrix& agg_M = M_el_[agg];
+        agg_M.SetSize(Agg_edge_weight.Size());
+        agg_M = 0.0;
+        for (int i = 0; i < agg_M.Size(); i++)
+        {
+            agg_M(i, i) = 1.0 / Agg_edge_weight[i];
+        }
+    }
+}
+
 void ElementMBuilder::Setup(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
@@ -36,7 +81,7 @@ void ElementMBuilder::Setup(
     total_num_traces_ = total_num_traces;
     num_aggs_ = vertex_target.size();
 
-    CM_el_.resize(num_aggs_);
+    M_el_.resize(num_aggs_);
     mfem::Array<int> faces;
     for (unsigned int i = 0; i < num_aggs_; i++)
     {
@@ -44,10 +89,10 @@ void ElementMBuilder::Setup(
         GetTableRow(Agg_face, i, faces);
         for (int j = 0; j < faces.Size(); ++j)
             nlocal_coarse_dofs += edge_traces[faces[j]].Width();
-        CM_el_[i].SetSize(nlocal_coarse_dofs);
+        M_el_[i].SetSize(nlocal_coarse_dofs);
     }
 
-    edge_cdof_markers_.resize(2);
+    edge_dof_markers_.resize(2);
     ResetEdgeCdofMarkers(total_num_traces + ncoarse_vertexdofs - num_aggs_);
 }
 
@@ -69,43 +114,43 @@ void CoefficientMBuilder::Setup(
     }
 }
 
-void ElementMBuilder::RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter)
+void ElementMBuilder::RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter)
 {
     agg_index_ = agg_index;
-    cdof_loc_ = cdof_loc;
-    edge_cdof_markers_[0][row] = cdof_loc;
+    dof_loc_ = dof_loc;
+    edge_dof_markers_[0][row] = dof_loc;
 }
 
 void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
 {
-    mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
-    CM_el_loc(l, cdof_loc_) = value;
-    CM_el_loc(cdof_loc_, l) = value;
+    mfem::DenseMatrix& M_el_loc(M_el_[agg_index_]);
+    M_el_loc(l, dof_loc_) = value;
+    M_el_loc(dof_loc_, l) = value;
 }
 
 void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 {
-    CM_el_[agg_index_](cdof_loc_, cdof_loc_) = value;
+    M_el_[agg_index_](dof_loc_, dof_loc_) = value;
 }
 
 void ElementMBuilder::AddTraceTraceBlock(int l, double value)
 {
-    mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
-    CM_el_loc(edge_cdof_markers_[0][l], cdof_loc_) = value;
-    CM_el_loc(cdof_loc_, edge_cdof_markers_[0][l]) = value;
+    mfem::DenseMatrix& M_el_loc(M_el_[agg_index_]);
+    M_el_loc(edge_dof_markers_[0][l], dof_loc_) = value;
+    M_el_loc(dof_loc_, edge_dof_markers_[0][l]) = value;
 }
 
 void ElementMBuilder::SetBubbleBubbleBlock(int l, int j, double value)
 {
-    mfem::DenseMatrix& CM_el_loc(CM_el_[agg_index_]);
-    CM_el_loc(l, j) = value;
-    CM_el_loc(j, l) = value;
+    mfem::DenseMatrix& M_el_loc(M_el_[agg_index_]);
+    M_el_loc(l, j) = value;
+    M_el_loc(j, l) = value;
 }
 
 void ElementMBuilder::ResetEdgeCdofMarkers(int size)
 {
-    edge_cdof_markers_[0].resize(size, -1);
-    edge_cdof_markers_[1].resize(size, -1);
+    edge_dof_markers_[0].resize(size, -1);
+    edge_dof_markers_[1].resize(size, -1);
 }
 
 void ElementMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
@@ -118,35 +163,35 @@ void ElementMBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix
         GetTableRow(Agg_cdof_edge, Aggs_[a], local_Agg_edge_cdof);
         for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
         {
-            edge_cdof_markers_[a][local_Agg_edge_cdof[k]] = k;
+            edge_dof_markers_[a][local_Agg_edge_cdof[k]] = k;
         }
     }
 }
 
 void ElementMBuilder::AddTraceAcross(int row, int col, int agg, double value)
 {
-    mfem::DenseMatrix& CM_el_loc(CM_el_[Aggs_[agg]]);
+    mfem::DenseMatrix& M_el_loc(M_el_[Aggs_[agg]]);
 
-    int id0_in_agg = edge_cdof_markers_[agg][row];
-    int id1_in_agg = edge_cdof_markers_[agg][col];
-    CM_el_loc(id0_in_agg, id1_in_agg) += value;
+    int id0_in_agg = edge_dof_markers_[agg][row];
+    int id1_in_agg = edge_dof_markers_[agg][col];
+    M_el_loc(id0_in_agg, id1_in_agg) += value;
 }
 
 std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::BuildAssembledM(
     const mfem::Vector& agg_weights_inverse) const
 {
     mfem::Array<int> edofs;
-    auto CoarseM = make_unique<mfem::SparseMatrix>(Agg_cdof_edge_ref_.Width());
-    for (int Agg = 0; Agg < Agg_cdof_edge_ref_.Height(); Agg++)
+    auto M = make_unique<mfem::SparseMatrix>(elem_edgedof_.Width());
+    for (int Agg = 0; Agg < elem_edgedof_.Height(); Agg++)
     {
-        GetTableRow(Agg_cdof_edge_ref_, Agg, edofs);
+        GetTableRow(elem_edgedof_, Agg, edofs);
         const double agg_weight = 1. / agg_weights_inverse(Agg);
-        mfem::DenseMatrix agg_M = CM_el_[Agg];
+        mfem::DenseMatrix agg_M = M_el_[Agg];
         agg_M *= agg_weight;
-        CoarseM->AddSubMatrix(edofs, edofs, agg_M);
+        M->AddSubMatrix(edofs, edofs, agg_M);
     }
-    CoarseM->Finalize();
-    return CoarseM;
+    M->Finalize();
+    return M;
 }
 
 /// this method may be unnecessary, could just use GetTableRow()
@@ -373,74 +418,6 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
 
     CoarseM->Finalize(0);
     return std::move(CoarseM);
-}
-
-FineMBuilder::FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& Agg_edgedof)
-    : Agg_edgedof_(Agg_edgedof)
-{
-    const mfem::SparseMatrix edgedof_Agg = smoothg::Transpose(Agg_edgedof);
-    num_aggs_ = Agg_edgedof_.Height();
-    M_el_.resize(num_aggs_);
-
-    mfem::Array<int> edofs;
-    for (unsigned int agg = 0; agg < num_aggs_; agg++)
-    {
-        GetTableRow(Agg_edgedof, agg, edofs);
-        mfem::DenseMatrix& agg_M = M_el_[agg];
-        agg_M.SetSize(edofs.Size());
-        agg_M = 0.0;
-        for (int i = 0; i < agg_M.Size(); i++)
-        {
-            const int edof = edofs[i];
-            const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
-            MFEM_ASSERT(edge_weight[edof] != 0.0, "divide by zero!");
-            agg_M(i, i) = ratio / edge_weight[edof];
-        }
-    }
-}
-
-FineMBuilder::FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
-                           const mfem::SparseMatrix& Agg_edgedof)
-    : Agg_edgedof_(Agg_edgedof)
-{
-    num_aggs_ = Agg_edgedof_.Height();
-    M_el_.resize(num_aggs_);
-
-    for (unsigned int agg = 0; agg < num_aggs_; agg++)
-    {
-        const mfem::Vector& Agg_edge_weight = local_edge_weight[agg];
-        mfem::DenseMatrix& agg_M = M_el_[agg];
-        agg_M.SetSize(Agg_edge_weight.Size());
-        agg_M = 0.0;
-        for (int i = 0; i < agg_M.Size(); i++)
-        {
-            agg_M(i, i) = 1.0 / Agg_edge_weight[i];
-        }
-    }
-}
-
-// TODO: the implementation is similar to ElementMBuilder, may combine the two
-std::unique_ptr<mfem::SparseMatrix> FineMBuilder::BuildAssembledM(
-    const mfem::Vector& agg_weights_inverse) const
-{
-    mfem::Array<int> edofs;
-    auto M = make_unique<mfem::SparseMatrix>(Agg_edgedof_.Width());
-    for (int Agg = 0; Agg < Agg_edgedof_.Height(); Agg++)
-    {
-        GetTableRow(Agg_edgedof_, Agg, edofs);
-        const mfem::DenseMatrix& agg_M = M_el_[Agg];
-
-        const double agg_weight = 1. / agg_weights_inverse(Agg);
-        MFEM_ASSERT(std::isfinite(agg_weight),
-                    "FineMBuilder: Bad aggregate weight!");
-        for (int i = 0; i < agg_M.Size(); i++)
-        {
-            const double M_ii = agg_M(i, i) * agg_weight;
-            M->Add(edofs[i], edofs[i], M_ii);
-        }
-    }
-    M->Finalize();
-    return M;
 }
 
 Agg_cdof_edge_Builder::Agg_cdof_edge_Builder(std::vector<mfem::DenseMatrix>& edge_traces,

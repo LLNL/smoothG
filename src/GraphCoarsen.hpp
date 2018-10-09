@@ -258,7 +258,7 @@ private:
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix* W_proc_;
-    const MBuilderWithElementM* fine_mbuilder_;
+    const ElementMBuilder* fine_mbuilder_;
     const GraphTopology& graph_topology_;
 
     /// Aggregate-to-coarse vertex dofs relation table
