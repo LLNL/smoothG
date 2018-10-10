@@ -247,6 +247,10 @@ MixedBlockEigensystem::MixedBlockEigensystem(
         mfem::Vector evals;
         eigs_.Compute(DMinvDt_dense, evals, evects_);
         eval_min_ = evals.Min();
+
+        // temporarily added to match dimension
+        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
+        DlocT_.Swap(DlocT_tmp);
     }
 
     if (!use_w_)

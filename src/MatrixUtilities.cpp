@@ -964,23 +964,53 @@ void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offs
     GenerateOffsets(comm, N, &local_size, start);
 }
 
+bool IsDiag(const mfem::SparseMatrix& A)
+{
+    if (A.Height() != A.Width() || A.Height() < A.NumNonZeroElems())
+    {
+        return false;
+    }
+
+    for (int i = 0; i < A.Height(); ++i)
+    {
+        if (A.RowSize(i) > 1)
+        {
+            return false;
+        }
+        else if (A.RowSize(i) == 1 && A.GetRowColumns(i)[0] != i)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // This constructor assumes M to be diagonal
 LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                                            const mfem::SparseMatrix& D)
 {
-    double* M_data = M.GetData();
-    Init(M_data, D);
+    M_is_diag_ = IsDiag(M);
+    if (M_is_diag_)
+    {
+        const double* M_data = M.GetData();
+        Init(M_data, D);
+    }
+    else
+    {
+        Init(M, D);
+    }
 }
 
 // This constructor takes the diagonal of M (as a Vector) as input
 LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::Vector& M,
                                            const mfem::SparseMatrix& D)
 {
-    double* M_data = M.GetData();
+    M_is_diag_ = true;
+    const double* M_data = M.GetData();
     Init(M_data, D);
 }
 
-void LocalGraphEdgeSolver::Init(double* M_data, const mfem::SparseMatrix& D)
+void LocalGraphEdgeSolver::Init(const double* M_data, const mfem::SparseMatrix& D)
 {
     mfem::SparseMatrix DT(smoothg::Transpose(D));
     MinvDT_.Swap(DT);
@@ -1005,28 +1035,38 @@ void LocalGraphEdgeSolver::Init(double* M_data, const mfem::SparseMatrix& D)
     solver_ = make_unique<mfem::UMFPackSolver>(A_);
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
-                                mfem::Vector& sol_sigma)
+void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D)
 {
-    // Set rhs(0)=0 so that the modified system after
-    // the elimination is consistent with the original one
-    mfem::Vector& rhs_copy = const_cast<mfem::Vector&>(rhs);
-    double rhs_0 = rhs_copy(0);
-    rhs_copy(0) = 0.;
+    offsets_.SetSize(3);
+    offsets_[0] = 0;
+    offsets_[1] = M.Height();
+    offsets_[2] = M.Height() + D.Height();
 
-    mfem::Vector sol_u_tmp(A_.Size());
-    sol_u_tmp = 0.;
-    solver_->Mult(rhs_copy, sol_u_tmp);
+    mfem::SparseMatrix D_copy(D, false);
+    D_copy.EliminateRow(0);
+    mfem::SparseMatrix DT = smoothg::Transpose(D_copy);
 
-    // Set rhs(0) back to its original vale (rhs is const Vector)
-    rhs_copy(0) = rhs_0;
+    mfem::SparseMatrix W(D.Height(), D.Height());
+    W.Add(0, 0, 1.0);
+    W.Finalize();
 
-    // SparseMatrix::Mult asserts that sol.Size() should equal MinvDT_->Height()
-    MinvDT_.Mult(sol_u_tmp, sol_sigma);
+    mfem::BlockMatrix block_A(offsets_);
+    block_A.SetBlock(0, 0, const_cast<mfem::SparseMatrix*>(&M));
+    block_A.SetBlock(1, 0, &D_copy);
+    block_A.SetBlock(0, 1, &DT);
+    block_A.SetBlock(1, 1, &W);
+
+    unique_ptr<mfem::SparseMatrix> tmp_A(block_A.CreateMonolithic());
+    A_.Swap(*tmp_A);
+
+    solver_ = make_unique<mfem::UMFPackSolver>(A_);
+
+    rhs_ = make_unique<mfem::BlockVector>(offsets_);
+    sol_ = make_unique<mfem::BlockVector>(offsets_);
+    rhs_->GetBlock(0) = 0.0;
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
-                                mfem::Vector& sol_sigma, mfem::Vector& sol_u)
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma) const
 {
     // Set rhs(0)=0 so that the modified system after
     // the elimination is consistent with the original one
@@ -1034,15 +1074,53 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
     double rhs_0 = rhs_copy(0);
     rhs_copy(0) = 0.;
 
-    sol_u = 0.;
-    solver_->Mult(rhs_copy, sol_u);
-    orthogonalize_from_constant(sol_u);
+    if (M_is_diag_)
+    {
+        mfem::Vector sol_u_tmp(rhs.Size());
+        solver_->Mult(rhs, sol_u_tmp);
+        MinvDT_.Mult(sol_u_tmp, sol_sigma);
+    }
+    else
+    {
+        rhs_->GetBlock(1) = rhs_copy;
+        solver_->Mult(*rhs_, *sol_);
+    }
 
-    // Set rhs(0) back to its original vale (rhs is const Vector)
+    // Set rhs_block1(0) back to its original vale (rhs is const BlockVector)
+    rhs_copy(0) = rhs_0;
+}
+
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma,
+                                mfem::Vector& sol_u, bool do_ortho) const
+{
+    // Set rhs(0)=0 so that the modified system after
+    // the elimination is consistent with the original one
+    mfem::Vector& rhs_copy = const_cast<mfem::Vector&>(rhs);
+    double rhs_0 = rhs_copy(0);
+    rhs_copy(0) = 0.;
+
+    if (M_is_diag_)
+    {
+        solver_->Mult(rhs, sol_u);
+        MinvDT_.Mult(sol_u, sol_sigma);
+    }
+    else
+    {
+        rhs_->GetBlock(1) = rhs_copy;
+        solver_->Mult(*rhs_, *sol_);
+
+        sol_sigma = sol_->GetBlock(0);
+        sol_u = sol_->GetBlock(1);
+        sol_u *= -1.0;
+    }
+
+    // Set rhs(0) back to its original vale (rhs is const BlockVector)
     rhs_copy(0) = rhs_0;
 
-    // SparseMatrix::Mult asserts that sol.Size() should equal MinvDT_->Height()
-    MinvDT_.Mult(sol_u, sol_sigma);
+    if (do_ortho)
+    {
+        orthogonalize_from_constant(sol_u);
+    }
 }
 
 double InnerProduct(const mfem::Vector& weight, const mfem::Vector& u,

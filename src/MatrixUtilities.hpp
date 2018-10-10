@@ -311,6 +311,8 @@ void GenerateOffsets(MPI_Comm comm, int N, HYPRE_Int loc_sizes[],
 */
 void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offsets);
 
+bool IsDiag(const mfem::SparseMatrix& A);
+
 /**
    @brief Solver for local saddle point problems, see the formula below.
 
@@ -359,7 +361,7 @@ public:
        @param rhs \f$ g \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma);
+    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma) const;
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
@@ -368,13 +370,23 @@ public:
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma, mfem::Vector& sol_u);
+    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma,
+              mfem::Vector& sol_u, bool do_ortho = true) const;
+
 private:
-    void Init(double* M_data, const mfem::SparseMatrix& D);
+    /// Setup matrix and solver when M is diagonal
+    void Init(const double* M_data, const mfem::SparseMatrix& D);
+
+    /// Setup matrix and solver when M is not diagonal
+    void Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
 
     std::unique_ptr<mfem::UMFPackSolver> solver_;
     mfem::SparseMatrix A_;
     mfem::SparseMatrix MinvDT_;
+    bool M_is_diag_;
+    mfem::Array<int> offsets_;
+    mutable std::unique_ptr<mfem::BlockVector> rhs_;
+    mutable std::unique_ptr<mfem::BlockVector> sol_;
 };
 
 /**
