@@ -130,14 +130,14 @@ void ElementMBuilder::SetTraceBubbleBlock(int l, double value)
 
 void ElementMBuilder::AddTraceTraceBlockDiag(double value)
 {
-    M_el_[agg_index_](dof_loc_, dof_loc_) = value;
+    M_el_[agg_index_](dof_loc_, dof_loc_) += value;
 }
 
 void ElementMBuilder::AddTraceTraceBlock(int l, double value)
 {
     mfem::DenseMatrix& M_el_loc(M_el_[agg_index_]);
-    M_el_loc(edge_dof_markers_[0][l], dof_loc_) = value;
-    M_el_loc(dof_loc_, edge_dof_markers_[0][l]) = value;
+    M_el_loc(edge_dof_markers_[0][l], dof_loc_) += value;
+    M_el_loc(dof_loc_, edge_dof_markers_[0][l]) += value;
 }
 
 void ElementMBuilder::SetBubbleBubbleBlock(int l, int j, double value)

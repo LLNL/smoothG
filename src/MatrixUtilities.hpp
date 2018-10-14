@@ -327,7 +327,7 @@ bool IsDiag(const mfem::SparseMatrix& A);
      \end{array} \right)
      =
      \left( \begin{array}{c}
-       0 \\ -g
+       -g \\ -f
      \end{array} \right)
    \f]
 
@@ -356,26 +356,39 @@ public:
     LocalGraphEdgeSolver(const mfem::Vector& M, const mfem::SparseMatrix& D);
 
     /**
-       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+       @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
 
-       @param rhs \f$ g \f$ in the formula above
+       @param rhs \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
     */
     void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma) const;
 
     /**
-       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+       @brief Solves \f$ (D M^{-1} D^T) u = f - D M^{-1} g \f$,
+                     \f$ \sigma = M^{-1} (D^T u + g) \f$.
 
-       @param rhs \f$ g \f$ in the formula above
+       @param rhs0 \f$ g \f$ in the formula above
+       @param rhs \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma,
-              mfem::Vector& sol_u, bool do_ortho = true) const;
+    void Mult(const mfem::Vector& rhs0, const mfem::Vector& rhs1,
+              mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
+
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
+
+       @param rhs1 \f$ f \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+       @param sol_u \f$ u \f$ in the formula above
+    */
+    void Mult(const mfem::Vector& rhs1,
+              mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
+
 
 private:
     /// Setup matrix and solver when M is diagonal
-    void Init(const double* M_data, const mfem::SparseMatrix& D);
+    void Init(const mfem::Vector& M_diag, const mfem::SparseMatrix& D);
 
     /// Setup matrix and solver when M is not diagonal
     void Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
@@ -384,6 +397,7 @@ private:
     mfem::SparseMatrix A_;
     mfem::SparseMatrix MinvDT_;
     bool M_is_diag_;
+    mfem::Vector Minv_;
     mfem::Array<int> offsets_;
     mutable std::unique_ptr<mfem::BlockVector> rhs_;
     mutable std::unique_ptr<mfem::BlockVector> sol_;
