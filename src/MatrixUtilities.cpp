@@ -987,7 +987,8 @@ bool IsDiag(const mfem::SparseMatrix& A)
 
 // This constructor assumes M to be diagonal
 LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
-                                           const mfem::SparseMatrix& D)
+                                           const mfem::SparseMatrix& D,
+                                           const mfem::Vector& const_rep)
 {
     M_is_diag_ = IsDiag(M);
     if (M_is_diag_)
@@ -999,6 +1000,8 @@ LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
     {
         Init(M, D);
     }
+
+    const_rep_.SetDataAndSize(const_rep.GetData(), const_rep.Size());
 }
 
 // This constructor takes the diagonal of M (as a Vector) as input
@@ -1088,7 +1091,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma
     rhs_copy(0) = rhs_0;
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs0, const mfem::Vector &rhs1,
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs0, const mfem::Vector& rhs1,
                                 mfem::Vector& sol_sigma, mfem::Vector& sol_u) const
 {
     if (M_is_diag_)
@@ -1118,10 +1121,10 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs0, const mfem::Vector &rh
         sol_u *= -1.0;
     }
 
-    orthogonalize_from_constant(sol_u);
+    orthogonalize_from_vector(sol_u, const_rep_);
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector &rhs1,
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs1,
                                 mfem::Vector& sol_sigma, mfem::Vector& sol_u) const
 {
     mfem::Vector rhs0(sol_sigma);

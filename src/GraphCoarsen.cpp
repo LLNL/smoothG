@@ -365,9 +365,10 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::DenseMatrix traces_extensions, bubbles, B_potentials, F_potentials;
     mfem::Vector ref_vec1, ref_vec2;
     mfem::Vector local_rhs_trace0, local_rhs_trace1, local_rhs_bubble, local_sol, trace;
-    mfem::Array<int> local_verts, facefdofs, local_fine_dofs, faces;
+    mfem::Array<int> local_verts, local_fine_dofs, faces;
     mfem::Array<int> facecdofs, local_facecdofs;
     mfem::Vector one;
+    mfem::SparseMatrix Mbb;
     for (unsigned int i = 0; i < nAggs; i++)
     {
         // extract local matrices and build local solver
@@ -381,7 +382,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         constant_rep.GetSubVector(local_verts, one);
 
         // next line does *not* assume M_proc_ is diagonal
-        LocalGraphEdgeSolver solver(Mloc, Dloc);
+        LocalGraphEdgeSolver solver(Mloc, Dloc, one);
 
         int nlocal_verts = local_verts.Size();
         local_rhs_trace1.SetSize(nlocal_verts);
@@ -419,24 +420,30 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         local_facecdofs.SetSize(nlocal_traces);
         local_rhs_trace0.SetSize(nlocal_fine_dofs);
 
+        std::vector<mfem::Array<int> > facefdofs(faces.Size());
+        std::vector<std::pair<int, int> > agg_trace_map(nlocal_traces);
+
         nlocal_traces = 0;
         for (int j = 0; j < faces.Size(); j++)
         {
             const int face = faces[j];
             GetTableRow(face_cdof, face, facecdofs);
-            GetTableRow(face_edge, face, facefdofs);
+            GetTableRow(face_edge, face, facefdofs[j]);
+
             auto Dtransfer = ExtractRowAndColumns(D_proc_, local_verts,
-                                                  facefdofs, colMapper_);
+                                                  facefdofs[j], colMapper_);
             mfem::SparseMatrix DtransferT = smoothg::Transpose(Dtransfer);
 
             auto Mtransfer = ExtractRowAndColumns(M_proc_, local_fine_dofs,
-                                                  facefdofs, colMapper_);
+                                                  facefdofs[j], colMapper_);
             mfem::SparseMatrix MtransferT = smoothg::Transpose(Mtransfer);
 
             mfem::DenseMatrix& edge_traces_f(edge_traces[face]);
             int num_traces = edge_traces_f.Width();
             for (int k = 0; k < num_traces; k++)
             {
+                agg_trace_map[nlocal_traces] = std::make_pair(j, k);
+
                 const int row = local_facecdofs[nlocal_traces] = facecdofs[k];
                 const int cdof_loc = num_bubbles_i + nlocal_traces;
                 coarse_mbuilder.RegisterRow(i, row, cdof_loc, bubble_counter);
@@ -469,16 +476,25 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
                     // compute and store diagonal block of coarse M
                     entry_value = DTTraceProduct(DtransferT, F_potentials, nlocal_traces, trace);
+                    entry_value -= MtransferT.InnerProduct(local_sol, trace);
                     coarse_mbuilder.AddTraceTraceBlockDiag(entry_value);
 
-                    entry_value = MtransferT.InnerProduct(local_sol, trace) * -1.0;
-                    coarse_mbuilder.AddTraceTraceBlockDiag(entry_value);
-
+                    int other_j = -1;
                     for (int l = 0; l < nlocal_traces; l++)
                     {
+                        std::pair<int, int>& loc_map = agg_trace_map[l];
+                        if (loc_map.first != other_j)
+                        {
+                            other_j = loc_map.first;
+                            auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
+                                                            facefdofs[other_j], colMapper_);
+                            Mbb.Swap(tmp);
+                        }
+
                         entry_value = DTTraceProduct(DtransferT, F_potentials, l, trace);
-                        coarse_mbuilder.AddTraceTraceBlock(local_facecdofs[l], entry_value);
-                        entry_value = DTTraceProduct(MtransferT, traces_extensions, l, trace) * -1.0;
+                        entry_value -= DTTraceProduct(MtransferT, traces_extensions, l, trace);
+                        entry_value += DTTraceProduct(Mbb, edge_traces[faces[other_j]],
+                                                      loc_map.second, trace);
                         coarse_mbuilder.AddTraceTraceBlock(local_facecdofs[l], entry_value);
                     }
                 }

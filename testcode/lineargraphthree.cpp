@@ -128,7 +128,6 @@ int main(int argc, char* argv[])
         fine_rhs.GetBlock(1)[i] = -1.0;
     }
 
-
     mfem::BlockVector sol0(fine_rhs);
     upscale.Solve(0, fine_rhs, sol0);
     upscale.ShowSolveInfo(0);
@@ -141,17 +140,6 @@ int main(int argc, char* argv[])
     upscale.Solve(2, fine_rhs, sol2);
     upscale.ShowSolveInfo(2);
 
-
-
-    mfem::SparseMatrix Mfine(upscale.GetMatrix(1).GetM());
-    mfem::SparseMatrix PsigmaT = smoothg::Transpose(upscale.GetPsigma(1));
-    mfem::SparseMatrix* Mcoarse = mfem::RAP(Mfine, PsigmaT);
-    Mcoarse->Print();
-
-    std::cout<<"\n\n";
-    upscale.GetMatrix(2).GetM().Print();
-
-//    if (false)
     {
         for (int i = 0; i < sol0.GetBlock(1).Size(); ++i)
         {

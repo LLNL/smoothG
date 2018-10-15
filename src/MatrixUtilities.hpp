@@ -350,7 +350,8 @@ public:
        multiple solves.
     */
     LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
-                         const mfem::SparseMatrix& D);
+                         const mfem::SparseMatrix& D,
+                         const mfem::Vector& const_rep);
 
     /// M is the diagonal of the matrix \f$ M \f$ in the formula above
     LocalGraphEdgeSolver(const mfem::Vector& M, const mfem::SparseMatrix& D);
@@ -401,6 +402,7 @@ private:
     mfem::Array<int> offsets_;
     mutable std::unique_ptr<mfem::BlockVector> rhs_;
     mutable std::unique_ptr<mfem::BlockVector> sol_;
+    mfem::Vector const_rep_;
 };
 
 /**

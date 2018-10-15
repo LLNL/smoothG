@@ -96,13 +96,11 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
                                     mixed_laplacians_[level - 1],
                                     std::move(gts[level - 1]), param_));
         coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
-        // if (level < param_.max_levels - 1)
+
+        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+        if (level < param_.max_levels - 1 || !param_.hybridization)
         {
-            mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
-            if (!param_.hybridization)
-            {
-                mixed_laplacians_.back().BuildM();
-            }
+            mixed_laplacians_.back().BuildM();
         }
     }
 
