@@ -367,7 +367,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::Vector local_rhs_trace0, local_rhs_trace1, local_rhs_bubble, local_sol, trace;
     mfem::Array<int> local_verts, local_fine_dofs, faces;
     mfem::Array<int> facecdofs, local_facecdofs;
-    mfem::Vector one;
+    mfem::Vector one, first_vert_target;
     mfem::SparseMatrix Mbb;
     for (unsigned int i = 0; i < nAggs; i++)
     {
@@ -388,7 +388,6 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         local_rhs_trace1.SetSize(nlocal_verts);
 
         mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
-        double scale = vertex_target_i(0, 0);
 
         // ---
         // solving bubble functions (vertex_target -> bubbles)
@@ -454,8 +453,9 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 // compute and store local coarse D
                 if (k == 0)
                 {
+                    vertex_target_i.GetColumnReference(0, first_vert_target);
                     CoarseD_->Set(bubble_counter + i, row,
-                                  local_rhs_trace1.Sum() * -1.*scale);
+                                  (local_rhs_trace1 * first_vert_target) * -1.);
                 }
 
                 // instead of doing local_rhs *= -1, we store -trace later

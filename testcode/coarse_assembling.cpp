@@ -81,7 +81,7 @@ int main(int argc, char* argv[])
 
     const int nbdr = nDimensions == 3 ? 6 : 4;
     mfem::Array<int> ess_attr(nbdr);
-    ess_attr = 0;
+    ess_attr = 1;
 
     const bool metis_agglomeration = false;
     const double proc_part_ubal = 2.0;
@@ -159,6 +159,32 @@ int main(int argc, char* argv[])
             if (myid == 0)
             {
                 std::cout << "Level " << level << ": || M_smoothG - M_RAP ||_inf = "
+                          << diff_maxnorm << "\n";
+            }
+
+            return EXIT_FAILURE;
+        }
+    }
+
+    for (int level = 1; level < upscale_param.max_levels; ++level)
+    {
+        const mfem::SparseMatrix& Dfine(fvupscale.GetMatrix(level - 1).GetD());
+        const mfem::SparseMatrix& Psigma = fvupscale.GetPsigma(level - 1);
+        unique_ptr<mfem::SparseMatrix> Dcoarse_RAP(
+                    mfem::RAP(fvupscale.GetPu(level - 1), Dfine, Psigma) );
+
+        const mfem::SparseMatrix& Dcoarse_smoothG = fvupscale.GetMatrix(level).GetD();
+
+        Dcoarse_RAP->Add(-1.0, Dcoarse_smoothG);
+        double diff_maxnorm_loc = Dcoarse_RAP->MaxNorm();
+        double diff_maxnorm;
+        MPI_Allreduce(&diff_maxnorm_loc, &diff_maxnorm, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+        if (diff_maxnorm > 1e-8)
+        {
+            if (myid == 0)
+            {
+                std::cout << "Level " << level << ": || D_smoothG - D_RAP ||_inf = "
                           << diff_maxnorm << "\n";
             }
 
