@@ -482,19 +482,20 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                     int other_j = -1;
                     for (int l = 0; l < nlocal_traces; l++)
                     {
+                        entry_value = DTTraceProduct(DtransferT, F_potentials, l, trace);
+                        entry_value -= DTTraceProduct(MtransferT, traces_extensions, l, trace);
+
                         std::pair<int, int>& loc_map = agg_trace_map[l];
-                        if (loc_map.first != other_j)
+                        if (loc_map.first != other_j && loc_map.first != j)
                         {
                             other_j = loc_map.first;
                             auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
                                                             facefdofs[other_j], colMapper_);
                             Mbb.Swap(tmp);
+                            entry_value += DTTraceProduct(Mbb, edge_traces[faces[other_j]],
+                                                          loc_map.second, trace);
                         }
 
-                        entry_value = DTTraceProduct(DtransferT, F_potentials, l, trace);
-                        entry_value -= DTTraceProduct(MtransferT, traces_extensions, l, trace);
-                        entry_value += DTTraceProduct(Mbb, edge_traces[faces[other_j]],
-                                                      loc_map.second, trace);
                         coarse_mbuilder.AddTraceTraceBlock(local_facecdofs[l], entry_value);
                     }
                 }

@@ -81,8 +81,8 @@ add_test(rescaling rescaling)
 add_test(parrescaling mpirun -np 2 ./rescaling)
 add_valgrind_test(vrescaling rescaling)
 
-add_test(coarse_assembling coarse_assembling -m 1)
-add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 1)
+add_test(coarse_assembling coarse_assembling -m 1 --perm ${SPE10_PERM})
+add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 1 --perm ${SPE10_PERM})
 
 add_test(NAME style
   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp

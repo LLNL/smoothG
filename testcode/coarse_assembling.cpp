@@ -150,7 +150,10 @@ int main(int argc, char* argv[])
         const mfem::SparseMatrix& Mcoarse_smoothG = fvupscale.GetMatrix(level).GetM();
 
         Mcoarse_RAP->Add(-1.0, Mcoarse_smoothG);
-        const double diff_maxnorm = Mcoarse_RAP->MaxNorm();
+        double diff_maxnorm_loc = Mcoarse_RAP->MaxNorm();
+        double diff_maxnorm;
+        MPI_Allreduce(&diff_maxnorm_loc, &diff_maxnorm, 1, MPI_DOUBLE, MPI_MAX, comm);
+
         if (diff_maxnorm > 1e-8)
         {
             if (myid == 0)
