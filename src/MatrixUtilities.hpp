@@ -353,8 +353,8 @@ public:
                          const mfem::SparseMatrix& D,
                          const mfem::Vector& const_rep);
 
-    /// M is the diagonal of the matrix \f$ M \f$ in the formula above
-    LocalGraphEdgeSolver(const mfem::Vector& M, const mfem::SparseMatrix& D);
+    /// solution u will not be orthogonalized to const_rep in solving stage
+    LocalGraphEdgeSolver(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
