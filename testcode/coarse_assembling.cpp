@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
         const mfem::SparseMatrix& Dfine(fvupscale.GetMatrix(level - 1).GetD());
         const mfem::SparseMatrix& Psigma = fvupscale.GetPsigma(level - 1);
         unique_ptr<mfem::SparseMatrix> Dcoarse_RAP(
-                    mfem::RAP(fvupscale.GetPu(level - 1), Dfine, Psigma) );
+            mfem::RAP(fvupscale.GetPu(level - 1), Dfine, Psigma) );
 
         const mfem::SparseMatrix& Dcoarse_smoothG = fvupscale.GetMatrix(level).GetD();
 
