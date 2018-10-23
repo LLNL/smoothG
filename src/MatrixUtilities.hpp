@@ -343,7 +343,6 @@ public:
        @param M matrix \f$ M \f$ in the formula in the class description
        @param D matrix \f$ D \f$ in the formula in the class description
 
-       M is assumed to be diagonal (TODO: should assert?)
        We construct the matrix \f$ A = D M^{-1} D^T \f$, eliminate the zeroth
        degree of freedom to ensure it is solvable. LU factorization of \f$ A \f$
        is computed and stored (until the object is deleted) for potential

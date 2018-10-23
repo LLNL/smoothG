@@ -56,7 +56,7 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
     }
 
     sz = std::min(max_evects_ - 1, sz);
-    out.SetSize(vectors.Height(), sz + 1);
+    out.SetSize(single_vec.Size(), sz + 1);
     Concatenate(single_vec, vectors, out);
 }
 
@@ -736,9 +736,13 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
         mfem::DenseMatrix face_sigma_tmp;
 
-        // restrict local sigmas in AggExt_sigma to the coarse face.
-        // shared faces or interior faces
-        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
+        // restrict local sigmas in AggExt_sigma to the coarse face
+        if (face_IsShared.RowSize(iface) == 0 && num_neighbor_aggs == 1)
+        {
+            // Nothing for boundary face because AggExt_sigma is not in boundary
+            face_sigma_tmp.SetSize(num_iface_edge_dof, 0);
+        }
+        else if (num_iface_edge_dof > 1)
         {
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -774,9 +778,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             face_sigma_tmp = mfem::DenseMatrix(face_sigma_tmp, 't');
             assert(!face_sigma_tmp.CheckFinite());
         }
-        else // global boundary face or only 1 dof on face
+        else // only 1 dof on face
         {
-            // TODO: build more meaningful basis on boundary faces
             face_sigma_tmp.SetSize(num_iface_edge_dof, 1);
             face_sigma_tmp = 1.;
         }
@@ -798,8 +801,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
-        // shared faces or interior faces
-        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
+        if (num_iface_edge_dof > 1)
         {
             dof_counter = num_iface_edge_dof;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -835,7 +837,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                                              face_nbh_dofs, colMapper_);
             sec_D.ReduceSend(iface, Dloc);
         }
-        else // global boundary face or only 1 dof on face
+        else // only 1 dof on face
         {
             mfem::SparseMatrix empty_matrix = SparseIdentity(0);
             sec_D.ReduceSend(iface, empty_matrix);
@@ -855,8 +857,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
-        // shared faces or interior faces
-        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
+        if (num_iface_edge_dof > 1)
         {
             dof_counter = num_iface_edge_dof;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -878,7 +879,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                                              face_nbh_dofs, colMapper_);
             sec_M.ReduceSend(iface, Mloc);
         }
-        else // global boundary face or only 1 dof on face
+        else // only 1 dof on face
         {
             mfem::SparseMatrix empty_matrix = SparseIdentity(0);
             sec_M.ReduceSend(iface, empty_matrix);
@@ -925,9 +926,14 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
             // compute the PV vector
             mfem::Vector PV_sigma_on_face;
-            const int num_neighbor_aggs = face_Agg.RowSize(iface);
 
-            if (face_IsShared.RowSize(iface) && num_iface_edge_dof > 1)
+            if (num_iface_edge_dof == 1)
+            {
+                // only 1 dof on face
+                PV_sigma_on_face.SetSize(num_iface_edge_dof);
+                PV_sigma_on_face = 1.; // should inherit something from contant_rep?
+            }
+            else if (face_IsShared.RowSize(iface))
             {
                 // This face is shared between two processors
                 // Gather local matrices from both processors and assemble them
@@ -984,16 +990,14 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                     nvertex_local_dofs, nedge_local_dofs);
 
                 // solve saddle point problem for PV and restrict to face
-                PV_sigma.SetSize(Mloc_neighbor.Size());
+                PV_sigma.SetSize(Mloc_neighbor.Height());
                 LocalGraphEdgeSolver solver(Mloc_neighbor, Dloc_neighbor);
                 solver.Mult(OneNegOne, PV_sigma);
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(),
-                                                num_iface_edge_dof);
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
             }
-            else if (num_neighbor_aggs == 2 && num_iface_edge_dof > 1)
+            else
             {
-                // This face is not shared between processors, but shared by
-                // two aggregates
+                // This face is not shared between processors
                 mfem::SparseMatrix& Mloc_0 = shared_Mloc_f[0];
                 mfem::SparseMatrix& Dloc_0 = shared_Dloc_f[0];
 
@@ -1003,17 +1007,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 mfem::Vector OneNegOne = MakeOneNegOne(shared_constant[iface][0], nvertex_neighbor0);
 
                 // solve saddle point problem for PV and restrict to face
-                PV_sigma.SetSize(Mloc_0.Size());
+                PV_sigma.SetSize(Mloc_0.Height());
                 LocalGraphEdgeSolver solver(Mloc_0, Dloc_0);
                 solver.Mult(OneNegOne, PV_sigma);
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(),
-                                                num_iface_edge_dof);
-            }
-            else
-            {
-                // global boundary face or only 1 dof on face
-                PV_sigma_on_face.SetSize(num_iface_edge_dof);
-                PV_sigma_on_face = 1.; // should inherit something from contant_rep?
+
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
             }
 
             // add PV vector to other vectors and orthogonalize

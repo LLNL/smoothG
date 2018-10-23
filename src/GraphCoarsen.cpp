@@ -176,6 +176,12 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
         edge_traces_f.GetColumnReference(0, PV_trace);
         double oneDpv = Dtransfer.InnerProduct(PV_trace, localconstant);
 
+        if (fabs(oneDpv) < 1e-10)
+        {
+            std::cout << "Warning: oneDpv is closed to zero, oneDpv = "
+                      << oneDpv << ", this may be due to bad PV traces!\n";
+        }
+
         if (oneDpv < 0)
         {
             sign_flip = true;
@@ -489,6 +495,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                         if (loc_map.first != other_j && loc_map.first != j)
                         {
                             other_j = loc_map.first;
+                            // TODO: avoid repeated extraction in high order coarsening
                             auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
                                                             facefdofs[other_j], colMapper_);
                             Mbb.Swap(tmp);

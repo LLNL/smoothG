@@ -106,7 +106,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
             {
                 // Assume M diagonal, no ess data
                 if (marker[mm])
-                    Mref.EliminateRow(mm, true);
+                    Mref.EliminateRowCol(mm, true);
             }
 
             Dref.EliminateCols(marker);

@@ -1082,6 +1082,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma
     {
         rhs_->GetBlock(1) = rhs_copy;
         solver_->Mult(*rhs_, *sol_);
+        sol_sigma = sol_->GetBlock(0);
     }
 
     // Set rhs_block1(0) back to its original vale (rhs is const BlockVector)

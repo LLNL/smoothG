@@ -111,6 +111,7 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
     // orthogonalize at coarse level, every level, or fine level?
+    OrthogonalizeLevel(level, sol_[level]->GetBlock(1));
 
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
@@ -118,7 +119,6 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
         coarsener_[i]->interpolate(*sol_[i + 1], *sol_[i]);
     }
     y = *sol_[0];
-    Orthogonalize(y);
 }
 
 void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
@@ -324,7 +324,7 @@ void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
 
 void Upscale::OrthogonalizeLevel(int level, mfem::Vector& vect) const
 {
-    const mfem::Vector coarse_constant_rep = GetConstantRep(level);
+    const mfem::Vector& coarse_constant_rep = GetConstantRep(level);
     double local_dot = (vect * coarse_constant_rep);
     double global_dot;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
