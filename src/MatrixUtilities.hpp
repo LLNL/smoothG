@@ -382,7 +382,7 @@ public:
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs1,
+    void Mult(const mfem::Vector& rhs_u,
               mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
 
 
