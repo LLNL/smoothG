@@ -56,7 +56,7 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
     }
 
     sz = std::min(max_evects_ - 1, sz);
-    out.SetSize(vectors.Height(), sz + 1);
+    out.SetSize(single_vec.Size(), sz + 1);
     Concatenate(single_vec, vectors, out);
 }
 
@@ -247,6 +247,10 @@ MixedBlockEigensystem::MixedBlockEigensystem(
         mfem::Vector evals;
         eigs_.Compute(DMinvDt_dense, evals, evects_);
         eval_min_ = evals.Min();
+
+        // temporarily added to match dimension
+        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
+        DlocT_.Swap(DlocT_tmp);
     }
 
     if (!use_w_)
@@ -642,6 +646,48 @@ mfem::Vector LocalMixedGraphSpectralTargets::ConstantLocal(
     return vect;
 }
 
+// Combine M0 and M1 in such a way that the first num_face_edges rows and cols
+// are summed together, and the rest are simply copied
+mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
+                            const mfem::SparseMatrix& M1,
+                            int num_face_edges)
+{
+    int size = M0.Height() + M1.Height() - num_face_edges;
+    int offset = M0.Height() - num_face_edges;
+
+    mfem::SparseMatrix M_combine(size, size);
+
+    const int* M0_i = M0.GetI();
+    const int* M0_j = M0.GetJ();
+    const double* M0_data = M0.GetData();
+
+    for (int i = 0; i < M0.Height(); ++i)
+    {
+        for (int j = M0_i[i]; j < M0_i[i + 1]; ++j)
+        {
+            M_combine.Set(i, M0_j[j], M0_data[j]);
+        }
+    }
+
+    const int* M1_i = M1.GetI();
+    const int* M1_j = M1.GetJ();
+    const double* M1_data = M1.GetData();
+
+    for (int i = 0; i < M1.Height(); ++i)
+    {
+        for (int j = M1_i[i]; j < M1_i[i + 1]; ++j)
+        {
+            int col = M1_j[j];
+            int combine_row = i < num_face_edges ? i : i + offset;
+            int combine_col = col < num_face_edges ? col : col + offset;
+            M_combine.Add(combine_row, combine_col, M1_data[j]);
+        }
+    }
+    M_combine.Finalize();
+
+    return M_combine;
+}
+
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
@@ -690,9 +736,13 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
         mfem::DenseMatrix face_sigma_tmp;
 
-        // restrict local sigmas in AggExt_sigma to the coarse face.
-        // shared faces or interior faces
-        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
+        // restrict local sigmas in AggExt_sigma to the coarse face
+        if (face_IsShared.RowSize(iface) == 0 && num_neighbor_aggs == 1)
+        {
+            // Nothing for boundary face because AggExt_sigma is not in boundary
+            face_sigma_tmp.SetSize(num_iface_edge_dof, 0);
+        }
+        else if (num_iface_edge_dof > 1)
         {
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -728,9 +778,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             face_sigma_tmp = mfem::DenseMatrix(face_sigma_tmp, 't');
             assert(!face_sigma_tmp.CheckFinite());
         }
-        else // global boundary face or only 1 dof on face
+        else // only 1 dof on face
         {
-            // TODO: build more meaningful basis on boundary faces
             face_sigma_tmp.SetSize(num_iface_edge_dof, 1);
             face_sigma_tmp = 1.;
         }
@@ -752,8 +801,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
-        // shared faces or interior faces
-        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
+        if (num_iface_edge_dof > 1)
         {
             dof_counter = num_iface_edge_dof;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -789,7 +837,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                                              face_nbh_dofs, colMapper_);
             sec_D.ReduceSend(iface, Dloc);
         }
-        else // global boundary face or only 1 dof on face
+        else // only 1 dof on face
         {
             mfem::SparseMatrix empty_matrix = SparseIdentity(0);
             sec_D.ReduceSend(iface, empty_matrix);
@@ -797,9 +845,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     }
     mfem::SparseMatrix** shared_Dloc = sec_D.Collect();
 
-    // Send and receive Mloc (only the diagonal values)
-    double* M_diag_data = M_local_.GetData();
-    SharedEntityCommunication<mfem::Vector> sec_M(comm_, face_d_td);
+    // Send and receive Mloc
+    SharedEntityCommunication<mfem::SparseMatrix> sec_M(comm_, face_d_td);
     sec_M.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
     {
@@ -810,8 +857,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
-        // shared faces or interior faces
-        if ((face_IsShared.RowSize(iface) || num_neighbor_aggs == 2) && num_iface_edge_dof > 1)
+        if (num_iface_edge_dof > 1)
         {
             dof_counter = num_iface_edge_dof;
             for (int i = 0; i < num_neighbor_aggs; ++i)
@@ -829,18 +875,17 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 dof_counter += local_dof.Size();
             }
 
-            mfem::Vector Mloc(face_nbh_dofs.Size());
-            for (int i = 0; i < face_nbh_dofs.Size(); i++)
-                Mloc[i] = M_diag_data[face_nbh_dofs[i]];
+            auto Mloc = ExtractRowAndColumns(M_local_, face_nbh_dofs,
+                                             face_nbh_dofs, colMapper_);
             sec_M.ReduceSend(iface, Mloc);
         }
-        else // global boundary face or only 1 dof on face
+        else // only 1 dof on face
         {
-            mfem::Vector empty_vector;
-            sec_M.ReduceSend(iface, empty_vector);
+            mfem::SparseMatrix empty_matrix = SparseIdentity(0);
+            sec_M.ReduceSend(iface, empty_matrix);
         }
     }
-    mfem::Vector** shared_Mloc = sec_M.Collect();
+    mfem::SparseMatrix** shared_Mloc = sec_M.Collect();
 
     // Add the "1, -1" divergence function to local trace targets
     // (paper calls this the "particular vector" which serves the
@@ -848,7 +893,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     // (it is only really 1, -1 for the first coarsening)
     // Perform SVD on the collected traces sigma for shared faces
     int capacity;
-    mfem::Vector PV_sigma, Mloc_neighbor;
+    mfem::Vector PV_sigma;
+    mfem::SparseMatrix Mloc_neighbor;
     mfem::Vector** shared_constant = CollectConstant(constant_rep);
     for (int iface = 0; iface < nfaces; ++iface)
     {
@@ -859,7 +905,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         {
             mfem::DenseMatrix* shared_sigma_f = shared_sigma[iface];
             mfem::SparseMatrix* shared_Dloc_f = shared_Dloc[iface];
-            mfem::Vector* shared_Mloc_f = shared_Mloc[iface];
+            mfem::SparseMatrix* shared_Mloc_f = shared_Mloc[iface];
 
             const int num_neighbor_proc = sec_trace.NumNeighbors(iface);
             assert(num_neighbor_proc < 3 && num_neighbor_proc > 0);
@@ -880,14 +926,19 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
             // compute the PV vector
             mfem::Vector PV_sigma_on_face;
-            const int num_neighbor_aggs = face_Agg.RowSize(iface);
 
-            if (face_IsShared.RowSize(iface) && num_iface_edge_dof > 1)
+            if (num_iface_edge_dof == 1)
+            {
+                // only 1 dof on face
+                PV_sigma_on_face.SetSize(num_iface_edge_dof);
+                PV_sigma_on_face = 1.; // should inherit something from contant_rep?
+            }
+            else if (face_IsShared.RowSize(iface))
             {
                 // This face is shared between two processors
                 // Gather local matrices from both processors and assemble them
-                mfem::Vector& Mloc_0 = shared_Mloc_f[0];
-                mfem::Vector& Mloc_1 = shared_Mloc_f[1];
+                mfem::SparseMatrix& Mloc_0 = shared_Mloc_f[0];
+                mfem::SparseMatrix& Mloc_1 = shared_Mloc_f[1];
                 mfem::SparseMatrix& Dloc_0 = shared_Dloc_f[0];
                 mfem::SparseMatrix& Dloc_1 = shared_Dloc_f[1];
 
@@ -902,15 +953,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                     Mloc_0.Size() + Mloc_1.Size() - num_iface_edge_dof;
 
                 // assemble contributions from each processor for shared dofs
-                Mloc_neighbor.SetSize(nedge_local_dofs);
-                for (int i = 0; i < num_iface_edge_dof; i++)
-                    Mloc_neighbor[i] = Mloc_0[i] + Mloc_1[i];
-                std::copy_n(Mloc_0.GetData() + num_iface_edge_dof,
-                            Mloc_0.Size() - num_iface_edge_dof,
-                            Mloc_neighbor.GetData() + num_iface_edge_dof);
-                std::copy_n(Mloc_1.GetData() + num_iface_edge_dof,
-                            Mloc_1.Size() - num_iface_edge_dof,
-                            Mloc_neighbor.GetData() + Mloc_0.Size());
+                mfem::SparseMatrix combined_M = CombineM(Mloc_0, Mloc_1, num_iface_edge_dof);
+                Mloc_neighbor.Swap(combined_M);
 
                 int Dloc_0_nnz = Dloc_0.NumNonZeroElems();
                 int Dloc_1_nnz = Dloc_1.NumNonZeroElems();
@@ -946,17 +990,15 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                     nvertex_local_dofs, nedge_local_dofs);
 
                 // solve saddle point problem for PV and restrict to face
-                PV_sigma.SetSize(Mloc_neighbor.Size());
+                PV_sigma.SetSize(Mloc_neighbor.Height());
                 LocalGraphEdgeSolver solver(Mloc_neighbor, Dloc_neighbor);
                 solver.Mult(OneNegOne, PV_sigma);
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(),
-                                                num_iface_edge_dof);
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
             }
-            else if (num_neighbor_aggs == 2 && num_iface_edge_dof > 1)
+            else
             {
-                // This face is not shared between processors, but shared by
-                // two aggregates
-                mfem::Vector& Mloc_0 = shared_Mloc_f[0];
+                // This face is not shared between processors
+                mfem::SparseMatrix& Mloc_0 = shared_Mloc_f[0];
                 mfem::SparseMatrix& Dloc_0 = shared_Dloc_f[0];
 
                 // set up an average zero vector (so no need to Normalize)
@@ -965,17 +1007,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 mfem::Vector OneNegOne = MakeOneNegOne(shared_constant[iface][0], nvertex_neighbor0);
 
                 // solve saddle point problem for PV and restrict to face
-                PV_sigma.SetSize(Mloc_0.Size());
+                PV_sigma.SetSize(Mloc_0.Height());
                 LocalGraphEdgeSolver solver(Mloc_0, Dloc_0);
                 solver.Mult(OneNegOne, PV_sigma);
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(),
-                                                num_iface_edge_dof);
-            }
-            else
-            {
-                // global boundary face or only 1 dof on face
-                PV_sigma_on_face.SetSize(num_iface_edge_dof);
-                PV_sigma_on_face = 1.; // should inherit something from contant_rep?
+
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
             }
 
             // add PV vector to other vectors and orthogonalize

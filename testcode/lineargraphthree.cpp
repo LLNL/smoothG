@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
 
     mfem::Vector weight(global_size - 1);
     weight = 1.0;
-
+    std::cout << "Finished constructing Graph." << std::endl;
     GraphUpscale upscale(comm, graph.GetVertexEdge(), global_partitioning,
                          upscale_param, weight);
     std::cout << "Finished constructing GraphUpscale." << std::endl;
@@ -120,7 +120,13 @@ int main(int argc, char* argv[])
 
     mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
     fine_rhs.GetBlock(0) = 0.0;
-    fine_rhs.GetBlock(1) = 1.0; // ?
+
+    // setup average zero right hand side (block 1).
+    fine_rhs.GetBlock(1) = 1.0;
+    for (int i = 0; i < fine_rhs.BlockSize(1) / 2; ++i)
+    {
+        fine_rhs.GetBlock(1)[i] = -1.0;
+    }
 
     mfem::BlockVector sol0(fine_rhs);
     upscale.Solve(0, fine_rhs, sol0);

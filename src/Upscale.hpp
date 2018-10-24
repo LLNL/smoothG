@@ -173,6 +173,16 @@ public:
     /// Dump some debug data
     void DumpDebug(const std::string& prefix) const;
 
+    const mfem::SparseMatrix& GetPsigma(int level) const
+    {
+        return coarsener_[level]->get_Psigma();
+    }
+
+    const mfem::SparseMatrix& GetPu(int level) const
+    {
+        return coarsener_[level]->get_Pu();
+    }
+
 protected:
     Upscale(MPI_Comm comm, int size)
         : Operator(size), comm_(comm), setup_time_(0.0)
