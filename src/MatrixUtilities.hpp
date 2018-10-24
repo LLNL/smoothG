@@ -358,10 +358,10 @@ public:
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
 
-       @param rhs \f$ f \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma) const;
+    void Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sigma) const;
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f - D M^{-1} g \f$,
@@ -378,7 +378,7 @@ public:
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
 
-       @param rhs1 \f$ f \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
