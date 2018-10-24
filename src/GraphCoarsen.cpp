@@ -178,7 +178,7 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
 
         if (fabs(oneDpv) < 1e-10)
         {
-            std::cout << "Warning: oneDpv is closed to zero, oneDpv = "
+            std::cerr << "Warning: oneDpv is closed to zero, oneDpv = "
                       << oneDpv << ", this may be due to bad PV traces!\n";
         }
 
