@@ -84,17 +84,8 @@ namespace smoothg
 class HybridSolver : public MixedLaplacianSolver
 {
 public:
-    /// Construct local mass matrix for the fine level edge space
-    static void BuildFineLevelLocalMassMatrix(
-        const mfem::SparseMatrix& vertex_edge,
-        const mfem::SparseMatrix& M,
-        std::vector<mfem::Vector>& M_el);
-
-public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
-
-
 
        @param comm MPI communicator
        @param mgL Mixed matrices for the graph Laplacian in the fine level
@@ -111,7 +102,7 @@ public:
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
-                 const SAAMGeParameters* saamge_param = nullptr);
+                 const SAAMGeParam* saamge_param = nullptr);
 
     /**
        @brief Constructor for coarse-level hybridiziation solver.
@@ -133,7 +124,7 @@ public:
                  const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
-                 const SAAMGeParameters* saamge_param = nullptr);
+                 const SAAMGeParam* saamge_param = nullptr);
 
     virtual ~HybridSolver();
 
@@ -170,6 +161,18 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
+    /**
+       @brief Update weights of local M matrices on aggregates
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+
+       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
+    */
+    void UpdateAggScaling(const mfem::Vector& agg_weights_inverse);
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;
@@ -179,22 +182,14 @@ public:
     ///@}
 
 protected:
-    template<typename T>
     void Init(const mfem::SparseMatrix& face_edgedof,
-              const std::vector<T>& M_el,
+              const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
               const mfem::SparseMatrix* face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
-    /**
-       @todo this method and its cousin share a lot of duplicated code
-    */
     void AssembleHybridSystem(
         const std::vector<mfem::DenseMatrix>& M_el,
-        const mfem::Array<int>& j_multiplier_edgedof);
-
-    void AssembleHybridSystem(
-        const std::vector<mfem::Vector>& M_el,
         const mfem::Array<int>& j_multiplier_edgedof);
 
     // Compute scaling vector and the scaled hybridized system
@@ -202,6 +197,9 @@ protected:
 
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();
+
+    // Assemble parallel hybridized system and build a solver for it
+    void BuildParallelSystemAndSolver();
 
 private:
     MPI_Comm comm_;
@@ -246,13 +244,14 @@ private:
     int num_edge_dofs_;
     int num_multiplier_dofs_;
 
-    bool use_SAAMGe_;
     bool use_w_;
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
 
-    const SAAMGeParameters* sa_param_;
+    mfem::Vector agg_weights_;
+
+    const SAAMGeParam* saamge_param_;
 #if SMOOTHG_USE_SAAMGE
     std::vector<int> sa_nparts_;
     saamge::agg_partitioning_relations_t* sa_apr_;

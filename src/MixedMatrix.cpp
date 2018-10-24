@@ -97,34 +97,29 @@ MixedMatrix::MixedMatrix(const Graph& graph, DistributeWeight dist_weight)
 }
 
 MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
+                         const std::vector<mfem::Vector>& local_weight,
                          const mfem::HypreParMatrix& edge_d_td)
-    : MixedMatrix(vertex_edge, mfem::Vector(vertex_edge.Width()) = 1.0, edge_d_td,
-                  DistributeWeight::True)
+    : edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose())
 {
+    mbuilder_ = make_unique<ElementMBuilder>(local_weight, vertex_edge);
+    M_ = mbuilder_->BuildAssembledM();
+    D_ = ConstructD(vertex_edge, edge_d_td);
+    GenerateRowStarts();
 }
 
-MixedMatrix::MixedMatrix(std::unique_ptr<mfem::SparseMatrix> M,
+MixedMatrix::MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,
                          const mfem::HypreParMatrix& edge_d_td)
-    :
-    M_(std::move(M)),
-    D_(std::move(D)),
-    W_(std::move(W)),
-    edge_d_td_(&edge_d_td),
-    edge_td_d_(edge_d_td_->Transpose())
+    : D_(std::move(D)), W_(std::move(W)), edge_d_td_(&edge_d_td),
+      edge_td_d_(edge_d_td.Transpose()), mbuilder_(std::move(mbuilder))
 {
     GenerateRowStarts();
 }
 
-/// @todo better documentation of the 1/-1 issue, make it optional?
-void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
-                       const mfem::Vector& weight,
-                       const mfem::SparseMatrix& w_block)
+void MixedMatrix::SetMFromWeightVector(const mfem::Vector& weight)
 {
-    const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
-    const int nvertices = vertex_edge.Height();
-    const int nedges = vertex_edge.Width();
+    const int nedges = weight.Size();
 
     int* M_fine_i = new int [nedges + 1];
     int* M_fine_j = new int [nedges];
@@ -141,6 +136,30 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
 
     M_ = make_unique<mfem::SparseMatrix>(M_fine_i, M_fine_j, M_fine_data,
                                          nedges, nedges);
+}
+
+void MixedMatrix::ScaleM(const mfem::Vector& weight)
+{
+    M_->ScaleRows(weight);
+}
+
+void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
+{
+    assert(mbuilder_);
+    M_ = mbuilder_->BuildAssembledM(agg_weights_inverse);
+}
+
+/// @todo better documentation of the 1/-1 issue, make it optional?
+void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
+                       const mfem::Vector& weight,
+                       const mfem::SparseMatrix& w_block)
+{
+    const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
+    const int nvertices = vertex_edge.Height();
+
+    //    SetMFromWeightVector(weight);
+    mbuilder_ = make_unique<ElementMBuilder>(weight, vertex_edge);
+    M_ = mbuilder_->BuildAssembledM();
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
     {
@@ -148,9 +167,68 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
         (*W_) *= -1.0;
     }
 
+    D_ = ConstructD(vertex_edge, edge_d_td);
+    GenerateRowStarts();
+}
+
+void MixedMatrix::GenerateRowStarts()
+{
+    const int nvertices = D_->Height();
+    MPI_Comm comm = edge_d_td_->GetComm();
+    Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
+    GenerateOffsets(comm, nvertices, *Drow_start_);
+}
+
+unique_ptr<mfem::BlockVector> MixedMatrix::SubVectorsToBlockVector(
+    const mfem::Vector& vec_u, const mfem::Vector& vec_p) const
+{
+    auto blockvec = make_unique<mfem::BlockVector>(GetBlockOffsets());
+    blockvec->GetBlock(0) = vec_u;
+    blockvec->GetBlock(1) = vec_p;
+    return blockvec;
+}
+
+mfem::Array<int>& MixedMatrix::GetBlockOffsets() const
+{
+    if (!blockOffsets_)
+    {
+        blockOffsets_ = make_unique<mfem::Array<int>>(3);
+        (*blockOffsets_)[0] = 0;
+        (*blockOffsets_)[1] = edge_d_td_->GetNumRows();
+        (*blockOffsets_)[2] = (*blockOffsets_)[1] + D_->Height();
+    }
+
+    return *blockOffsets_;
+}
+
+mfem::Array<int>& MixedMatrix::GetBlockTrueOffsets() const
+{
+    if (!blockTrueOffsets_)
+    {
+        blockTrueOffsets_ = make_unique<mfem::Array<int>>(3);
+        (*blockTrueOffsets_)[0] = 0;
+        (*blockTrueOffsets_)[1] = edge_d_td_->GetNumCols();
+        (*blockTrueOffsets_)[2] = (*blockTrueOffsets_)[1] + D_->Height();
+    }
+
+    return *(blockTrueOffsets_);
+}
+
+bool MixedMatrix::CheckW() const
+{
+    const double zero_tol = 1e-6;
+
+    mfem::HypreParMatrix* W = GetParallelW();
+
+    return W && MaxNorm(*W) > zero_tol;
+}
+
+std::unique_ptr<mfem::SparseMatrix> MixedMatrix::ConstructD(
+    const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge)
+{
     // Nonzero row of edge_owned means the edge is owned by the local proc
     mfem::SparseMatrix edge_owned;
-    edge_d_td.GetDiag(edge_owned);
+    edge_trueedge.GetDiag(edge_owned);
 
     mfem::SparseMatrix graphDT(smoothg::Transpose(vertex_edge));
 
@@ -177,62 +255,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
             graphDT_data[graphDT_i[j]] = -1.;
         }
     }
-
-    D_ = unique_ptr<mfem::SparseMatrix>(mfem::Transpose(graphDT));
-    GenerateRowStarts();
-}
-
-void MixedMatrix::GenerateRowStarts()
-{
-    const int nvertices = D_->Height();
-    MPI_Comm comm = edge_d_td_->GetComm();
-    Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
-    GenerateOffsets(comm, nvertices, *Drow_start_);
-}
-
-unique_ptr<mfem::BlockVector> MixedMatrix::subvecs_to_blockvector(
-    const mfem::Vector& vec_u, const mfem::Vector& vec_p) const
-{
-    auto blockvec = make_unique<mfem::BlockVector>(get_blockoffsets());
-    blockvec->GetBlock(0) = vec_u;
-    blockvec->GetBlock(1) = vec_p;
-    return blockvec;
-}
-
-// overload to be available when parallel = false
-mfem::Array<int>& MixedMatrix::get_blockoffsets() const
-{
-    if (!blockOffsets_)
-    {
-        blockOffsets_ = make_unique<mfem::Array<int>>(3);
-        (*blockOffsets_)[0] = 0;
-        (*blockOffsets_)[1] = edge_d_td_->GetNumRows();
-        (*blockOffsets_)[2] = (*blockOffsets_)[1] + D_->Height();
-    }
-
-    return *blockOffsets_;
-}
-
-mfem::Array<int>& MixedMatrix::get_blockTrueOffsets() const
-{
-    if (!blockTrueOffsets_)
-    {
-        blockTrueOffsets_ = make_unique<mfem::Array<int>>(3);
-        (*blockTrueOffsets_)[0] = 0;
-        (*blockTrueOffsets_)[1] = edge_d_td_->GetNumCols();
-        (*blockTrueOffsets_)[2] = (*blockTrueOffsets_)[1] + D_->Height();
-    }
-
-    return *(blockTrueOffsets_);
-}
-
-bool MixedMatrix::CheckW() const
-{
-    const double zero_tol = 1e-6;
-
-    mfem::HypreParMatrix* W = get_pW();
-
-    return W && MaxNorm(*W) > zero_tol;
+    return unique_ptr<mfem::SparseMatrix>(mfem::Transpose(graphDT));
 }
 
 } // namespace smoothg

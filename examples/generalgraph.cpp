@@ -34,8 +34,8 @@ using std::make_shared;
 
 using namespace smoothg;
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
-               int isolate);
+void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
+                    int isolate);
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian);
 
 int main(int argc, char* argv[])
@@ -50,6 +50,7 @@ int main(int argc, char* argv[])
     SpectralCoarsenerParameters coarsen_param;
 
     // program options from command line
+    UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
     int num_partitions = 12;
     args.AddOption(&num_partitions, "-np", "--num-part",
@@ -73,12 +74,6 @@ int main(int argc, char* argv[])
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of loading partition).");
-    args.AddOption(&(coarsen_param.max_evects), "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    args.AddOption(&(coarsen_param.spectral_tol), "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
-    args.AddOption(&(coarsen_param.use_hybridization), "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
     bool generate_graph = false;
     args.AddOption(&generate_graph, "-gg", "--generate-graph", "-no-gg",
                    "--no-generate-graph", "Generate a graph at runtime.");
@@ -103,12 +98,9 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
-    args.AddOption(&(coarsen_param.dual_target), "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    args.AddOption(&(coarsen_param.scaled_dual), "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    args.AddOption(&(coarsen_param.energy_dual), "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
+
+    // Read upscaling options from command line into upscale_param object
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
@@ -125,7 +117,8 @@ int main(int argc, char* argv[])
     }
 
     assert(num_partitions >= num_procs);
-
+    upscale_param.coarse_components = (upscale_param.coarse_components &&
+                                       !upscale_param.hybridization);
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix global_vertex_edge;
@@ -149,7 +142,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> global_partitioning;
     if (metis_agglomeration || generate_graph)
     {
-        MetisPart(global_vertex_edge, global_partitioning, num_partitions, isolate);
+        MetisGraphPart(global_vertex_edge, global_partitioning, num_partitions, isolate);
     }
     else
     {
@@ -176,7 +169,7 @@ int main(int argc, char* argv[])
     {
         /// [Upscale]
         GraphUpscale upscale(comm, global_vertex_edge, global_partitioning,
-                             coarsen_param, edge_weight);
+                             upscale_param, edge_weight);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
@@ -187,29 +180,33 @@ int main(int argc, char* argv[])
         /// [Right Hand Side]
         if (generate_graph || generate_fiedler)
         {
-            rhs_u_fine = ComputeFiedlerVector(upscale.GetFineMatrix());
+            rhs_u_fine = ComputeFiedlerVector(upscale.GetMatrix(0));
         }
         else
         {
             rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
         }
 
-        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+        mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
 
         /// [Solve]
-        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        upscale.ShowCoarseSolveInfo();
+        std::vector<mfem::BlockVector> sol(upscale_param.max_levels, fine_rhs);
+        for (int level = 0; level < upscale_param.max_levels; ++level)
+        {
+            upscale.Solve(level, fine_rhs, sol[level]);
+            upscale.ShowSolveInfo(level);
 
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        upscale.ShowFineSolveInfo();
+            auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
+
+            if (level > 0 && myid == 0)
+            {
+                ShowErrors(error_info);
+            }
+        }
         /// [Solve]
-
-        /// [Check Error]
-        upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
 
         if (save_fiedler)
         {
@@ -221,8 +218,8 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
-               int isolate)
+void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, int num_parts,
+                    int isolate)
 {
     smoothg::MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(2);
@@ -240,9 +237,9 @@ void MetisPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& part, in
 
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 {
-    auto& pM = mixed_laplacian.get_pM();
-    auto& pD = mixed_laplacian.get_pD();
-    auto* pW = mixed_laplacian.get_pW();
+    auto& pM = mixed_laplacian.GetParallelM();
+    auto& pD = mixed_laplacian.GetParallelD();
+    auto* pW = mixed_laplacian.GetParallelW();
 
     unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
 

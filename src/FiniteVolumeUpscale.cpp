@@ -27,68 +27,94 @@ namespace smoothg
 FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& vertex_edge,
                                          const mfem::Vector& weight,
-                                         const mfem::Array<int>& global_partitioning,
+                                         const mfem::Array<int>& partitioning,
                                          const mfem::HypreParMatrix& edge_d_td,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
-                                         double spect_tol, int max_evects,
-                                         bool dual_target, bool scaled_dual,
-                                         bool energy_dual, bool hybridization,
-                                         const SAAMGeParameters* saamge_param)
-    : Upscale(comm, vertex_edge.Height(), hybridization),
+                                         const UpscaleParameters& param)
+    : Upscale(comm, vertex_edge.Height(), param.hybridization),
       edge_d_td_(edge_d_td),
-      edge_boundary_att_(edge_boundary_att)
+      edge_boundary_att_(edge_boundary_att),
+      ess_attr_(ess_attr),
+      param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+    std::vector<GraphTopology> gts;
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(ve_copy, weight, edge_d_td_,
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    GraphTopology graph_topology(ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
+    gts.emplace_back(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], graph_topology, spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
-    coarsener_->construct_coarse_subspace();
-
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
-
-    mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
-    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
-
-    mfem::Array<int> marker(Dref.Width());
-    marker = 0;
-
-    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
-                       coarsener_->construct_face_facedof_table(),
-                       ess_attr, marker);
-
-    if (hybridization) // Hybridization solver
+    // coarser levels: topology
+    for (int level = 2; level < param_.max_levels; ++level)
     {
-        auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm, mixed_laplacians_.back(), *coarsener_,
-                             &face_bdratt, &marker, 0, saamge_param);
+        gts.emplace_back(gts.back(), param_.coarse_factor);
     }
-    else // L2-H1 block diagonal preconditioner
+
+    // coarser levels: matrices
+    for (int level = 1; level < param_.max_levels; ++level)
     {
-        for (int mm = 0; mm < marker.Size(); ++mm)
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                    mixed_laplacians_[level - 1],
+                                    std::move(gts[level - 1]), param_));
+        coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
+
+        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+
+        if (level < param_.max_levels - 1 || !param_.hybridization)
         {
-            // Assume M diagonal, no ess data
-            if (marker[mm])
-                Mref.EliminateRow(mm, true);
+            mixed_laplacians_.back().BuildM();
         }
-
-        Dref.EliminateCols(marker);
-
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm, mixed_laplacians_.back());
     }
 
-    MakeCoarseVectors();
+    // fine level: solver
+    MakeFineSolver();
+    MakeVectors(0);
+
+    // coarser levels: solver
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
+        mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
+        mfem::Array<int> marker(Dref.Width());
+        marker = 0;
+
+        MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
+                           coarsener_[level - 1]->construct_face_facedof_table(),
+                           ess_attr, marker);
+
+        if (param_.hybridization) // Hybridization solver
+        {
+            auto face_bdratt = coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
+            solver_[level] = make_unique<HybridSolver>(
+                                 comm, GetMatrix(level), *coarsener_[level - 1],
+                                 &face_bdratt, &marker, 0, param_.saamge_param);
+        }
+        else // L2-H1 block diagonal preconditioner
+        {
+            GetMatrix(level).BuildM();
+            mfem::SparseMatrix& Mref = GetMatrix(level).GetM();
+            for (int mm = 0; mm < marker.Size(); ++mm)
+            {
+                // Assume M diagonal, no ess data
+                if (marker[mm])
+                    Mref.EliminateRowCol(mm, true);
+            }
+
+            Dref.EliminateCols(marker);
+
+            solver_[level] = make_unique<MinresBlockSolverFalse>(comm, GetMatrix(level));
+        }
+        MakeVectors(level);
+    }
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -98,87 +124,115 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& vertex_edge,
                                          const mfem::Vector& weight,
                                          const mfem::SparseMatrix& w_block,
-                                         const mfem::Array<int>& global_partitioning,
+                                         const mfem::Array<int>& partitioning,
                                          const mfem::HypreParMatrix& edge_d_td,
                                          const mfem::SparseMatrix& edge_boundary_att,
                                          const mfem::Array<int>& ess_attr,
-                                         double spect_tol, int max_evects,
-                                         bool dual_target, bool scaled_dual,
-                                         bool energy_dual, bool hybridization,
-                                         const SAAMGeParameters* saamge_param)
-    : Upscale(comm, vertex_edge.Height(), hybridization),
+                                         const UpscaleParameters& param)
+    : Upscale(comm, vertex_edge.Height(), param.hybridization),
       edge_d_td_(edge_d_td),
-      edge_boundary_att_(edge_boundary_att)
+      edge_boundary_att_(edge_boundary_att),
+      ess_attr_(ess_attr),
+      param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
 
+    solver_.resize(param.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+    std::vector<GraphTopology> gts;
+
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(ve_copy, weight, w_block, edge_d_td_,
+    mixed_laplacians_.emplace_back(vertex_edge, weight, w_block, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    GraphTopology graph_topology(ve_copy, edge_d_td_, global_partitioning, &edge_boundary_att_);
+    gts.emplace_back(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
 
-    coarsener_ = make_unique<SpectralAMG_MGL_Coarsener>(
-                     mixed_laplacians_[0], graph_topology, spect_tol,
-                     max_evects, dual_target, scaled_dual, energy_dual, hybridization);
-    coarsener_->construct_coarse_subspace();
-
-    mixed_laplacians_.push_back(coarsener_->GetCoarse());
-
-    mfem::SparseMatrix& Mref = mixed_laplacians_.back().getWeight();
-    mfem::SparseMatrix& Dref = mixed_laplacians_.back().getD();
-
-    mfem::Array<int> marker(Dref.Width());
-    marker = 0;
-
-    MarkDofsOnBoundary(coarsener_->get_GraphTopology_ref().face_bdratt_,
-                       coarsener_->construct_face_facedof_table(),
-                       ess_attr, marker);
-
-    if (hybridization) // Hybridization solver
+    // coarser levels: topology
+    for (int level = 2; level < param_.max_levels; ++level)
     {
-        auto face_bdratt = coarsener_->get_GraphTopology_ref().face_bdratt_;
-        coarse_solver_ = make_unique<HybridSolver>(
-                             comm, mixed_laplacians_.back(), *coarsener_,
-                             &face_bdratt, &marker, 0, saamge_param);
+        gts.emplace_back(gts.back(), param_.coarse_factor);
     }
-    else // L2-H1 block diagonal preconditioner
+
+    // coarser levels: matrices
+    for (int level = 1; level < param_.max_levels; ++level)
     {
-        for (int mm = 0; mm < marker.Size(); ++mm)
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                    mixed_laplacians_[level - 1],
+                                    std::move(gts[level - 1]), param_));
+        coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
+
+        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+        if (level < param_.max_levels - 1 || !param_.hybridization)
         {
-            // Assume M diagonal, no ess data
-            if (marker[mm])
-                Mref.EliminateRow(mm, true);
+            mixed_laplacians_.back().BuildM();
         }
-
-        Dref.EliminateCols(marker);
-
-        coarse_solver_ = make_unique<MinresBlockSolverFalse>(comm, mixed_laplacians_.back());
     }
 
-    MakeCoarseVectors();
+    // fine level: solver
+    MakeFineSolver();
+    MakeVectors(0);
+
+    // coarser levels: solver
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
+        mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
+        mfem::Array<int> marker(Dref.Width());
+        marker = 0;
+
+        MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
+                           coarsener_[level - 1]->construct_face_facedof_table(),
+                           ess_attr, marker);
+
+        if (param_.hybridization) // Hybridization solver
+        {
+            auto face_bdratt = coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
+            solver_[level] = make_unique<HybridSolver>(
+                                 comm, GetMatrix(level), *coarsener_[level - 1],
+                                 &face_bdratt, &marker, 0, param_.saamge_param);
+        }
+        else // L2-H1 block diagonal preconditioner
+        {
+            GetMatrix(level).BuildM();
+            mfem::SparseMatrix& Mref = GetMatrix(level).GetM();
+            for (int mm = 0; mm < marker.Size(); ++mm)
+            {
+                // Assume M diagonal, no ess data
+                if (marker[mm])
+                    Mref.EliminateRow(mm, true);
+            }
+
+            Dref.EliminateCols(marker);
+
+            solver_[level] = make_unique<MinresBlockSolverFalse>(comm, GetMatrix(level));
+        }
+        MakeVectors(level);
+    }
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
-void FiniteVolumeUpscale::MakeFineSolver(const mfem::Array<int>& marker) const
+void FiniteVolumeUpscale::MakeFineSolver()
 {
-    if (!fine_solver_)
+    mfem::Array<int> marker;
+    BooleanMult(edge_boundary_att_, ess_attr_, marker);
+
+    if (!solver_[0])
     {
-        if (use_hybridization_) // Hybridization solver
+        if (param_.hybridization) // Hybridization solver
         {
-            fine_solver_ = make_unique<HybridSolver>(comm_, GetFineMatrix(),
-                                                     &edge_boundary_att_, &marker);
+            solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
+                                                   &edge_boundary_att_, &marker);
         }
         else // L2-H1 block diagonal preconditioner
         {
-            mfem::SparseMatrix& Mref = GetFineMatrix().getWeight();
-            mfem::SparseMatrix& Dref = GetFineMatrix().getD();
-            const bool w_exists = GetFineMatrix().CheckW();
+            mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
+            mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
+            const bool w_exists = GetMatrix(0).CheckW();
 
             for (int mm = 0; mm < marker.Size(); ++mm)
             {
@@ -190,15 +244,13 @@ void FiniteVolumeUpscale::MakeFineSolver(const mfem::Array<int>& marker) const
                     Mref.EliminateRow(mm, set_diag);
                 }
             }
-            mfem::Array<int> mfem_const_broken;
-            mfem_const_broken.MakeRef(marker);
-            Dref.EliminateCols(mfem_const_broken);
+            Dref.EliminateCols(marker);
             if (!w_exists && myid_ == 0)
             {
                 Dref.EliminateRow(0);
             }
 
-            fine_solver_ = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
         }
     }
 }

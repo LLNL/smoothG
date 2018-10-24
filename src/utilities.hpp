@@ -184,6 +184,10 @@ int MarkDofsOnBoundary(
 void GetTableRow(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
 
+/// if you call GetTableRow repeatedly, bad things might happen
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
+
 /**
    @brief Finite volume integrator
 
@@ -292,6 +296,7 @@ public:
     static void SetMeshSizes(double hx, double hy, double hz);
     static void Set2DSlice(SliceOrientation o, int npos );
 
+    static void BlankPermeability();
     static void ReadPermeabilityFile(const std::string& fileName);
     static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
 
@@ -392,6 +397,10 @@ struct SpectralCoarsenerParameters
 
     const SAAMGeParameters* sa_param = nullptr;
 };
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor);
 
 } // namespace smoothg
 

@@ -44,28 +44,26 @@ public:
 
        @param comm MPI communicator
        @param global_vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
-       @param edge_weight edge weights
-       @param coarsen_param parameters for spectral coarsener
+       @param global_partitioning partition of global vertices for the first
+              graph coarsening (use upscale.coarse_factor for further coarsening)
+       @param weight edge weights. if not provided, set to an empty vector
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& global_vertex_edge,
                  const mfem::Array<int>& global_partitioning,
-                 const SpectralCoarsenerParameters& coarsen_param,
-                 const mfem::Vector& edge_weight = mfem::Vector());
+                 const UpscaleParameters& param = UpscaleParameters(),
+                 const mfem::Vector& global_weight = mfem::Vector());
+
     /**
        @brief Constructor
 
        @param comm MPI communicator
        @param global_vertex_edge relationship between vertices and edge
-       @param coarse_factor how coarse to partition the graph
-       @param edge_weight edge weights
-       @param coarsen_param parameters for spectral coarsener
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& global_vertex_edge,
-                 const SpectralCoarsenerParameters& coarsen_param,
-                 const mfem::Vector& edge_weight = mfem::Vector());
+                 const UpscaleParameters& param = UpscaleParameters(),
+                 const mfem::Vector& global_weight = mfem::Vector());
 
     /// Read permuted vertex vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
@@ -85,14 +83,13 @@ public:
     /// Write permuted edge vector
     void WriteEdgeVector(const mfem::Vector& vect, const std::string& filename) const;
 
-    // Create Fine Level Solver
-    void MakeFineSolver() const;
+    /// Create Fine Level Solver
+    void MakeFineSolver();
 
 private:
     void Init(const mfem::SparseMatrix& vertex_edge,
               const mfem::Array<int>& global_partitioning,
-              const mfem::Vector& weight,
-              const SpectralCoarsenerParameters& coarsen_param);
+              const mfem::Vector& weight);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
@@ -104,6 +101,7 @@ private:
 
     const int global_edges_;
     const int global_vertices_;
+    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg

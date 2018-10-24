@@ -38,8 +38,14 @@ int main(int argc, char* argv[])
     picojson::object serialize;
 
     // Setup Parameters
-    SpectralCoarsenerParameters coarsen_param;
-    coarsen_param.coarsening_factor = 80;
+    UpscaleParameters param;
+    param.coarse_factor = 80;
+    param.max_evects = 4;
+    param.spect_tol = 1.0;
+    param.dual_target = false;
+    param.scaled_dual = false;
+    param.energy_dual = false;
+    param.hybridization = false;
 
     // Solve Parameters
     constexpr auto max_iter = 800;
@@ -55,7 +61,7 @@ int main(int argc, char* argv[])
     // Power Iteration With Upscale Operators
     {
         // Upscaler
-        const GraphUpscale upscale(comm, vertex_edge, coarsen_param);
+        const GraphUpscale upscale(comm, vertex_edge, param);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);

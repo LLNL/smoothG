@@ -90,7 +90,9 @@ void LocalEigenSolver::AllocateWorkspace(int n, bool is_gev)
 {
     A_.resize(n * n, 0.0);
     if (is_gev)
+    {
         B_.resize(n * n, 0.0);
+    }
     n_max_ = n;
 
     int lwork = -1;
@@ -115,7 +117,7 @@ void LocalEigenSolver::AllocateWorkspace(int n, bool is_gev)
     iwork_.resize(n);
 
     d_.resize(n);
-    e_.resize(n);
+    e_.resize(n); // could be n - 1?
     tau_.resize(n);
 
     iblock_.resize(n, 1);
@@ -155,6 +157,7 @@ int LocalEigenSolver::Compute(
     int n, double* a, mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     evals.SetSize(n);
+    assert(n <= (int) d_.size());
 
     // Triangularize A = Q * T * Q^T
     dsytrd_(&uplo_, &n, a, &n, d_.data(), e_.data(), tau_.data(), work_.data(),
@@ -162,7 +165,8 @@ int LocalEigenSolver::Compute(
 
     // d_ and e_ changed by dsterf_
     // copy since they are needed for dstein_
-    std::copy(std::begin(d_), std::end(d_), evals.GetData());
+    // std::copy(std::begin(d_), std::end(d_), evals.GetData());
+    std::copy(std::begin(d_), std::begin(d_) + n, evals.GetData());
     auto e_copy = e_;
 
     // Compute all eigenvalues

@@ -41,41 +41,21 @@ public:
 
        @param mgL the actual mixed graph Laplacian
        @param gt the topology describing how vertices and edges are agglomerated
-       @param spectral_tol number specifying how small eigenvalues must be before they
-              are included in the coarse space. A larger number here leads to a more
-              accurate, more expensive coarse space.
-       @param max_evecs_per_agg cap the number of eigenvectors per aggregate that will
-              be used in the coarse space.
-       @param dual_target get traces from eigenvectors of dual graph Laplacian
-       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
-              Typically coarse problem gets better accuracy but becomes harder
-              to solve when this option is turned on.
-       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
-              (guarantees approximation property in edge energy norm)
-       @param is_hybridization_used whether to prepare the coarse space to use the
-              HybridSolver
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                              const GraphTopology& gt,
-                              double spectral_tol,
-                              unsigned int max_evecs_per_agg,
-                              bool dual_target,
-                              bool scaled_dual,
-                              bool energy_dual,
-                              bool is_hybridization_used);
-
-    SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL, const GraphTopology& gt,
-                              const SpectralCoarsenerParameters& param);
+                              GraphTopology gt,
+                              const UpscaleParameters& param = UpscaleParameters());
 
 private:
     /**
        @brief Coarsen the graph, constructing projectors, coarse operators, etc.
+
+       @param constant_rep representation of constant on finer level
     */
-    void do_construct_coarse_subspace();
+    void do_construct_coarse_subspace(const mfem::Vector& constant_rep);
 
 private:
-    // TODO: make it a const reference if the first constructor is not kept
-    SpectralCoarsenerParameters coarsen_param_;
+    const UpscaleParameters& param_;
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

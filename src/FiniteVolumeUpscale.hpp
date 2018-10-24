@@ -44,63 +44,51 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
-       @param weight edge weights. if not provided, set to all ones
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
+       @param weight edge weights.
+       @param partitioning partition of vertices
+       @param edge_d_td the paralle dof_truedof table for the edge space
+       @param edge_boundary_att table with ones whenever a edge has a particular
+                        boundary attribute
+       @param ess_attr for edge space, list of boundary attributes to treat
+                        as essential boundary conditions
     */
     FiniteVolumeUpscale(MPI_Comm comm,
                         const mfem::SparseMatrix& vertex_edge,
                         const mfem::Vector& weight,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
-                        double spect_tol = 0.001, int max_evects = 4,
-                        bool dual_target = false, bool scaled_dual = false,
-                        bool energy_dual = false, bool hybridization = false,
-                        const SAAMGeParameters* saamge_param = nullptr);
+                        const UpscaleParameters& param = UpscaleParameters());
 
     /**
        @brief Constructor with W block specified
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
-       @param weight edge weights. if not provided, set to all ones
+       @param weight edge weights.
+       @param partitioning partition of vertices
        @param w_block W block matrix
-       @param spect_tol spectral tolerance determines how many eigenvectors to
-                        keep per aggregate
-       @param max_evects maximum number of eigenvectors to keep per aggregate
-       @param trace_method methods for getting edge trace samples
-       @param hybridization use hybridization as solver
-       @param saamge_param SAAMGe parameters, use SAAMGe as preconditioner for
-              coarse hybridized system if saamge_param is not nullptr
     */
     FiniteVolumeUpscale(MPI_Comm comm,
                         const mfem::SparseMatrix& vertex_edge,
                         const mfem::Vector& weight,
                         const mfem::SparseMatrix& w_block,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
                         const mfem::SparseMatrix& edge_boundary_att,
                         const mfem::Array<int>& ess_attr,
-                        double spect_tol = 0.001, int max_evects = 4,
-                        bool dual_target = false, bool scaled_dual = false,
-                        bool energy_dual = false, bool hybridization = false,
-                        const SAAMGeParameters* saamge_param = nullptr);
+                        const UpscaleParameters& param = UpscaleParameters());
 
-    void MakeFineSolver(const mfem::Array<int>& marker) const;
+    void MakeFineSolver();
 
 private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix& edge_boundary_att_;
+    const mfem::Array<int>& ess_attr_;
     //std::vector<double> ess_data;
+
+    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg

@@ -69,7 +69,7 @@ void UpscalingStatistics::ComputeErrorSquare(
     {
         for (unsigned int j = 0; j < help_.size(); ++j)
         {
-            help_[j] = make_unique<mfem::BlockVector>(mgL[j].get_blockoffsets());
+            help_[j] = make_unique<mfem::BlockVector>(mgL[j].GetBlockOffsets());
             (*help_[j]) = 0.0;
         }
     }
@@ -87,14 +87,14 @@ void UpscalingStatistics::ComputeErrorSquare(
     if (!mgL[0].CheckW())
     {
         par_orthogonalize_from_constant(help_[0]->GetBlock(1),
-                                        mgL[0].get_Drow_start().Last());
+                                        mgL[0].GetDrowStart().Last());
     }
 
     for (int j(0); j <= k; ++j)
     {
         MFEM_ASSERT(help_[j]->Size() == sol[j]->Size() &&
                     sol[j]->GetBlock(0).Size()
-                    == mgL[j].getD().Width(),
+                    == mgL[j].GetD().Width(),
                     "Graph Laplacian");
 
         int sigmasize = sol[0]->GetBlock(0).Size();
@@ -123,21 +123,21 @@ void UpscalingStatistics::ComputeErrorSquare(
 
         if (j == k)
         {
-            mgL[0].getD().Mult(sigma_h, dsigma_h);
+            mgL[0].GetD().Mult(sigma_h, dsigma_h);
 
             sigma_weighted_l2_error_square_(k, j)
-                = mgL[0].getWeight().InnerProduct(sigma_h, sigma_h);
+                = mgL[0].GetM().InnerProduct(sigma_h, sigma_h);
             Dsigma_l2_error_square_(k, j) = dsigma_h * dsigma_h;
             u_l2_error_square_(k, j) = u_h * u_h;
         }
         else
         {
             subtract(sigma_H, sigma_h, sigma_diff);
-            mgL[j].getD().Mult(sigma_diff, dsigma_diff);
+            mgL[j].GetD().Mult(sigma_diff, dsigma_diff);
             subtract(u_H, u_h, u_diff);
 
             sigma_weighted_l2_error_square_(k, j)
-                = mgL[j].getWeight().InnerProduct(sigma_diff, sigma_diff);
+                = mgL[j].GetM().InnerProduct(sigma_diff, sigma_diff);
             Dsigma_l2_error_square_(k, j) = dsigma_diff * dsigma_diff;
             u_l2_error_square_(k, j) = u_diff * u_diff;
         }
@@ -393,25 +393,25 @@ mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh)
     int* edge_bdrattr_i = new int[nedges + 1]();
     int* edge_bdrattr_j = new int[nbdr_edges];
 
-
+    // in the loop below, edge_bdrattr_i is used as a temporary array
     for (int j = 0; j < nbdr_edges; j++)
     {
         int edge = mesh->GetBdrElementEdgeIndex(j);
         edge_bdrattr_i[edge + 1] = mesh->GetBdrAttribute(j);
     }
+    edge_bdrattr_i[0] = 0;
 
     int count = 0;
-
     for (int j = 1; j <= nedges; j++)
     {
         if (edge_bdrattr_i[j])
         {
             edge_bdrattr_j[count++] = edge_bdrattr_i[j] - 1;
-            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1] + 1;
+            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1] + 1; // single nonzero in this row
         }
         else
         {
-            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1];
+            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1]; // no nonzeros in this row
         }
     }
 
@@ -474,6 +474,18 @@ void GetTableRow(
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
     J.MakeRef(mat.GetJ() + begin, size);
+}
+
+/// instead of a reference, get a copy
+void GetTableRowCopy(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
+{
+    const int begin = mat.GetI()[rownum];
+    const int end = mat.GetI()[rownum + 1];
+    const int size = end - begin;
+    mfem::Array<int> temp;
+    temp.MakeRef(mat.GetJ() + begin, size);
+    temp.Copy(J);
 }
 
 void FiniteVolumeMassIntegrator::AssembleElementMatrix(
@@ -671,13 +683,22 @@ void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
     npos = npos_;
 }
 
+void InversePermeabilityFunction::BlankPermeability()
+{
+    inversePermeability = new double[3 * Nx * Ny * Nz];
+    for (int i = 0; i < 3 * Nx * Ny * Nz; ++i)
+    {
+        inversePermeability[i] = 1.0;
+    }
+}
+
 void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName)
 {
     std::ifstream permfile(fileName.c_str());
 
     if (!permfile.is_open())
     {
-        std::cout << "Error in opening file " << fileName << std::endl;
+        std::cerr << "Error in opening file " << fileName << std::endl;
         mfem::mfem_error("File does not exist");
     }
 
@@ -781,7 +802,6 @@ void InversePermeabilityFunction::InversePermeability(const mfem::Vector& x,
 
     if (orientation == NONE)
         val[2] = inversePermeability[Ny * Nx * k + Nx * j + i + 2 * Nx * Ny * Nz];
-
 }
 
 double InversePermeabilityFunction::InvNorm2(const mfem::Vector& x)
@@ -1011,6 +1031,33 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat)
     }
 
     return cols;
+}
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor)
+{
+    const int SPE10_num_x_volumes = 60;
+    const int SPE10_num_y_volumes = 220;
+    const int SPE10_num_z_volumes = 85;
+
+    const int nDimensions = num_procs_xyz.size();
+
+    mfem::Array<int> nxyz(nDimensions);
+    nxyz[0] = SPE10_num_x_volumes / num_procs_xyz[0] / coarsening_factor[0];
+    nxyz[1] = SPE10_num_y_volumes / num_procs_xyz[1] / coarsening_factor[1];
+    if (nDimensions == 3)
+        nxyz[2] = SPE10_num_z_volumes / num_procs_xyz[2] / coarsening_factor[2];
+
+    for (int& i : nxyz)
+    {
+        i = std::max(1, i);
+    }
+
+    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
+    partitioning.Append(cart_part);
+
+    cart_part.MakeDataOwner();
 }
 
 } // namespace smoothg
