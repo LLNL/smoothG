@@ -14,13 +14,9 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file finitevolume.cpp
-   @brief This is an example for upscaling a graph Laplacian coming from a finite
-   volume discretization of a simple reservior model in parallel.
-
-   A simple way to run the example:
-
-   mpirun -n 4 ./finitevolume
+   @file coarse_assembling.cpp
+   @brief Test if the coarse M and D constructed in GraphCoarsen coincide
+   with the RAP approach.
 */
 
 #include <fstream>
