@@ -368,7 +368,7 @@ public:
                      \f$ \sigma = M^{-1} (D^T u + g) \f$.
 
        @param rhs_sigma \f$ g \f$ in the formula above
-       @param rhs \f$ f \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
