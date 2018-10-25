@@ -50,7 +50,7 @@ public:
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& global_vertex_edge,
-                 const mfem::Array<int>& global_partitioning,
+                 const mfem::Array<int>& partitioning,
                  const UpscaleParameters& param = UpscaleParameters(),
                  const mfem::Vector& global_weight = mfem::Vector());
 
@@ -65,28 +65,13 @@ public:
                  const UpscaleParameters& param = UpscaleParameters(),
                  const mfem::Vector& global_weight = mfem::Vector());
 
-    /// Read permuted vertex vector
-    mfem::Vector ReadVertexVector(const std::string& filename) const;
-
-    /// Read permuted vertex vector, in mixed form
-    mfem::BlockVector ReadVertexBlockVector(const std::string& filename) const;
-
-    /// Write permuted vertex vector
-    void WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const;
-
     /// Create Fine Level Solver
     void MakeFineSolver();
 
 private:
     void Init(const mfem::SparseMatrix& vertex_edge,
-              const mfem::Array<int>& global_partitioning,
+              const mfem::Array<int>& partitioning,
               const mfem::Vector& weight);
-
-    mfem::Vector ReadVector(const std::string& filename, int global_size,
-                            const mfem::Array<int>& local_to_global) const;
-
-    void WriteVector(const mfem::Vector& vect, const std::string& filename, int global_size,
-                     const mfem::Array<int>& local_to_global) const;
 
     std::unique_ptr<smoothg::Graph> graph_;
 

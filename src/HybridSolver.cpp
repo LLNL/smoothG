@@ -70,7 +70,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
                            const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
-                           const SAAMGeParam *saamge_param)
+                           const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.GetBlockOffsets()),
     comm_(comm),

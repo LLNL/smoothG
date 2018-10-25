@@ -48,8 +48,14 @@ public:
        @param vertex_edge_global edge weight of global graph, if not provided,
     */
     Graph(MPI_Comm comm,
-          mfem::SparseMatrix vertex_edge_global,
-          mfem::Vector edge_weight_global = mfem::Vector());
+          const mfem::SparseMatrix& vertex_edge_global,
+          const mfem::Vector& edge_weight_global = mfem::Vector());
+
+    /// Read permuted vertex vector
+    mfem::Vector ReadVertexVector(const std::string& filename) const;
+
+    /// Write permuted vertex vector
+    void WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const;
 
     ///@name Getters for tables that describe parallel graph
     ///@{
@@ -87,12 +93,7 @@ public:
     ///@}
 private:
     void Distribute(const mfem::SparseMatrix& vertex_edge_global,
-                    const mfem::Vector& edge_weight_global,
-                    const mfem::Array<int>& partition_global);
-
-    void Distribute(const mfem::SparseMatrix& vertex_edge_global,
-                    const mfem::Vector& edge_weight_global,
-                    int coarsening_factor, bool do_parmetis_partition);
+                    const mfem::Vector& edge_weight_global);
 
     /**
        @brief distribute a global serial graph into parallel local subgraphs.
@@ -103,13 +104,16 @@ private:
        between processors, which is encoded in edge_e_te_.
 
        @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
     */
-    void DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
-                              const mfem::Array<int>& partition_global);
+    void DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global);
 
     void DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
+
+    mfem::Vector ReadVector(const std::string& filename, int global_size,
+                            const mfem::Array<int>& local_to_global) const;
+
+    void WriteVector(const mfem::Vector& vect, const std::string& filename,
+                     int global_size, const mfem::Array<int>& local_to_global) const;
 
     MPI_Comm comm_;
     int myid_;
@@ -120,10 +124,8 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
 
-    mfem::Array<int> partition_local_;
     mfem::Array<int> vert_local2global_;
     mfem::Array<int> edge_local2global_;
-
     mfem::Array<HYPRE_Int> vertex_starts_;
 }; // class Graph
 

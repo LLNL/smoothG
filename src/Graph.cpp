@@ -39,58 +39,24 @@ Graph::Graph(MPI_Comm comm,
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
 
-    Distribute(vertex_edge_global, edge_weight_global, partition_global);
-}
-
-
-void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
-                       const mfem::Vector& edge_weight_global,
-                       int coarsening_factor, bool do_parmetis_partition)
-{
-    int num_vertices_global = vertex_edge_global.Height();
-    int num_parts_global = (num_vertices_global / (double)(coarsening_factor)) + 0.5;
-    num_parts_global = std::max(1, num_parts_global);
-
-    mfem::Array<int> partition_global;
-    if (do_parmetis_partition)
-    {
-#if SMOOTHG_USE_PARMETIS
-        PartitionByIndex(num_vertices_global, num_procs_, partition_global);
-        Distribute(vertex_edge_global, edge_weight_global, partition_global);
-
-        mfem::Array<int> partition_distributed;
-        smoothg::ParMetisGraphPartitioner parallel_partitioner;
-        parallel_partitioner.doPartition(
-            *this, num_parts_global, partition_distributed);
-        Redistribute(partition_distributed);
-#else
-        std::cout << "ParMetis needs to enabled!\n";
-        std::abort();
-#endif
-    }
-    else
-    {
-        // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
-        // obtain the same global partition from metis?
-        auto vert_vert = smoothg::AAt(vertex_edge_global);
-        Partition(vert_vert, partition_global, num_procs_);
-        Distribute(vertex_edge_global, edge_weight_global, partition_global);
-    }
+    Distribute(vertex_edge_global, edge_weight_global);
 }
 
 void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
-                       const mfem::Vector& edge_weight_global,
-                       const mfem::Array<int>& partition_global)
+                       const mfem::Vector& edge_weight_global)
 {
-    DistributeVertexEdge(vertex_edge_global, partition_global);
+    DistributeVertexEdge(vertex_edge_global);
     DistributeEdgeWeight(edge_weight_global);
 }
 
-void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
-                                 const mfem::Array<int>& partition_global)
+void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
 {
     MFEM_VERIFY(HYPRE_AssumedPartitionCheck(),
                 "this method can not be used without assumed partition");
+
+    mfem::SparseMatrix vert_vert = AAt(vertex_edge_global);
+    mfem::Array<int> partition_global;
+    Partition(vert_vert, partition_global, num_procs_);
 
     // Get the number of local aggregates by dividing the total by num_procs
     int nAggs_global = partition_global.Size() ? partition_global.Max() + 1 : 0;
@@ -134,16 +100,6 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global,
     mfem::Array<int> edge_local2global_tmp;
     edge_local2global_tmp.MakeRef(proc_edge.GetRowColumns(myid_), nedges_local);
     edge_local2global_tmp.Copy(edge_local2global_);
-
-    // Construct local partitioning array for local vertices
-    partition_local_.SetSize(nvertices_local);
-    int vert_global;
-    int Agg_begin = proc_Agg_i[myid_];
-    for (int i = 0; i < nvertices_local; i++)
-    {
-        vert_global = vert_local2global_[i];
-        partition_local_[i] = partition_global[vert_global] - Agg_begin;
-    }
 
     // Count number of true edges in each processor
     int ntedges_global = vertex_edge_global.Width();
@@ -243,6 +199,59 @@ void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 {
     edge_weight_local_.SetSize(vertex_edge_local_.Width());
     edge_weight_global.GetSubVector(edge_local2global_, edge_weight_local_);
+}
+
+mfem::Vector Graph::ReadVertexVector(const std::string& filename) const
+{
+    return ReadVector(filename, vertex_starts_.Last(), vert_local2global_);
+}
+
+mfem::Vector Graph::ReadVector(const std::string& filename, int global_size,
+                               const mfem::Array<int>& local_to_global) const
+{
+    assert(global_size > 0);
+
+    std::ifstream file(filename);
+    assert(file.is_open());
+
+    mfem::Vector global_vect(global_size);
+    mfem::Vector local_vect;
+
+    global_vect.Load(file, global_size);
+    global_vect.GetSubVector(local_to_global, local_vect);
+
+    return local_vect;
+}
+
+void Graph::WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const
+{
+    WriteVector(vect, filename, vertex_starts_.Last(), vert_local2global_);
+}
+
+void Graph::WriteVector(const mfem::Vector& vect, const std::string& filename,
+                        int global_size, const mfem::Array<int>& local_to_global) const
+{
+    assert(global_size > 0);
+    assert(vect.Size() <= global_size);
+
+    int num_procs;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+    mfem::Vector global_local(global_size);
+    global_local = 0.0;
+    global_local.SetSubVector(local_to_global, vect);
+
+    mfem::Vector global_global(global_size);
+    MPI_Scan(global_local.GetData(), global_global.GetData(), global_size,
+             MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    if (myid_ == num_procs - 1)
+    {
+        std::ofstream out_file(filename);
+        out_file.precision(16);
+        out_file << std::scientific;
+        global_global.Print(out_file, 1);
+    }
 }
 
 } // namespace smoothg

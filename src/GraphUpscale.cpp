@@ -25,7 +25,7 @@ namespace smoothg
 
 /// @todo why is there not timing here?
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_vertex_edge,
-                           const mfem::Array<int>& global_partitioning,
+                           const mfem::Array<int>& partitioning,
                            const UpscaleParameters& param,
                            const mfem::Vector& global_weight)
     : Upscale(comm, global_vertex_edge.Height()),
@@ -33,7 +33,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_verte
       global_vertices_(global_vertex_edge.Height()),
       param_(param)
 {
-    Init(global_vertex_edge, global_partitioning, global_weight);
+    Init(global_vertex_edge, partitioning, global_weight);
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_vertex_edge,
@@ -53,7 +53,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_verte
 }
 
 void GraphUpscale::Init(const mfem::SparseMatrix& global_vertex_edge,
-                        const mfem::Array<int>& global_partitioning,
+                        const mfem::Array<int>& partitioning,
                         const mfem::Vector& global_weight)
 {
     mfem::StopWatch chrono;
@@ -66,12 +66,12 @@ void GraphUpscale::Init(const mfem::SparseMatrix& global_vertex_edge,
 
     if (global_weight.Size() == 0)
     {
-        graph_ = make_unique<smoothg::Graph>(comm_, global_vertex_edge, global_partitioning);
+        graph_ = make_unique<smoothg::Graph>(comm_, global_vertex_edge);
     }
     else
     {
         graph_ = make_unique<smoothg::Graph>(comm_, global_vertex_edge,
-                                             global_weight, global_partitioning);
+                                             global_weight);
     }
 
     Operator::height = graph_->GetVertexToEdge().Height();
@@ -79,7 +79,6 @@ void GraphUpscale::Init(const mfem::SparseMatrix& global_vertex_edge,
 
     mixed_laplacians_.emplace_back(*graph_);
 
-    const mfem::Array<int>& partitioning = graph_->GetLocalPartition();
     gts.emplace_back(*graph_, partitioning);
 
     // coarser levels: topology
@@ -142,76 +141,6 @@ void GraphUpscale::MakeFineSolver()
         {
             solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
         }
-    }
-}
-
-mfem::Vector GraphUpscale::ReadVertexVector(const std::string& filename) const
-{
-    assert(graph_);
-    return ReadVector(filename, global_vertices_, graph_->GetVertexLocalToGlobalMap());
-}
-
-mfem::Vector GraphUpscale::ReadVector(const std::string& filename, int global_size,
-                                      const mfem::Array<int>& local_to_global) const
-{
-    assert(global_size > 0);
-
-    std::ifstream file(filename);
-    assert(file.is_open());
-
-    mfem::Vector global_vect(global_size);
-    mfem::Vector local_vect;
-
-    global_vect.Load(file, global_size);
-    global_vect.GetSubVector(local_to_global, local_vect);
-
-    return local_vect;
-}
-
-mfem::BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filename) const
-{
-    assert(graph_);
-    mfem::Vector vertex_vect = ReadVector(filename, global_vertices_,
-                                          graph_->GetVertexLocalToGlobalMap());
-
-    mfem::BlockVector vect = GetBlockVector(0);
-    vect.GetBlock(0) = 0.0;
-    vect.GetBlock(1) = vertex_vect;
-
-    return vect;
-}
-
-
-void GraphUpscale::WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const
-{
-    assert(graph_);
-    WriteVector(vect, filename, global_vertices_, graph_->GetVertexLocalToGlobalMap());
-}
-
-void GraphUpscale::WriteVector(const mfem::Vector& vect, const std::string& filename,
-                               int global_size,
-                               const mfem::Array<int>& local_to_global) const
-{
-    assert(global_size > 0);
-    assert(vect.Size() <= global_size);
-
-    int num_procs;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-
-    mfem::Vector global_local(global_size);
-    global_local = 0.0;
-    global_local.SetSubVector(local_to_global, vect);
-
-    mfem::Vector global_global(global_size);
-    MPI_Scan(global_local.GetData(), global_global.GetData(), global_size,
-             MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-    if (myid_ == num_procs - 1)
-    {
-        std::ofstream out_file(filename);
-        out_file.precision(16);
-        out_file << std::scientific;
-        global_global.Print(out_file, 1);
     }
 }
 
