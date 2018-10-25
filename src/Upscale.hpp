@@ -101,13 +101,8 @@ public:
     virtual void CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const;
 
     /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(mfem::Vector& vect) const;
-    virtual void Orthogonalize(mfem::BlockVector& vect) const;
-
-    virtual void OrthogonalizeCoarse(mfem::Vector& vect) const;
-    virtual void OrthogonalizeCoarse(mfem::BlockVector& vect) const;
-
-    virtual void OrthogonalizeLevel(int level, mfem::Vector& vect) const;
+    virtual void Orthogonalize(int level, mfem::Vector& vect) const;
+    virtual void Orthogonalize(int level, mfem::BlockVector& vect) const;
 
     /// Create an appropriately sized vertex-space vector
     virtual mfem::Vector GetVector(int level) const;

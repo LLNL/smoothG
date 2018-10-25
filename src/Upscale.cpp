@@ -52,7 +52,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
         coarsener_[i]->interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
     y = sol_[0]->GetBlock(1);
-    Orthogonalize(y);
+    Orthogonalize(0, y);
 }
 
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
@@ -111,7 +111,7 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
     // orthogonalize at coarse level, every level, or fine level?
-    OrthogonalizeLevel(level, sol_[level]->GetBlock(1));
+    Orthogonalize(level, sol_[level]->GetBlock(1));
 
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
@@ -141,7 +141,7 @@ void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
 
     solver_[1]->Solve(x, y);
     y *= -1.0;
-    OrthogonalizeCoarse(y);
+    Orthogonalize(1, y); // TODO: temporary literal 1!
 }
 
 mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const
@@ -158,7 +158,7 @@ void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) cons
 
     solver_[1]->Solve(x, y);
     y *= -1.0;
-    OrthogonalizeCoarse(y);
+    Orthogonalize(1, y); // TODO: temporary literal 1!
 }
 
 mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
@@ -302,27 +302,12 @@ void Upscale::CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const
     GetMatrix(1).GetBlockTrueOffsets().Copy(offsets);
 }
 
-void Upscale::Orthogonalize(mfem::Vector& vect) const
+void Upscale::Orthogonalize(int level, mfem::BlockVector& vect) const
 {
-    par_orthogonalize_from_constant(vect, GetMatrix(0).GetDrowStart().Last());
+    Orthogonalize(level, vect.GetBlock(1));
 }
 
-void Upscale::Orthogonalize(mfem::BlockVector& vect) const
-{
-    Orthogonalize(vect.GetBlock(1));
-}
-
-void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
-{
-    OrthogonalizeLevel(1, vect);
-}
-
-void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
-{
-    OrthogonalizeCoarse(vect.GetBlock(1));
-}
-
-void Upscale::OrthogonalizeLevel(int level, mfem::Vector& vect) const
+void Upscale::Orthogonalize(int level, mfem::Vector& vect) const
 {
     const mfem::Vector& coarse_constant_rep = GetConstantRep(level);
     double local_dot = (vect * coarse_constant_rep);

@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
 
         // Interpolate back to Fine Level
         auto sol_u_fine = upscale.Interpolate(sol_u_coarse);
-        upscale.Orthogonalize(sol_u_fine);
+        upscale.Orthogonalize(0, sol_u_fine);
 
         upscale.WriteVertexVector(sol_u_fine, "sol3.out");
     }
