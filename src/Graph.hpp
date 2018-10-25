@@ -51,18 +51,6 @@ public:
           mfem::SparseMatrix vertex_edge_global,
           mfem::Vector edge_weight_global = mfem::Vector());
 
-
-    /**
-       @brief Redistribute the graph among processors based on a new partition.
-
-       Redistribute the graph based on partition_distributed, which is a
-       partition vector of size number of local vertices with value global
-       aggregate number.
-
-       @param partition_distributed new partition vector.
-    */
-    void Redistribute(const mfem::Array<int>& partition_distributed);
-
     ///@name Getters for tables that describe parallel graph
     ///@{
     const mfem::SparseMatrix& GetVertexToEdge() const
@@ -122,40 +110,6 @@ private:
                               const mfem::Array<int>& partition_global);
 
     void DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
-
-    /**
-       @brief Construct a NewEntity_OldTrueEntity relation table
-
-       Given a relation table of local entities to distributed true entities,
-       construct a NewEntity_OldTrueEntity relation table for the distributed
-       entities so that all the new distributed entities after the shffling are
-       related to some local entities (so they are either owned or shared by the
-       local processor)
-
-       @param local_distributed is a relation table of local entities to
-              distributed true entities
-    */
-    std::unique_ptr<mfem::HypreParMatrix> NewEntityToOldTrueEntity(
-        const mfem::HypreParMatrix& local_distributed);
-
-    std::unique_ptr<mfem::HypreParMatrix> DistributedPartitionToParMatrix(
-        const mfem::Array<int>& partition_distributed);
-
-    std::unique_ptr<mfem::HypreParMatrix> RedistributeVertices(
-        const mfem::HypreParMatrix& vertex_Agg_tmp);
-
-    void UpdateEdgeLocalToGlobalMap(
-        const mfem::HypreParMatrix& newedge_oldtrueedge);
-
-    void RedistributeEdges(const mfem::HypreParMatrix& vertex_permutation);
-
-    /// Depth-first Search on part of a graph (specified by local_vertex_map)
-    void LocalDepthFirstSearch(const mfem::SparseMatrix& vert_vert,
-                               const mfem::Array<int>& local_vertex_map,
-                               const int vertex,
-                               const int Agg);
-
-    void SeparateNoncontigousPartitions();
 
     MPI_Comm comm_;
     int myid_;
