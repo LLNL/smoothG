@@ -68,20 +68,11 @@ public:
     /// Read permuted vertex vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
 
-    /// Read permuted edge vector
-    mfem::Vector ReadEdgeVector(const std::string& filename) const;
-
     /// Read permuted vertex vector, in mixed form
     mfem::BlockVector ReadVertexBlockVector(const std::string& filename) const;
 
-    /// Read permuted edge vector, in mixed form
-    mfem::BlockVector ReadEdgeBlockVector(const std::string& filename) const;
-
     /// Write permuted vertex vector
     void WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const;
-
-    /// Write permuted edge vector
-    void WriteEdgeVector(const mfem::Vector& vect, const std::string& filename) const;
 
     /// Create Fine Level Solver
     void MakeFineSolver();
