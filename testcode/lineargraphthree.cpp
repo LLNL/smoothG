@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
     args.Parse();
     // force three levels for simplicity
     upscale_param.max_levels = 3;
-    // upscale_param.hybridization = true; // tempted to do this, may make more sense for three level
+    // upscale_param.hybridization = true;
     if (myid == 0)
     {
         args.PrintOptions(std::cout);
@@ -135,11 +135,31 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol1(fine_rhs);
     upscale.Solve(1, fine_rhs, sol1);
     upscale.ShowSolveInfo(1);
+    auto error_info_1 = upscale.ComputeErrors(sol1, sol0);
+    std::cout << "Level 1 errors:" << std::endl;
+    std::cout << "  vertex error: " << error_info_1[0] << std::endl;
+    std::cout << "  edge error: " << error_info_1[1] << std::endl;
+    std::cout << "  div error: " << error_info_1[2] << std::endl;
+    double h1 = 2.0 / ((double) global_size);
+    double expected_error1 = 1.0 * h1;
+    if (error_info_1[0] > expected_error1)
+        result++;
 
     mfem::BlockVector sol2(fine_rhs);
     upscale.Solve(2, fine_rhs, sol2);
     upscale.ShowSolveInfo(2);
+    auto error_info_2 = upscale.ComputeErrors(sol2, sol0);
+    std::cout << "Level 2 errors:" << std::endl;
+    std::cout << "  vertex error: " << error_info_2[0] << std::endl;
+    std::cout << "  edge error: " << error_info_2[1] << std::endl;
+    std::cout << "  div error: " << error_info_2[2] << std::endl;
+    double h2 = 8.0 / ((double) global_size);
+    double expected_error2 = 1.0 * h2;
+    if (error_info_2[0] > expected_error2)
+        result++;
 
+    const bool verbose = false;
+    if (verbose)
     {
         for (int i = 0; i < sol0.GetBlock(1).Size(); ++i)
         {
