@@ -276,7 +276,7 @@ int main(int argc, char* argv[])
         pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-        auto sol_upscaled = fvupscale->Interpolate(sol_coarse);
+        auto sol_upscaled = fvupscale->Interpolate(1, sol_coarse);
         for (int i = 0; i < sol_upscaled.Size(); ++i)
             sol_upscaled(i) = std::log(sol_upscaled(i));
         fvupscale->Orthogonalize(0, sol_upscaled);

@@ -180,7 +180,7 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
                 "PDESampler object in wrong state (call NewSample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
-        fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
+        fvupscale_->Restrict(1, rhs_fine_, rhs_coarse_);
     mfem::Vector coarse_sol = fvupscale_->GetVector(1);
     fvupscale_->SolveCoarse(rhs_coarse_, coarse_sol);
 
@@ -209,7 +209,7 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
                 "PDESampler object in wrong state (call NewSample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
-        fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
+        fvupscale_->Restrict(1, rhs_fine_, rhs_coarse_);
     coefficient_coarse_.SetSize(rhs_coarse_.Size());
     fvupscale_->SolveCoarse(rhs_coarse_, coefficient_coarse_);
 

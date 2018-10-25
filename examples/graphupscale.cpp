@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
 
         // Do work at Coarse Level
-        auto rhs_u_coarse = upscale.Restrict(rhs_u_fine);
+        auto rhs_u_coarse = upscale.Restrict(1, rhs_u_fine);
         auto sol_u_coarse = upscale.SolveCoarse(rhs_u_coarse);
 
         // If multiple iterations, reuse vector
@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
         }
 
         // Interpolate back to Fine Level
-        auto sol_u_fine = upscale.Interpolate(sol_u_coarse);
+        auto sol_u_fine = upscale.Interpolate(1, sol_u_coarse);
         upscale.Orthogonalize(0, sol_u_fine);
 
         upscale.WriteVertexVector(sol_u_fine, "sol3.out");

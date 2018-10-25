@@ -249,8 +249,8 @@ int main(int argc, char* argv[])
         }
         else
         {
-            fvupscale.Restrict(fine_u, work_u);
-            fvupscale.Restrict(fine_rhs, work_rhs);
+            fvupscale.Restrict(1, fine_u, work_u);
+            fvupscale.Restrict(1, fine_rhs, work_rhs);
         }
 
         const mfem::SparseMatrix* W = fvupscale.GetMatrix(k).GetW();
@@ -306,7 +306,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    fvupscale.Interpolate(work_u.GetBlock(1), fine_u.GetBlock(1));
+                    fvupscale.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
                 }
 
                 field = fine_u.GetBlock(1);

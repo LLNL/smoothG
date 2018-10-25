@@ -203,16 +203,11 @@ void Upscale::Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) con
     coarsener_[level - 1]->interpolate(x, y);
 }
 
-void Upscale::Interpolate(const mfem::Vector& x, mfem::Vector& y) const
+mfem::Vector Upscale::Interpolate(int level, const mfem::Vector& x) const
 {
-    Interpolate(1, x, y);
-}
+    mfem::Vector fine_vect = GetVector(level - 1);
 
-mfem::Vector Upscale::Interpolate(const mfem::Vector& x) const
-{
-    mfem::Vector fine_vect = GetVector(0);
-
-    Interpolate(1, x, fine_vect);
+    Interpolate(level, x, fine_vect);
 
     return fine_vect;
 }
@@ -224,16 +219,11 @@ void Upscale::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVect
     coarsener_[level - 1]->interpolate(x, y);
 }
 
-void Upscale::Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const
+mfem::BlockVector Upscale::Interpolate(int level, const mfem::BlockVector& x) const
 {
-    Interpolate(1, x, y);
-}
+    mfem::BlockVector fine_vect(GetBlockVector(level - 1));
 
-mfem::BlockVector Upscale::Interpolate(const mfem::BlockVector& x) const
-{
-    mfem::BlockVector fine_vect(GetBlockVector(0));
-
-    Interpolate(1, x, fine_vect);
+    Interpolate(level, x, fine_vect);
 
     return fine_vect;
 }
@@ -245,15 +235,10 @@ void Upscale::Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const
     coarsener_[level - 1]->restrict(x, y);
 }
 
-void Upscale::Restrict(const mfem::Vector& x, mfem::Vector& y) const
+mfem::Vector Upscale::Restrict(int level, const mfem::Vector& x) const
 {
-    Restrict(1, x, y);
-}
-
-mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
-{
-    mfem::Vector coarse_vect = GetVector(1);
-    Restrict(x, coarse_vect);
+    mfem::Vector coarse_vect = GetVector(level);
+    Restrict(level, x, coarse_vect);
 
     return coarse_vect;
 }
@@ -265,15 +250,10 @@ void Upscale::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector&
     coarsener_[level - 1]->restrict(x, y);
 }
 
-void Upscale::Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const
+mfem::BlockVector Upscale::Restrict(int level, const mfem::BlockVector& x) const
 {
-    Restrict(1, x, y);
-}
-
-mfem::BlockVector Upscale::Restrict(const mfem::BlockVector& x) const
-{
-    mfem::BlockVector coarse_vect(GetBlockVector(1));
-    Restrict(x, coarse_vect);
+    mfem::BlockVector coarse_vect(GetBlockVector(level));
+    Restrict(level, x, coarse_vect);
 
     return coarse_vect;
 }

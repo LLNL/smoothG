@@ -72,25 +72,21 @@ public:
     virtual void SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector SolveFine(const mfem::BlockVector& x) const;
 
-    /// Interpolate a coarse vector to the fine level
+    /// Interpolate from level to the finer level-1
     virtual void Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const;
-    virtual void Interpolate(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Interpolate(const mfem::Vector& x) const;
+    virtual mfem::Vector Interpolate(int level, const mfem::Vector& x) const;
 
-    /// Interpolate a coarse vector to the fine level, in mixed form
+    /// Interpolate from level to the finer level-1, in mixed form
     virtual void Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual void Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Interpolate(const mfem::BlockVector& x) const;
+    virtual mfem::BlockVector Interpolate(int level, const mfem::BlockVector& x) const;
 
-    /// Restrict a fine vector to the coarse level
+    /// Restrict vector at level-1 to level
     virtual void Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const;
-    virtual void Restrict(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Restrict(const mfem::Vector& x) const;
+    virtual mfem::Vector Restrict(int level, const mfem::Vector& x) const;
 
-    /// Restrict a fine vector to the coarse level, in mixed form
+    /// Restrict vector at level-1 to level, in mixed form
     virtual void Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual void Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Restrict(const mfem::BlockVector& x) const;
+    virtual mfem::BlockVector Restrict(int level, const mfem::BlockVector& x) const;
 
     /// Get block offsets
     virtual void FineBlockOffsets(mfem::Array<int>& offsets) const;
