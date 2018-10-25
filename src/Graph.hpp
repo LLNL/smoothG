@@ -51,11 +51,11 @@ public:
           const mfem::SparseMatrix& vertex_edge_global,
           const mfem::Vector& edge_weight_global = mfem::Vector());
 
-    /// Read permuted vertex vector
+    /// Read global vector from file, then distribute to local vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
 
-    /// Write permuted vertex vector
-    void WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const;
+    /// Assemble global vector from local vector, then write to file
+    void WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const;
 
     ///@name Getters for tables that describe parallel graph
     ///@{

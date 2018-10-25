@@ -223,9 +223,9 @@ mfem::Vector Graph::ReadVector(const std::string& filename, int global_size,
     return local_vect;
 }
 
-void Graph::WriteVertexVector(const mfem::Vector& vect, const std::string& filename) const
+void Graph::WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const
 {
-    WriteVector(vect, filename, vertex_starts_.Last(), vert_local2global_);
+    WriteVector(vec_loc, filename, vertex_starts_.Last(), vert_local2global_);
 }
 
 void Graph::WriteVector(const mfem::Vector& vect, const std::string& filename,
