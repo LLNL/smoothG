@@ -822,13 +822,6 @@ void Deflate(mfem::DenseMatrix& a, const mfem::Vector& v)
     }
 }
 
-void orthogonalize_from_constant(mfem::Vector& vec)
-{
-    vec -= vec.Sum() / vec.Size();
-}
-
-/// scaling chosen to match orthogonalize_from_constant, not sure it
-/// actually makes sense
 void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt)
 {
     double dot = (vec * wrt) / (wrt * wrt);

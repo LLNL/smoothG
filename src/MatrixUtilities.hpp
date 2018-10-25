@@ -241,19 +241,15 @@ void Concatenate(const mfem::Vector& a, const mfem::DenseMatrix& b,
 void Deflate(mfem::DenseMatrix& a, const mfem::Vector& v);
 
 /**
-   @brief Orthogonalize this vector from the constant vector.
+   @brief Orthogonalize this vector against wrt
 
-   This is equivalent to shifting the vector so it has zero mean.
+   In most cases, wrt is some (possibly non-nodal) representation of
+   the constant vector, in which case this funtion shifts the vector
+   so that it has zero mean.
 
-   The correct way to do this is with respect to a finite element space,
-   take an FiniteElementSpace argument or a list of volumes or something.
-   For now we assume equal size volumes, or a graph, and just take
-   vec.Sum() / vec.Size()
-
-   @todo improve this for the finite volume case
+   @param vec the vector to be modified
+   @param wrt the vector with respect to which to orthogonalize vec
 */
-void orthogonalize_from_constant(mfem::Vector& vec);
-
 void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt);
 
 /**
