@@ -72,7 +72,7 @@ void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
     {
         // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
         // obtain the same global partition from metis?
-        auto vert_vert = smoothg::AAT(vertex_edge_global);
+        auto vert_vert = smoothg::AAt(vertex_edge_global);
         Partition(vert_vert, partition_global, num_procs_);
         Distribute(vertex_edge_global, edge_weight_global, partition_global);
     }

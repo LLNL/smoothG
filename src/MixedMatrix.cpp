@@ -90,7 +90,7 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
 }
 
 MixedMatrix::MixedMatrix(const Graph& graph, DistributeWeight dist_weight)
-    : MixedMatrix(graph.GetLocalVertexToEdge(), graph.GetLocalEdgeWeight(),
+    : MixedMatrix(graph.GetVertexToEdge(), graph.GetEdgeWeight(),
                   graph.GetEdgeToTrueEdge(), dist_weight)
 {
     graph_space_ = make_unique<GraphSpace>(graph);

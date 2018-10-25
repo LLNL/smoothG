@@ -27,9 +27,9 @@ namespace smoothg
 {
 
 GraphSpace::GraphSpace(const Graph& graph)
-    : graph_(graph), vertex_vdof_(SparseIdentity(graph.GetNumberOfVertices())),
-      vertex_edof_(graph.GetLocalVertexToEdge()),
-      edge_edof_(SparseIdentity(graph.GetNumberOfEdges()))
+    : graph_(graph), vertex_vdof_(SparseIdentity(graph.NumVertices())),
+      vertex_edof_(graph.GetVertexToEdge()),
+      edge_edof_(SparseIdentity(graph.NumEdges()))
 {
 }
 

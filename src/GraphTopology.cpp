@@ -84,7 +84,7 @@ GraphTopology::GraphTopology(
     const Graph& graph,
     const mfem::Array<int>& partition,
     const mfem::SparseMatrix* edge_boundaryattr)
-    : vertex_edge_(graph.GetLocalVertexToEdge()),
+    : vertex_edge_(graph.GetVertexToEdge()),
       edge_trueedge_(graph.GetEdgeToTrueEdge())
 {
     Init(partition, edge_boundaryattr, nullptr);

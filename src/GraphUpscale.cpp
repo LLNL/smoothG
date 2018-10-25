@@ -74,7 +74,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& global_vertex_edge,
                                              global_weight, global_partitioning);
     }
 
-    Operator::height = graph_->GetLocalVertexToEdge().Height();
+    Operator::height = graph_->GetVertexToEdge().Height();
     Operator::width = Operator::height;
 
     mixed_laplacians_.emplace_back(*graph_);
