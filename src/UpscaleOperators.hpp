@@ -89,7 +89,7 @@ public:
     {
         mfem::BlockVector x_block(x.GetData(), offsets_);
         mfem::BlockVector y_block(y.GetData(), offsets_);
-        A_.Solve(x_block, y_block);
+        A_.Solve(1, x_block, y_block);
     }
 private:
     const Upscale& A_;
@@ -101,7 +101,7 @@ class UpscaleFineSolve : public mfem::Operator
 {
 public:
     UpscaleFineSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetD().Height()), A_(A)  { }
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.SolveFine(x, y); }
+    void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(0, x, y); }
 
 private:
     const Upscale& A_;
@@ -122,7 +122,7 @@ public:
     {
         mfem::BlockVector x_block(x.GetData(), offsets_);
         mfem::BlockVector y_block(y.GetData(), offsets_);
-        A_.SolveFine(x_block, y_block);
+        A_.Solve(0, x_block, y_block);
     }
 private:
     const Upscale& A_;

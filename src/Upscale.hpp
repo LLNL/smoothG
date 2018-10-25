@@ -37,40 +37,40 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
-    /// apply the upscaling at any level
+    /**
+       @brief Apply the upscaling.
+
+       Both vector arguments are sized for the finest level; the right-hand
+       side is restricted to desired level, solved there, and interpolated
+       back up to the finest level.
+    */
     virtual void Mult(int level, const mfem::Vector& x, mfem::Vector& y) const;
 
     /// Wrapper for applying the upscaling, in mfem terminology
+    /// @todo this method (and the inheritance from mfem::Operator) makes much
+    ///       less sense in a multilevel setting.
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const override;
 
-    /// Wrapper for applying the upscaling
+    /**
+       Wrapper for applying the upscaling: both x and y are at finest level.
+
+       As in Mult(), solve itself takes place at desired (coarse) level.
+    */
     virtual void Solve(int level, const mfem::Vector& x, mfem::Vector& y) const;
-    virtual void Solve(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector Solve(const mfem::Vector& x) const;
+    virtual mfem::Vector Solve(int level, const mfem::Vector& x) const;
 
-    /// Solve at any level in mixed form
+    /// Wrapper for applying the upscaling in mixed form: result is at finest level
     virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    virtual mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
 
-    /// Wrapper for applying the upscaling in mixed form
-    virtual void Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector Solve(const mfem::BlockVector& x) const;
+    /// Solve at only given level, without interpolation or restriction
+    virtual void SolveAtLevel(int level, const mfem::Vector& x, mfem::Vector& y) const;
+    virtual mfem::Vector SolveAtLevel(int level, const mfem::Vector& x) const;
 
-    /// Wrapper for only the coarse level, no coarsen, interpolate with fine level
-    virtual void SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector SolveCoarse(const mfem::Vector& x) const;
-
-    /// Wrapper for only the coarse level, no coarsen, interpolate with fine level,
-    //  in mixed form
-    virtual void SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector SolveCoarse(const mfem::BlockVector& x) const;
-
-    /// Solve Fine Level
-    virtual void SolveFine(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual mfem::Vector SolveFine(const mfem::Vector& x) const;
-
-    /// Solve Fine Level, in mixed form
-    virtual void SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    virtual mfem::BlockVector SolveFine(const mfem::BlockVector& x) const;
+    /// Solve at only given level, without interpolation or restriction
+    /// in mixed form
+    virtual void SolveAtLevel(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    virtual mfem::BlockVector SolveAtLevel(int level, const mfem::BlockVector& x) const;
 
     /// Interpolate from level to the finer level-1
     virtual void Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const;

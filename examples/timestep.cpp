@@ -283,11 +283,11 @@ int main(int argc, char* argv[])
 
             if (k == 0)
             {
-                fvupscale.SolveFine(tmp, work_u);
+                fvupscale.Solve(0, tmp, work_u);
             }
             else
             {
-                fvupscale.SolveCoarse(tmp, work_u);
+                fvupscale.SolveAtLevel(1, tmp, work_u);
             }
 
             if (myid == 0)
