@@ -33,8 +33,7 @@ namespace smoothg
 
 Graph::Graph(MPI_Comm comm,
              const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Vector& edge_weight_global,
-             const mfem::Array<int>& partition_global)
+             const mfem::Vector& edge_weight_global)
     : comm_(comm)
 {
     MPI_Comm_size(comm_, &num_procs_);
@@ -43,47 +42,6 @@ Graph::Graph(MPI_Comm comm,
     Distribute(vertex_edge_global, edge_weight_global, partition_global);
 }
 
-Graph::Graph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Array<int>& partition_global)
-    : comm_(comm)
-{
-    MPI_Comm_size(comm_, &num_procs_);
-    MPI_Comm_rank(comm_, &myid_);
-
-    mfem::Vector edge_weight_global(vertex_edge_global.Width());
-    edge_weight_global = 1.0;
-
-    Distribute(vertex_edge_global, edge_weight_global, partition_global);
-}
-
-Graph::Graph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Vector& edge_weight_global,
-             const int coarsening_factor,
-             const bool do_parmetis_partition)
-    : comm_(comm)
-{
-    MPI_Comm_size(comm_, &num_procs_);
-    MPI_Comm_rank(comm_, &myid_);
-
-    Distribute(vertex_edge_global, edge_weight_global, coarsening_factor, do_parmetis_partition);
-}
-
-Graph::Graph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const int coarsening_factor,
-             const bool do_parmetis_partition)
-    : comm_(comm)
-{
-    MPI_Comm_size(comm_, &num_procs_);
-    MPI_Comm_rank(comm_, &myid_);
-
-    mfem::Vector edge_weight_global(vertex_edge_global.Width());
-    edge_weight_global = 1.0;
-
-    Distribute(vertex_edge_global, edge_weight_global, coarsening_factor, do_parmetis_partition);
-}
 
 void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
                        const mfem::Vector& edge_weight_global,
@@ -112,14 +70,10 @@ void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
     }
     else
     {
-        auto edge_vert = smoothg::Transpose(vertex_edge_global);
-        auto vert_vert = smoothg::Mult(vertex_edge_global, edge_vert);
-
         // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
         // obtain the same global partition from metis?
-        smoothg::MetisGraphPartitioner partitioner;
-        partitioner.setUnbalanceTol(2);
-        partitioner.doPartition(vert_vert, num_parts_global, partition_global);
+        auto vert_vert = smoothg::AAT(vertex_edge_global);
+        Partition(vert_vert, partition_global, num_procs_);
         Distribute(vertex_edge_global, edge_weight_global, partition_global);
     }
 }

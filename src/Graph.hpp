@@ -38,62 +38,19 @@ class Graph
 {
 public:
     /**
-       @brief Distribute a weighted graph to the communicator.
-
-       Generally we read a global graph on one processor, and then distribute
-       it. This constructor handles that process.
-
-       @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param vertex_edge_global edge weight of global graph
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
-    */
-    Graph(MPI_Comm comm,
-          const mfem::SparseMatrix& vertex_edge_global,
-          const mfem::Vector& edge_weight_global,
-          const mfem::Array<int>& partition_global);
-
-    /**
-       @brief Distribute an unweighted graph to the communicator.
-
-       Generally we read a global graph on one processor, and then distribute
-       it. This constructor handles that process.
-
-       @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
-    */
-    Graph(MPI_Comm comm,
-          const mfem::SparseMatrix& vertex_edge_global,
-          const mfem::Array<int>& partition_global);
-
-    /**
        @brief Distribute a graph to the communicator.
 
-       If do_parmetis_partition is true, the constructor will first distribute
-       the global graph based on a simple partition to form a temporary
-       distributed graph, and then call parmetis to generate high quality
-       parition, and redistribute the temporary distributed graph to obtain the
-       final distributed graph. If do_parmetis_partition is false, the
-       constructor will call metis to partition the global graph and distribute
+       Generally we read a global graph on one processor, and then distribute
+       it. This constructor handles that process.
 
        @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param num_parts_global intended number of global partitions.
-       @param do_parmetis_partition whether to call parmetis or metis
+       @param vertex_edge_global describes the entire global unsigned graph
+       @param vertex_edge_global edge weight of global graph, if not provided,
     */
     Graph(MPI_Comm comm,
-          const mfem::SparseMatrix& vertex_edge_global,
-          const mfem::Vector& edge_weight_global,
-          const int coarsening_factor,
-          const bool do_parmetis_partition = false);
+          mfem::SparseMatrix vertex_edge_global,
+          mfem::Vector edge_weight_global = mfem::Vector());
 
-    Graph(MPI_Comm comm,
-          const mfem::SparseMatrix& vertex_edge_global,
-          const int coarsening_factor,
-          const bool do_parmetis_partition = false);
 
     /**
        @brief Redistribute the graph among processors based on a new partition.
@@ -108,24 +65,14 @@ public:
 
     ///@name Getters for tables that describe parallel graph
     ///@{
-    const mfem::SparseMatrix& GetLocalVertexToEdge() const
+    const mfem::SparseMatrix& GetVertexToEdge() const
     {
         return vertex_edge_local_;
     }
 
-    const mfem::Vector& GetLocalEdgeWeight() const
+    const mfem::Vector& GetEdgeWeight() const
     {
         return edge_weight_local_;
-    }
-
-    const mfem::HypreParMatrix& GetVertexToTrueEdge() const
-    {
-        return *vertex_trueedge_;
-    }
-
-    const mfem::Array<int>& GetLocalPartition() const
-    {
-        return partition_local_;
     }
 
     const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
@@ -133,27 +80,17 @@ public:
         return *edge_trueedge_;
     }
 
-    const mfem::Array<int>& GetVertexLocalToGlobalMap() const
-    {
-        return vert_local2global_;
-    }
-
-    const mfem::Array<int>& GetEdgeLocalToGlobalMap() const
-    {
-        return edge_local2global_;
-    }
-
     const mfem::Array<int>& GetVertexStarts() const
     {
         return vertex_starts_;
     }
 
-    const int GetNumberOfVertices() const
+    const int NumVertices() const
     {
         return vertex_edge_local_.Height();
     }
 
-    const int GetNumberOfEdges() const
+    const int NumEdges() const
     {
         return vertex_edge_local_.Width();
     }
