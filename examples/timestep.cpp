@@ -222,8 +222,8 @@ int main(int argc, char* argv[])
 
         // Input Vectors
         std::vector<mfem::Array<int>> offsets(2);
-        fvupscale.FineBlockOffsets(offsets[0]);
-        fvupscale.CoarseBlockOffsets(offsets[1]);
+        fvupscale.BlockOffsets(0, offsets[0]);
+        fvupscale.BlockOffsets(1, offsets[1]);
 
         mfem::BlockVector fine_rhs(offsets[0]);
         fine_rhs.GetBlock(0) = 0.0;

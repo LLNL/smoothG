@@ -258,28 +258,14 @@ mfem::BlockVector Upscale::Restrict(int level, const mfem::BlockVector& x) const
     return coarse_vect;
 }
 
-/// @todo deprecated, add with level argument
-void Upscale::FineBlockOffsets(mfem::Array<int>& offsets) const
+void Upscale::BlockOffsets(int level, mfem::Array<int>& offsets) const
 {
-    GetMatrix(0).GetBlockOffsets().Copy(offsets);
+    GetMatrix(level).GetBlockOffsets().Copy(offsets);
 }
 
-/// @todo deprecated, add with level argument
-void Upscale::CoarseBlockOffsets(mfem::Array<int>& offsets) const
+void Upscale::TrueBlockOffsets(int level, mfem::Array<int>& offsets) const
 {
-    GetMatrix(1).GetBlockOffsets().Copy(offsets);
-}
-
-/// @todo deprecated, add with level argument
-void Upscale::FineTrueBlockOffsets(mfem::Array<int>& offsets) const
-{
-    GetMatrix(0).GetBlockTrueOffsets().Copy(offsets);
-}
-
-/// @todo deprecated, add with level argument
-void Upscale::CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const
-{
-    GetMatrix(1).GetBlockTrueOffsets().Copy(offsets);
+    GetMatrix(level).GetBlockTrueOffsets().Copy(offsets);
 }
 
 void Upscale::Orthogonalize(int level, mfem::BlockVector& vect) const

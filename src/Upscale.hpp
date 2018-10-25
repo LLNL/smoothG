@@ -88,13 +88,11 @@ public:
     virtual void Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Restrict(int level, const mfem::BlockVector& x) const;
 
-    /// Get block offsets
-    virtual void FineBlockOffsets(mfem::Array<int>& offsets) const;
-    virtual void CoarseBlockOffsets(mfem::Array<int>& offsets) const;
+    /// Get block offsets for sigma, u blocks of mixed form dofs
+    virtual void BlockOffsets(int level, mfem::Array<int>& offsets) const;
 
-    /// Get true block offsets
-    virtual void FineTrueBlockOffsets(mfem::Array<int>& offsets) const;
-    virtual void CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const;
+    /// Get true block offsets for sigma, u blocks of mixed form dofs
+    virtual void TrueBlockOffsets(int level, mfem::Array<int>& offsets) const;
 
     /// Orthogonalize against the constant vector
     virtual void Orthogonalize(int level, mfem::Vector& vect) const;
