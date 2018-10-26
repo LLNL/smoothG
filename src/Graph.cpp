@@ -58,48 +58,23 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
     mfem::Array<int> partition_global;
     Partition(vert_vert, partition_global, num_procs_);
 
-    // Get the number of local aggregates by dividing the total by num_procs
-    int nAggs_global = partition_global.Size() ? partition_global.Max() + 1 : 0;
-    int nAggs_local = nAggs_global / num_procs_;
-    int nAgg_leftover = nAggs_global % num_procs_;
-
-    // Construct the relation table aggregate_vertex from global partition
-    auto Agg_vert = PartitionToMatrix(partition_global, nAggs_global);
-
-    // Construct the relation table proc_aggregate
-    int* proc_Agg_i = new int[num_procs_ + 1];
-    int* proc_Agg_j = new int[nAggs_global];
-    double* proc_Agg_data = new double[nAggs_global];
-    std::fill_n(proc_Agg_data, nAggs_global, 1.);
-    std::iota(proc_Agg_j, proc_Agg_j + nAggs_global, 0);
-
-    // For proc id < nAgg_leftover, nAggs_local have one more (from leftover)
-    nAggs_local++;
-    for (int id = 0; id <= nAgg_leftover; id++)
-        proc_Agg_i[id] = id * nAggs_local;
-    nAggs_local--;
-    for (int id = nAgg_leftover + 1; id <= num_procs_; id++)
-        proc_Agg_i[id] = proc_Agg_i[id - 1] + nAggs_local;
-    mfem::SparseMatrix proc_Agg(proc_Agg_i, proc_Agg_j, proc_Agg_data,
-                                num_procs_, nAggs_global);
+    // Construct the relation table processor_vertex from global partition
+    auto proc_vert = PartitionToMatrix(partition_global, num_procs_);
 
     // Compute edge_proc relation (for constructing edge to true edge later)
-    mfem::SparseMatrix proc_vert = smoothg::Mult(proc_Agg, Agg_vert);
     mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vertex_edge_global);
     proc_edge.SortColumnIndices();
     mfem::SparseMatrix edge_proc(smoothg::Transpose(proc_edge) );
 
     // Construct vertex local to global index array
     int nvertices_local = proc_vert.RowSize(myid_);
-    mfem::Array<int> vert_loc2glo_tmp;
-    vert_loc2glo_tmp.MakeRef(proc_vert.GetRowColumns(myid_), nvertices_local);
-    vert_loc2glo_tmp.Copy(vert_local2global_);
+    mfem::Array<int> vert_l2g(proc_vert.GetRowColumns(myid_), nvertices_local);
+    vert_l2g.Copy(vert_local2global_);
 
     // Construct edge local to global index array
     int nedges_local = proc_edge.RowSize(myid_);
-    mfem::Array<int> edge_local2global_tmp;
-    edge_local2global_tmp.MakeRef(proc_edge.GetRowColumns(myid_), nedges_local);
-    edge_local2global_tmp.Copy(edge_local2global_);
+    mfem::Array<int> edge_l2g(proc_edge.GetRowColumns(myid_), nedges_local);
+    edge_l2g.Copy(edge_local2global_);
 
     // Count number of true edges in each processor
     int ntedges_global = vertex_edge_global.Width();
