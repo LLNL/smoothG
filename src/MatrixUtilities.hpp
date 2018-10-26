@@ -77,6 +77,8 @@ mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B
 */
 mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
 
+std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A);
+
 /**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense.

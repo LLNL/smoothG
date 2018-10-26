@@ -64,15 +64,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& global_vertex_edge,
     sol_.resize(param_.max_levels);
     std::vector<GraphTopology> gts;
 
-    if (global_weight.Size() == 0)
-    {
-        graph_ = make_unique<smoothg::Graph>(comm_, global_vertex_edge);
-    }
-    else
-    {
-        graph_ = make_unique<smoothg::Graph>(comm_, global_vertex_edge,
-                                             global_weight);
-    }
+    graph_ = make_unique<smoothg::Graph>(comm_, global_vertex_edge, global_weight);
 
     Operator::height = graph_->GetVertexToEdge().Height();
     Operator::width = Operator::height;

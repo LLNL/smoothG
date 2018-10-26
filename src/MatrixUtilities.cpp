@@ -90,6 +90,19 @@ mfem::SparseMatrix AAt(const mfem::SparseMatrix& A)
     return smoothg::Mult(A, At);
 }
 
+std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A)
+{
+    unique_ptr<mfem::HypreParMatrix> At(A.Transpose());
+    assert(At);
+
+    mfem::HypreParMatrix* AAt = mfem::ParMult(&A, At.get());
+    assert(AAt);
+
+    AAt->CopyColStarts();
+
+    return std::unique_ptr<mfem::HypreParMatrix>(AAt);
+}
+
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
 {
     // TODO(gelever1): Perform this more better

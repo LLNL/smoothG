@@ -198,7 +198,29 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
 void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 {
     edge_weight_local_.SetSize(vertex_edge_local_.Width());
-    edge_weight_global.GetSubVector(edge_local2global_, edge_weight_local_);
+    if (edge_weight_global.Size())
+    {
+        edge_weight_global.GetSubVector(edge_local2global_, edge_weight_local_);
+    }
+    else
+    {
+        edge_weight_local_ = 1.0;
+    }
+
+    // for shared edges multiply the weight by 2 (so M matrix is divided by 2)
+    unique_ptr<mfem::HypreParMatrix> e_te_e = AAt(*edge_trueedge_);
+    mfem::SparseMatrix edge_is_shared;
+    HYPRE_Int* junk_map;
+    e_te_e->GetOffd(edge_is_shared, junk_map);
+
+    assert(edge_is_shared.Height() == edge_weight_local_.Size());
+    for (int edge = 0; edge < edge_is_shared.Height(); ++edge)
+    {
+        if (edge_is_shared.RowSize(edge))
+        {
+            edge_weight_local_[edge] *= 2.0;
+        }
+    }
 }
 
 mfem::Vector Graph::ReadVertexVector(const std::string& filename) const
