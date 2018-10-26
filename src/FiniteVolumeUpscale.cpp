@@ -29,8 +29,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::Vector& weight,
                                          const mfem::Array<int>& partitioning,
                                          const mfem::HypreParMatrix& edge_d_td,
-                                         const mfem::SparseMatrix& edge_boundary_att,
-                                         const mfem::Array<int>& ess_attr,
+                                         const mfem::SparseMatrix* edge_boundary_att,
+                                         const mfem::Array<int>* ess_attr,
                                          const UpscaleParameters& param)
     : Upscale(comm, vertex_edge.Height(), param.hybridization),
       edge_d_td_(edge_d_td),
@@ -49,10 +49,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
-                                   MixedMatrix::DistributeWeight::False);
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_);
 
-    gts.emplace_back(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
+    gts.emplace_back(ve_copy, edge_d_td_, partitioning, edge_boundary_att_);
 
     // coarser levels: topology
     for (int level = 2; level < param_.max_levels; ++level)
@@ -89,7 +88,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
         MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
                            coarsener_[level - 1]->construct_face_facedof_table(),
-                           ess_attr, marker);
+                           *ess_attr, marker);
 
         if (param_.hybridization) // Hybridization solver
         {
@@ -126,8 +125,8 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix& w_block,
                                          const mfem::Array<int>& partitioning,
                                          const mfem::HypreParMatrix& edge_d_td,
-                                         const mfem::SparseMatrix& edge_boundary_att,
-                                         const mfem::Array<int>& ess_attr,
+                                         const mfem::SparseMatrix* edge_boundary_att,
+                                         const mfem::Array<int>* ess_attr,
                                          const UpscaleParameters& param)
     : Upscale(comm, vertex_edge.Height(), param.hybridization),
       edge_d_td_(edge_d_td),
@@ -146,10 +145,9 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(vertex_edge, weight, w_block, edge_d_td_,
-                                   MixedMatrix::DistributeWeight::False);
+    mixed_laplacians_.emplace_back(vertex_edge, weight, w_block, edge_d_td_);
 
-    gts.emplace_back(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
+    gts.emplace_back(ve_copy, edge_d_td_, partitioning, edge_boundary_att_);
 
     // coarser levels: topology
     for (int level = 2; level < param_.max_levels; ++level)
@@ -185,7 +183,7 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 
         MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
                            coarsener_[level - 1]->construct_face_facedof_table(),
-                           ess_attr, marker);
+                           *ess_attr, marker);
 
         if (param_.hybridization) // Hybridization solver
         {
@@ -219,14 +217,14 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
 void FiniteVolumeUpscale::MakeFineSolver()
 {
     mfem::Array<int> marker;
-    BooleanMult(edge_boundary_att_, ess_attr_, marker);
+    BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
 
     if (!solver_[0])
     {
         if (param_.hybridization) // Hybridization solver
         {
             solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
-                                                   &edge_boundary_att_, &marker);
+                                                   edge_boundary_att_, &marker);
         }
         else // L2-H1 block diagonal preconditioner
         {

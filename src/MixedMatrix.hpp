@@ -40,7 +40,6 @@ namespace smoothg
 class MixedMatrix
 {
 public:
-    enum class DistributeWeight : bool {True = true, False = false};
     /**
        @brief Create a mixed graph in parallel mode.
 
@@ -52,23 +51,19 @@ public:
     */
     MixedMatrix(const mfem::SparseMatrix& vertex_edge,
                 const mfem::Vector& weight,
-                const mfem::HypreParMatrix& edge_d_td,
-                DistributeWeight dist_weight = DistributeWeight::True);
+                const mfem::HypreParMatrix& edge_d_td);
 
     MixedMatrix(const mfem::SparseMatrix& vertex_edge,
                 const mfem::Vector& weight,
                 const mfem::SparseMatrix& w_block,
-                const mfem::HypreParMatrix& edge_d_td,
-                DistributeWeight dist_weight = DistributeWeight::True);
+                const mfem::HypreParMatrix& edge_d_td);
 
     MixedMatrix(const mfem::SparseMatrix& vertex_edge,
                 const mfem::Vector& weight,
                 const mfem::Vector& w_block,
-                const mfem::HypreParMatrix& edge_d_td,
-                DistributeWeight dist_weight = DistributeWeight::True);
+                const mfem::HypreParMatrix& edge_d_td);
 
-    MixedMatrix(const Graph& graph,
-                DistributeWeight dist_weight = DistributeWeight::True);
+    MixedMatrix(const Graph& graph);
 
     MixedMatrix(const mfem::SparseMatrix& vertex_edge,
                 const std::vector<mfem::Vector>& local_weight,

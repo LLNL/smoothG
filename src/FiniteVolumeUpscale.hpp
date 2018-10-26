@@ -57,8 +57,8 @@ public:
                         const mfem::Vector& weight,
                         const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
-                        const mfem::SparseMatrix& edge_boundary_att,
-                        const mfem::Array<int>& ess_attr,
+                        const mfem::SparseMatrix* edge_boundary_att,
+                        const mfem::Array<int>* ess_attr,
                         const UpscaleParameters& param = UpscaleParameters());
 
     /**
@@ -76,16 +76,16 @@ public:
                         const mfem::SparseMatrix& w_block,
                         const mfem::Array<int>& partitioning,
                         const mfem::HypreParMatrix& edge_d_td,
-                        const mfem::SparseMatrix& edge_boundary_att,
-                        const mfem::Array<int>& ess_attr,
+                        const mfem::SparseMatrix* edge_boundary_att,
+                        const mfem::Array<int>* ess_attr,
                         const UpscaleParameters& param = UpscaleParameters());
 
     void MakeFineSolver();
 
 private:
     const mfem::HypreParMatrix& edge_d_td_;
-    const mfem::SparseMatrix& edge_boundary_att_;
-    const mfem::Array<int>& ess_attr_;
+    const mfem::SparseMatrix* edge_boundary_att_;
+    const mfem::Array<int>* ess_attr_;
     //std::vector<double> ess_data;
 
     const UpscaleParameters& param_;

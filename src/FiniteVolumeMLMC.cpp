@@ -49,8 +49,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
-                                   MixedMatrix::DistributeWeight::False);
+    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_);
 
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
