@@ -49,55 +49,14 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     // Hypre may modify the original vertex_edge, which we seek to avoid
     mfem::SparseMatrix ve_copy(vertex_edge);
 
-    mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_);
+    Graph graph(vertex_edge, edge_d_td_, weight);
+    mixed_laplacians_.emplace_back(graph);
 
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param_));
     coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
-    mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
-    MakeVectors(0);
-
-    MakeCoarseSolver();
-    MakeVectors(1);
-
-    chrono.Stop();
-    setup_time_ += chrono.RealTime();
-}
-
-FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
-                                   const mfem::SparseMatrix& vertex_edge,
-                                   const std::vector<mfem::Vector>& local_weight,
-                                   const mfem::Array<int>& partitioning,
-                                   const mfem::HypreParMatrix& edge_d_td,
-                                   const mfem::SparseMatrix& edge_boundary_att,
-                                   const mfem::Array<int>& ess_attr,
-                                   const UpscaleParameters& param)
-    :
-    Upscale(comm, vertex_edge.Height()),
-    weight_(local_weight[0]),
-    edge_d_td_(edge_d_td),
-    edge_boundary_att_(edge_boundary_att),
-    ess_attr_(ess_attr),
-    param_(param)
-{
-    mfem::StopWatch chrono;
-    chrono.Start();
-
-    solver_.resize(param.max_levels);
-    rhs_.resize(param_.max_levels);
-    sol_.resize(param_.max_levels);
-
-    // Hypre may modify the original vertex_edge, which we seek to avoid
-    mfem::SparseMatrix ve_copy(vertex_edge);
-
-    mixed_laplacians_.emplace_back(vertex_edge, local_weight, edge_d_td_);
-
-    GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
-    coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                mixed_laplacians_[0], std::move(gt), param_));
-    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);
 

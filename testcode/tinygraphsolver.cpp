@@ -132,7 +132,8 @@ int main(int argc, char* argv[])
     mfem::HypreParMatrix edge_d_td(comm, nedges, edge_start,
                                    &edge_d_td_diag);
 
-    MixedMatrix mixed_graph_laplacian(vertex_edge, weight, w, edge_d_td);
+    Graph graph(vertex_edge, edge_d_td, weight);
+    MixedMatrix mixed_graph_laplacian(graph, VectorToMatrix(w));
 
     mfem::Array<int>& blockOffsets(mixed_graph_laplacian.GetBlockOffsets());
     mfem::BlockVector rhs = *mixed_graph_laplacian.SubVectorsToBlockVector(rhs_u_fine, rhs_p_fine);

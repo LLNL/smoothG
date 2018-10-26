@@ -97,7 +97,7 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     W_block *= cell_volume_ * kappa * kappa;
     auto fvupscale_temp = std::make_shared<FiniteVolumeUpscale>(
                               comm, vertex_edge, weight, W_block, partitioning, edge_d_td,
-                              edge_boundary_att, ess_attr, param);
+                              &edge_boundary_att, &ess_attr, param);
     fvupscale_temp->MakeFineSolver();
     fvupscale_ = fvupscale_temp;
 

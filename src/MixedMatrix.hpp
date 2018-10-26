@@ -49,25 +49,7 @@ public:
        @param edge_d_td edge to true edge table
        @param dist_weight true if edges shared between processors should be cut in half
     */
-    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const mfem::Vector& weight,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const mfem::Vector& weight,
-                const mfem::SparseMatrix& w_block,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const mfem::Vector& weight,
-                const mfem::Vector& w_block,
-                const mfem::HypreParMatrix& edge_d_td);
-
-    MixedMatrix(const Graph& graph);
-
-    MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                const std::vector<mfem::Vector>& local_weight,
-                const mfem::HypreParMatrix& edge_d_td);
+    MixedMatrix(const Graph& graph, const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
     MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
@@ -323,7 +305,7 @@ private:
        modify it to have -1, 1 in the resulting D_ matrix.
     */
     void Init(const mfem::SparseMatrix& vertex_edge,
-              const mfem::Vector& weight,
+              const std::vector<mfem::Vector>& edge_weight_split,
               const mfem::SparseMatrix& w_block);
 
     std::unique_ptr<mfem::SparseMatrix> ConstructD(

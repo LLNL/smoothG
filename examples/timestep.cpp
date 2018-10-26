@@ -215,8 +215,8 @@ int main(int argc, char* argv[])
     // Time Stepping
     {
         FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, W_block,
-                                      partitioning, *edge_d_td, edge_boundary_att,
-                                      ess_attr, upscale_param);
+                                      partitioning, *edge_d_td, &edge_boundary_att,
+                                      &ess_attr, upscale_param);
 
         fvupscale.PrintInfo();
 

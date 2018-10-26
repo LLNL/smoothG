@@ -68,7 +68,8 @@ MixedMatrix OriginalScaledFineMatrix(mfem::ParFiniteElementSpace& sigmafespace,
         }
     }
     auto edge_trueedge = sigmafespace.Dof_TrueDof_Matrix();
-    return MixedMatrix(vertex_edge, local_weight, *edge_trueedge);
+    Graph graph(vertex_edge, *edge_trueedge, local_weight);
+    return MixedMatrix(graph);
 }
 
 mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,

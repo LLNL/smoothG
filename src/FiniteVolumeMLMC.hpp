@@ -57,23 +57,6 @@ public:
                      const mfem::Array<int>& ess_attr,
                      const UpscaleParameters& param = UpscaleParameters());
 
-    /**
-       @brief Constructor
-
-       @param comm MPI communicator
-       @param vertex_edge relationship between vertices and edge
-       @param local_weight vertex-based fine edge weights.
-       @param partitioning partition of vertices
-    */
-    FiniteVolumeMLMC(MPI_Comm comm,
-                     const mfem::SparseMatrix& vertex_edge,
-                     const std::vector<mfem::Vector>& local_weight,
-                     const mfem::Array<int>& partitioning,
-                     const mfem::HypreParMatrix& edge_d_td,
-                     const mfem::SparseMatrix& edge_boundary_att,
-                     const mfem::Array<int>& ess_attr,
-                     const UpscaleParameters& param = UpscaleParameters());
-
     void MakeFineSolver();
 
     /// coeff should have the size of the number of *vertices* in the fine graph

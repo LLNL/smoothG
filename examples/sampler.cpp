@@ -257,7 +257,7 @@ int main(int argc, char* argv[])
     // Create Upscaler
     auto fvupscale = std::make_shared<FiniteVolumeUpscale>(
                          comm, vertex_edge, weight, W_block, partitioning, *edge_d_td,
-                         edge_boundary_att, ess_attr, upscale_param);
+                         &edge_boundary_att, &ess_attr, upscale_param);
 
     fvupscale->MakeFineSolver();
     fvupscale->PrintInfo();

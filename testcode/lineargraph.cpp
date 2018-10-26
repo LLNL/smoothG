@@ -254,7 +254,8 @@ int main(int argc, char* argv[])
     {
         weight(i) = 1.0 / graph.GetM()(i, i);
     }
-    MixedMatrix mgL(graph.GetD(), weight, *partition.edge_d_td);
+    Graph smoothg_graph(graph.GetD(), *partition.edge_d_td, weight);
+    MixedMatrix mgL(smoothg_graph);
     GraphCoarsen graph_coarsen(mgL, graph_topology);
     ElementMBuilder builder;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,

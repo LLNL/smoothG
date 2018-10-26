@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                                  edge_boundary_att, ess_attr, upscale_param);
+                                  &edge_boundary_att, &ess_attr, upscale_param);
 
     fvupscale.MakeFineSolver();
 
