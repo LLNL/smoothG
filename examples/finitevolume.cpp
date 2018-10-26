@@ -182,22 +182,25 @@ int main(int argc, char* argv[])
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
+    mfem::BlockVector rhs_fine(fvupscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
-    auto sol_upscaled = fvupscale.Solve(rhs_fine);
-    fvupscale.ShowSolveInfo(1);
-
-    auto sol_fine = fvupscale.SolveFine(rhs_fine);
-    fvupscale.ShowSolveInfo(0);
-
-    auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
-
-    if (myid == 0)
+    /// [Solve]
+    std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
+    for (int level = 0; level < upscale_param.max_levels; ++level)
     {
-        ShowErrors(error_info);
+        fvupscale.Solve(level, rhs_fine, sol[level]);
+        fvupscale.ShowSolveInfo(level);
+
+        auto error_info = fvupscale.ComputeErrors(sol[level], sol[0]);
+
+        if (level > 0 && myid == 0)
+        {
+            ShowErrors(error_info);
+        }
     }
+    /// [Solve]
 
     // Visualize the solution
     if (visualization)
@@ -232,8 +235,10 @@ int main(int argc, char* argv[])
             MPI_Barrier(comm);
         };
 
-        Visualize(sol_upscaled.GetBlock(1));
-        Visualize(sol_fine.GetBlock(1));
+        for (int level = 0; level < upscale_param.max_levels; ++level)
+        {
+            Visualize(sol[level].GetBlock(1));
+        }
     }
 
     return EXIT_SUCCESS;

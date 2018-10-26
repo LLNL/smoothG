@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
         const auto upscale = GraphUpscale(comm, vertex_edge, global_partitioning, param);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
-        const auto sol = upscale.Solve(rhs_u_fine);
+        const auto sol = upscale.Solve(1, rhs_u_fine);
 
         upscale.WriteVertexVector(sol, "sol1.out");
     }
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
         const auto upscale = GraphUpscale(comm, vertex_edge, param);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
-        const auto sol = upscale.Solve(rhs_u_fine);
+        const auto sol = upscale.Solve(1, rhs_u_fine);
 
         upscale.WriteVertexVector(sol, "sol2.out");
     }
@@ -98,18 +98,18 @@ int main(int argc, char* argv[])
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
 
         // Do work at Coarse Level
-        auto rhs_u_coarse = upscale.Restrict(rhs_u_fine);
-        auto sol_u_coarse = upscale.SolveCoarse(rhs_u_coarse);
+        auto rhs_u_coarse = upscale.Restrict(1, rhs_u_fine);
+        auto sol_u_coarse = upscale.SolveAtLevel(1, rhs_u_coarse);
 
         // If multiple iterations, reuse vector
         for (int i = 0; i < 5; ++i)
         {
-            upscale.SolveCoarse(rhs_u_coarse, sol_u_coarse);
+            upscale.SolveAtLevel(1, rhs_u_coarse, sol_u_coarse);
         }
 
         // Interpolate back to Fine Level
-        auto sol_u_fine = upscale.Interpolate(sol_u_coarse);
-        upscale.Orthogonalize(sol_u_fine);
+        auto sol_u_fine = upscale.Interpolate(1, sol_u_coarse);
+        upscale.Orthogonalize(0, sol_u_fine);
 
         upscale.WriteVertexVector(sol_u_fine, "sol3.out");
     }
@@ -120,8 +120,8 @@ int main(int argc, char* argv[])
 
         mfem::BlockVector fine_rhs = upscale.ReadVertexBlockVector(rhs_filename);
 
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
+        mfem::BlockVector fine_sol = upscale.Solve(0, fine_rhs);
+        mfem::BlockVector upscaled_sol = upscale.Solve(1, fine_rhs);
 
         upscale.PrintInfo();
 
@@ -146,8 +146,8 @@ int main(int argc, char* argv[])
 
         const auto rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 
-        const auto minres_sol = minres_upscale.Solve(rhs_u_fine);
-        const auto hb_sol = hb_upscale.Solve(rhs_u_fine);
+        const auto minres_sol = minres_upscale.Solve(1, rhs_u_fine);
+        const auto hb_sol = hb_upscale.Solve(1, rhs_u_fine);
 
         const auto error = CompareError(comm, hb_sol, minres_sol);
 

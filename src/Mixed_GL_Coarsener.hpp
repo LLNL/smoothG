@@ -61,10 +61,10 @@ public:
        versions of the derivative matrix \f$ D \f$ and the weighting
        matrix \f$ M \f$.
     */
-    void construct_coarse_subspace()
+    void construct_coarse_subspace(const mfem::Vector& constant_rep)
     {
         graph_coarsen_ = make_unique<GraphCoarsen>(mgL_, graph_topology_);
-        do_construct_coarse_subspace();
+        do_construct_coarse_subspace(constant_rep);
         is_coarse_subspace_constructed_ = true;
     }
 
@@ -148,7 +148,7 @@ public:
     MixedMatrix GetCoarse();
 
 private:
-    virtual void do_construct_coarse_subspace() = 0;
+    virtual void do_construct_coarse_subspace(const mfem::Vector& constant_rep) = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;

@@ -150,7 +150,8 @@ int GraphCoarsen::BuildCoarseFaceCoarseDof(unsigned int nfaces,
 
 void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                                    const mfem::SparseMatrix& Agg_vertex,
-                                   const mfem::SparseMatrix& face_edge)
+                                   const mfem::SparseMatrix& face_edge,
+                                   const mfem::Vector& constant_rep)
 {
     const unsigned int nfaces = face_edge.Height();
     bool sign_flip;
@@ -168,11 +169,18 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
 
         mfem::DenseMatrix& edge_traces_f(edge_traces[iface]);
         int num_traces = edge_traces_f.Width();
-        mfem::Vector allone(Dtransfer.Height());
-        allone = 1.;
+
+        mfem::Vector localconstant;
+        constant_rep.GetSubVector(local_verts, localconstant);
 
         edge_traces_f.GetColumnReference(0, PV_trace);
-        double oneDpv = Dtransfer.InnerProduct(PV_trace, allone);
+        double oneDpv = Dtransfer.InnerProduct(PV_trace, localconstant);
+
+        if (fabs(oneDpv) < 1e-10)
+        {
+            std::cerr << "Warning: oneDpv is closed to zero, oneDpv = "
+                      << oneDpv << ", this may be due to bad PV traces!\n";
+        }
 
         if (oneDpv < 0)
         {
@@ -180,14 +188,16 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
             oneDpv *= -1.;
         }
         else
+        {
             sign_flip = false;
+        }
 
         PV_trace /= oneDpv;
 
         for (int k = 1; k < num_traces; k++)
         {
             edge_traces_f.GetColumnReference(k, trace);
-            double alpha = Dtransfer.InnerProduct(trace, allone);
+            double alpha = Dtransfer.InnerProduct(trace, localconstant);
 
             if (sign_flip)
                 alpha *= -1.;
@@ -196,6 +206,9 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
             ScaledPV.Set(alpha, PV_trace);
             trace -= ScaledPV;
         }
+
+        // TODO: might need to SVD?
+
     }
 }
 
@@ -311,7 +324,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                std::vector<mfem::DenseMatrix>& vertex_target,
                                mfem::SparseMatrix& face_cdof,
                                mfem::SparseMatrix& Pedges,
-                               CoarseMBuilder& coarse_mbuilder)
+                               CoarseMBuilder& coarse_mbuilder,
+                               const mfem::Vector& constant_rep)
 {
     // put trace_extensions and bubble_functions in Pedges
     // the coarse dof numbering is as follows: first loop over each face, count
@@ -345,7 +359,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                                total_num_traces + ncoarse_vertexdofs - nAggs);
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
-    NormalizeTraces(edge_traces, Agg_vertex, face_edge);
+    // this is Gelever's "ScaleEdgeTargets"
+    NormalizeTraces(edge_traces, Agg_vertex, face_edge, constant_rep);
 
     coarse_mbuilder.Setup(edge_traces, vertex_target, Agg_face, total_num_traces,
                           ncoarse_vertexdofs);
@@ -355,9 +370,11 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::Vector B_potential, F_potential;
     mfem::DenseMatrix traces_extensions, bubbles, B_potentials, F_potentials;
     mfem::Vector ref_vec1, ref_vec2;
-    mfem::Vector local_rhs_trace, local_rhs_bubble, local_sol, trace;
-    mfem::Array<int> local_verts, facefdofs, local_fine_dofs, faces;
+    mfem::Vector local_rhs_trace0, local_rhs_trace1, local_rhs_bubble, local_sol, trace;
+    mfem::Array<int> local_verts, local_fine_dofs, faces;
     mfem::Array<int> facecdofs, local_facecdofs;
+    mfem::Vector one, first_vert_target;
+    mfem::SparseMatrix Mbb;
     for (unsigned int i = 0; i < nAggs; i++)
     {
         // extract local matrices and build local solver
@@ -368,14 +385,15 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                          local_fine_dofs, colMapper_);
         auto Dloc = ExtractRowAndColumns(D_proc_, local_verts,
                                          local_fine_dofs, colMapper_);
+        constant_rep.GetSubVector(local_verts, one);
+
         // next line does *not* assume M_proc_ is diagonal
-        LocalGraphEdgeSolver solver(Mloc, Dloc);
+        LocalGraphEdgeSolver solver(Mloc, Dloc, one);
 
         int nlocal_verts = local_verts.Size();
-        local_rhs_trace.SetSize(nlocal_verts);
+        local_rhs_trace1.SetSize(nlocal_verts);
 
         mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
-        double scale = vertex_target_i(0, 0);
 
         // ---
         // solving bubble functions (vertex_target -> bubbles)
@@ -405,41 +423,55 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         traces_extensions.SetSize(nlocal_fine_dofs, nlocal_traces);
         F_potentials.SetSize(nlocal_verts, nlocal_traces);
         local_facecdofs.SetSize(nlocal_traces);
+        local_rhs_trace0.SetSize(nlocal_fine_dofs);
+
+        std::vector<mfem::Array<int> > facefdofs(faces.Size());
+        std::vector<std::pair<int, int> > agg_trace_map(nlocal_traces);
 
         nlocal_traces = 0;
         for (int j = 0; j < faces.Size(); j++)
         {
             const int face = faces[j];
             GetTableRow(face_cdof, face, facecdofs);
-            GetTableRow(face_edge, face, facefdofs);
+            GetTableRow(face_edge, face, facefdofs[j]);
+
             auto Dtransfer = ExtractRowAndColumns(D_proc_, local_verts,
-                                                  facefdofs, colMapper_);
+                                                  facefdofs[j], colMapper_);
             mfem::SparseMatrix DtransferT = smoothg::Transpose(Dtransfer);
+
+            auto Mtransfer = ExtractRowAndColumns(M_proc_, local_fine_dofs,
+                                                  facefdofs[j], colMapper_);
+            mfem::SparseMatrix MtransferT = smoothg::Transpose(Mtransfer);
 
             mfem::DenseMatrix& edge_traces_f(edge_traces[face]);
             int num_traces = edge_traces_f.Width();
             for (int k = 0; k < num_traces; k++)
             {
+                agg_trace_map[nlocal_traces] = std::make_pair(j, k);
+
                 const int row = local_facecdofs[nlocal_traces] = facecdofs[k];
                 const int cdof_loc = num_bubbles_i + nlocal_traces;
                 coarse_mbuilder.RegisterRow(i, row, cdof_loc, bubble_counter);
                 edge_traces_f.GetColumnReference(k, trace);
-                Dtransfer.Mult(trace, local_rhs_trace);
+                Dtransfer.Mult(trace, local_rhs_trace1);
+                Mtransfer.Mult(trace, local_rhs_trace0);
 
                 // compute and store local coarse D
                 if (k == 0)
                 {
+                    vertex_target_i.GetColumnReference(0, first_vert_target);
                     CoarseD_->Set(bubble_counter + i, row,
-                                  local_rhs_trace.Sum() * -1.*scale);
+                                  (local_rhs_trace1 * first_vert_target) * -1.);
                 }
 
                 // instead of doing local_rhs *= -1, we store -trace later
                 if (nlocal_fine_dofs)
                 {
-                    orthogonalize_from_constant(local_rhs_trace);
+                    orthogonalize_from_vector(local_rhs_trace1, one);
+                    // orthogonalize_from_constant(local_rhs_trace);
                     traces_extensions.GetColumnReference(nlocal_traces, local_sol);
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
-                    solver.Mult(local_rhs_trace, local_sol, F_potential);
+                    solver.Mult(local_rhs_trace0, local_rhs_trace1, local_sol, F_potential);
 
                     // compute and store off diagonal block of coarse M
                     for (int l = 0; l < num_bubbles_i; l++)
@@ -450,10 +482,27 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
                     // compute and store diagonal block of coarse M
                     entry_value = DTTraceProduct(DtransferT, F_potentials, nlocal_traces, trace);
+                    entry_value -= MtransferT.InnerProduct(local_sol, trace);
                     coarse_mbuilder.AddTraceTraceBlockDiag(entry_value);
+
+                    int other_j = -1;
                     for (int l = 0; l < nlocal_traces; l++)
                     {
                         entry_value = DTTraceProduct(DtransferT, F_potentials, l, trace);
+                        entry_value -= DTTraceProduct(MtransferT, traces_extensions, l, trace);
+
+                        std::pair<int, int>& loc_map = agg_trace_map[l];
+                        if (loc_map.first != other_j && loc_map.first != j)
+                        {
+                            other_j = loc_map.first;
+                            // TODO: avoid repeated extraction in high order coarsening
+                            auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
+                                                            facefdofs[other_j], colMapper_);
+                            Mbb.Swap(tmp);
+                            entry_value += DTTraceProduct(Mbb, edge_traces[faces[other_j]],
+                                                          loc_map.second, trace);
+                        }
+
                         coarse_mbuilder.AddTraceTraceBlock(local_facecdofs[l], entry_value);
                     }
                 }
@@ -597,12 +646,12 @@ void GraphCoarsen::BuildInterpolation(
     std::vector<mfem::DenseMatrix>& vertex_targets,
     mfem::SparseMatrix& Pvertices, mfem::SparseMatrix& Pedges,
     mfem::SparseMatrix& face_cdof,
-    CoarseMBuilder& coarse_m_builder)
+    CoarseMBuilder& coarse_m_builder, const mfem::Vector& constant_rep)
 {
     BuildPVertices(vertex_targets, Pvertices, coarse_m_builder);
 
     BuildPEdges(edge_traces, vertex_targets, face_cdof, Pedges,
-                coarse_m_builder);
+                coarse_m_builder, constant_rep);
 
     BuildW(Pvertices);
 }

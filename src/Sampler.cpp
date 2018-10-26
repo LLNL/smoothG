@@ -108,7 +108,7 @@ void PDESampler::Initialize(int dimension, double kappa)
 {
     rhs_fine_.SetSize(fine_vector_size_);
     coefficient_fine_.SetSize(fine_vector_size_);
-    rhs_coarse_ = fvupscale_->GetCoarseVector();
+    rhs_coarse_ = fvupscale_->GetVector(1);
     coefficient_coarse_.SetSize(num_coarse_aggs_);
 
     double nu_parameter;
@@ -151,7 +151,7 @@ const mfem::Vector& PDESampler::GetFineCoefficient()
     MFEM_ASSERT(current_state_ == FINE_SAMPLE,
                 "PDESampler object in wrong state (call NewSample() first)!");
 
-    fvupscale_->SolveFine(rhs_fine_, coefficient_fine_);
+    fvupscale_->Solve(0, rhs_fine_, coefficient_fine_);
     for (int i = 0; i < coefficient_fine_.Size(); ++i)
     {
         coefficient_fine_(i) = std::exp(coefficient_fine_(i));
@@ -180,12 +180,12 @@ mfem::Vector& PDESampler::GetCoarseCoefficient()
                 "PDESampler object in wrong state (call NewSample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
-        fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
-    mfem::Vector coarse_sol = fvupscale_->GetCoarseVector();
-    fvupscale_->SolveCoarse(rhs_coarse_, coarse_sol);
+        fvupscale_->Restrict(1, rhs_fine_, rhs_coarse_);
+    mfem::Vector coarse_sol = fvupscale_->GetVector(1);
+    fvupscale_->SolveAtLevel(1, rhs_coarse_, coarse_sol);
 
     coefficient_coarse_ = 0.0;
-    mfem::Vector coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
+    mfem::Vector coarse_constant_rep = fvupscale_->GetConstantRep(1);
     MFEM_ASSERT(coarse_constant_rep.Size() == coarse_sol.Size(),
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
     int agg_index = 0;
@@ -209,11 +209,11 @@ mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
                 "PDESampler object in wrong state (call NewSample() first)!");
 
     if (current_state_ == FINE_SAMPLE)
-        fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
+        fvupscale_->Restrict(1, rhs_fine_, rhs_coarse_);
     coefficient_coarse_.SetSize(rhs_coarse_.Size());
-    fvupscale_->SolveCoarse(rhs_coarse_, coefficient_coarse_);
+    fvupscale_->SolveAtLevel(1, rhs_coarse_, coefficient_coarse_);
 
-    const mfem::Vector& coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
+    const mfem::Vector& coarse_constant_rep = fvupscale_->GetConstantRep(1);
     MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_coarse_.Size(),
                 "PDESampler::GetCoarseCoefficient : Sizes do not match!");
     for (int i = 0; i < coefficient_coarse_.Size(); ++i)

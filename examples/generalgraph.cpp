@@ -177,29 +177,33 @@ int main(int argc, char* argv[])
         /// [Right Hand Side]
         if (generate_graph || generate_fiedler)
         {
-            rhs_u_fine = ComputeFiedlerVector(upscale.GetFineMatrix());
+            rhs_u_fine = ComputeFiedlerVector(upscale.GetMatrix(0));
         }
         else
         {
             rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
         }
 
-        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());
+        mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
 
         /// [Solve]
-        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
-        upscale.ShowSolveInfo(1);
+        std::vector<mfem::BlockVector> sol(upscale_param.max_levels, fine_rhs);
+        for (int level = 0; level < upscale_param.max_levels; ++level)
+        {
+            upscale.Solve(level, fine_rhs, sol[level]);
+            upscale.ShowSolveInfo(level);
 
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        upscale.ShowSolveInfo(0);
+            auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
+
+            if (level > 0 && myid == 0)
+            {
+                ShowErrors(error_info);
+            }
+        }
         /// [Solve]
-
-        /// [Check Error]
-        upscale.ShowErrors(upscaled_sol, fine_sol);
-        /// [Check Error]
 
         if (save_fiedler)
         {

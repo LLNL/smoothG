@@ -55,7 +55,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param_));
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);
@@ -98,7 +98,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param_));
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
     MakeVectors(0);
 
@@ -113,7 +113,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 /// RescaleCoarseCoefficient with int level argument)
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
-    GetFineMatrix().UpdateM(coeff);
+    GetMatrix(0).UpdateM(coeff);
     if (!param_.hybridization)
     {
         ForceMakeFineSolver();
@@ -130,7 +130,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     if (!param_.hybridization)
     {
-        GetCoarseMatrix().UpdateM(coeff);
+        GetMatrix(1).UpdateM(coeff);
         MakeCoarseSolver();
     }
     else
@@ -143,7 +143,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 
 void FiniteVolumeMLMC::MakeCoarseSolver()
 {
-    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    mfem::SparseMatrix& Dref = GetMatrix(1).GetD();
     mfem::Array<int> marker(Dref.Width());
     marker = 0;
 
@@ -158,13 +158,13 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
         solver_[1] = make_unique<HybridSolver>(
-                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         comm_, GetMatrix(1), *coarsener_[0],
                          &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
-        GetCoarseMatrix().BuildM();
-        mfem::SparseMatrix& Mref = GetCoarseMatrix().GetM();
+        GetMatrix(1).BuildM();
+        mfem::SparseMatrix& Mref = GetMatrix(1).GetM();
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -174,7 +174,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         Dref.EliminateCols(marker);
 
-        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(1));
     }
 }
 
@@ -185,14 +185,14 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     if (param_.hybridization) // Hybridization solver
     {
-        solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
                                                &edge_boundary_att_, &marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = GetFineMatrix().GetM();
-        mfem::SparseMatrix& Dref = GetFineMatrix().GetD();
-        const bool w_exists = GetFineMatrix().CheckW();
+        mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
+        mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
+        const bool w_exists = GetMatrix(0).CheckW();
 
         for (int mm = 0; mm < marker.Size(); ++mm)
         {
@@ -210,7 +210,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             Dref.EliminateRow(0);
         }
 
-        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
     }
 
 }

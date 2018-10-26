@@ -175,9 +175,12 @@ public:
        @param local_edge_trace_targets traces of the vertex targets
        @param local_vertex_targets vectors corresponding to smallest eigenvalues
                                    on the vertex space.
+       @param constant_rep representation of constant vertex vector on finer
+                           space
     */
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
+                 std::vector<mfem::DenseMatrix>& local_vertex_targets,
+                 const mfem::Vector& constant_rep);
 private:
     /**
        @brief Solve an eigenvalue problem on each agglomerate, put the result in
@@ -200,10 +203,26 @@ private:
        @param local_edge_trace_targets (OUT)
     */
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
-                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
+                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+                            const mfem::Vector& constant_rep);
 
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
+
+    /**
+       @brief Fill onenegone partly with a constant positive value, partly with
+       a constant negative value, so that it has zero average
+
+       (on coarser levels this does something different)
+    */
+    mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
+
+    /// given an assembled vector on vertices, return extracted value on (possibly shared) faces
+    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect);
+
+    /// shared_constant expected to be an array of legth 2, just returns them
+    /// stacked on top of each other
+    mfem::Vector ConstantLocal(mfem::Vector* shared_constant);
 
     MPI_Comm comm_;
 
