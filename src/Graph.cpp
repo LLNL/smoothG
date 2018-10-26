@@ -42,6 +42,16 @@ Graph::Graph(MPI_Comm comm,
     Distribute(vertex_edge_global, edge_weight_global);
 }
 
+Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
+             const mfem::HypreParMatrix& edge_trueedge,
+             const mfem::Vector& edge_weight_local)
+    : comm_(edge_trueedge.GetComm()), vertex_edge_local_(vertex_edge_local),
+      edge_weight_local_(edge_weight_local)
+{
+    edge_trueedge_ = make_unique<mfem::HypreParMatrix>();
+    edge_trueedge_->MakeRef(edge_trueedge);
+}
+
 void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
                        const mfem::Vector& edge_weight_global)
 {
@@ -201,6 +211,7 @@ void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 
 mfem::Vector Graph::ReadVertexVector(const std::string& filename) const
 {
+    assert(vert_loc_to_glo_.Size() == vertex_edge_local_.Height());
     return ReadVector(filename, vertex_starts_.Last(), vert_loc_to_glo_);
 }
 
@@ -223,6 +234,7 @@ mfem::Vector Graph::ReadVector(const std::string& filename, int global_size,
 
 void Graph::WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const
 {
+    assert(vert_loc_to_glo_.Size() == vertex_edge_local_.Height());
     WriteVector(vec_loc, filename, vertex_starts_.Last(), vert_loc_to_glo_);
 }
 

@@ -51,6 +51,10 @@ public:
           const mfem::SparseMatrix& vertex_edge_global,
           const mfem::Vector& edge_weight_global = mfem::Vector());
 
+    Graph(const mfem::SparseMatrix& vertex_edge_local,
+          const mfem::HypreParMatrix& edge_trueedge,
+          const mfem::Vector& edge_weight_local = mfem::Vector());
+
     /// Read global vector from file, then distribute to local vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
 
