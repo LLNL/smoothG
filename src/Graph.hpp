@@ -107,6 +107,8 @@ private:
     */
     void DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global);
 
+    void MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge);
+
     void DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,

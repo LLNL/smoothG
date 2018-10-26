@@ -55,29 +55,46 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
                 "this method can not be used without assumed partition");
 
     mfem::SparseMatrix vert_vert = AAt(vertex_edge_global);
-    mfem::Array<int> partition_global;
-    Partition(vert_vert, partition_global, num_procs_);
+    mfem::Array<int> partition;
+    Partition(vert_vert, partition, num_procs_);
 
     // Construct the relation table processor_vertex from global partition
-    auto proc_vert = PartitionToMatrix(partition_global, num_procs_);
-
-    // Compute edge_proc relation (for constructing edge to true edge later)
-    mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vertex_edge_global);
-    proc_edge.SortColumnIndices();
-    mfem::SparseMatrix edge_proc(smoothg::Transpose(proc_edge) );
+    mfem::SparseMatrix proc_vert = PartitionToMatrix(partition, num_procs_);
 
     // Construct vertex local to global index array
     int nvertices_local = proc_vert.RowSize(myid_);
     mfem::Array<int> vert_l2g(proc_vert.GetRowColumns(myid_), nvertices_local);
     vert_l2g.Copy(vert_local2global_);
 
-    // Construct edge local to global index array
-    int nedges_local = proc_edge.RowSize(myid_);
-    mfem::Array<int> edge_l2g(proc_edge.GetRowColumns(myid_), nedges_local);
+    // Compute edge_proc relation (for constructing edge to true edge later)
+    mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vertex_edge_global);
+    proc_edge.SortColumnIndices(); // TODO: this may not be needed once SEC is fixed
+
+    mfem::Array<int> edge_l2g(proc_edge.GetRowColumns(myid_), proc_edge.RowSize(myid_));
     edge_l2g.Copy(edge_local2global_);
 
+    // Extract local submatrix of the global vertex to edge relation table
+    mfem::Array<int> map(vertex_edge_global.Width());
+    map = -1;
+    auto tmp = ExtractRowAndColumns(vertex_edge_global, vert_local2global_,
+                                    edge_local2global_, map);
+    vertex_edge_local_.Swap(tmp);
+
+    MakeEdgeTrueEdge(proc_edge);
+
+    // Compute vertex_trueedge (needed for redistribution)
+//    GenerateOffsets(comm_, vertex_edge_local_.Height(), vertex_starts_);
+//    vertex_trueedge_.reset(
+//        edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
+}
+
+void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
+{
+    int nedges_local = proc_edge.RowSize(myid_);
+    mfem::SparseMatrix edge_proc = smoothg::Transpose(proc_edge);
+
     // Count number of true edges in each processor
-    int ntedges_global = vertex_edge_global.Width();
+    int ntedges_global = proc_edge.Width();
     mfem::Array<int> tedge_couters(num_procs_ + 1);
     tedge_couters = 0;
     for (int i = 0; i < ntedges_global; i++)
@@ -155,19 +172,6 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
                          e_te_offd_i, e_te_offd_j, e_te_offd_data, offd_counter, e_te_col_map);
     edge_trueedge_->CopyRowStarts();
     edge_trueedge_->CopyColStarts();
-
-    // Extract local submatrix of the global vertex to edge relation table
-    mfem::Array<int> map(ntedges_global);
-    map = -1;
-
-    auto tmp = ExtractRowAndColumns(vertex_edge_global, vert_local2global_,
-                                    edge_local2global_, map);
-    vertex_edge_local_.Swap(tmp);
-
-    // Compute vertex_trueedge
-    GenerateOffsets(comm_, vertex_edge_local_.Height(), vertex_starts_);
-    vertex_trueedge_.reset(
-        edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
 }
 
 void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
