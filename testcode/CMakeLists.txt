@@ -84,6 +84,8 @@ add_valgrind_test(vrescaling rescaling)
 add_test(coarse_assembling coarse_assembling -m 1 --perm ${SPE10_PERM})
 add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 1 --perm ${SPE10_PERM})
 
+add_test(lineargraphthree lineargraphthree --size 64 --partitions 32 --max-evects 1 --coarse-factor 2)
+
 add_test(NAME style
   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

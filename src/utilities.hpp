@@ -140,12 +140,6 @@ void VisualizeSolution(int k,
                        const mfem::BlockVector& sol);
 
 class GraphTopology;
-void PostProcess(mfem::SparseMatrix& M_global,
-                 mfem::SparseMatrix& D_global,
-                 GraphTopology& graph_topology_,
-                 mfem::Vector& sol,
-                 mfem::Vector& solp,
-                 const mfem::Vector& rhs);
 
 /**
    @brief Build boundary attribute table from mesh.

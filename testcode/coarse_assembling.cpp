@@ -15,7 +15,8 @@
 
 /**
    @file coarse_assembling.cpp
-   @brief Test if the coarse M and D constructed in GraphCoarsen coincides
+
+   @brief Test if the coarse M and D constructed in GraphCoarsen coincide
    with the RAP approach.
 */
 
