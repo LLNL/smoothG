@@ -183,6 +183,19 @@ double MaxNorm(const mfem::HypreParMatrix& A);
    @param A the matrix to extract from
    @param rows the rows to extract
    @param cols the columns to extract
+
+   @returns the extracted submatrix
+*/
+mfem::SparseMatrix ExtractRowAndColumns(
+    const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
+    const mfem::Array<int>& cols);
+
+/**
+   @brief Extract a submatrix from a matrix
+
+   @param A the matrix to extract from
+   @param rows the rows to extract
+   @param cols the columns to extract
    @param colMapper basically a data workspace
 
    @returns the extracted submatrix

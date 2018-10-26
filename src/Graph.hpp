@@ -105,7 +105,7 @@ private:
 
        @param vertex_edge_global describes the entire global graph, unsigned
     */
-    void DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global);
+    void DistributeVertexEdge(const mfem::SparseMatrix& vert_edge_global);
 
     void MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge);
 
@@ -126,8 +126,8 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
 
-    mfem::Array<int> vert_local2global_;
-    mfem::Array<int> edge_local2global_;
+    mfem::Array<int> vert_loc_to_glo_;
+    mfem::Array<int> edge_loc_to_glo_;
     mfem::Array<HYPRE_Int> vertex_starts_;
 }; // class Graph
 

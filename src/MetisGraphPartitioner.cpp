@@ -232,11 +232,7 @@ void MetisGraphPartitioner::IsolatePreProcess(const mfem::SparseMatrix& wtable,
     mfem::Array<int> indices_m(indices.data(), indices.size());
     indices_m.Copy(sub_to_global);
 
-    mfem::Array<int> col_map(wtable.Height());
-    col_map = -1;
-
-    mfem::SparseMatrix sub_mat = ExtractRowAndColumns(wtable, indices_m,
-                                                      indices_m, col_map);
+    mfem::SparseMatrix sub_mat = ExtractRowAndColumns(wtable, indices_m, indices_m);
     sub_table.Swap(sub_mat);
 }
 

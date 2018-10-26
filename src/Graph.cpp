@@ -49,12 +49,12 @@ void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
     DistributeEdgeWeight(edge_weight_global);
 }
 
-void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
+void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vert_edge_global)
 {
     MFEM_VERIFY(HYPRE_AssumedPartitionCheck(),
                 "this method can not be used without assumed partition");
 
-    mfem::SparseMatrix vert_vert = AAt(vertex_edge_global);
+    mfem::SparseMatrix vert_vert = AAt(vert_edge_global);
     mfem::Array<int> partition;
     Partition(vert_vert, partition, num_procs_);
 
@@ -64,20 +64,17 @@ void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vertex_edge_global)
     // Construct vertex local to global index array
     int nvertices_local = proc_vert.RowSize(myid_);
     mfem::Array<int> vert_l2g(proc_vert.GetRowColumns(myid_), nvertices_local);
-    vert_l2g.Copy(vert_local2global_);
+    vert_l2g.Copy(vert_loc_to_glo_);
 
     // Compute edge_proc relation (for constructing edge to true edge later)
-    mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vertex_edge_global);
+    mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vert_edge_global);
     proc_edge.SortColumnIndices(); // TODO: this may not be needed once SEC is fixed
 
     mfem::Array<int> edge_l2g(proc_edge.GetRowColumns(myid_), proc_edge.RowSize(myid_));
-    edge_l2g.Copy(edge_local2global_);
+    edge_l2g.Copy(edge_loc_to_glo_);
 
     // Extract local submatrix of the global vertex to edge relation table
-    mfem::Array<int> map(vertex_edge_global.Width());
-    map = -1;
-    auto tmp = ExtractRowAndColumns(vertex_edge_global, vert_local2global_,
-                                    edge_local2global_, map);
+    auto tmp = ExtractRowAndColumns(vert_edge_global, vert_loc_to_glo_, edge_loc_to_glo_);
     vertex_edge_local_.Swap(tmp);
 
     MakeEdgeTrueEdge(proc_edge);
@@ -136,7 +133,7 @@ void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
     int diag_counter(0), offd_counter(0);
     for (int i = 0; i < nedges_local; i++)
     {
-        tedge_new = tedge_old2new[edge_local2global_[i]];
+        tedge_new = tedge_old2new[edge_loc_to_glo_[i]];
         if ( (tedge_new >= tedge_begin) && (tedge_new < tedge_end) )
         {
             e_te_diag_j[diag_counter++] = tedge_new - tedge_begin;
@@ -179,7 +176,7 @@ void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
     edge_weight_local_.SetSize(vertex_edge_local_.Width());
     if (edge_weight_global.Size())
     {
-        edge_weight_global.GetSubVector(edge_local2global_, edge_weight_local_);
+        edge_weight_global.GetSubVector(edge_loc_to_glo_, edge_weight_local_);
     }
     else
     {
@@ -204,7 +201,7 @@ void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 
 mfem::Vector Graph::ReadVertexVector(const std::string& filename) const
 {
-    return ReadVector(filename, vertex_starts_.Last(), vert_local2global_);
+    return ReadVector(filename, vertex_starts_.Last(), vert_loc_to_glo_);
 }
 
 mfem::Vector Graph::ReadVector(const std::string& filename, int global_size,
@@ -226,7 +223,7 @@ mfem::Vector Graph::ReadVector(const std::string& filename, int global_size,
 
 void Graph::WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const
 {
-    WriteVector(vec_loc, filename, vertex_starts_.Last(), vert_local2global_);
+    WriteVector(vec_loc, filename, vertex_starts_.Last(), vert_loc_to_glo_);
 }
 
 void Graph::WriteVector(const mfem::Vector& vect, const std::string& filename,
