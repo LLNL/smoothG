@@ -45,8 +45,18 @@ Graph::Graph(MPI_Comm comm,
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
              const mfem::Vector& edge_weight_local)
+    : comm_(edge_trueedge.GetComm()), vertex_edge_local_(vertex_edge_local)
+{
+    edge_trueedge_ = make_unique<mfem::HypreParMatrix>();
+    edge_trueedge_->MakeRef(edge_trueedge);
+    SplitEdgeWeight(edge_weight_local);
+}
+
+Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
+      const mfem::HypreParMatrix& edge_trueedge,
+      const std::vector<mfem::Vector>& edge_weight_split)
     : comm_(edge_trueedge.GetComm()), vertex_edge_local_(vertex_edge_local),
-      edge_weight_local_(edge_weight_local)
+      edge_weight_split_(edge_weight_split)
 {
     edge_trueedge_ = make_unique<mfem::HypreParMatrix>();
     edge_trueedge_->MakeRef(edge_trueedge);
@@ -56,7 +66,8 @@ void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
                        const mfem::Vector& edge_weight_global)
 {
     DistributeVertexEdge(vertex_edge_global);
-    DistributeEdgeWeight(edge_weight_global);
+    mfem::Vector edge_weight_local = DistributeEdgeWeight(edge_weight_global);
+    SplitEdgeWeight(edge_weight_local);
 }
 
 void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vert_edge_global)
@@ -181,30 +192,52 @@ void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
     edge_trueedge_->CopyColStarts();
 }
 
-void Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
+mfem::Vector Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 {
-    edge_weight_local_.SetSize(vertex_edge_local_.Width());
+    mfem::Vector edge_weight_local(vertex_edge_local_.Width());
     if (edge_weight_global.Size())
     {
-        edge_weight_global.GetSubVector(edge_loc_to_glo_, edge_weight_local_);
+        edge_weight_global.GetSubVector(edge_loc_to_glo_, edge_weight_local);
     }
     else
     {
-        edge_weight_local_ = 1.0;
+        edge_weight_local = 1.0;
     }
 
-    // for shared edges multiply the weight by 2 (so M matrix is divided by 2)
+    // for edges shared by two processes, multiply the weight by 2 (M is divided by 2)
     unique_ptr<mfem::HypreParMatrix> e_te_e = AAt(*edge_trueedge_);
     mfem::SparseMatrix edge_is_shared;
     HYPRE_Int* junk_map;
     e_te_e->GetOffd(edge_is_shared, junk_map);
 
-    assert(edge_is_shared.Height() == edge_weight_local_.Size());
+    assert(edge_is_shared.Height() == edge_weight_local.Size());
     for (int edge = 0; edge < edge_is_shared.Height(); ++edge)
     {
         if (edge_is_shared.RowSize(edge))
         {
-            edge_weight_local_[edge] *= 2.0;
+            edge_weight_local[edge] *= 2.0;
+        }
+    }
+
+    return edge_weight_local;
+}
+
+void Graph::SplitEdgeWeight(const mfem::Vector& edge_weight_local)
+{
+    // for edges having two vertices, multiply the weight by 2 (M is divided by 2)
+    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge_local_);
+    edge_weight_split_.resize(edge_vert.Width());
+
+    mfem::Array<int> edges;
+    for (int vert = 0; vert < edge_vert.Width(); vert++)
+    {
+        GetTableRow(vertex_edge_local_, vert, edges);
+        edge_weight_split_[vert].SetSize(edges.Size());
+        for (int i = 0; i < edges.Size(); i++)
+        {
+            const int edge = edges[i];
+            double ratio = edge_vert.RowSize(edge) == 2 ? 2.0 : 1.0;
+            edge_weight_split_[vert][i] = edge_weight_local[edge] * ratio;
         }
     }
 }

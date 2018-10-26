@@ -55,6 +55,10 @@ public:
           const mfem::HypreParMatrix& edge_trueedge,
           const mfem::Vector& edge_weight_local = mfem::Vector());
 
+    Graph(const mfem::SparseMatrix& vertex_edge_local,
+          const mfem::HypreParMatrix& edge_trueedge,
+          const std::vector<mfem::Vector>& edge_weight_local);
+
     /// Read global vector from file, then distribute to local vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
 
@@ -68,9 +72,9 @@ public:
         return vertex_edge_local_;
     }
 
-    const mfem::Vector& GetEdgeWeight() const
+    const std::vector<mfem::Vector>& GetEdgeWeight() const
     {
-        return edge_weight_local_;
+        return edge_weight_split_;
     }
 
     const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
@@ -107,13 +111,15 @@ private:
        vertex is local to one and only one processor, while edges can be shared
        between processors, which is encoded in edge_e_te_.
 
-       @param vertex_edge_global describes the entire global graph, unsigned
+       @param vertex_edge_global describes the entire unsigned global graph
     */
     void DistributeVertexEdge(const mfem::SparseMatrix& vert_edge_global);
 
     void MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge);
 
-    void DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
+    mfem::Vector DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
+
+    void SplitEdgeWeight(const mfem::Vector& edge_weight_local);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
@@ -126,7 +132,7 @@ private:
     int num_procs_;
 
     mfem::SparseMatrix vertex_edge_local_;
-    mfem::Vector edge_weight_local_;
+    std::vector<mfem::Vector> edge_weight_split_;
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
 
