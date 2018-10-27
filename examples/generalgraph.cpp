@@ -165,11 +165,12 @@ int main(int argc, char* argv[])
     }
     /// [Load the edge weights]
 
-    // Set up GraphUpscale
+    Graph graph(comm, global_vertex_edge, edge_weight);
+
+    // Set up Upscale
     {
         /// [Upscale]
-        GraphUpscale upscale(comm, global_vertex_edge, global_partitioning,
-                             upscale_param, edge_weight);
+        Upscale upscale(graph, nullptr, nullptr, upscale_param);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
@@ -184,7 +185,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
+            rhs_u_fine = graph.ReadVertexVector(FiedlerFileName);
         }
 
         mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
@@ -210,7 +211,7 @@ int main(int argc, char* argv[])
 
         if (save_fiedler)
         {
-            upscale.WriteVertexVector(rhs_u_fine, FiedlerFileName);
+            graph.WriteVertexVector(rhs_u_fine, FiedlerFileName);
         }
     }
 

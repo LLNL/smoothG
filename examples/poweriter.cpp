@@ -56,12 +56,12 @@ int main(int argc, char* argv[])
     // Global Input Information
     constexpr auto ve_filename = "../../graphdata/vertex_edge_sample.txt";
     constexpr auto rhs_filename = "../../graphdata/fiedler_sample.txt";
-    const auto vertex_edge = ReadVertexEdge(ve_filename);
+    const Graph graph(comm, ReadVertexEdge(ve_filename));
 
     // Power Iteration With Upscale Operators
     {
         // Upscaler
-        const GraphUpscale upscale(comm, vertex_edge, param);
+        const Upscale upscale(graph, nullptr, nullptr, param);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);
@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
         upscale.PrintInfo();
 
         // Read and normalize true Fiedler vector
-        Vector true_sol = upscale.ReadVertexVector(rhs_filename);
+        Vector true_sol = graph.ReadVertexVector(rhs_filename);
         true_sol /= ParNormlp(true_sol, 2, comm);
 
         // Power Iteration for each Operator

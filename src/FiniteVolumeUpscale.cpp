@@ -32,11 +32,10 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix* edge_boundary_att,
                                          const mfem::Array<int>* ess_attr,
                                          const UpscaleParameters& param)
-    : Upscale(comm, vertex_edge.Height(), param.hybridization),
+    : Upscale(comm, vertex_edge.Height(), param),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
-      ess_attr_(ess_attr),
-      param_(param)
+      ess_attr_(ess_attr)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -129,11 +128,10 @@ FiniteVolumeUpscale::FiniteVolumeUpscale(MPI_Comm comm,
                                          const mfem::SparseMatrix* edge_boundary_att,
                                          const mfem::Array<int>* ess_attr,
                                          const UpscaleParameters& param)
-    : Upscale(comm, vertex_edge.Height(), param.hybridization),
+    : Upscale(comm, vertex_edge.Height(), param),
       edge_d_td_(edge_d_td),
       edge_boundary_att_(edge_boundary_att),
-      ess_attr_(ess_attr),
-      param_(param)
+      ess_attr_(ess_attr)
 {
     mfem::StopWatch chrono;
     chrono.Start();

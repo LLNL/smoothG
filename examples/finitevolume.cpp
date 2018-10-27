@@ -173,16 +173,15 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
+    Graph graph(vertex_edge, *edge_d_td, weight);
+
     // Create Upscaler and Solve
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                                  &edge_boundary_att, &ess_attr, upscale_param);
+    Upscale upscale(graph, partitioning, &edge_boundary_att, &ess_attr, upscale_param);
 
-    fvupscale.MakeFineSolver();
+    upscale.PrintInfo();
+    upscale.ShowSetupTime();
 
-    fvupscale.PrintInfo();
-    fvupscale.ShowSetupTime();
-
-    mfem::BlockVector rhs_fine(fvupscale.GetBlockVector(0));
+    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
@@ -190,10 +189,10 @@ int main(int argc, char* argv[])
     std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
     for (int level = 0; level < upscale_param.max_levels; ++level)
     {
-        fvupscale.Solve(level, rhs_fine, sol[level]);
-        fvupscale.ShowSolveInfo(level);
+        upscale.Solve(level, rhs_fine, sol[level]);
+        upscale.ShowSolveInfo(level);
 
-        auto error_info = fvupscale.ComputeErrors(sol[level], sol[0]);
+        auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
 
         if (level > 0 && myid == 0)
         {

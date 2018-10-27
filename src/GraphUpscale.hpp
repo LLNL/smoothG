@@ -74,10 +74,6 @@ private:
               const mfem::Vector& weight);
 
     std::unique_ptr<smoothg::Graph> graph_;
-
-    const int global_edges_;
-    const int global_vertices_;
-    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg

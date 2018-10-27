@@ -37,6 +37,30 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
+    Upscale(const Graph& graph,
+            const mfem::SparseMatrix& w_block,
+            const mfem::Array<int>& partitioning,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
+    Upscale(const Graph& graph,
+            const mfem::Array<int>& partitioning,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
+    Upscale(const Graph& graph,
+            const mfem::SparseMatrix& w_block,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
+    Upscale(const Graph& graph,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
     /**
        @brief Apply the upscaling.
 
@@ -172,12 +196,26 @@ public:
         return coarsener_[level]->get_Pu();
     }
 
+    /// Create Fine Level Solver
+    void MakeFineSolver();
+
+    void MakeSolver(int level);
+
+    /// coeff should have the size of the number of *vertices* in the fine graph
+    void RescaleFineCoefficient(const mfem::Vector& coeff);
+
+    /// coeff should have the size of the number of *aggregates*
+    /// in the coarse graph
+    void RescaleCoarseCoefficient(const mfem::Vector& coeff);
+
 protected:
-    Upscale(MPI_Comm comm, int size, bool use_hybridization = false)
-        : Operator(size), comm_(comm), setup_time_(0.0), use_hybridization_(use_hybridization)
+    Upscale(MPI_Comm comm, int size, const UpscaleParameters& param = UpscaleParameters())
+        : Operator(size), comm_(comm), setup_time_(0.0), param_(param)
     {
         MPI_Comm_rank(comm_, &myid_);
     }
+
+    void Init(const Graph& graph, const mfem::Array<int>& partitioning);
 
     void MakeVectors(int level)
     {
@@ -197,14 +235,16 @@ protected:
 
     double setup_time_;
 
-    const bool use_hybridization_;
-
     std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
     /// why exactly is this mutable?
     mutable std::vector<mfem::Vector> constant_rep_;
 
+    const mfem::SparseMatrix* edge_boundary_att_;
+    const mfem::Array<int>* ess_attr_;
+
+    const UpscaleParameters& param_;
 private:
     void SetOperator(const mfem::Operator& op) {};
 };

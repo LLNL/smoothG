@@ -86,9 +86,8 @@ private:
     const mfem::HypreParMatrix& edge_d_td_;
     const mfem::SparseMatrix* edge_boundary_att_;
     const mfem::Array<int>* ess_attr_;
-    //std::vector<double> ess_data;
 
-    const UpscaleParameters& param_;
+    //std::vector<double> ess_data;
 };
 
 } // namespace smoothg

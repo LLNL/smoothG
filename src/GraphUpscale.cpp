@@ -28,10 +28,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_verte
                            const mfem::Array<int>& partitioning,
                            const UpscaleParameters& param,
                            const mfem::Vector& global_weight)
-    : Upscale(comm, global_vertex_edge.Height()),
-      global_edges_(global_vertex_edge.Width()),
-      global_vertices_(global_vertex_edge.Height()),
-      param_(param)
+    : Upscale(comm, global_vertex_edge.Height(), param)
 {
     Init(global_vertex_edge, partitioning, global_weight);
 }
@@ -39,10 +36,7 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_verte
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& global_vertex_edge,
                            const UpscaleParameters& param,
                            const mfem::Vector& global_weight)
-    : Upscale(comm, global_vertex_edge.Height()),
-      global_edges_(global_vertex_edge.Width()),
-      global_vertices_(global_vertex_edge.Height()),
-      param_(param)
+    : Upscale(comm, global_vertex_edge.Height(), param)
 {
     // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
     // obtain the same global partition from metis?
