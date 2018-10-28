@@ -136,7 +136,7 @@ void HybridSolver::Init(
     agg_weights_ = 1.0;
 
     mfem::SparseMatrix edgedof_bdrattr;
-    if (face_bdrattr)
+    if (face_bdrattr && face_bdrattr->Width())
     {
         mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
         mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, *face_bdrattr);
@@ -206,7 +206,7 @@ void HybridSolver::Init(
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
     ess_multiplier_bc_ = false;
-    if (face_bdrattr && ess_edge_dofs)
+    if (face_bdrattr && face_bdrattr->Width() && ess_edge_dofs)
     {
         ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
         for (int i = 0; i < num_multiplier_dofs_; i++)

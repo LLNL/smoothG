@@ -59,6 +59,15 @@ public:
           const mfem::HypreParMatrix& edge_trueedge,
           const std::vector<mfem::Vector>& edge_weight_local);
 
+    /// Move constructor
+    Graph(Graph&& other) noexcept;
+
+    /// Assignment operator
+    Graph& operator=(Graph other) noexcept;
+
+    /// Swap two graphs
+    friend void swap(Graph& lhs, Graph& rhs) noexcept;
+
     /// Read global vector from file, then distribute to local vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
 
@@ -97,10 +106,11 @@ public:
         return vertex_edge_local_.Width();
     }
 
-    MPI_Comm GetComm() const { return comm_; }
+    MPI_Comm GetComm() const { return edge_trueedge_->GetComm(); }
     ///@}
 private:
-    void Distribute(const mfem::SparseMatrix& vertex_edge_global,
+    void Distribute(MPI_Comm comm,
+                    const mfem::SparseMatrix& vertex_edge_global,
                     const mfem::Vector& edge_weight_global);
 
     /**
@@ -113,9 +123,10 @@ private:
 
        @param vertex_edge_global describes the entire unsigned global graph
     */
-    void DistributeVertexEdge(const mfem::SparseMatrix& vert_edge_global);
+    void DistributeVertexEdge(MPI_Comm comm,
+                              const mfem::SparseMatrix& vert_edge_global);
 
-    void MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge);
+    void MakeEdgeTrueEdge(MPI_Comm comm, int myid, const mfem::SparseMatrix& proc_edge);
 
     mfem::Vector DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
 
@@ -126,10 +137,6 @@ private:
 
     void WriteVector(const mfem::Vector& vect, const std::string& filename,
                      int global_size, const mfem::Array<int>& local_to_global) const;
-
-    MPI_Comm comm_;
-    int myid_;
-    int num_procs_;
 
     mfem::SparseMatrix vertex_edge_local_;
     std::vector<mfem::Vector> edge_weight_split_;

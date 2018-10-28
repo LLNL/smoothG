@@ -558,7 +558,7 @@ void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)
     rhs_.resize(param_.max_levels);
     sol_.resize(param_.max_levels);
     std::vector<GraphTopology> gts;
-    gts.emplace_back(graph, partitioning);
+    gts.emplace_back(graph, partitioning, edge_boundary_att_);
 
     // coarser levels: topology
     for (int level = 2; level < param_.max_levels; ++level)
@@ -595,7 +595,10 @@ void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)
 void Upscale::MakeFineSolver()
 {
     mfem::Array<int> marker;
-    BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
+    if (edge_boundary_att_)
+    {
+        BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
+    }
 
     if (!solver_[0])
     {
@@ -620,7 +623,10 @@ void Upscale::MakeFineSolver()
                     Mref.EliminateRow(mm, set_diag);
                 }
             }
-            Dref.EliminateCols(marker);
+            if (marker.Size())
+            {
+                Dref.EliminateCols(marker);
+            }
             if (!w_exists && myid_ == 0)
             {
                 Dref.EliminateRow(0);
@@ -634,19 +640,22 @@ void Upscale::MakeFineSolver()
 void Upscale::MakeSolver(int level)
 {
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
-    mfem::Array<int> marker(Dref.Width());
-    marker = 0;
+    mfem::Array<int> marker;
 
-    MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
-            coarsener_[level - 1]->construct_face_facedof_table(),
-            *ess_attr_, marker);
+    if (edge_boundary_att_)
+    {
+        marker.SetSize(Dref.Width());
+        MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
+                           coarsener_[level - 1]->construct_face_facedof_table(),
+                           *ess_attr_, marker);
+    }
 
     if (param_.hybridization) // Hybridization solver
     {
         auto face_bdratt = coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
         solver_[level] = make_unique<HybridSolver>(
-                    comm_, GetMatrix(level), *coarsener_[level - 1],
-                &face_bdratt, &marker, 0, param_.saamge_param);
+                             comm_, GetMatrix(level), *coarsener_[level - 1],
+                             &face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -658,9 +667,10 @@ void Upscale::MakeSolver(int level)
             if (marker[mm])
                 Mref.EliminateRow(mm, true);
         }
-
-        Dref.EliminateCols(marker);
-
+        if (marker.Size())
+        {
+            Dref.EliminateCols(marker);
+        }
         solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level));
     }
     MakeVectors(level);

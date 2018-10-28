@@ -34,90 +34,115 @@ namespace smoothg
 Graph::Graph(MPI_Comm comm,
              const mfem::SparseMatrix& vertex_edge_global,
              const mfem::Vector& edge_weight_global)
-    : comm_(comm)
 {
-    MPI_Comm_size(comm_, &num_procs_);
-    MPI_Comm_rank(comm_, &myid_);
-
-    Distribute(vertex_edge_global, edge_weight_global);
+    Distribute(comm, vertex_edge_global, edge_weight_global);
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
              const mfem::Vector& edge_weight_local)
-    : comm_(edge_trueedge.GetComm()), vertex_edge_local_(vertex_edge_local)
+    : vertex_edge_local_(vertex_edge_local)
 {
-    edge_trueedge_ = make_unique<mfem::HypreParMatrix>();
-    edge_trueedge_->MakeRef(edge_trueedge);
+    // temporary work-around (TODO: make a copy function for HypreParMatrix)
+    unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
+    edge_trueedge_.reset(trueedge_edge->Transpose());
+
     SplitEdgeWeight(edge_weight_local);
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
-      const mfem::HypreParMatrix& edge_trueedge,
-      const std::vector<mfem::Vector>& edge_weight_split)
-    : comm_(edge_trueedge.GetComm()), vertex_edge_local_(vertex_edge_local),
-      edge_weight_split_(edge_weight_split)
+             const mfem::HypreParMatrix& edge_trueedge,
+             const std::vector<mfem::Vector>& edge_weight_split)
+    : vertex_edge_local_(vertex_edge_local), edge_weight_split_(edge_weight_split)
 {
-    edge_trueedge_ = make_unique<mfem::HypreParMatrix>();
-    edge_trueedge_->MakeRef(edge_trueedge);
+    // temporary work-around (TODO: make a copy function for HypreParMatrix)
+    unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
+    edge_trueedge_.reset(trueedge_edge->Transpose());
 }
 
-void Graph::Distribute(const mfem::SparseMatrix& vertex_edge_global,
+Graph::Graph(Graph&& other) noexcept
+{
+    swap(*this, other);
+}
+
+Graph& Graph::operator=(Graph other) noexcept
+{
+    swap(*this, other);
+
+    return *this;
+}
+
+void swap(Graph& lhs, Graph& rhs) noexcept
+{
+    lhs.vertex_edge_local_.Swap(rhs.vertex_edge_local_);
+    std::swap(lhs.edge_weight_split_, rhs.edge_weight_split_);
+    std::swap(lhs.edge_trueedge_, rhs.edge_trueedge_);
+    std::swap(lhs.vertex_trueedge_, rhs.vertex_trueedge_);
+
+    mfem::Swap(lhs.vert_loc_to_glo_, rhs.vert_loc_to_glo_);
+    mfem::Swap(lhs.edge_loc_to_glo_, rhs.edge_loc_to_glo_);
+    mfem::Swap(lhs.vertex_starts_, rhs.vertex_starts_);
+}
+
+void Graph::Distribute(MPI_Comm comm,
+                       const mfem::SparseMatrix& vertex_edge_global,
                        const mfem::Vector& edge_weight_global)
 {
-    DistributeVertexEdge(vertex_edge_global);
+    DistributeVertexEdge(comm, vertex_edge_global);
     mfem::Vector edge_weight_local = DistributeEdgeWeight(edge_weight_global);
     SplitEdgeWeight(edge_weight_local);
 }
 
-void Graph::DistributeVertexEdge(const mfem::SparseMatrix& vert_edge_global)
+void Graph::DistributeVertexEdge(MPI_Comm comm,
+                                 const mfem::SparseMatrix& vert_edge_global)
 {
     MFEM_VERIFY(HYPRE_AssumedPartitionCheck(),
                 "this method can not be used without assumed partition");
 
+    int num_procs;
+    int myid;
+    MPI_Comm_size(comm, &num_procs);
+    MPI_Comm_rank(comm, &myid);
+
     mfem::SparseMatrix vert_vert = AAt(vert_edge_global);
     mfem::Array<int> partition;
-    Partition(vert_vert, partition, num_procs_);
+    Partition(vert_vert, partition, num_procs);
 
-    // Construct the relation table processor_vertex from global partition
-    mfem::SparseMatrix proc_vert = PartitionToMatrix(partition, num_procs_);
-
-    // Construct vertex local to global index array
-    int nvertices_local = proc_vert.RowSize(myid_);
-    mfem::Array<int> vert_l2g(proc_vert.GetRowColumns(myid_), nvertices_local);
-    vert_l2g.Copy(vert_loc_to_glo_);
-
-    // Compute edge_proc relation (for constructing edge to true edge later)
+    // Construct processor to vertex/edge from global partition
+    mfem::SparseMatrix proc_vert = PartitionToMatrix(partition, num_procs);
     mfem::SparseMatrix proc_edge = smoothg::Mult(proc_vert, vert_edge_global);
     proc_edge.SortColumnIndices(); // TODO: this may not be needed once SEC is fixed
 
-    mfem::Array<int> edge_l2g(proc_edge.GetRowColumns(myid_), proc_edge.RowSize(myid_));
-    edge_l2g.Copy(edge_loc_to_glo_);
+    // Construct vertex/edge local to global index array
+    GetTableRowCopy(proc_vert, myid, vert_loc_to_glo_);
+    GetTableRowCopy(proc_edge, myid, edge_loc_to_glo_);
 
     // Extract local submatrix of the global vertex to edge relation table
     auto tmp = ExtractRowAndColumns(vert_edge_global, vert_loc_to_glo_, edge_loc_to_glo_);
     vertex_edge_local_.Swap(tmp);
 
-    MakeEdgeTrueEdge(proc_edge);
+    MakeEdgeTrueEdge(comm, myid, proc_edge);
 
     // Compute vertex_trueedge (needed for redistribution)
-//    GenerateOffsets(comm_, vertex_edge_local_.Height(), vertex_starts_);
-//    vertex_trueedge_.reset(
-//        edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
+    GenerateOffsets(comm, vertex_edge_local_.Height(), vertex_starts_);
+    //    vertex_trueedge_.reset(
+    //        edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
 }
 
-void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
+void Graph::MakeEdgeTrueEdge(MPI_Comm comm, int myid, const mfem::SparseMatrix& proc_edge)
 {
-    int nedges_local = proc_edge.RowSize(myid_);
+    const int num_procs = proc_edge.Height();
+    const int nedges_local = proc_edge.RowSize(myid);
+
     mfem::SparseMatrix edge_proc = smoothg::Transpose(proc_edge);
 
     // Count number of true edges in each processor
     int ntedges_global = proc_edge.Width();
-    mfem::Array<int> tedge_couters(num_procs_ + 1);
+    mfem::Array<int> tedge_couters(num_procs + 1);
     tedge_couters = 0;
     for (int i = 0; i < ntedges_global; i++)
         tedge_couters[edge_proc.GetRowColumns(i)[0] + 1]++;
-    int ntedges_local = tedge_couters[myid_ + 1];
+    int ntedges_local = tedge_couters[myid + 1];
     tedge_couters.PartialSum();
     assert(tedge_couters.Last() == ntedges_global);
 
@@ -141,7 +166,7 @@ void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
     e_te_offd_i[0] = 0;
     std::fill_n(e_te_offd_data, nedges_local - ntedges_local, 1.0);
 
-    for (int i = num_procs_ - 1; i > 0; i--)
+    for (int i = num_procs - 1; i > 0; i--)
         tedge_couters[i] = tedge_couters[i - 1];
     tedge_couters[0] = 0;
 
@@ -149,8 +174,8 @@ void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
         nedges_local - ntedges_local);
 
     int tedge_new;
-    int tedge_begin = tedge_couters[myid_];
-    int tedge_end = tedge_couters[myid_ + 1];
+    int tedge_begin = tedge_couters[myid];
+    int tedge_end = tedge_couters[myid + 1];
     int diag_counter(0), offd_counter(0);
     for (int i = 0; i < nedges_local; i++)
     {
@@ -182,10 +207,10 @@ void Graph::MakeEdgeTrueEdge(const mfem::SparseMatrix& proc_edge)
     mfem::Array<HYPRE_Int> edge_starts, tedge_starts;
     mfem::Array<HYPRE_Int>* starts[2] = {&edge_starts, &tedge_starts};
     HYPRE_Int size[2] = {nedges_local, ntedges_local};
-    GenerateOffsets(comm_, 2, size, starts);
+    GenerateOffsets(comm, 2, size, starts);
 
     edge_trueedge_ = make_unique<mfem::HypreParMatrix>(
-                         comm_, edge_starts.Last(), ntedges_global, edge_starts, tedge_starts,
+                         comm, edge_starts.Last(), ntedges_global, edge_starts, tedge_starts,
                          e_te_diag_i, e_te_diag_j, e_te_diag_data,
                          e_te_offd_i, e_te_offd_j, e_te_offd_data, offd_counter, e_te_col_map);
     edge_trueedge_->CopyRowStarts();
@@ -278,7 +303,9 @@ void Graph::WriteVector(const mfem::Vector& vect, const std::string& filename,
     assert(vect.Size() <= global_size);
 
     int num_procs;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    int myid;
+    MPI_Comm_size(GetComm(), &num_procs);
+    MPI_Comm_rank(GetComm(), &myid);
 
     mfem::Vector global_local(global_size);
     global_local = 0.0;
@@ -288,7 +315,7 @@ void Graph::WriteVector(const mfem::Vector& vect, const std::string& filename,
     MPI_Scan(global_local.GetData(), global_global.GetData(), global_size,
              MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-    if (myid_ == num_procs - 1)
+    if (myid == num_procs - 1)
     {
         std::ofstream out_file(filename);
         out_file.precision(16);

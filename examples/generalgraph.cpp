@@ -138,20 +138,6 @@ int main(int argc, char* argv[])
 
     /// [Load graph from file or generate one]
 
-    /// [Partitioning]
-    mfem::Array<int> global_partitioning;
-    if (metis_agglomeration || generate_graph)
-    {
-        MetisGraphPart(global_vertex_edge, global_partitioning, num_partitions, isolate);
-    }
-    else
-    {
-        std::ifstream partFile(partition_filename);
-        global_partitioning.SetSize(nvertices_global);
-        global_partitioning.Load(partFile, nvertices_global);
-    }
-    /// [Partitioning]
-
     /// [Load the edge weights]
     mfem::Vector edge_weight(nedges_global);
     if (std::strlen(weight_filename))
@@ -167,10 +153,25 @@ int main(int argc, char* argv[])
 
     Graph graph(comm, global_vertex_edge, edge_weight);
 
+    /// [Partitioning]
+    mfem::Array<int> partitioning;
+    if (metis_agglomeration || generate_graph)
+    {
+        MetisGraphPart(graph.GetVertexToEdge(), partitioning, num_partitions, isolate);
+    }
+    else
+    {
+        // TODO: does not work in parallel
+        std::ifstream partFile(partition_filename);
+        partitioning.SetSize(nvertices_global);
+        partitioning.Load(partFile, nvertices_global);
+    }
+    /// [Partitioning]
+
     // Set up Upscale
     {
         /// [Upscale]
-        Upscale upscale(graph, nullptr, nullptr, upscale_param);
+        Upscale upscale(graph, partitioning, nullptr, nullptr, upscale_param);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

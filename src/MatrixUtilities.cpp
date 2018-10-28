@@ -627,7 +627,7 @@ mfem::SparseMatrix ExtractRowAndColumns(
 {
     mfem::Array<int> col_map(A.Width());
     col_map = -1;
-    ExtractRowAndColumns(A, rows, cols, col_map);
+    return ExtractRowAndColumns(A, rows, cols, col_map);
 }
 
 mfem::SparseMatrix ExtractRowAndColumns(
