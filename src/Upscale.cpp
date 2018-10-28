@@ -611,7 +611,6 @@ void Upscale::MakeFineSolver()
         {
             mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
             mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
-            const bool w_exists = GetMatrix(0).CheckW();
 
             for (int mm = 0; mm < marker.Size(); ++mm)
             {
@@ -626,10 +625,6 @@ void Upscale::MakeFineSolver()
             if (marker.Size())
             {
                 Dref.EliminateCols(marker);
-            }
-            if (!w_exists && myid_ == 0)
-            {
-                Dref.EliminateRow(0);
             }
 
             solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));

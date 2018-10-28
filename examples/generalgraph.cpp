@@ -67,9 +67,6 @@ int main(int argc, char* argv[])
     const char* weight_filename = "";
     args.AddOption(&weight_filename, "-w", "--weight",
                    "File to load for graph edge weights.");
-    const char* w_block_filename = "";
-    args.AddOption(&w_block_filename, "-wb", "--w_block",
-                   "File to load for w block.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -245,7 +242,7 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 
     unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
 
-    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
+    mfem::Vector M_inv;
     pM.GetDiag(M_inv);
     MinvDT->InvScaleRows(M_inv);
 
