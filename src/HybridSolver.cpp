@@ -616,6 +616,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
         saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
         saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
         saamge_param_->use_arpack, saamge_param_->do_aggregates);
+    sa_ml_data_ = saamge::ml_produce_data(*pHybridSystem_, sa_apr_, emp, mlp);
     auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
 
     prec_ = make_unique<saamge::VCycleSolver>(level->tg_data, false);
