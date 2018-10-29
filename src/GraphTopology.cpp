@@ -145,9 +145,10 @@ GraphTopology::GraphTopology(const mfem::SparseMatrix& vertex_edge,
 }
 
 GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
-    : vertex_edge_(graph_topology.vertex_edge_),
-      edge_trueedge_(graph_topology.edge_trueedge_)
+    : edge_trueedge_(graph_topology.edge_trueedge_)
 {
+    vertex_edge_.Swap(graph_topology.vertex_edge_);
+
     face_trueface_ = std::move(graph_topology.face_trueface_);
     face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
 

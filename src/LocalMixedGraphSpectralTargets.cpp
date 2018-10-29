@@ -417,14 +417,8 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
         double eval_min = 0.0;
         // Collect trace samples from eigenvectors of dual graph Laplacian
         auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_, Mloc_diag_inv_);
-        if (energy_dual_)
-        {
-            eval_min = eigs_.Compute(EES[0], EES[1], evects);
-        }
-        else
-        {
-            eval_min = eigs_.Compute(EES[0], evects);
-        }
+        eval_min = eigs_.Compute(EES, evects);
+
         CheckMinimalEigenvalue(eval_min, "edge");
 
         // Transpose all edge eigenvectors for extraction later
@@ -613,7 +607,7 @@ mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
     SharedEntityCommunication<mfem::Vector> sec_constant(comm_, *graph_topology_.face_trueface_);
     sec_constant.ReducePrepare();
 
-    unsigned int num_faces = graph_topology_.get_num_faces();
+    unsigned int num_faces = graph_topology_.NumFaces();
 
     for (unsigned int face = 0; face < num_faces; ++face)
     {
@@ -623,16 +617,11 @@ mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
         for (int k = 0; k < graph_topology_.face_Agg_.RowSize(face); ++k) //  agg : neighbors)
         {
             int agg = neighbors[k];
-            // std::vector<int> agg_vertices = agg_vertexdof_.GetIndices(agg);
             mfem::Array<int> agg_vertices;
-            mfem::Vector vals_dummy;
-            graph_topology_.Agg_vertex_.GetRow(agg, agg_vertices, vals_dummy);
+            GetTableRow(graph_topology_.Agg_vertex_, agg, agg_vertices);
             mfem::Vector sub_vect;
             constant_vect.GetSubVector(agg_vertices, sub_vect);
-            // auto sub_vect = constant_vect.GetSubVector(agg_vertices);
 
-            // constant_data.insert(std::end(constant_data), std::begin(sub_vect),
-            //  std::end(sub_vect));
             for (int l = 0; l < sub_vect.Size(); ++l)
                 constant_data.push_back(sub_vect(l));
         }

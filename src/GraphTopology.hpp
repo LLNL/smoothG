@@ -109,9 +109,9 @@ public:
     ~GraphTopology() {}
 
     /// Return number of faces in aggregated graph
-    unsigned int get_num_faces() const { return Agg_face_.Width(); }
+    unsigned int NumFaces() const { return Agg_face_.Width(); }
     /// Return number of aggregates in coarse graph
-    unsigned int get_num_aggregates() const { return Agg_face_.Height(); }
+    unsigned int NumAggs() const { return Agg_face_.Height(); }
 
     ///@name Getters for row/column partitions of tables
     ///@{
@@ -126,7 +126,7 @@ public:
     ///@}
 
     // vertex to edge table
-    const mfem::SparseMatrix& vertex_edge_;
+    mfem::SparseMatrix vertex_edge_;
 
     ///@name entity to true_entity tables for edge and face
     ///@{
@@ -155,8 +155,6 @@ private:
     void Init(const mfem::Array<int>& partition,
               const mfem::SparseMatrix* edge_boundaryattr,
               const mfem::HypreParMatrix* edge_trueedge_edge_ptr);
-
-    void BuildExtendedAggregates();
 
     mfem::Array<HYPRE_Int> vertex_start_;
     mfem::Array<HYPRE_Int> edge_start_;

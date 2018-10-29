@@ -103,11 +103,11 @@ public:
 
     unsigned int get_num_faces()
     {
-        return graph_topology_.get_num_faces();
+        return graph_topology_.NumFaces();
     }
     unsigned int get_num_aggregates()
     {
-        return graph_topology_.get_num_aggregates();
+        return graph_topology_.NumAggs();
     }
     const GraphTopology& get_GraphTopology_ref() const
     {
