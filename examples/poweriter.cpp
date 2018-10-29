@@ -21,7 +21,6 @@
 #include <mpi.h>
 
 #include "mfem.hpp"
-#include "../src/GraphUpscale.hpp"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;

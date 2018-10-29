@@ -22,8 +22,7 @@ add_library(smoothg LocalMixedGraphSpectralTargets.cpp GraphCoarsenBuilder.cpp
   GraphCoarsen.cpp utilities.cpp MinresBlockSolver.cpp HybridSolver.cpp
   sharedentitycommunication.cpp GraphTopology.cpp Mixed_GL_Coarsener.cpp
   SpectralAMG_MGL_Coarsener.cpp MetisGraphPartitioner.cpp MatrixUtilities.cpp
-  MixedMatrix.cpp LocalEigenSolver.cpp GraphGenerator.cpp GraphUpscale.cpp 
-  FiniteVolumeUpscale.cpp FiniteVolumeMLMC.cpp Upscale.cpp MixedLaplacianSolver.cpp Graph.cpp GraphSpace.cpp Sampler.cpp)
+  MixedMatrix.cpp LocalEigenSolver.cpp GraphGenerator.cpp Upscale.cpp MixedLaplacianSolver.cpp Graph.cpp GraphSpace.cpp Sampler.cpp)
 
 #####
 # library for install target

@@ -21,7 +21,7 @@
 #ifndef __SAMPLER_HPP__
 #define __SAMPLER_HPP__
 
-#include "FiniteVolumeUpscale.hpp"
+#include "Upscale.hpp"
 
 #include <random>
 #include "mfem.hpp"
