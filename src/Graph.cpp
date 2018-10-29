@@ -47,7 +47,17 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
     unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
     edge_trueedge_.reset(trueedge_edge->Transpose());
 
-    SplitEdgeWeight(edge_weight_local);
+    if (edge_weight_local)
+    {
+        SplitEdgeWeight(edge_weight_local);
+    }
+    else
+    {
+        mfem::Vector unit_edge_weight(vertex_edge_local_.Width());
+        unit_edge_weight = 1.0;
+        FixSharedEdgeWeight(unit_edge_weight);
+        SplitEdgeWeight(unit_edge_weight);
+    }
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
@@ -228,8 +238,13 @@ mfem::Vector Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
     {
         edge_weight_local = 1.0;
     }
+    FixSharedEdgeWeight(edge_weight_local);
 
-    // for edges shared by two processes, multiply the weight by 2 (M is divided by 2)
+    return edge_weight_local;
+}
+
+void Graph::FixSharedEdgeWeight(mfem::Vector& edge_weight_local)
+{
     unique_ptr<mfem::HypreParMatrix> e_te_e = AAt(*edge_trueedge_);
     mfem::SparseMatrix edge_is_shared;
     HYPRE_Int* junk_map;
@@ -243,8 +258,6 @@ mfem::Vector Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
             edge_weight_local[edge] *= 2.0;
         }
     }
-
-    return edge_weight_local;
 }
 
 void Graph::SplitEdgeWeight(const mfem::Vector& edge_weight_local)

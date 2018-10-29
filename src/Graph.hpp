@@ -130,9 +130,14 @@ private:
 
     void MakeEdgeTrueEdge(MPI_Comm comm, int myid, const mfem::SparseMatrix& proc_edge);
 
+    /// distribute edge weight of global graph to local graph (of each processor)
     mfem::Vector DistributeEdgeWeight(const mfem::Vector& edge_weight_global);
 
+    /// split edge weights based on vertices (analog to element matrix in FEM)
     void SplitEdgeWeight(const mfem::Vector& edge_weight_local);
+
+    /// For edges shared by two processes, multiply weight by 2 (M is divided by 2)
+    void FixSharedEdgeWeight(mfem::Vector& edge_weight_local);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
