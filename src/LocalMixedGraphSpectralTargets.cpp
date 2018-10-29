@@ -114,9 +114,8 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     }
 }
 
-LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(const MixedMatrix& mgL,
-    const GraphTopology& graph_topology,
-    const smoothg::UpscaleParameters& param)
+LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
+    const MixedMatrix& mgL, const GraphTopology& graph_topology, const UpscaleParameters& param)
     :
     LocalMixedGraphSpectralTargets(param.spect_tol, param.max_evects,
                                    param.dual_target, param.scaled_dual, param.energy_dual,
@@ -136,8 +135,7 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
     mfem::HypreParMatrix vertex_edge_bd(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
                                         vertdof_starts, edgedof_starts, &vertex_edge);
     unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_bd, &edge_trueedge) );
-    unique_ptr<mfem::HypreParMatrix> pedge_vertex( pvertex_edge->Transpose() );
-    unique_ptr<mfem::HypreParMatrix> pvertex_vertex( ParMult(pvertex_edge.get(), pedge_vertex.get()) );
+    unique_ptr<mfem::HypreParMatrix> pvertex_vertex( AAt(*pvertex_edge) );
 
     graph_topology_.GetAggregateStart().Copy(Agg_start_);
 
@@ -495,11 +493,11 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     // Compute face to permuted edge relation table
     auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
-    const mfem::HypreParMatrix& edge_trueedge(graph_topology_.edge_trueedge_);
+    auto& edge_trueedge = const_cast<mfem::HypreParMatrix&>(graph_topology_.edge_trueedge_);
 
-    mfem::SparseMatrix& face_edge(const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_));
-    mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_trueedge.GetGlobalNumRows(),
-                                     face_start, const_cast<int*>(edge_trueedge.RowPart()), &face_edge);
+    auto& face_edge = const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_);
+    mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_trueedge.M(),
+                                     face_start, edge_trueedge.RowPart(), &face_edge);
 
     ParMatrix face_trueedge(ParMult(&face_edge_d, &edge_trueedge));
     face_perm_edof_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
@@ -525,7 +523,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         GetExtAggDofs(DofType::edof, iAgg, ext_loc_edofs);
         GetExtAggDofs(DofType::vdof, iAgg, ext_loc_vdofs);
 
-
         // Single vertex aggregate
         if (ext_loc_edofs.Size() == 0)
         {
@@ -549,7 +546,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
             Concatenate(constant, evects, out);
             evects = out;
-
         }
 
         int nevects = evects.Width();

@@ -24,7 +24,7 @@
 #include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
-#include "GraphSpace.hpp"
+#include "Graph.hpp"
 #include "GraphCoarsenBuilder.hpp"
 
 namespace smoothg

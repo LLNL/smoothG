@@ -84,10 +84,9 @@ GraphTopology::GraphTopology(
     const Graph& graph,
     const mfem::Array<int>& partition,
     const mfem::SparseMatrix* edge_boundaryattr)
-    : vertex_edge_(graph.GetVertexToEdge()),
-      edge_trueedge_(graph.GetEdgeToTrueEdge())
+    : GraphTopology(graph.GetVertexToEdge(), graph.GetEdgeToTrueEdge(),
+                    partition, edge_boundaryattr)
 {
-    Init(partition, edge_boundaryattr, nullptr);
 }
 
 GraphTopology::GraphTopology(
@@ -428,16 +427,16 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
 }
 
 std::vector<GraphTopology> MultilevelGraphTopology(
-    mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_d_td,
-    const mfem::SparseMatrix* edge_boundaryattr, int num_levels, int coarsening_factor)
+    const Graph& graph, const mfem::SparseMatrix* edge_boundaryattr,
+    int num_levels, int coarsening_factor)
 {
     std::vector<GraphTopology> graph_topologies;
     graph_topologies.reserve(num_levels - 1);
 
     // Construct finest level graph topology
     mfem::Array<int> partitioning;
-    PartitionAAT(vertex_edge, partitioning, coarsening_factor);
-    graph_topologies.emplace_back(vertex_edge, edge_d_td, partitioning, edge_boundaryattr);
+    PartitionAAT(graph.GetVertexToEdge(), partitioning, coarsening_factor);
+    graph_topologies.emplace_back(graph, partitioning, edge_boundaryattr);
 
     // Construct coarser levels graph topology by recursion
     for (int i = 0; i < num_levels - 2; i++)

@@ -32,5 +32,4 @@
 #include "Upscale.hpp"
 #include "UpscaleOperators.hpp"
 #include "Graph.hpp"
-#include "GraphSpace.hpp"
 #include "Sampler.hpp"

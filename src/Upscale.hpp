@@ -209,11 +209,6 @@ public:
     void RescaleCoarseCoefficient(const mfem::Vector& coeff);
 
 protected:
-    Upscale(MPI_Comm comm, int size, const UpscaleParameters& param = UpscaleParameters())
-        : Operator(size), comm_(comm), setup_time_(0.0), param_(param)
-    {
-        MPI_Comm_rank(comm_, &myid_);
-    }
 
     void Init(const Graph& graph, const mfem::Array<int>& partitioning);
 

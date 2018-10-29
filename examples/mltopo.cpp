@@ -90,8 +90,10 @@ int main(int argc, char* argv[])
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
     auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh.get());
 
+    Graph graph(vertex_edge, *edge_d_td);
+
     // Build multilevel graph topology
-    auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, &edge_boundaryattr,
+    auto graph_topos = MultilevelGraphTopology(graph, &edge_boundaryattr,
                                                num_levels, coarsening_factor);
 
     // Visualize aggregates in all levels
