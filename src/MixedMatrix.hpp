@@ -330,8 +330,6 @@ private:
     mutable std::unique_ptr<mfem::Array<int>> blockOffsets_;
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
 
-    std::unique_ptr<GraphSpace> graph_space_;
-
     std::unique_ptr<MBuilder> mbuilder_;
 }; // class MixedMatrix
 

@@ -35,7 +35,6 @@ MixedMatrix::MixedMatrix(const Graph& graph, const mfem::SparseMatrix& w_block)
     : edge_d_td_(&graph.GetEdgeToTrueEdge()),
       edge_td_d_(edge_d_td_->Transpose())
 {
-    graph_space_ = make_unique<GraphSpace>(graph);
     Init(graph.GetVertexToEdge(), graph.GetEdgeWeight(), w_block);
 }
 

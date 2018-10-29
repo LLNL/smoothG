@@ -612,10 +612,10 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        sa_nparts_.size(), sa_nparts_.data(), saamge_param_->first_nu_pro, saamge_param_->nu_pro,
-        saamge_param_->nu_relax, saamge_param_->first_theta, saamge_param_->theta, polynomial_coarse,
-        saamge_param_->correct_nulspace, saamge_param_->use_arpack, saamge_param_->do_aggregates);
-    sa_ml_data_ = saamge::ml_produce_data(*pHybridSystem_, sa_apr_, emp, mlp);
+        saamge_param_->num_levels - 1, sa_nparts_.data(), saamge_param_->first_nu_pro,
+        saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
+        saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
+        saamge_param_->use_arpack, saamge_param_->do_aggregates);
     auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
 
     prec_ = make_unique<saamge::VCycleSolver>(level->tg_data, false);
