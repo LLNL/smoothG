@@ -67,7 +67,8 @@ int main(int argc, char* argv[])
         param.scaled_dual = scaled_dual;
         param.energy_dual = energy_dual;
         param.hybridization = hybridization;
-        const GraphUpscale upscale(comm, vertex_edge, coarse_factor, param);
+        param.coarse_factor = coarse_factor;
+        const GraphUpscale upscale(comm, vertex_edge, param);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);
@@ -96,7 +97,7 @@ int main(int argc, char* argv[])
 
             // Normalize
             result /= ParNormlp(result, 2, comm);
-            upscale.Orthogonalize(result);
+            upscale.Orthogonalize(0, result);
 
             // Match Signs
             double true_sign = true_sol[0] / std::fabs(true_sol[0]);

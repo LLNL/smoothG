@@ -38,7 +38,7 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
 {
 }
 
-void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
+void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(const mfem::Vector& constant_rep)
 {
     using LMGST = LocalMixedGraphSpectralTargets;
 
@@ -48,7 +48,8 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
     LMGST localtargets(param_.spect_tol, param_.max_evects, param_.dual_target,
                        param_.scaled_dual, param_.energy_dual, mgL_.GetM(),
                        mgL_.GetD(), mgL_.GetW(), graph_topology_);
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
+    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets,
+                         constant_rep);
 
     if (param_.coarse_components)
     {
@@ -62,7 +63,7 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
     graph_coarsen_->BuildInterpolation(local_edge_traces,
                                        local_spectral_vertex_targets,
                                        Pu_, Psigma_, face_facedof_table_,
-                                       *coarse_m_builder_);
+                                       *coarse_m_builder_, constant_rep);
 
     CoarseD_ = graph_coarsen_->GetCoarseD();
     CoarseW_ = graph_coarsen_->GetCoarseW();

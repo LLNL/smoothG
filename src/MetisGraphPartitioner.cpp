@@ -338,6 +338,9 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
                   mfem::Array<int>& partitioning, int coarsening_factor)
 {
+    MFEM_ASSERT(coarsening_factor > 1,
+                "coarsening_factor does not make sense!");
+
     const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
     const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
 

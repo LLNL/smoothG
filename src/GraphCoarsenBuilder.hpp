@@ -126,13 +126,22 @@ class ElementMBuilder : public CoarseMBuilder
 public:
     ElementMBuilder() {}
 
+    /// Fine level element M builder using edge weight
+    ElementMBuilder(const mfem::Vector& edge_weight,
+                    const mfem::SparseMatrix& elem_edgedof);
+
+    /// Fine level element M builder using local edge weight
+    ElementMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
+                    const mfem::SparseMatrix& elem_edgedof);
+
+    /// Setting up coarse level element M builder
     void Setup(
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
         int total_num_traces, int ncoarse_vertexdofs);
 
-    void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter);
+    void RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter);
 
     void SetTraceBubbleBlock(int l, double value);
 
@@ -150,9 +159,9 @@ public:
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
-    void SetAggToEdgeDofsTableReference(const mfem::SparseMatrix& Agg_cdof_edge)
+    void SetAggToEdgeDofsTableReference(const mfem::SparseMatrix& elem_edgedof)
     {
-        Agg_cdof_edge_ref_.MakeRef(Agg_cdof_edge);
+        elem_edgedof_.MakeRef(elem_edgedof);
     }
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
@@ -160,17 +169,17 @@ public:
 
     bool NeedsCoarseVertexDofs() { return true; }
 
-    const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return CM_el_; }
+    const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return M_el_; }
 
-    const mfem::SparseMatrix& GetAggEdgeDofTable() const { return Agg_cdof_edge_ref_; }
+    const mfem::SparseMatrix& GetElemEdgeDofTable() const { return elem_edgedof_; }
 
 private:
-    std::vector<mfem::DenseMatrix> CM_el_;
-    mfem::SparseMatrix Agg_cdof_edge_ref_;
+    std::vector<mfem::DenseMatrix> M_el_;
+    mfem::SparseMatrix elem_edgedof_;
 
-    std::vector<std::vector<int>> edge_cdof_markers_;
+    std::vector<std::vector<int>> edge_dof_markers_;
     int agg_index_;
-    int cdof_loc_;
+    int dof_loc_;
 
     mfem::Array<int> Aggs_;
 };
@@ -244,22 +253,6 @@ private:
     std::vector<mfem::DenseMatrix> comp_E_E_;
 
     bool components_built_;
-};
-
-class FineMBuilder : public MBuilder
-{
-public:
-    FineMBuilder(const mfem::Vector& edge_weight, const mfem::SparseMatrix& Agg_edgedof);
-    FineMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
-                 const mfem::SparseMatrix& Agg_edgedof);
-
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
-        const mfem::Vector& agg_weights_inverse) const;
-    const std::vector<mfem::Vector>& GetElementMatrices() const { return M_el_; }
-    const mfem::SparseMatrix& GetAggEdgeDofTable() const { return Agg_edgedof_; }
-private:
-    std::vector<mfem::Vector> M_el_;
-    const mfem::SparseMatrix& Agg_edgedof_;
 };
 
 /**

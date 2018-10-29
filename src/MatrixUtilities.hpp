@@ -241,18 +241,16 @@ void Concatenate(const mfem::Vector& a, const mfem::DenseMatrix& b,
 void Deflate(mfem::DenseMatrix& a, const mfem::Vector& v);
 
 /**
-   @brief Orthogonalize this vector from the constant vector.
+   @brief Orthogonalize this vector against wrt
 
-   This is equivalent to shifting the vector so it has zero mean.
+   In most cases, wrt is some (possibly non-nodal) representation of
+   the constant vector, in which case this funtion shifts the vector
+   so that it has zero mean.
 
-   The correct way to do this is with respect to a finite element space,
-   take an FiniteElementSpace argument or a list of volumes or something.
-   For now we assume equal size volumes, or a graph, and just take
-   vec.Sum() / vec.Size()
-
-   @todo improve this for the finite volume case
+   @param vec the vector to be modified
+   @param wrt the vector with respect to which to orthogonalize vec
 */
-void orthogonalize_from_constant(mfem::Vector& vec);
+void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt);
 
 /**
    @brief Orthogonalize this vector from the constant vector.
@@ -309,6 +307,8 @@ void GenerateOffsets(MPI_Comm comm, int N, HYPRE_Int loc_sizes[],
 */
 void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offsets);
 
+bool IsDiag(const mfem::SparseMatrix& A);
+
 /**
    @brief Solver for local saddle point problems, see the formula below.
 
@@ -323,7 +323,7 @@ void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offs
      \end{array} \right)
      =
      \left( \begin{array}{c}
-       0 \\ -g
+       -g \\ -f
      \end{array} \right)
    \f]
 
@@ -339,40 +339,65 @@ public:
        @param M matrix \f$ M \f$ in the formula in the class description
        @param D matrix \f$ D \f$ in the formula in the class description
 
-       M is assumed to be diagonal (TODO: should assert?)
        We construct the matrix \f$ A = D M^{-1} D^T \f$, eliminate the zeroth
        degree of freedom to ensure it is solvable. LU factorization of \f$ A \f$
        is computed and stored (until the object is deleted) for potential
        multiple solves.
     */
     LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
-                         const mfem::SparseMatrix& D);
+                         const mfem::SparseMatrix& D,
+                         const mfem::Vector& const_rep);
 
-    /// M is the diagonal of the matrix \f$ M \f$ in the formula above
-    LocalGraphEdgeSolver(const mfem::Vector& M, const mfem::SparseMatrix& D);
+    /// solution u will not be orthogonalized to const_rep in solving stage
+    LocalGraphEdgeSolver(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
 
     /**
-       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+       @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
 
-       @param rhs \f$ g \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma);
+    void Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sigma) const;
 
     /**
-       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+       @brief Solves \f$ (D M^{-1} D^T) u = f - D M^{-1} g \f$,
+                     \f$ \sigma = M^{-1} (D^T u + g) \f$.
 
-       @param rhs \f$ g \f$ in the formula above
+       @param rhs_sigma \f$ g \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma, mfem::Vector& sol_u);
+    void Mult(const mfem::Vector& rhs_sigma, const mfem::Vector& rhs_u,
+              mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
+
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
+
+       @param rhs_u \f$ f \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+       @param sol_u \f$ u \f$ in the formula above
+    */
+    void Mult(const mfem::Vector& rhs_u,
+              mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
+
+
 private:
-    void Init(double* M_data, const mfem::SparseMatrix& D);
+    /// Setup matrix and solver when M is diagonal
+    void Init(const mfem::Vector& M_diag, const mfem::SparseMatrix& D);
+
+    /// Setup matrix and solver when M is not diagonal
+    void Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
 
     std::unique_ptr<mfem::UMFPackSolver> solver_;
     mfem::SparseMatrix A_;
     mfem::SparseMatrix MinvDT_;
+    bool M_is_diag_;
+    mfem::Vector Minv_;
+    mfem::Array<int> offsets_;
+    mutable std::unique_ptr<mfem::BlockVector> rhs_;
+    mutable std::unique_ptr<mfem::BlockVector> sol_;
+    mfem::Vector const_rep_;
 };
 
 /**

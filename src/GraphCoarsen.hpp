@@ -96,7 +96,8 @@ public:
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,
         mfem::SparseMatrix& face_dof,
-        CoarseMBuilder& coarse_m_builder);
+        CoarseMBuilder& coarse_m_builder,
+        const mfem::Vector& constant_rep);
 
     /**
        @brief Get the aggregate to coarse vertex dofs relation table
@@ -179,7 +180,8 @@ private:
     */
     void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                          const mfem::SparseMatrix& Agg_vertex,
-                         const mfem::SparseMatrix& face_edge);
+                         const mfem::SparseMatrix& face_edge,
+                         const mfem::Vector& constant_rep);
 
     /**
        Figure out NNZ for each row of PEdges, which is to say, for each fine
@@ -232,13 +234,15 @@ private:
                    (coarse faces, coarse dofs)
        @param[out] Pedges the interpolation
        @param[out] CM_el the coarse element mass matrices in case build_coarse_relation is true
+       @param[in] constant_rep representation of vertex constants on finer level
     */
     void BuildPEdges(
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         mfem::SparseMatrix& face_cdof,
         mfem::SparseMatrix& Pedges,
-        CoarseMBuilder& coarse_mbuilder);
+        CoarseMBuilder& coarse_mbuilder,
+        const mfem::Vector& constant_rep);
 
     void BuildW(const mfem::SparseMatrix& Pvertices);
 
@@ -249,12 +253,12 @@ private:
                              const mfem::SparseMatrix& vert_Agg,
                              const mfem::SparseMatrix& edge_vert,
                              const int agg,
-                             mfem::Vector& Mloc);
+                             mfem::DenseMatrix& Mloc);
 
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix* W_proc_;
-    const FineMBuilder* fine_mbuilder_;
+    const ElementMBuilder* fine_mbuilder_;
     const GraphTopology& graph_topology_;
 
     /// Aggregate-to-coarse vertex dofs relation table

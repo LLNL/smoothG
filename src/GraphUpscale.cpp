@@ -31,26 +31,23 @@ GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_
     : Upscale(comm, vertex_edge_global.Height()),
       global_edges_(vertex_edge_global.Width()),
       global_vertices_(vertex_edge_global.Height()),
-      coarse_factor_(-1), // todo: this shouldd go in UpscaleParameters
       param_(param)
 {
     Init(vertex_edge_global, global_partitioning, global_weight);
 }
 
 GraphUpscale::GraphUpscale(MPI_Comm comm, const mfem::SparseMatrix& vertex_edge_global,
-                           int coarse_factor,
                            const UpscaleParameters& param,
                            const mfem::Vector& weight)
     : Upscale(comm, vertex_edge_global.Height()),
       global_edges_(vertex_edge_global.Width()),
       global_vertices_(vertex_edge_global.Height()),
-      coarse_factor_(coarse_factor),
       param_(param)
 {
     // TODO(gelever1) : should processor 0 partition and distribute or assume all processors will
     // obtain the same global partition from metis?
     mfem::Array<int> global_partitioning;
-    PartitionAAT(vertex_edge_global, global_partitioning, coarse_factor);
+    PartitionAAT(vertex_edge_global, global_partitioning, param_.coarse_factor);
 
     Init(vertex_edge_global, global_partitioning, weight);
 }
@@ -67,7 +64,7 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     sol_.resize(param_.max_levels);
     std::vector<GraphTopology> gts;
 
-    // fine level
+    // fine level: topology and matrices
     pgraph_ = make_unique<smoothg::ParGraph>(comm_, vertex_edge_global, global_partitioning);
     const mfem::Array<int>& partitioning = pgraph_->GetLocalPartition();
     mfem::SparseMatrix& vertex_edge = pgraph_->GetLocalVertexToEdge();
@@ -86,16 +83,34 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
     mixed_laplacians_.emplace_back(vertex_edge, local_weight, *edge_e_te_);
     gts.emplace_back(vertex_edge, *edge_e_te_, partitioning);
 
-    // coarser levels
+    // coarser levels: topology
+    for (int level = 2; level < param_.max_levels; ++level)
+    {
+        gts.emplace_back(gts.back(), param_.coarse_factor);
+    }
+
+    // coarser levels: matrices
     for (int level = 1; level < param_.max_levels; ++level)
     {
-        gts.emplace_back(gts.back(), coarse_factor_);
         coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                     mixed_laplacians_[level - 1],
                                     std::move(gts[level - 1]), param_));
-        coarsener_[level - 1]->construct_coarse_subspace();
-        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+        coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
 
+        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+        if (level < param_.max_levels - 1 || !param_.hybridization)
+        {
+            mixed_laplacians_.back().BuildM();
+        }
+    }
+
+    // fine level: solver
+    MakeFineSolver();
+    MakeVectors(0);
+
+    // coarser levels: solver
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
         if (param_.hybridization)
         {
             // coarse_components method does not store element matrices
@@ -106,16 +121,11 @@ void GraphUpscale::Init(const mfem::SparseMatrix& vertex_edge_global,
         }
         else // L2-H1 block diagonal preconditioner
         {
-            GetMatrix(level).BuildM();
-            solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+            // GetMatrix(level).BuildM();
+            solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level));
         }
-
         MakeVectors(level);
     }
-
-    // todo: MakeFineSolver() could be optional
-    // also, more disturbingly, moving it above the coarse braces breaks things
-    MakeFineSolver();
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
@@ -171,7 +181,7 @@ mfem::BlockVector GraphUpscale::ReadVertexBlockVector(const std::string& filenam
     mfem::Vector vertex_vect = ReadVector(filename, global_vertices_,
                                           pgraph_->GetVertexLocalToGlobalMap());
 
-    mfem::BlockVector vect = GetFineBlockVector();
+    mfem::BlockVector vect = GetBlockVector(0);
     vect.GetBlock(0) = 0.0;
     vect.GetBlock(1) = vertex_vect;
 
@@ -183,7 +193,7 @@ mfem::BlockVector GraphUpscale::ReadEdgeBlockVector(const std::string& filename)
     assert(pgraph_);
     mfem::Vector edge_vect = ReadVector(filename, global_edges_, pgraph_->GetEdgeLocalToGlobalMap());
 
-    mfem::BlockVector vect = GetFineBlockVector();
+    mfem::BlockVector vect = GetBlockVector(0);
     vect.GetBlock(0) = edge_vect;
     vect.GetBlock(1) = 0.0;
 

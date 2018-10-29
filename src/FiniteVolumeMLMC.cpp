@@ -54,7 +54,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(graph_topology), param_));
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
@@ -99,7 +99,6 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    std::unique_ptr<GraphTopology> graph_topology;
     if (edge_boundary_att_.Height() == 0)
     {
         GraphTopology graph_topology(ve_copy, edge_d_td_, partitioning, nullptr);
@@ -112,19 +111,19 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
         coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                     mixed_laplacians_[0], std::move(graph_topology), param_));
     }
-
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
+    MakeVectors(0);
 
     MakeCoarseSolver();
-
     MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
+/// @todo multilevel implementation
 FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::SparseMatrix& vertex_edge,
                                    const std::vector<mfem::Vector>& local_weight,
@@ -159,18 +158,18 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                 mixed_laplacians_[0], std::move(gt), param_));
-    coarsener_[0]->construct_coarse_subspace();
-
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
+    MakeVectors(0);
 
     MakeCoarseSolver();
-
     MakeVectors(1);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
+/// @todo multilevel implementation
 FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
                                    const mfem::SparseMatrix& vertex_edge,
                                    const mfem::Vector& weight,
@@ -207,13 +206,12 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
     mixed_laplacians_.emplace_back(vertex_edge, weight, edge_d_td_,
                                    MixedMatrix::DistributeWeight::False);
 
-    GraphTopology graph_topology(ve_copy, edge_d_td_, partitioning,
-                                 &edge_boundary_att_);
+    GraphTopology gt(ve_copy, edge_d_td_, partitioning, &edge_boundary_att_);
 
     coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                mixed_laplacians_[0], std::move(graph_topology),
+                                mixed_laplacians_[0], std::move(gt),
                                 param_));
-    coarsener_[0]->construct_coarse_subspace();
+    coarsener_[0]->construct_coarse_subspace(GetConstantRep(0));
 
     mixed_laplacians_.push_back(coarsener_[0]->GetCoarse());
 
@@ -229,7 +227,7 @@ FiniteVolumeMLMC::FiniteVolumeMLMC(MPI_Comm comm,
 
 void FiniteVolumeMLMC::CoarsenEssentialVertexBoundary(int special_vertex_dofs)
 {
-    const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    const mfem::SparseMatrix& Dref = GetMatrix(1).GetD();
     int new_size = Dref.Height();
 
     coarse_ess_u_data_.SetSize(new_size);
@@ -251,7 +249,7 @@ void FiniteVolumeMLMC::SetEssentialData(const mfem::Vector& new_data,
 {
     ess_u_data_ = new_data;
 
-    const mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    const mfem::SparseMatrix& Dref = GetMatrix(1).GetD();
     int new_size = Dref.Height();
 
     const int old_size = ess_u_data_.Size();
@@ -294,7 +292,7 @@ void FiniteVolumeMLMC::ModifyCoarseRHSEssential(mfem::BlockVector& coarserhs) co
 /// RescaleCoarseCoefficient with int level argument)
 void FiniteVolumeMLMC::RescaleFineCoefficient(const mfem::Vector& coeff)
 {
-    GetFineMatrix().UpdateM(coeff);
+    GetMatrix(0).UpdateM(coeff);
     if (!param_.hybridization)
     {
         ForceMakeFineSolver();
@@ -311,7 +309,7 @@ void FiniteVolumeMLMC::RescaleCoarseCoefficient(const mfem::Vector& coeff)
 {
     if (!param_.hybridization)
     {
-        GetCoarseMatrix().UpdateM(coeff);
+        GetMatrix(1).UpdateM(coeff);
         MakeCoarseSolver();
     }
     else
@@ -353,7 +351,7 @@ void EliminateColsForMultipleBC(mfem::SparseMatrix& mat,
 
 void FiniteVolumeMLMC::MakeCoarseSolver()
 {
-    mfem::SparseMatrix& Dref = GetCoarseMatrix().GetD();
+    mfem::SparseMatrix& Dref = GetMatrix(1).GetD();
     mfem::Array<int> ess_sigma_marker(Dref.Width());
     ess_sigma_marker = 0;
 
@@ -368,13 +366,13 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         auto& face_bdratt = coarsener_[0]->get_GraphTopology_ref().face_bdratt_;
         solver_[1] = make_unique<HybridSolver>(
-                         comm_, GetCoarseMatrix(), *coarsener_[0],
+                         comm_, GetMatrix(1), *coarsener_[0],
                          &face_bdratt, &ess_sigma_marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
-        GetCoarseMatrix().BuildM();
-        mfem::SparseMatrix& Mref = GetCoarseMatrix().GetM();
+        GetMatrix(1).BuildM();
+        mfem::SparseMatrix& Mref = GetMatrix(1).GetM();
         for (int mm = 0; mm < ess_sigma_marker.Size(); ++mm)
         {
             // Assume M diagonal, no ess data
@@ -385,7 +383,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
 
         if (coarse_impose_ess_u_conditions_)
         {
-            ess_u_coarserhs_correction_ = make_unique<mfem::BlockVector>(GetCoarseBlockVector());
+            ess_u_coarserhs_correction_ = make_unique<mfem::BlockVector>(GetBlockVector(1));
             *ess_u_coarserhs_correction_ = 0.0;
             if (coarse_ess_u_matrix_eliminated_)
             {
@@ -417,7 +415,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
                     }
                 }
                 W.Finalize();
-                GetCoarseMatrix().SetW(W);
+                GetMatrix(1).SetW(W);
 
                 coarse_ess_u_matrix_eliminated_ = true;
             }
@@ -431,7 +429,7 @@ void FiniteVolumeMLMC::MakeCoarseSolver()
             }
         }
 
-        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetCoarseMatrix());
+        solver_[1] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(1));
     }
 }
 
@@ -442,14 +440,14 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
     if (param_.hybridization) // Hybridization solver
     {
-        solver_[0] = make_unique<HybridSolver>(comm_, GetFineMatrix(),
+        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
                                                &edge_boundary_att_, &ess_sigma_marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
-        mfem::SparseMatrix& Mref = GetFineMatrix().GetM();
-        mfem::SparseMatrix& Dref = GetFineMatrix().GetD();
-        const bool w_exists = GetFineMatrix().CheckW();
+        mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
+        mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
+        const bool w_exists = GetMatrix(0).CheckW();
 
         for (int mm = 0; mm < ess_sigma_marker.Size(); ++mm)
         {
@@ -468,7 +466,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
 
         if (impose_ess_u_conditions_)
         {
-            ess_u_finerhs_correction_ = make_unique<mfem::BlockVector>(GetFineBlockVector());
+            ess_u_finerhs_correction_ = make_unique<mfem::BlockVector>(GetBlockVector(0));
             *ess_u_finerhs_correction_ = 0.0;
             if (ess_u_matrix_eliminated_)
             {
@@ -500,7 +498,7 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
                     }
                 }
                 W.Finalize();
-                GetFineMatrix().SetW(W);
+                GetMatrix(0).SetW(W);
                 ess_u_matrix_eliminated_ = true;
             }
 
@@ -517,38 +515,39 @@ void FiniteVolumeMLMC::ForceMakeFineSolver()
             Dref.EliminateRow(0);
         }
 
-        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetFineMatrix());
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
     }
 
     // TODO: we can actually delete ess_u_marker_, ess_u_data_ at this point, which
     // suggests they should be parameters here instead of in the constructor
 }
 
-void FiniteVolumeMLMC::SolveEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void FiniteVolumeMLMC::SolveEssU(int level,
+                                 const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(rhs_[1]);
-    assert(sol_[1]);
-    assert(coarsener_[0]);
-    assert(solver_[1]);
+    assert(rhs_[level]);
+    assert(sol_[level]);
+    assert(coarsener_[level - 1]);
+    assert(solver_[level]);
 
-    coarsener_[0]->restrict(x, *rhs_[1]);
-    // rhs_[1]->GetBlock(1) *= -1.0;
+    coarsener_[level - 1]->restrict(x, *rhs_[level]);
+    // rhs_[level]->GetBlock(1) *= -1.0;
 
-    ModifyCoarseRHSEssential(*rhs_[1]); // does not match semantics in fine case
+    ModifyCoarseRHSEssential(*rhs_[level]); // does not match semantics in fine case
 
     {
         std::ofstream out("mlmc_fv_coarserhs.vector");
-        rhs_[1]->Print(out, 1);
+        rhs_[level]->Print(out, 1);
     }
 
-    solver_[1]->Solve(*rhs_[1], *sol_[1]);
+    solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
     {
         std::ofstream out("mlmc_fv_coarsesol.vector");
-        sol_[1]->Print(out, 1);
+        sol_[level]->Print(out, 1);
     }
 
-    coarsener_[0]->interpolate(*sol_[1], y);
+    coarsener_[level - 1]->interpolate(*sol_[level], y);
 
     // Orthogonalize(y);
 }

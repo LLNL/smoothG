@@ -64,6 +64,7 @@ int main(int argc, char* argv[])
     param.scaled_dual = scaled_dual;
     param.energy_dual = energy_dual;
     param.hybridization = hybridization;
+    param.coarse_factor = coarse_factor;
     {
         const auto edge_vertex = smoothg::Transpose(vertex_edge);
         const auto vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
@@ -74,53 +75,53 @@ int main(int argc, char* argv[])
         const auto upscale = GraphUpscale(comm, vertex_edge, global_partitioning, param);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
-        const auto sol = upscale.Solve(rhs_u_fine);
+        const auto sol = upscale.Solve(1, rhs_u_fine);
 
         upscale.WriteVertexVector(sol, "sol1.out");
     }
 
     // vertex_edge and coarse factor
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor, param);
+        const auto upscale = GraphUpscale(comm, vertex_edge, param);
 
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
-        const auto sol = upscale.Solve(rhs_u_fine);
+        const auto sol = upscale.Solve(1, rhs_u_fine);
 
         upscale.WriteVertexVector(sol, "sol2.out");
     }
 
     // Using coarse space
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor, param);
+        const auto upscale = GraphUpscale(comm, vertex_edge, param);
 
         // Start at Fine Level
         const auto rhs_u_fine = upscale.ReadVertexVector(rhs_filename);
 
         // Do work at Coarse Level
-        auto rhs_u_coarse = upscale.Restrict(rhs_u_fine);
-        auto sol_u_coarse = upscale.SolveCoarse(rhs_u_coarse);
+        auto rhs_u_coarse = upscale.Restrict(1, rhs_u_fine);
+        auto sol_u_coarse = upscale.SolveAtLevel(1, rhs_u_coarse);
 
         // If multiple iterations, reuse vector
         for (int i = 0; i < 5; ++i)
         {
-            upscale.SolveCoarse(rhs_u_coarse, sol_u_coarse);
+            upscale.SolveAtLevel(1, rhs_u_coarse, sol_u_coarse);
         }
 
         // Interpolate back to Fine Level
-        auto sol_u_fine = upscale.Interpolate(sol_u_coarse);
-        upscale.Orthogonalize(sol_u_fine);
+        auto sol_u_fine = upscale.Interpolate(1, sol_u_coarse);
+        upscale.Orthogonalize(0, sol_u_fine);
 
         upscale.WriteVertexVector(sol_u_fine, "sol3.out");
     }
 
     // Comparing Error; essentially generalgraph.cpp
     {
-        const auto upscale = GraphUpscale(comm, vertex_edge, coarse_factor, param);
+        const auto upscale = GraphUpscale(comm, vertex_edge, param);
 
         mfem::BlockVector fine_rhs = upscale.ReadVertexBlockVector(rhs_filename);
 
-        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);
-        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);
+        mfem::BlockVector fine_sol = upscale.Solve(0, fine_rhs);
+        mfem::BlockVector upscaled_sol = upscale.Solve(1, fine_rhs);
 
         upscale.PrintInfo();
 
@@ -138,15 +139,15 @@ int main(int argc, char* argv[])
     // Compare Minres vs hybridization solvers
     {
         param.hybridization = false;
-        const auto minres_upscale = GraphUpscale(comm, vertex_edge, coarse_factor, param);
+        const auto minres_upscale = GraphUpscale(comm, vertex_edge, param);
 
         param.hybridization = true;
-        const auto hb_upscale = GraphUpscale(comm, vertex_edge, coarse_factor, param);
+        const auto hb_upscale = GraphUpscale(comm, vertex_edge, param);
 
         const auto rhs_u_fine = minres_upscale.ReadVertexVector(rhs_filename);
 
-        const auto minres_sol = minres_upscale.Solve(rhs_u_fine);
-        const auto hb_sol = hb_upscale.Solve(rhs_u_fine);
+        const auto minres_sol = minres_upscale.Solve(1, rhs_u_fine);
+        const auto hb_sol = hb_upscale.Solve(1, rhs_u_fine);
 
         const auto error = CompareError(comm, hb_sol, minres_sol);
 
@@ -162,7 +163,7 @@ int main(int argc, char* argv[])
         SAAMGeParam saamge_param;
         param.coarse_coefficient = false;
         param.saamge_param = &saamge_param;
-        const auto hbsa_upscale = GraphUpscale(comm, vertex_edge, coarse_factor, param);
+        const auto hbsa_upscale = GraphUpscale(comm, vertex_edge, param);
 
         const auto hbsa_sol = hbsa_upscale.Solve(rhs_u_fine);
         const auto error_sa_mr = CompareError(comm, hbsa_sol, minres_sol);

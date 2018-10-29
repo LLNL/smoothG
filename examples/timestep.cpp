@@ -222,8 +222,8 @@ int main(int argc, char* argv[])
 
         // Input Vectors
         std::vector<mfem::Array<int>> offsets(2);
-        fvupscale.FineBlockOffsets(offsets[0]);
-        fvupscale.CoarseBlockOffsets(offsets[1]);
+        fvupscale.BlockOffsets(0, offsets[0]);
+        fvupscale.BlockOffsets(1, offsets[1]);
 
         mfem::BlockVector fine_rhs(offsets[0]);
         fine_rhs.GetBlock(0) = 0.0;
@@ -249,8 +249,8 @@ int main(int argc, char* argv[])
         }
         else
         {
-            fvupscale.Restrict(fine_u, work_u);
-            fvupscale.Restrict(fine_rhs, work_rhs);
+            fvupscale.Restrict(1, fine_u, work_u);
+            fvupscale.Restrict(1, fine_rhs, work_rhs);
         }
 
         const mfem::SparseMatrix* W = fvupscale.GetMatrix(k).GetW();
@@ -283,11 +283,11 @@ int main(int argc, char* argv[])
 
             if (k == 0)
             {
-                fvupscale.SolveFine(tmp, work_u);
+                fvupscale.Solve(0, tmp, work_u);
             }
             else
             {
-                fvupscale.SolveCoarse(tmp, work_u);
+                fvupscale.SolveAtLevel(1, tmp, work_u);
             }
 
             if (myid == 0)
@@ -306,7 +306,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    fvupscale.Interpolate(work_u.GetBlock(1), fine_u.GetBlock(1));
+                    fvupscale.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
                 }
 
                 field = fine_u.GetBlock(1);
