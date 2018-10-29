@@ -43,7 +43,8 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param global_partitioning partition of global vertices
+       @param global_partitioning partition of global vertices for the first
+              graph coarsening (use upscale.coarse_factor for further coarsening)
        @param weight edge weights. if not provided, set to an empty vector
     */
     GraphUpscale(MPI_Comm comm,
@@ -57,11 +58,9 @@ public:
 
        @param comm MPI communicator
        @param vertex_edge relationship between vertices and edge
-       @param coarse_factor how coarse to partition the graph
     */
     GraphUpscale(MPI_Comm comm,
                  const mfem::SparseMatrix& vertex_edge,
-                 int coarse_factor,
                  const UpscaleParameters& param = UpscaleParameters(),
                  const mfem::Vector& weight = mfem::Vector());
 
@@ -83,7 +82,7 @@ public:
     /// Write permuted edge vector
     void WriteEdgeVector(const mfem::Vector& vect, const std::string& filename) const;
 
-    // Create Fine Level Solver
+    /// Create Fine Level Solver
     void MakeFineSolver();
 
 private:

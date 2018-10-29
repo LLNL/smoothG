@@ -94,7 +94,7 @@ MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
                          const mfem::HypreParMatrix& edge_d_td)
     : edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose())
 {
-    mbuilder_ = make_unique<FineMBuilder>(local_weight, vertex_edge);
+    mbuilder_ = make_unique<ElementMBuilder>(local_weight, vertex_edge);
     M_ = mbuilder_->BuildAssembledM();
     D_ = ConstructD(vertex_edge, edge_d_td);
     GenerateRowStarts();
@@ -151,7 +151,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
     const int nvertices = vertex_edge.Height();
 
     //    SetMFromWeightVector(weight);
-    mbuilder_ = make_unique<FineMBuilder>(weight, vertex_edge);
+    mbuilder_ = make_unique<ElementMBuilder>(weight, vertex_edge);
     M_ = mbuilder_->BuildAssembledM();
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)

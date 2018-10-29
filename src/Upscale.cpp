@@ -25,231 +25,205 @@
 namespace smoothg
 {
 
+void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    // restrict right-hand-side x
+    rhs_[0]->GetBlock(1) = x;
+    for (int i = 0; i < level; ++i)
+    {
+        coarsener_[i]->restrict(rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
+    }
+
+    // solve
+    if (level > 0)
+    {
+        rhs_[level]->GetBlock(1) *= -1.0;
+    }
+    solver_[level]->Solve(rhs_[level]->GetBlock(1), sol_[level]->GetBlock(1));
+    if (level == 0)
+    {
+        sol_[level]->GetBlock(1) *= -1.0;
+    }
+    // orthogonalize at coarse level, every level, or fine level?
+
+    // interpolate solution
+    for (int i = level - 1; i >= 0; --i)
+    {
+        coarsener_[i]->interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
+    }
+    y = sol_[0]->GetBlock(1);
+    Orthogonalize(0, y);
+}
+
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(rhs_coarse_);
-    assert(sol_coarse_);
-    assert(coarsener_);
-    assert(coarse_solver_);
-
-    coarsener_->restrict(x, rhs_coarse_->GetBlock(1));
-    rhs_coarse_->GetBlock(0) = 0.0;
-    rhs_coarse_->GetBlock(1) *= -1.0;
-
-    coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
-
-    coarsener_->interpolate(sol_coarse_->GetBlock(1), y);
-
-    Orthogonalize(y);
+    Mult(1, x, y);
 }
 
-void Upscale::Solve(const mfem::Vector& x, mfem::Vector& y) const
+void Upscale::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-    Mult(x, y);
+    Mult(level, x, y);
 }
 
-mfem::Vector Upscale::Solve(const mfem::Vector& x) const
+mfem::Vector Upscale::Solve(int level, const mfem::Vector& x) const
 {
     mfem::Vector y(x.Size());
 
-    Solve(x, y);
+    Solve(level, x, y);
 
     return y;
 }
 
-void Upscale::Solve(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(rhs_coarse_);
-    assert(sol_coarse_);
-    assert(coarsener_);
-    assert(coarse_solver_);
+    MFEM_ASSERT(
+        rhs_[0], "Multilevel vectors not built, probably because MakeVectors() not called!");
 
-    coarsener_->restrict(x, *rhs_coarse_);
-    rhs_coarse_->GetBlock(1) *= -1.0;
+    // restrict right-hand-side x
+    *rhs_[0] = x;
+    for (int i = 0; i < level; ++i)
+    {
+        coarsener_[i]->restrict(*rhs_[i], * rhs_[i + 1]);
+    }
 
-    coarse_solver_->Solve(*rhs_coarse_, *sol_coarse_);
+    // solve
+    rhs_[level]->GetBlock(1) *= -1.0; // for reasons I do not fully understand
 
-    coarsener_->interpolate(*sol_coarse_, y);
+    solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
-    Orthogonalize(y);
+    // orthogonalize at coarse level, every level, or fine level?
+    Orthogonalize(level, sol_[level]->GetBlock(1));
+
+    // interpolate solution
+    for (int i = level - 1; i >= 0; --i)
+    {
+        coarsener_[i]->interpolate(*sol_[i + 1], *sol_[i]);
+    }
+    y = *sol_[0];
 }
 
-mfem::BlockVector Upscale::Solve(const mfem::BlockVector& x) const
+mfem::BlockVector Upscale::Solve(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetFineBlockVector());
+    mfem::BlockVector y(GetBlockVector(0));
 
-    Solve(x, y);
+    Solve(level, x, y);
 
     return y;
 }
 
-void Upscale::SolveCoarse(const mfem::Vector& x, mfem::Vector& y) const
+void Upscale::SolveAtLevel(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarse_solver_);
+    assert(solver_[level]);
 
-    coarse_solver_->Solve(x, y);
-    y *= -1.0;
-    OrthogonalizeCoarse(y);
+    solver_[level]->Solve(x, y);
+    y *= -1.0; // ????
+    Orthogonalize(level, y);
 }
 
-mfem::Vector Upscale::SolveCoarse(const mfem::Vector& x) const
+mfem::Vector Upscale::SolveAtLevel(int level, const mfem::Vector& x) const
 {
-    mfem::Vector coarse_vect = GetCoarseVector();
-    SolveCoarse(x, coarse_vect);
+    mfem::Vector coarse_vect = GetVector(1);
+    SolveAtLevel(level, x, coarse_vect);
 
     return coarse_vect;
 }
 
-void Upscale::SolveCoarse(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void Upscale::SolveAtLevel(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarse_solver_);
+    assert(solver_[level]);
 
-    coarse_solver_->Solve(x, y);
+    solver_[level]->Solve(x, y);
     y *= -1.0;
-    OrthogonalizeCoarse(y);
+    Orthogonalize(level, y); // TODO: temporary literal 1!
 }
 
-mfem::BlockVector Upscale::SolveCoarse(const mfem::BlockVector& x) const
+mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetCoarseBlockVector());
-    SolveCoarse(x, coarse_vect);
+    mfem::BlockVector coarse_vect(GetBlockVector(1));
+    SolveAtLevel(level, x, coarse_vect);
 
     return coarse_vect;
 }
 
-void Upscale::SolveFine(const mfem::Vector& x, mfem::Vector& y) const
+void Upscale::Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(fine_solver_);
-
-    fine_solver_->Solve(x, y);
-    y *= -1.0;
-
-    Orthogonalize(y);
+    assert(coarsener_[level - 1]);
+    coarsener_[level - 1]->interpolate(x, y);
 }
 
-mfem::Vector Upscale::SolveFine(const mfem::Vector& x) const
+mfem::Vector Upscale::Interpolate(int level, const mfem::Vector& x) const
 {
-    mfem::Vector y(x.Size());
+    mfem::Vector fine_vect = GetVector(level - 1);
 
-    SolveFine(x, y);
-
-    return y;
-}
-
-void Upscale::SolveFine(const mfem::BlockVector& x, mfem::BlockVector& y) const
-{
-    assert(fine_solver_);
-
-    fine_solver_->Solve(x, y);
-    y *= -1.0;
-
-    Orthogonalize(y);
-}
-
-mfem::BlockVector Upscale::SolveFine(const mfem::BlockVector& x) const
-{
-    mfem::BlockVector y(GetFineBlockVector());
-
-    SolveFine(x, y);
-
-    return y;
-}
-
-void Upscale::Interpolate(const mfem::Vector& x, mfem::Vector& y) const
-{
-    assert(coarsener_);
-
-    coarsener_->interpolate(x, y);
-}
-
-mfem::Vector Upscale::Interpolate(const mfem::Vector& x) const
-{
-    mfem::Vector fine_vect = GetFineVector();
-
-    Interpolate(x, fine_vect);
+    Interpolate(level, x, fine_vect);
 
     return fine_vect;
 }
 
-void Upscale::Interpolate(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void Upscale::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarsener_);
+    assert(coarsener_[level - 1]);
 
-    coarsener_->interpolate(x, y);
+    coarsener_[level - 1]->interpolate(x, y);
 }
 
-mfem::BlockVector Upscale::Interpolate(const mfem::BlockVector& x) const
+mfem::BlockVector Upscale::Interpolate(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector fine_vect(GetFineBlockVector());
+    mfem::BlockVector fine_vect(GetBlockVector(level - 1));
 
-    Interpolate(x, fine_vect);
+    Interpolate(level, x, fine_vect);
 
     return fine_vect;
 }
 
-void Upscale::Restrict(const mfem::Vector& x, mfem::Vector& y) const
+void Upscale::Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-    assert(coarsener_);
+    assert(coarsener_[level - 1]);
 
-    coarsener_->restrict(x, y);
+    coarsener_[level - 1]->restrict(x, y);
 }
 
-mfem::Vector Upscale::Restrict(const mfem::Vector& x) const
+mfem::Vector Upscale::Restrict(int level, const mfem::Vector& x) const
 {
-    mfem::Vector coarse_vect = GetCoarseVector();
-    Restrict(x, coarse_vect);
+    mfem::Vector coarse_vect = GetVector(level);
+    Restrict(level, x, coarse_vect);
 
     return coarse_vect;
 }
 
-void Upscale::Restrict(const mfem::BlockVector& x, mfem::BlockVector& y) const
+void Upscale::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
-    assert(coarsener_);
+    assert(coarsener_[level - 1]);
 
-    coarsener_->restrict(x, y);
+    coarsener_[level - 1]->restrict(x, y);
 }
 
-mfem::BlockVector Upscale::Restrict(const mfem::BlockVector& x) const
+mfem::BlockVector Upscale::Restrict(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetCoarseBlockVector());
-    Restrict(x, coarse_vect);
+    mfem::BlockVector coarse_vect(GetBlockVector(level));
+    Restrict(level, x, coarse_vect);
 
     return coarse_vect;
 }
 
-void Upscale::FineBlockOffsets(mfem::Array<int>& offsets) const
+void Upscale::BlockOffsets(int level, mfem::Array<int>& offsets) const
 {
-    GetFineMatrix().GetBlockOffsets().Copy(offsets);
+    GetMatrix(level).GetBlockOffsets().Copy(offsets);
 }
 
-void Upscale::CoarseBlockOffsets(mfem::Array<int>& offsets) const
+void Upscale::TrueBlockOffsets(int level, mfem::Array<int>& offsets) const
 {
-    GetCoarseMatrix().GetBlockOffsets().Copy(offsets);
+    GetMatrix(level).GetBlockTrueOffsets().Copy(offsets);
 }
 
-void Upscale::FineTrueBlockOffsets(mfem::Array<int>& offsets) const
+void Upscale::Orthogonalize(int level, mfem::BlockVector& vect) const
 {
-    GetFineMatrix().GetBlockTrueOffsets().Copy(offsets);
+    Orthogonalize(level, vect.GetBlock(1));
 }
 
-void Upscale::CoarseTrueBlockOffsets(mfem::Array<int>& offsets) const
+void Upscale::Orthogonalize(int level, mfem::Vector& vect) const
 {
-    GetCoarseMatrix().GetBlockTrueOffsets().Copy(offsets);
-}
-
-void Upscale::Orthogonalize(mfem::Vector& vect) const
-{
-    par_orthogonalize_from_constant(vect, GetFineMatrix().GetDrowStart().Last());
-}
-
-void Upscale::Orthogonalize(mfem::BlockVector& vect) const
-{
-    Orthogonalize(vect.GetBlock(1));
-}
-
-void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
-{
-    const mfem::Vector coarse_constant_rep = GetCoarseConstantRep();
+    const mfem::Vector& coarse_constant_rep = GetConstantRep(level);
     double local_dot = (vect * coarse_constant_rep);
     double global_dot;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
@@ -261,51 +235,24 @@ void Upscale::OrthogonalizeCoarse(mfem::Vector& vect) const
     vect.Add(-global_dot / global_scale, coarse_constant_rep);
 }
 
-void Upscale::OrthogonalizeCoarse(mfem::BlockVector& vect) const
+mfem::Vector Upscale::GetVector(int level) const
 {
-    OrthogonalizeCoarse(vect.GetBlock(1));
+    const auto& offsets = GetMatrix(level).GetBlockOffsets();
+    const int vsize = offsets[2] - offsets[1];
+
+    return mfem::Vector(vsize);
 }
 
-mfem::Vector Upscale::GetCoarseVector() const
+mfem::BlockVector Upscale::GetBlockVector(int level) const
 {
-    const auto& offsets = GetCoarseMatrix().GetBlockOffsets();
-    const int coarse_vsize = offsets[2] - offsets[1];
-
-    return mfem::Vector(coarse_vsize);
-}
-
-mfem::Vector Upscale::GetFineVector() const
-{
-    const auto& offsets = GetFineMatrix().GetBlockOffsets();
-    const int fine_vsize = offsets[2] - offsets[1];
-
-    return mfem::Vector(fine_vsize);
-}
-
-mfem::BlockVector Upscale::GetCoarseBlockVector() const
-{
-    const auto& offsets = GetCoarseMatrix().GetBlockOffsets();
+    const auto& offsets = GetMatrix(level).GetBlockOffsets();
 
     return mfem::BlockVector(offsets);
 }
 
-mfem::BlockVector Upscale::GetFineBlockVector() const
+mfem::BlockVector Upscale::GetTrueBlockVector(int level) const
 {
-    const auto& offsets = GetFineMatrix().GetBlockOffsets();
-
-    return mfem::BlockVector(offsets);
-}
-
-mfem::BlockVector Upscale::GetCoarseTrueBlockVector() const
-{
-    const auto& offsets = GetCoarseMatrix().GetBlockTrueOffsets();
-
-    return mfem::BlockVector(offsets);
-}
-
-mfem::BlockVector Upscale::GetFineTrueBlockVector() const
-{
-    const auto& offsets = GetFineMatrix().GetBlockTrueOffsets();
+    const auto& offsets = GetMatrix(level).GetBlockTrueOffsets();
 
     return mfem::BlockVector(offsets);
 }
@@ -322,97 +269,82 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
     return mixed_laplacians_[level];
 }
 
-MixedMatrix& Upscale::GetFineMatrix()
+const mfem::Vector& Upscale::GetConstantRep(unsigned int level) const
 {
-    return GetMatrix(0);
-}
-
-const MixedMatrix& Upscale::GetFineMatrix() const
-{
-    return GetMatrix(0);
-}
-
-MixedMatrix& Upscale::GetCoarseMatrix()
-{
-    return GetMatrix(1);
-}
-
-const MixedMatrix& Upscale::GetCoarseMatrix() const
-{
-    return GetMatrix(1);
-}
-
-const mfem::Vector& Upscale::GetCoarseConstantRep() const
-{
-    if (coarse_constant_rep_.Size() == 0)
+    for (unsigned int i = constant_rep_.size(); i < level + 1; ++i)
     {
-        mfem::Vector fine_ones = GetFineVector();
-        fine_ones = 1.0;
-        coarse_constant_rep_ = Restrict(fine_ones);
+        constant_rep_.emplace_back(GetVector(i));
+        if (i == 0)
+        {
+            constant_rep_.back() = 1.0;
+        }
+        else
+        {
+            Restrict(i, constant_rep_[i - 1], constant_rep_.back());
+        }
     }
-    return coarse_constant_rep_;
+    return constant_rep_[level];
 }
 
 void Upscale::PrintInfo(std::ostream& out) const
 {
-    // Matrix sizes, not solvers
-    int nnz_coarse = GetCoarseMatrix().GlobalNNZ();
-    int nnz_fine = GetFineMatrix().GlobalNNZ();
-
-    // True dof size
-    auto size_fine = GetFineMatrix().GetDrowStart().Last() +
-                     GetFineMatrix().GetEdgeDofToTrueDof().N();
-    auto size_coarse = GetCoarseMatrix().GetDrowStart().Last() +
-                       GetCoarseMatrix().GetEdgeDofToTrueDof().N();
-
     int num_procs;
     MPI_Comm_size(comm_, &num_procs);
 
-    auto op_comp = OperatorComplexity();
-
-    if (myid_ == 0)
+    std::stringstream tout;
     {
-        int old_precision = out.precision();
-        out.precision(3);
+        tout.precision(3);
 
-        out << "\n";
+        tout << "\n";
 
         if (num_procs > 1)
         {
-            out << "Processors: " << num_procs << "\n";
-            out << "---------------------\n";
+            tout << "Processors: " << num_procs << "\n";
+            tout << "---------------------\n";
         }
 
-        out << "Fine Matrix\n";
-        out << "---------------------\n";
-        out << "Size\t\t" << size_fine << "\n";
-        out << "NonZeros:\t" << nnz_fine << "\n";
-        out << "\n";
-        out << "Coarse Matrix\n";
-        out << "---------------------\n";
-        out << "Size\t\t" << size_coarse << "\n";
-        out << "NonZeros:\t" << nnz_coarse << "\n";
-        out << "\n";
-        out << "Op Comp:\t" << op_comp << "\n";
+        tout << "\n";
 
-        out.precision(old_precision);
+        for (unsigned int i = 0; i < mixed_laplacians_.size(); ++i)
+        {
+            tout << "Level " << i << " Matrix\n";
+            tout << "---------------------\n";
+            tout << "M Size\t\t" << GetMatrix(i).GetParallelD().N() << "\n";
+            tout << "D Size\t\t" << GetMatrix(i).GetParallelD().M() << "\n";
+            // tout << "+ Size\t\t" << GetMatrix(i).GlobalRows() << "\n";
+            tout << "NonZeros:\t" << GetMatrix(i).GlobalNNZ() << "\n";
+            tout << "\n";
+
+            if (i != 0 && solver_[i] && solver_[0])
+            {
+                double op_comp = 1.0 + (solver_[i]->GetNNZ() / (double) solver_[0]->GetNNZ());
+
+                tout << "Op Comp:\t" << op_comp << "\n";
+                tout << "\n";
+            }
+        }
+    }
+    if (myid_ == 0)
+    {
+        out << tout.str();
     }
 }
 
+/// @todo multilevel this implementation (relatively easy)
 double Upscale::OperatorComplexity() const
 {
-    assert(coarse_solver_);
+    assert(solver_[1]);
 
-    int nnz_coarse = coarse_solver_->GetNNZ();
+    int nnz_coarse = solver_[1]->GetNNZ();
     int nnz_fine;
 
-    if (fine_solver_)
+    if (solver_[0])
     {
-        nnz_fine = fine_solver_->GetNNZ();
+        nnz_fine = solver_[0]->GetNNZ();
     }
     else
     {
-        nnz_fine = GetFineMatrix().GlobalNNZ();
+        nnz_fine = GetMatrix(0).GlobalNNZ();
     }
 
 
@@ -423,53 +355,45 @@ double Upscale::OperatorComplexity() const
 
 void Upscale::SetPrintLevel(int print_level)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetPrintLevel(print_level);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetPrintLevel(print_level);
+        if (solver)
+            solver->SetPrintLevel(print_level);
     }
 }
 
 void Upscale::SetMaxIter(int max_num_iter)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetMaxIter(max_num_iter);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetMaxIter(max_num_iter);
+        if (solver)
+            solver->SetMaxIter(max_num_iter);
     }
 }
 
 void Upscale::SetRelTol(double rtol)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetRelTol(rtol);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetRelTol(rtol);
+        if (solver)
+            solver->SetRelTol(rtol);
     }
 }
 
 void Upscale::SetAbsTol(double atol)
 {
-    assert(coarse_solver_);
-    coarse_solver_->SetAbsTol(atol);
-
-    if (fine_solver_)
+    for (auto& solver : solver_)
     {
-        fine_solver_->SetAbsTol(atol);
+        if (solver)
+            solver->SetAbsTol(atol);
     }
 }
 
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,
                                            const mfem::BlockVector& fine_sol) const
 {
-    const mfem::SparseMatrix& M = GetFineMatrix().GetM();
-    const mfem::SparseMatrix& D = GetFineMatrix().GetD();
+    const mfem::SparseMatrix& M = GetMatrix(0).GetM();
+    const mfem::SparseMatrix& D = GetMatrix(0).GetD();
 
     auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
     info.push_back(OperatorComplexity());
@@ -488,27 +412,25 @@ void Upscale::ShowErrors(const mfem::BlockVector& upscaled_sol,
     }
 }
 
-void Upscale::ShowCoarseSolveInfo(std::ostream& out) const
+void Upscale::ShowSolveInfo(int level, std::ostream& out) const
 {
-    assert(coarse_solver_);
-
-    if (myid_ == 0)
+    assert(solver_[level]);
+    std::string tag;
+    if (level == 0)
+        tag = "Fine";
+    else if (level == 1)
+        tag = "Coarse1";
+    else
     {
-        out << "\n";
-        out << "Coarse Solve Time:       " << coarse_solver_->GetTiming() << "\n";
-        out << "Coarse Solve Iterations: " << coarse_solver_->GetNumIterations() << "\n";
+        std::stringstream out;
+        out << "Level" << level;
+        tag = out.str();
     }
-}
-
-void Upscale::ShowFineSolveInfo(std::ostream& out) const
-{
-    assert(fine_solver_);
-
     if (myid_ == 0)
     {
         out << "\n";
-        out << "Fine Solve Time:         " << fine_solver_->GetTiming() << "\n";
-        out << "Fine Solve Iterations:   " << fine_solver_->GetNumIterations() << "\n";
+        out << tag << " Solve Time:         " << solver_[level]->GetTiming() << "\n";
+        out << tag << " Solve Iterations:   " << solver_[level]->GetNumIterations() << "\n";
     }
 }
 
@@ -521,37 +443,54 @@ void Upscale::ShowSetupTime(std::ostream& out) const
     }
 }
 
-double Upscale::GetCoarseSolveTime() const
+double Upscale::GetSolveTime(int level) const
 {
-    assert(coarse_solver_);
-
-    return coarse_solver_->GetTiming();
+    assert(solver_[level]);
+    return solver_[level]->GetTiming();
 }
 
-double Upscale::GetFineSolveTime() const
+int Upscale::GetSolveIters(int level) const
 {
-    assert(fine_solver_);
-
-    return fine_solver_->GetTiming();
-}
-
-int Upscale::GetCoarseSolveIters() const
-{
-    assert(coarse_solver_);
-
-    return coarse_solver_->GetNumIterations();
-}
-
-int Upscale::GetFineSolveIters() const
-{
-    assert(fine_solver_);
-
-    return fine_solver_->GetNumIterations();
+    assert(solver_[level]);
+    return solver_[level]->GetNumIterations();
 }
 
 double Upscale::GetSetupTime() const
 {
     return setup_time_;
+}
+
+void Upscale::DumpDebug(const std::string& prefix) const
+{
+    int counter = 0;
+    for (auto& ml : mixed_laplacians_)
+    {
+        std::stringstream s;
+        s << prefix << "M" << counter << ".sparsematrix";
+        std::ofstream outM(s.str().c_str());
+        outM << std::scientific << std::setprecision(15);
+        ml.GetM().Print(outM, 1);
+        s.str("");
+        s << prefix << "D" << counter++ << ".sparsematrix";
+        std::ofstream outD(s.str().c_str());
+        outD << std::scientific << std::setprecision(15);
+        ml.GetD().Print(outD, 1);
+    }
+
+    counter = 0;
+    for (auto& c : coarsener_)
+    {
+        std::stringstream s;
+        s << prefix << "Psigma" << counter << ".sparsematrix";
+        std::ofstream outPsigma(s.str().c_str());
+        outPsigma << std::scientific << std::setprecision(15);
+        c->get_Psigma().Print(outPsigma, 1);
+        s.str("");
+        s << prefix << "Pu" << counter++ << ".sparsematrix";
+        std::ofstream outPu(s.str().c_str());
+        outPu << std::scientific << std::setprecision(15);
+        c->get_Pu().Print(outPu, 1);
+    }
 }
 
 } // namespace smoothg

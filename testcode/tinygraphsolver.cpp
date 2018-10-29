@@ -213,7 +213,9 @@ int main(int argc, char* argv[])
 
         if (!w_block)
         {
-            orthogonalize_from_constant(sol.GetBlock(1));
+            mfem::Vector one(sol.GetBlock(1).Size());
+            one = 1.0;
+            orthogonalize_from_vector(sol.GetBlock(1), one);
         }
 
         std::cout.precision(16);

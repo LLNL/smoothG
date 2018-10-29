@@ -30,6 +30,7 @@
 
 #include "mfem.hpp"
 #include "GraphTopology.hpp"
+#include "LocalEigenSolver.hpp"
 
 namespace smoothg
 {
@@ -71,6 +72,7 @@ struct SAAMGeParam
 class UpscaleParameters
 {
 public:
+    int max_levels;
     double spect_tol;
     int max_evects;
     bool dual_target;
@@ -78,21 +80,26 @@ public:
     bool energy_dual;
     bool hybridization;
     bool coarse_components;
+    int coarse_factor;
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
 
-    UpscaleParameters() : spect_tol(0.001),
+    UpscaleParameters() : max_levels(2),
+        spect_tol(0.001),
         max_evects(4),
         dual_target(false),
         scaled_dual(false),
         energy_dual(false),
         hybridization(false),
         coarse_components(false),
+        coarse_factor(64),
         saamge_param(NULL)
     {}
 
     void RegisterInOptionsParser(mfem::OptionsParser& args)
     {
+        args.AddOption(&max_levels, "--max-levels", "--max-levels",
+                       "Number of levels in multilevel hierarchy");
         args.AddOption(&max_evects, "-m", "--max-evects",
                        "Maximum eigenvectors per aggregate.");
         args.AddOption(&spect_tol, "-t", "--spect-tol",
@@ -107,6 +114,8 @@ public:
                        "--no-energy-dual", "Use energy matrix in trace generation.");
         args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
                        "--no-coarse-components", "Store trace, bubble components of coarse M.");
+        args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
+                       "Coarsening factor for metis agglomeration.");
     }
 };
 
@@ -166,9 +175,12 @@ public:
        @param local_edge_trace_targets traces of the vertex targets
        @param local_vertex_targets vectors corresponding to smallest eigenvalues
                                    on the vertex space.
+       @param constant_rep representation of constant vertex vector on finer
+                           space
     */
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
+                 std::vector<mfem::DenseMatrix>& local_vertex_targets,
+                 const mfem::Vector& constant_rep);
 private:
     /**
        @brief Solve an eigenvalue problem on each agglomerate, put the result in
@@ -191,18 +203,26 @@ private:
        @param local_edge_trace_targets (OUT)
     */
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
-                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
-
-    std::vector<mfem::SparseMatrix> BuildEdgeEigenSystem(
-        const mfem::SparseMatrix& Lloc,
-        const mfem::SparseMatrix& Dloc,
-        const mfem::Vector& Mloc_diag_inv);
+                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+                            const mfem::Vector& constant_rep);
 
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
-    void CheckMinimalEigenvalue(
-        double eval_min, int aggregate_id, std::string entity);
+    /**
+       @brief Fill onenegone partly with a constant positive value, partly with
+       a constant negative value, so that it has zero average
+
+       (on coarser levels this does something different)
+    */
+    mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
+
+    /// given an assembled vector on vertices, return extracted value on (possibly shared) faces
+    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect);
+
+    /// shared_constant expected to be an array of legth 2, just returns them
+    /// stacked on top of each other
+    mfem::Vector ConstantLocal(mfem::Vector* shared_constant);
 
     MPI_Comm comm_;
 
@@ -230,7 +250,7 @@ private:
     mfem::Array<HYPRE_Int> D_local_rowstart;
     mfem::Array<HYPRE_Int> edge_ext_start;
 
-    mfem::Array<int> colMapper;
+    mfem::Array<int> colMapper_;
 };
 
 } // namespace smoothg

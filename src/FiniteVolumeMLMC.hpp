@@ -109,7 +109,7 @@ public:
     /// hack, for solve with essential vertex boundary conditions
     void SolveFineEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const;
     /// hack
-    void SolveEssU(const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    void SolveEssU(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
 
 private:
     const mfem::Vector& weight_;

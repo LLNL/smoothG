@@ -273,7 +273,7 @@ int main(int argc, char* argv[])
     fvupscale->ShowSetupTime();
     fvupscale->MakeFineSolver();
 
-    mfem::BlockVector rhs_fine(fvupscale->GetFineBlockVector());
+    mfem::BlockVector rhs_fine(fvupscale->GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
@@ -314,13 +314,13 @@ int main(int argc, char* argv[])
 
         auto coarse_coefficient = sampler->GetCoarseCoefficient();
         fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
-        auto sol_upscaled = fvupscale->Solve(rhs_fine);
-        fvupscale->ShowCoarseSolveInfo();
+        auto sol_upscaled = fvupscale->Solve(1, rhs_fine);
+        fvupscale->ShowSolveInfo(1);
 
         auto fine_coefficient = sampler->GetFineCoefficient();
         fvupscale->RescaleFineCoefficient(fine_coefficient);
-        auto sol_fine = fvupscale->SolveFine(rhs_fine);
-        fvupscale->ShowFineSolveInfo();
+        auto sol_fine = fvupscale->Solve(0, rhs_fine);
+        fvupscale->ShowSolveInfo(0);
 
         auto error_info = fvupscale->ComputeErrors(sol_upscaled, sol_fine);
 

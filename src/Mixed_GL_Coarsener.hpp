@@ -44,7 +44,7 @@ public:
        agglomerated topology.
     */
     Mixed_GL_Coarsener(const MixedMatrix& mgL,
-                       std::unique_ptr<GraphTopology> gt)
+                       GraphTopology gt)
         : mgL_(mgL), graph_topology_(std::move(gt)) {}
 
     virtual ~Mixed_GL_Coarsener() {}
@@ -61,10 +61,10 @@ public:
        versions of the derivative matrix \f$ D \f$ and the weighting
        matrix \f$ M \f$.
     */
-    void construct_coarse_subspace()
+    void construct_coarse_subspace(const mfem::Vector& constant_rep)
     {
-        graph_coarsen_ = make_unique<GraphCoarsen>(mgL_, *graph_topology_);
-        do_construct_coarse_subspace();
+        graph_coarsen_ = make_unique<GraphCoarsen>(mgL_, graph_topology_);
+        do_construct_coarse_subspace(constant_rep);
         is_coarse_subspace_constructed_ = true;
     }
 
@@ -103,15 +103,15 @@ public:
 
     unsigned int get_num_faces()
     {
-        return graph_topology_->get_num_faces();
+        return graph_topology_.get_num_faces();
     }
     unsigned int get_num_aggregates()
     {
-        return graph_topology_->get_num_aggregates();
+        return graph_topology_.get_num_aggregates();
     }
     const GraphTopology& get_GraphTopology_ref() const
     {
-        return *graph_topology_;
+        return graph_topology_;
     }
     const GraphCoarsen& get_GraphCoarsen_ref() const
     {
@@ -148,7 +148,7 @@ public:
     MixedMatrix GetCoarse();
 
 private:
-    virtual void do_construct_coarse_subspace() = 0;
+    virtual void do_construct_coarse_subspace(const mfem::Vector& constant_rep) = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;
@@ -162,7 +162,7 @@ private:
 
 protected:
     const MixedMatrix& mgL_;
-    std::unique_ptr<GraphTopology> graph_topology_;
+    GraphTopology graph_topology_;
     std::unique_ptr<GraphCoarsen> graph_coarsen_;
 
     mfem::SparseMatrix face_facedof_table_;

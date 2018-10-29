@@ -140,12 +140,6 @@ void VisualizeSolution(int k,
                        const mfem::BlockVector& sol);
 
 class GraphTopology;
-void PostProcess(mfem::SparseMatrix& M_global,
-                 mfem::SparseMatrix& D_global,
-                 GraphTopology& graph_topology_,
-                 mfem::Vector& sol,
-                 mfem::Vector& solp,
-                 const mfem::Vector& rhs);
 
 /**
    @brief Build boundary attribute table from mesh.
@@ -193,8 +187,9 @@ public:
 
        @param comm the communicator over which to distribute the graph
        @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
+       @param partition_global for each vertex, indicates which agglomerate it
+              is in. Can be obtained from MetisGraphPartitioner. This class
+              will somehow localize these agglomerates to processors?
     */
     ParGraph(MPI_Comm comm,
              const mfem::SparseMatrix& vertex_edge_global,
