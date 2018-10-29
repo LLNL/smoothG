@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(1, rhs_u_fine);
-        upscale.ShowSolveInfo(1);
+
         graph.WriteVertexVector(sol, "sol1.out");
     }
 
@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(1, rhs_u_fine);
-        upscale.ShowSolveInfo(1);
+
         graph.WriteVertexVector(sol, "sol2.out");
     }
 
@@ -106,6 +106,7 @@ int main(int argc, char* argv[])
         const auto upscale = Upscale(graph, nullptr, nullptr, param);
 
         mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
+        fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = graph.ReadVertexVector(rhs_filename);
 
         mfem::BlockVector fine_sol = upscale.Solve(0, fine_rhs);
