@@ -59,6 +59,8 @@ public:
           const mfem::HypreParMatrix& edge_trueedge,
           const std::vector<mfem::Vector>& edge_weight_local);
 
+    Graph() = default;
+
     /// Move constructor
     Graph(Graph&& other) noexcept;
 

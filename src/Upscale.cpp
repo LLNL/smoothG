@@ -600,40 +600,40 @@ void Upscale::MakeFineSolver()
         BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
     }
 
-    if (!solver_[0])
+    if (param_.hybridization) // Hybridization solver
     {
-        if (param_.hybridization) // Hybridization solver
+        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
+                                               edge_boundary_att_, &marker);
+    }
+    else // L2-H1 block diagonal preconditioner
+    {
+        mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
+        mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
+
+        for (int mm = 0; mm < marker.Size(); ++mm)
         {
-            solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
-                                                   edge_boundary_att_, &marker);
+            if (marker[mm])
+            {
+                //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
+
+                const bool set_diag = true;
+                Mref.EliminateRow(mm, set_diag);
+            }
         }
-        else // L2-H1 block diagonal preconditioner
+        if (marker.Size())
         {
-            mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
-            mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
-
-            for (int mm = 0; mm < marker.Size(); ++mm)
-            {
-                if (marker[mm])
-                {
-                    //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
-
-                    const bool set_diag = true;
-                    Mref.EliminateRow(mm, set_diag);
-                }
-            }
-            if (marker.Size())
-            {
-                Dref.EliminateCols(marker);
-            }
-
-            solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
+            Dref.EliminateCols(marker);
         }
+
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
     }
 }
 
 void Upscale::MakeSolver(int level)
 {
+    // TODO: unify construction of solvers in all levels
+    assert(level > 0);
+
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
     mfem::Array<int> marker;
 

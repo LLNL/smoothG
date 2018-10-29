@@ -174,6 +174,7 @@ private:
     };
 
     // const Upscale& fvupscale_;
+    Graph graph_;
     std::shared_ptr<const Upscale> fvupscale_;
     NormalDistribution normal_distribution_;
     int fine_vector_size_;
