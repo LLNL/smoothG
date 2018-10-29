@@ -47,8 +47,6 @@ int main(int argc, char* argv[])
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid);
 
-    SpectralCoarsenerParameters coarsen_param;
-
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);

@@ -114,15 +114,13 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     }
 }
 
-LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-    const MixedMatrix& mgL,
+LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(const MixedMatrix& mgL,
     const GraphTopology& graph_topology,
-    const SpectralCoarsenerParameters& coarsen_param)
+    const smoothg::UpscaleParameters& param)
     :
-    LocalMixedGraphSpectralTargets(
-        coarsen_param.spectral_tol, coarsen_param.max_evects,
-        coarsen_param.dual_target, coarsen_param.scaled_dual, coarsen_param.energy_dual,
-        mgL.GetM(), mgL.GetD(), mgL.GetW(), graph_topology)
+    LocalMixedGraphSpectralTargets(param.spect_tol, param.max_evects,
+                                   param.dual_target, param.scaled_dual, param.energy_dual,
+                                   mgL.GetM(), mgL.GetD(), mgL.GetW(), graph_topology)
 {
 }
 
