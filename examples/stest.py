@@ -558,10 +558,10 @@ def make_tests():
 
     tests["parpoweriter"] = \
         [["mpirun", "-n", num_procs, "./poweriter"],
-         {"coarse-error": 0.20499789652195419,
-          "coarse-eval": 0.17663653207421526,
-          "fine-error": 2.9887390635842169e-05,
-          "fine-eval": 0.17545528997977797}]
+         {"coarse-error": 1.4795742061962853,
+          "coarse-eval": 0.33533401525270057,
+          "fine-error": 2.950192232309819e-05,
+          "fine-eval": 0.17545528997987314}]
 
     tests["partimestep"] = \
         [["mpirun", "-n", num_procs, "./timestep",
