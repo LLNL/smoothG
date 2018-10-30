@@ -388,17 +388,14 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
             }
         }
     }
-    else if (!use_w_)
-    {
-        if (myid_ == 0)
-        {
-            Hrhs_[0] = 0.0;
-            //mat_hybrid.EliminateRowCol(0, 0., Hrhs_);
-        }
-    }
 
     // assemble true right hand side
     multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
+
+    if (!ess_multiplier_bc_ && !use_w_ && myid_ == 0)
+    {
+        trueHrhs_[0] = 0.0;
+    }
 
     if (diagonal_scaling_.Size() > 0)
         RescaleVector(diagonal_scaling_, trueHrhs_);
@@ -642,11 +639,6 @@ void HybridSolver::BuildParallelSystemAndSolver()
             }
         }
     }
-    else if (!use_w_)
-    {
-        if (myid_ == 0)
-            HybridSystemElim_->EliminateRowCol(0);
-    }
 
     auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
                               comm_, multiplier_start_.Last(), multiplier_start_,
@@ -661,6 +653,16 @@ void HybridSolver::BuildParallelSystemAndSolver()
         ComputeScaledHybridSystem(*HybridSystem_d);
     }
     nnz_ = pHybridSystem_->NNZ();
+
+    mfem::Array<int> ess_dof;
+    if (!ess_multiplier_bc_ && !use_w_ && myid_ == 0)
+    {
+        ess_dof.Append(0);
+    }
+    mfem::HypreParVector junk_vec1(*pHybridSystem_);
+    mfem::HypreParVector junk_vec2(*pHybridSystem_);
+    pHybridSystem_->EliminateRowsCols(ess_dof, junk_vec1, junk_vec2);
+
 
     mfem::StopWatch chrono;
     chrono.Clear();

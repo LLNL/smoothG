@@ -96,7 +96,7 @@ void Visualize(const mfem::Vector& sol,
     vis_v << "keys cjl\n";
 
     MPI_Barrier(pmesh->GetComm());
-};
+}
 
 int main(int argc, char* argv[])
 {

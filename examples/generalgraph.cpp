@@ -150,13 +150,13 @@ int main(int argc, char* argv[])
 
     /// [Partitioning]
     mfem::Array<int> partitioning;
-    if (metis_agglomeration || generate_graph)
+    if (metis_agglomeration || generate_graph || num_procs > 1)
     {
-        MetisGraphPart(graph.GetVertexToEdge(), partitioning, num_partitions, isolate);
+        MetisGraphPart(graph.GetVertexToEdge(), partitioning,
+                       num_partitions / num_procs, isolate);
     }
     else
     {
-        // TODO: does not work in parallel
         std::ifstream partFile(partition_filename);
         partitioning.SetSize(nvertices_global);
         partitioning.Load(partFile, nvertices_global);

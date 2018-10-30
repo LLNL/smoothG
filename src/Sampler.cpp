@@ -97,12 +97,8 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     W_block *= cell_volume_ * kappa * kappa;
 
     graph_ = Graph(vertex_edge, edge_d_td, weight);
-    auto fvupscale_temp = std::make_shared<Upscale>(
-                              graph_, W_block, partitioning,
-                              &edge_boundary_att, &ess_attr, param);
-    fvupscale_temp->MakeFineSolver();
-    fvupscale_ = fvupscale_temp;
-
+    fvupscale_ = std::make_shared<Upscale>(graph_, W_block, partitioning,
+                                           &edge_boundary_att, &ess_attr, param);
     Initialize(dimension, kappa);
 }
 
