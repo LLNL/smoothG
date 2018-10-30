@@ -246,20 +246,20 @@ def make_tests():
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--coarse-components"],
-         {"finest-div-error": 0.66539721108640504,
-          "finest-p-error": 0.66846726286617364,
-          "finest-u-error": 0.64769209816383067,
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
     tests["parsamplegraph1-coeff-hb"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--coarse-components",
           "--hybridization"],
-         {"finest-div-error": 0.66539721108640504,
-          "finest-p-error": 0.66846726286617364,
-          "finest-u-error": 0.64769209816383067,
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.000874038778061}]
 
     tests["graph-metis"] = \
@@ -492,9 +492,9 @@ def make_tests():
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1"],
-         {"finest-div-error": 0.66539721108640504,
-          "finest-p-error": 0.66846726286617364,
-          "finest-u-error": 0.64769209816383067,
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
     tests["pargraph-metis"] = \
@@ -502,9 +502,9 @@ def make_tests():
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--metis-agglomeration"],
-         {"finest-div-error": 0.66539721108640504,
-          "finest-p-error": 0.66846726286617364,
-          "finest-u-error": 0.64769209816383067,
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
     tests["pargraph-metis-mac"] = \
@@ -521,30 +521,30 @@ def make_tests():
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
-         {"finest-div-error": 0.13454445054689845,
-          "finest-p-error": 0.14411853551571041,
-          "finest-u-error": 0.1933930718576109,
-          "operator-complexity": 1.2525774742252578}]
+         {"finest-div-error": 0.1438138616203242,
+          "finest-p-error": 0.1874559440644907,
+          "finest-u-error": 0.25470044682041143,
+          "operator-complexity": 1.2292477075229247}]
 
     tests["pargraph-hybridization"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--hybridization"],
-         {"finest-div-error": 0.13454445054689845,
-          "finest-p-error": 0.14411853551571041,
-          "finest-u-error": 0.1933930718576109,
-          "operator-complexity": 1.0136724637425256}]
+         {"finest-div-error": 0.1438138616203242,
+          "finest-p-error": 0.1874559440644907,
+          "finest-u-error": 0.25470044682041143,
+          "operator-complexity": 1.0124793314423153}]
 
     tests["pargraph-usegenerator"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--generate-graph"],
-         {"finest-div-error": 0.12808147362633718,
-          "finest-p-error": 0.1614147886897882,
-          "finest-u-error": 0.20935377374419262,
-          "operator-complexity": 1.2560974390256097}]
+         {"finest-div-error": 0.19793206480307649,
+          "finest-p-error": 0.28945297307624301,
+          "finest-u-error": 0.29617987947507896,
+          "operator-complexity": 1.1895581044189558}]
 
     tests["pargraph-usegenerator-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
