@@ -13,24 +13,26 @@
  *
  ***********************************************************************EHEADER*/
 
-/** @file smoothG.hpp
-    @brief Contains all header files for easy include
+/** @file
+
+    @brief Implements GraphSpace object.
 */
 
-#include "LocalMixedGraphSpectralTargets.hpp"
-#include "GraphCoarsen.hpp"
-#include "utilities.hpp"
-#include "HybridSolver.hpp"
-#include "MixedMatrix.hpp"
-#include "GraphTopology.hpp"
-#include "Mixed_GL_Coarsener.hpp"
-#include "SpectralAMG_MGL_Coarsener.hpp"
-#include "MinresBlockSolver.hpp"
-#include "MetisGraphPartitioner.hpp"
-#include "MatrixUtilities.hpp"
-#include "GraphGenerator.hpp"
-#include "Upscale.hpp"
-#include "UpscaleOperators.hpp"
-#include "Graph.hpp"
-#include "Sampler.hpp"
 #include "GraphSpace.hpp"
+#include "MatrixUtilities.hpp"
+
+using std::unique_ptr;
+
+namespace smoothg
+{
+
+GraphSpace::GraphSpace(const Graph& graph)
+    : graph_(graph), vertex_vdof_(SparseIdentity(graph.GetNumberOfVertices())),
+      vertex_edof_(graph.GetLocalVertexToEdge()),
+      edge_edof_(SparseIdentity(graph.GetNumberOfEdges()))
+{
+}
+
+
+} // namespace smoothg
+

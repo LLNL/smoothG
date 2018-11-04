@@ -13,24 +13,43 @@
  *
  ***********************************************************************EHEADER*/
 
-/** @file smoothG.hpp
-    @brief Contains all header files for easy include
-*/
+/** @file
 
-#include "LocalMixedGraphSpectralTargets.hpp"
-#include "GraphCoarsen.hpp"
-#include "utilities.hpp"
-#include "HybridSolver.hpp"
-#include "MixedMatrix.hpp"
+    @brief Contains GraphSpace class.
+ */
+
+#ifndef __GRAPHSPACE_HPP__
+#define __GRAPHSPACE_HPP__
+
+#include "mfem.hpp"
 #include "GraphTopology.hpp"
-#include "Mixed_GL_Coarsener.hpp"
-#include "SpectralAMG_MGL_Coarsener.hpp"
-#include "MinresBlockSolver.hpp"
-#include "MetisGraphPartitioner.hpp"
-#include "MatrixUtilities.hpp"
-#include "GraphGenerator.hpp"
-#include "Upscale.hpp"
-#include "UpscaleOperators.hpp"
-#include "Graph.hpp"
-#include "Sampler.hpp"
-#include "GraphSpace.hpp"
+
+namespace smoothg
+{
+
+/**
+   @brief Contains information about degrees of freedom to vertex/edge
+*/
+class GraphSpace
+{
+public:
+    /**
+       @brief Create a mixed graph in parallel mode.
+
+       @param graph_topology
+    */
+    GraphSpace(const Graph& graph);
+
+private:
+    const Graph& graph_;
+
+    mfem::SparseMatrix vertex_vdof_;
+    mfem::SparseMatrix vertex_edof_;
+    mfem::SparseMatrix edge_edof_;
+
+    std::shared_ptr<mfem::HypreParMatrix> edof_etruedof_;
+}; // class GraphSpace
+
+} // namespace smoothg
+
+#endif /* __GRAPHSPACE_HPP__ */
