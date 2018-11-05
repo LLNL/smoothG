@@ -26,13 +26,23 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-GraphSpace::GraphSpace(const Graph& graph)
-    : graph_(graph), vertex_vdof_(SparseIdentity(graph.GetNumberOfVertices())),
-      vertex_edof_(graph.GetLocalVertexToEdge()),
-      edge_edof_(SparseIdentity(graph.GetNumberOfEdges()))
+GraphSpace::GraphSpace(Graph graph)
+    : vertex_vdof_(SparseIdentity(graph.NumVertices())),
+      vertex_edof_(graph.GetVertexToEdge(), false),
+      edge_edof_(SparseIdentity(graph.NumEdges())), graph_(std::move(graph))
 {
+    edof_trueedof_ = std::make_shared<mfem::HypreParMatrix>();
+    edof_trueedof_->MakeRef(graph_.GetEdgeToTrueEdge());
 }
 
+GraphSpace::GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
+                       mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
+                       std::shared_ptr<mfem::HypreParMatrix> edof_trueedof)
+    : vertex_vdof_(std::move(vertex_vdof)), vertex_edof_(std::move(vertex_edof)),
+      edge_edof_(std::move(edge_edof)), edof_trueedof_(std::move(edof_trueedof)),
+      graph_(std::move(graph))
+{
+}
 
 } // namespace smoothg
 

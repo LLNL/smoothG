@@ -34,20 +34,32 @@ class GraphSpace
 {
 public:
     /**
-       @brief Create a mixed graph in parallel mode.
+       @brief Construct GraphSpace from Graph, entity and dof are 1-1
 
-       @param graph_topology
+       @param graph The graph on which the GraphSpace is based.
     */
-    GraphSpace(const Graph& graph);
+    GraphSpace(Graph graph);
+
+    /**
+       @brief Constructor that essentially collect all members from input
+    */
+    GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
+               mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
+               std::shared_ptr<mfem::HypreParMatrix> edof_trueedof);
+
+    const mfem::SparseMatrix& GetVertexToVDof() const { return vertex_vdof_; }
+    const mfem::SparseMatrix& GetVertexToEDof() const { return vertex_edof_; }
+    const mfem::SparseMatrix& GetEdgeToEDof() const { return edge_edof_; }
+    const mfem::HypreParMatrix& GetEDofToTrueEDof() const { return *edof_trueedof_; }
+    const Graph& GetGraph() const { return graph_; }
 
 private:
-    const Graph& graph_;
-
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix vertex_edof_;
     mfem::SparseMatrix edge_edof_;
+    std::shared_ptr<mfem::HypreParMatrix> edof_trueedof_;
 
-    std::shared_ptr<mfem::HypreParMatrix> edof_etruedof_;
+    Graph graph_;
 }; // class GraphSpace
 
 } // namespace smoothg
