@@ -251,6 +251,16 @@ def make_tests():
           "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
+    tests["parsamplegraph1-coeff-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components"],
+         {"finest-div-error": 0.63689693723000362,
+          "finest-p-error": 0.64187135487003488,
+          "finest-u-error": 0.59087512350996252,
+          "operator-complexity": 1.008739912600874}]
+
     tests["parsamplegraph1-coeff-hb"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
@@ -261,6 +271,17 @@ def make_tests():
           "finest-p-error": 0.80196594708999625,
           "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.000874038778061}]
+
+    tests["parsamplegraph1-coeff-hb-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components",
+          "--hybridization"],
+         {"finest-div-error": 0.63689693723000362,
+          "finest-p-error": 0.64187135487003488,
+          "finest-u-error": 0.59087512350996252,
+          "operator-complexity": 1.0004420643459024}]
 
     tests["graph-metis"] = \
         [["./generalgraph",
@@ -348,6 +369,13 @@ def make_tests():
           "coarse-eval": 0.17663653196285808,
           "fine-error": 2.9382710663490486e-05,
           "fine-eval": 0.17545528997990226}]
+
+    tests["poweriter-mac"] = \
+        [["./poweriter"],
+         {"coarse-error": 0.26120392031493855,
+          "coarse-eval": 0.17978705998830949,
+          "fine-error": 2.7998030058085634e-05,
+          "fine-eval": 0.17545528997985335}]
 
     tests["graph-weight"] = \
         [["./generalgraph",
@@ -497,6 +525,15 @@ def make_tests():
           "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
+    tests["parsamplegraph1-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1"],
+         {"finest-div-error": 0.63689693723000385,
+          "finest-p-error": 0.64187135487003799,
+          "finest-u-error": 0.59087512350995663,
+          "operator-complexity": 1.008739912600874}]
+
     tests["pargraph-metis"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
@@ -512,10 +549,10 @@ def make_tests():
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--metis-agglomeration"],
-         {"finest-div-error": 0.22228470008233389,
-          "finest-p-error": 0.22265174467689006,
-          "finest-u-error": 0.22168973853676807,
-          "operator-complexity": 1.016509834901651}]
+         {"finest-div-error": 0.63689693723000385,
+          "finest-p-error": 0.64187135487003799,
+          "finest-u-error": 0.59087512350995663,
+          "operator-complexity": 1.008739912600874}]
 
     tests["parsamplegraph4"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -526,6 +563,15 @@ def make_tests():
           "finest-u-error": 0.25470044682041143,
           "operator-complexity": 1.2292477075229247}]
 
+    tests["parsamplegraph4-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4"],
+         {"finest-div-error": 0.094122554052011503,
+          "finest-p-error": 0.11511310888163191,
+          "finest-u-error": 0.18119613898323036,
+          "operator-complexity": 1.1303686963130368}]
+
     tests["pargraph-hybridization"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
@@ -535,6 +581,16 @@ def make_tests():
           "finest-p-error": 0.1874559440644907,
           "finest-u-error": 0.25470044682041143,
           "operator-complexity": 1.0124793314423153}]
+
+    tests["pargraph-hybridization-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4",
+          "--hybridization"],
+         {"finest-div-error": 0.094122554052011503,
+          "finest-p-error": 0.11511310888163191,
+          "finest-u-error": 0.18119613898323036,
+          "operator-complexity": 1.0067715933613413}]
 
     tests["pargraph-usegenerator"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -551,10 +607,10 @@ def make_tests():
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--generate-graph"],
-         {"finest-div-error": 0.1070681247529167,
-          "finest-p-error": 0.10863131137013603,
-          "finest-u-error": 0.12848813745253315,
-          "operator-complexity": 1.2578874211257887}]
+         {"finest-div-error": 0.10696386867442335,
+          "finest-p-error": 0.19594367090858048,
+          "finest-u-error": 0.2468153494604973,
+          "operator-complexity": 1.1347886521134789}]
 
     tests["parpoweriter"] = \
         [["mpirun", "-n", num_procs, "./poweriter"],
@@ -562,6 +618,13 @@ def make_tests():
           "coarse-eval": 0.33533401525270057,
           "fine-error": 2.950192232309819e-05,
           "fine-eval": 0.17545528997987314}]
+
+    tests["parpoweriter-mac"] = \
+        [["mpirun", "-n", num_procs, "./poweriter"],
+         {"coarse-error": 1.3769646029608467,
+          "coarse-eval": 0.24465778499404064,
+          "fine-error": 2.9877711869866266e-05,
+          "fine-eval": 0.1754552899797806}]
 
     tests["partimestep"] = \
         [["mpirun", "-n", num_procs, "./timestep",
@@ -581,7 +644,7 @@ def make_tests():
           "--kappa", "0.01",
           "--num-samples", "2"],
          {"fine-mean-l1": 0.54961180496539375,
-          "max-p-error": 0.39696741537314961}]
+          "max-p-error": 0.39869063097389679}]
 
     if "tux" in platform.node():
         tests["veigenvector"] = \
