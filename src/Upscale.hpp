@@ -201,12 +201,9 @@ public:
 
     void MakeSolver(int level);
 
-    /// coeff should have the size of the number of *vertices* in the fine graph
-    void RescaleFineCoefficient(const mfem::Vector& coeff);
-
     /// coeff should have the size of the number of *aggregates*
-    /// in the coarse graph
-    void RescaleCoarseCoefficient(const mfem::Vector& coeff);
+    /// in the coarse graph, or *vertices* in the finest graph
+    void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
     int GetNumLevels() const { return rhs_.size(); }
     int GetNumVertices(int level) const { return rhs_[level]->GetBlock(1).Size(); }
