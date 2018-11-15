@@ -208,6 +208,9 @@ public:
     /// in the coarse graph
     void RescaleCoarseCoefficient(const mfem::Vector& coeff);
 
+    int GetNumLevels() const { return rhs_.size(); }
+    int GetNumVertices(int level) const { return rhs_[level]->GetBlock(1).Size(); }
+
 protected:
 
     void Init(const Graph& graph, const mfem::Array<int>& partitioning);

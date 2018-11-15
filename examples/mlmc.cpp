@@ -283,7 +283,7 @@ int main(int argc, char* argv[])
         std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = "
                   << num_fine_edges << ", coarse aggregates = " << num_aggs << std::endl;
     }
-    unique_ptr<TwoLevelSampler> sampler;
+    unique_ptr<MultilevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {
         sampler = make_unique<SimpleSampler>(num_fine_vertices, num_aggs);
@@ -310,12 +310,12 @@ int main(int argc, char* argv[])
 
         sampler->NewSample();
 
-        auto coarse_coefficient = sampler->GetCoarseCoefficient();
+        auto coarse_coefficient = sampler->GetCoefficient(1);
         upscale.RescaleCoarseCoefficient(coarse_coefficient);
         auto sol_upscaled = upscale.Solve(1, rhs_fine);
         upscale.ShowSolveInfo(1);
 
-        auto fine_coefficient = sampler->GetFineCoefficient();
+        auto fine_coefficient = sampler->GetCoefficient(0);
         upscale.RescaleFineCoefficient(fine_coefficient);
         auto sol_fine = upscale.Solve(0, rhs_fine);
         upscale.ShowSolveInfo(0);
