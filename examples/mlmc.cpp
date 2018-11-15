@@ -25,6 +25,9 @@
    ./mlmc --perm spe_perm.dat
 */
 
+// best multilevel command line so far (appears to create a reasonable result):
+// ./mlmc --sampler-type pde --num-samples 2 --max-levels 3 --hybridization --no-coarse-components --max-evects 1 --coarse-factor 8
+
 #include <fstream>
 #include <sstream>
 #include <mpi.h>

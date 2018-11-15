@@ -182,6 +182,8 @@ mfem::Vector& PDESampler::GetFineCoefficient()
 
    indexing: the indexing above is wrong if there is more than one dof / aggregate,
              we consider only the coefficient for the *constant* component i
+
+   @todo: not working multilevel unless restricted to one eigenvector / agg (which maybe is the only sensible case for sampling anyway?)
 */
 mfem::Vector& PDESampler::GetCoefficient(int level)
 {
