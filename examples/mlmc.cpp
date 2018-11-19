@@ -265,7 +265,7 @@ int main(int argc, char* argv[])
     }
 
     // Create Upscaler and Solve
-    Upscale upscale(*graph, partitioning, &edge_boundary_att, &ess_attr, upscale_param);
+    Upscale upscale(*graph, &partitioning, &edge_boundary_att, &ess_attr, upscale_param);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();

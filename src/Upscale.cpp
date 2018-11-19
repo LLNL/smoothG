@@ -27,7 +27,7 @@ namespace smoothg
 
 Upscale::Upscale(const Graph& graph,
                  const mfem::SparseMatrix& w_block,
-                 const mfem::Array<int>& partitioning,
+                 const mfem::Array<int>* partitioning,
                  const mfem::SparseMatrix* edge_boundary_att,
                  const mfem::Array<int>* ess_attr,
                  const UpscaleParameters& param)
@@ -38,47 +38,28 @@ Upscale::Upscale(const Graph& graph,
     chrono.Start();
 
     mixed_laplacians_.emplace_back(graph, w_block);
-    Init(graph, partitioning);
+
+    if (partitioning)
+    {
+        Init(graph, *partitioning);
+    }
+    else
+    {
+        mfem::Array<int> partition;
+        PartitionAAT(graph.GetVertexToEdge(), partition, param_.coarse_factor);
+        Init(graph, partition);
+    }
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
 Upscale::Upscale(const Graph& graph,
-                 const mfem::Array<int>& partitioning,
+                 const mfem::Array<int>* partitioning,
                  const mfem::SparseMatrix* edge_boundary_att,
                  const mfem::Array<int>* ess_attr,
                  const UpscaleParameters& param)
     : Upscale(graph, SparseIdentity(0), partitioning, edge_boundary_att, ess_attr, param)
-{
-}
-
-Upscale::Upscale(const Graph& graph,
-                 const mfem::SparseMatrix& w_block,
-                 const mfem::SparseMatrix* edge_boundary_att,
-                 const mfem::Array<int>* ess_attr,
-                 const UpscaleParameters& param)
-    : Operator(graph.NumVertices()), comm_(graph.GetComm()), setup_time_(0.0),
-      edge_boundary_att_(edge_boundary_att), ess_attr_(ess_attr), param_(param)
-{
-    mfem::StopWatch chrono;
-    chrono.Start();
-
-    mixed_laplacians_.emplace_back(graph, w_block);
-
-    mfem::Array<int> partitioning;
-    PartitionAAT(graph.GetVertexToEdge(), partitioning, param_.coarse_factor);
-    Init(graph, partitioning);
-
-    chrono.Stop();
-    setup_time_ += chrono.RealTime();
-}
-
-Upscale::Upscale(const Graph& graph,
-                 const mfem::SparseMatrix* edge_boundary_att,
-                 const mfem::Array<int>* ess_attr,
-                 const UpscaleParameters& param)
-    : Upscale(graph, SparseIdentity(0), edge_boundary_att, ess_attr, param)
 {
 }
 

@@ -166,7 +166,7 @@ int main(int argc, char* argv[])
     // Set up Upscale
     {
         /// [Upscale]
-        Upscale upscale(graph, partitioning, nullptr, nullptr, upscale_param);
+        Upscale upscale(graph, &partitioning, nullptr, nullptr, upscale_param);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();

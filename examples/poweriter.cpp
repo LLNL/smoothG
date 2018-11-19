@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     // Power Iteration With Upscale Operators
     {
         // Upscaler
-        const Upscale upscale(graph, nullptr, nullptr, param);
+        const Upscale upscale(graph, nullptr, nullptr, nullptr, param);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);

@@ -39,24 +39,13 @@ class Upscale : public mfem::Operator
 public:
     Upscale(const Graph& graph,
             const mfem::SparseMatrix& w_block,
-            const mfem::Array<int>& partitioning,
+            const mfem::Array<int>* partitioning = nullptr,
             const mfem::SparseMatrix* edge_boundary_att = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const UpscaleParameters& param = UpscaleParameters());
 
     Upscale(const Graph& graph,
-            const mfem::Array<int>& partitioning,
-            const mfem::SparseMatrix* edge_boundary_att = nullptr,
-            const mfem::Array<int>* ess_attr = nullptr,
-            const UpscaleParameters& param = UpscaleParameters());
-
-    Upscale(const Graph& graph,
-            const mfem::SparseMatrix& w_block,
-            const mfem::SparseMatrix* edge_boundary_att = nullptr,
-            const mfem::Array<int>* ess_attr = nullptr,
-            const UpscaleParameters& param = UpscaleParameters());
-
-    Upscale(const Graph& graph,
+            const mfem::Array<int>* partitioning = nullptr,
             const mfem::SparseMatrix* edge_boundary_att = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const UpscaleParameters& param = UpscaleParameters());

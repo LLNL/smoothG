@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
     Graph graph(vertex_edge, *edge_d_td, weight);
 
     // Create Upscaler and Solve
-    Upscale upscale(graph, partitioning, &edge_boundary_att, &ess_attr, upscale_param);
+    Upscale upscale(graph, &partitioning, &edge_boundary_att, &ess_attr, upscale_param);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();
