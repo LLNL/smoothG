@@ -25,6 +25,9 @@
    ./mlmc --perm spe_perm.dat
 */
 
+// best multilevel command line so far (appears to create a reasonable result):
+// ./mlmc --sampler-type pde --num-samples 2 --max-levels 3 --hybridization --no-coarse-components --max-evects 1 --coarse-factor 8
+
 #include <fstream>
 #include <sstream>
 #include <mpi.h>
@@ -254,41 +257,33 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
-    // Create Upscaler and Solve
-    unique_ptr<FiniteVolumeMLMC> fvupscale;
-
+    unique_ptr<Graph> graph;
     if (elem_mass == false)
     {
-        fvupscale = make_unique<FiniteVolumeMLMC>(
-                        comm, vertex_edge, weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, upscale_param);
+        graph = make_unique<Graph>(vertex_edge, *edge_d_td, weight);
     }
     else
     {
-        fvupscale = make_unique<FiniteVolumeMLMC>(
-                        comm, vertex_edge, local_weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, upscale_param);
+        graph = make_unique<Graph>(vertex_edge, *edge_d_td, local_weight);
     }
-    fvupscale->PrintInfo();
-    fvupscale->ShowSetupTime();
-    fvupscale->MakeFineSolver();
 
-    mfem::BlockVector rhs_fine(fvupscale->GetBlockVector(0));
+    // Create Upscaler and Solve
+    Upscale upscale(*graph, partitioning, &edge_boundary_att, &ess_attr, upscale_param);
+
+    upscale.PrintInfo();
+    upscale.ShowSetupTime();
+    upscale.MakeFineSolver();
+
+    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
-    const int num_fine_vertices = vertex_edge.Height();
-    const int num_fine_edges = vertex_edge.Width();
-    const int num_aggs = partitioning.Max() + 1; // this can be wrong if there are empty partitions
-    if (myid == 0)
-    {
-        std::cout << "fine graph vertices = " << num_fine_vertices << ", fine graph edges = "
-                  << num_fine_edges << ", coarse aggregates = " << num_aggs << std::endl;
-    }
-    unique_ptr<TwoLevelSampler> sampler;
+    const int num_levels = upscale_param.max_levels;
+    unique_ptr<MultilevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {
-        sampler = make_unique<SimpleSampler>(num_fine_vertices, num_aggs);
+        MFEM_ASSERT(num_levels == 2, "SimpleSampler only implemented 2-level here!");
+        sampler = make_unique<SimpleSampler>(vertex_edge.Height(), partitioning.Max() + 1);
     }
     else if (std::string(sampler_type) == "pde")
     {
@@ -311,52 +306,50 @@ int main(int argc, char* argv[])
             std::cout << "---\nSample " << sample << "\n---" << std::endl;
 
         sampler->NewSample();
+        std::vector<mfem::Vector> coefficient(num_levels);
+        std::vector<mfem::BlockVector> sol;
 
-        auto coarse_coefficient = sampler->GetCoarseCoefficient();
-        fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
-        auto sol_upscaled = fvupscale->Solve(1, rhs_fine);
-        fvupscale->ShowSolveInfo(1);
-
-        auto fine_coefficient = sampler->GetFineCoefficient();
-        fvupscale->RescaleFineCoefficient(fine_coefficient);
-        auto sol_fine = fvupscale->Solve(0, rhs_fine);
-        fvupscale->ShowSolveInfo(0);
-
-        auto error_info = fvupscale->ComputeErrors(sol_upscaled, sol_fine);
-
-        if (myid == 0)
+        for (int level = 0; level < num_levels; ++level)
         {
-            ShowErrors(error_info);
+            coefficient[level] = sampler->GetCoefficient(level);
+            upscale.RescaleCoefficient(level, coefficient[level]);
+            sol.push_back(upscale.Solve(level, rhs_fine));
+            upscale.ShowSolveInfo(level);
+
+            if (level > 0)
+            {
+                auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
+                if (myid == 0)
+                    ShowErrors(error_info);
+            }
+
+            std::stringstream filename;
+            filename << "pressure_s" << sample << "_l" << level;
+            SaveFigure(sol[level].GetBlock(1), ufespace, filename.str());
+            if (visualization)
+            {
+                mfem::ParGridFunction field(&ufespace);
+                std::stringstream caption;
+                caption << "pressure sample " << sample << " level " << level;
+                Visualize(sol[level].GetBlock(1), field, *pmesh, caption.str());
+            }
         }
 
         // for more informative visualization
-        for (int i = 0; i < fine_coefficient.Size(); ++i)
+        for (int i = 0; i < coefficient[0].Size(); ++i)
         {
-            fine_coefficient[i] = std::log(fine_coefficient[i]);
+            coefficient[0](i) = std::log(coefficient[0](i));
         }
-
-        std::stringstream coarsename;
-        coarsename << "upscaledpressure" << sample;
-        SaveFigure(sol_upscaled.GetBlock(1), ufespace, coarsename.str());
-        std::stringstream finename;
-        finename << "finepressure" << sample;
-        SaveFigure(sol_fine.GetBlock(1), ufespace, finename.str());
         std::stringstream coeffname;
         coeffname << "coefficient" << sample;
-        SaveFigure(fine_coefficient, ufespace, coeffname.str());
+        SaveFigure(coefficient[0], ufespace, coeffname.str());
 
-        // Visualize the solution
         if (visualization)
         {
             mfem::ParGridFunction field(&ufespace);
-
-            std::stringstream ss1, ss2, ss3;
-            ss1 << "upscaled pressure" << sample;
-            Visualize(sol_upscaled.GetBlock(1), field, *pmesh, ss1.str());
-            ss2 << "fine pressure" << sample;
-            Visualize(sol_fine.GetBlock(1), field, *pmesh, ss2.str());
-            ss3 << "coefficient" << sample;
-            Visualize(fine_coefficient, field, *pmesh, ss3.str());
+            std::stringstream caption;
+            caption << "coefficient" << sample;
+            Visualize(coefficient[0], field, *pmesh, caption.str());
         }
     }
 

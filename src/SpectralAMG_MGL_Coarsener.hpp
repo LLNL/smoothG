@@ -56,7 +56,6 @@ private:
 
 private:
     const UpscaleParameters& param_;
-
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

@@ -37,6 +37,30 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
+    Upscale(const Graph& graph,
+            const mfem::SparseMatrix& w_block,
+            const mfem::Array<int>& partitioning,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
+    Upscale(const Graph& graph,
+            const mfem::Array<int>& partitioning,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
+    Upscale(const Graph& graph,
+            const mfem::SparseMatrix& w_block,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
+    Upscale(const Graph& graph,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const UpscaleParameters& param = UpscaleParameters());
+
     /**
        @brief Apply the upscaling.
 
@@ -172,12 +196,21 @@ public:
         return coarsener_[level]->get_Pu();
     }
 
+    /// Create Fine Level Solver
+    void MakeFineSolver();
+
+    void MakeSolver(int level);
+
+    /// coeff should have the size of the number of *aggregates*
+    /// in the coarse graph, or *vertices* in the finest graph
+    void RescaleCoefficient(int level, const mfem::Vector& coeff);
+
+    int GetNumLevels() const { return rhs_.size(); }
+    int GetNumVertices(int level) const { return rhs_[level]->GetBlock(1).Size(); }
+
 protected:
-    Upscale(MPI_Comm comm, int size)
-        : Operator(size), comm_(comm), setup_time_(0.0)
-    {
-        MPI_Comm_rank(comm_, &myid_);
-    }
+
+    void Init(const Graph& graph, const mfem::Array<int>& partitioning);
 
     void MakeVectors(int level)
     {
@@ -203,6 +236,10 @@ protected:
     /// why exactly is this mutable?
     mutable std::vector<mfem::Vector> constant_rep_;
 
+    const mfem::SparseMatrix* edge_boundary_att_;
+    const mfem::Array<int>* ess_attr_;
+
+    const UpscaleParameters& param_;
 private:
     void SetOperator(const mfem::Operator& op) {};
 };

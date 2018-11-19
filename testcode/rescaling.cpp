@@ -47,9 +47,9 @@ mfem::PWConstCoefficient InvElemScaleCoefficient(const mfem::Vector& elem_scale)
     return mfem::PWConstCoefficient(inverse_elem_scale);
 }
 
-MixedMatrix OriginalScaledFineMatrix(mfem::ParFiniteElementSpace& sigmafespace,
-                                     const mfem::SparseMatrix& vertex_edge,
-                                     const mfem::Vector& elem_scale)
+Graph SetupFVGraph(mfem::ParFiniteElementSpace& sigmafespace,
+                   const mfem::SparseMatrix& vertex_edge,
+                   const mfem::Vector& elem_scale)
 {
     auto inv_scale_coef = InvElemScaleCoefficient(elem_scale);
     mfem::BilinearForm a2(&sigmafespace);
@@ -68,7 +68,7 @@ MixedMatrix OriginalScaledFineMatrix(mfem::ParFiniteElementSpace& sigmafespace,
         }
     }
     auto edge_trueedge = sigmafespace.Dof_TrueDof_Matrix();
-    return MixedMatrix(vertex_edge, local_weight, *edge_trueedge);
+    return Graph(vertex_edge, *edge_trueedge, local_weight);
 }
 
 mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,
@@ -159,7 +159,8 @@ int main(int argc, char* argv[])
     mfem::Vector agg_scale = SimpleAscendingScaling(partitioning.Max() + 1);
 
     // Create a fine level MixedMatrix corresponding to piecewise constant coefficient
-    auto fine_mgL = OriginalScaledFineMatrix(sigmafespace, vertex_edge, elem_scale);
+    Graph graph = SetupFVGraph(sigmafespace, vertex_edge, elem_scale);
+    MixedMatrix fine_mgL(graph);
 
     // Create a coarsener to build interpolation matrices and coarse M builder
     auto coarsener = BuildCoarsener(vertex_edge, fine_mgL, partitioning, &edge_bdratt);

@@ -40,7 +40,6 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     comm_(comm),
     D_(mgL.GetD()),
     W_(mgL.GetW()),
-    use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
@@ -77,7 +76,6 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     comm_(comm),
     D_(mgL.GetD()),
     W_(mgL.GetW()),
-    use_spectralAMGe_((saamge_param != nullptr)),
     use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
@@ -103,7 +101,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 HybridSolver::~HybridSolver()
 {
 #if SMOOTHG_USE_SAAMGE
-    if (use_spectralAMGe_)
+    if (saamge_param_)
     {
         saamge::ml_free_data(sa_ml_data_);
         saamge::agg_free_partitioning(sa_apr_);
@@ -138,7 +136,7 @@ void HybridSolver::Init(
     agg_weights_ = 1.0;
 
     mfem::SparseMatrix edgedof_bdrattr;
-    if (face_bdrattr)
+    if (face_bdrattr && face_bdrattr->Width())
     {
         mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
         mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, *face_bdrattr);
@@ -208,7 +206,7 @@ void HybridSolver::Init(
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
     ess_multiplier_bc_ = false;
-    if (face_bdrattr && ess_edge_dofs)
+    if (face_bdrattr && face_bdrattr->Width() && ess_edge_dofs)
     {
         ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
         for (int i = 0; i < num_multiplier_dofs_; i++)
@@ -390,17 +388,14 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
             }
         }
     }
-    else if (!use_w_)
-    {
-        if (myid_ == 0)
-        {
-            Hrhs_[0] = 0.0;
-            //mat_hybrid.EliminateRowCol(0, 0., Hrhs_);
-        }
-    }
 
     // assemble true right hand side
     multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
+
+    if (!ess_multiplier_bc_ && !use_w_ && myid_ == 0)
+    {
+        trueHrhs_[0] = 0.0;
+    }
 
     if (diagonal_scaling_.Size() > 0)
         RescaleVector(diagonal_scaling_, trueHrhs_);
@@ -644,17 +639,12 @@ void HybridSolver::BuildParallelSystemAndSolver()
             }
         }
     }
-    else if (!use_w_)
-    {
-        if (myid_ == 0)
-            HybridSystemElim_->EliminateRowCol(0);
-    }
 
     auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
                               comm_, multiplier_start_.Last(), multiplier_start_,
                               HybridSystemElim_.get());
 
-    if (rescale_iter_ == 0 || use_spectralAMGe_)
+    if (rescale_iter_ == 0 || saamge_param_)
     {
         pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
     }
@@ -663,6 +653,16 @@ void HybridSolver::BuildParallelSystemAndSolver()
         ComputeScaledHybridSystem(*HybridSystem_d);
     }
     nnz_ = pHybridSystem_->NNZ();
+
+    mfem::Array<int> ess_dof;
+    if (!ess_multiplier_bc_ && !use_w_ && myid_ == 0)
+    {
+        ess_dof.Append(0);
+    }
+    mfem::HypreParVector junk_vec1(*pHybridSystem_);
+    mfem::HypreParVector junk_vec2(*pHybridSystem_);
+    pHybridSystem_->EliminateRowsCols(ess_dof, junk_vec1, junk_vec2);
+
 
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -684,7 +684,7 @@ void HybridSolver::BuildParallelSystemAndSolver()
     const bool use_prec = min_size > 0;
     if (use_prec)
     {
-        if (use_spectralAMGe_)
+        if (saamge_param_)
         {
             BuildSpectralAMGePreconditioner();
         }

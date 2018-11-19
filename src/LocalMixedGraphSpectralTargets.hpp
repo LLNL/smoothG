@@ -167,6 +167,11 @@ public:
         const mfem::SparseMatrix* W_local,
         const GraphTopology& graph_topology);
 
+    LocalMixedGraphSpectralTargets(
+        const MixedMatrix& mixed_graph_laplacian,
+        const GraphTopology& graph_topology,
+        const UpscaleParameters& param);
+
     ~LocalMixedGraphSpectralTargets() {}
 
     /**
@@ -182,26 +187,45 @@ public:
                  std::vector<mfem::DenseMatrix>& local_vertex_targets,
                  const mfem::Vector& constant_rep);
 private:
+    enum DofType { vdof, edof }; // vertex-based and edge-based dofs
+
     /**
-       @brief Solve an eigenvalue problem on each agglomerate, put the result in
-       local_vertex_targets.
+       @brief Compute spectral vectex targets for each aggregate
 
-       Put the normal trace of these into AggExt_sigma
+       Solve an eigenvalue problem on each extended aggregate, restrict eigenvectors
+       to original aggregate and use SVD to remove linear dependence, put resulting
+       vectors in local_vertex_targets as column vectors.
 
-       @param local_vertex targets is a std::vector of size nAEs when it comes in.
-           When it comes out, each entry is a DenseMatrix with one column for each
-           eigenvector selected.
+       Put edge traces into ExtAgg_sigmaT as row vectors
+       Trace generation depends on dual_target_, scaled_dual_, and energy_dual_
+
+       @param ExtAgg_sigmaT (OUT)
+       @param local_vertex targets (OUT)
     */
-    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
+    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
                               std::vector<mfem::DenseMatrix>& local_vertex_targets);
 
     /**
-       @brief Given normal traces of eigenvectors in AggExt_sigma, put those as well as
-       some kind of PV vector into local_edge_trace_targets.
+       @brief Compute edge trace targets for each coarse face
 
-       @param AggExt_sigma (IN)
+       Given edge traces in aggregates (from ExtAgg_sigmaT), restrict them to coarse
+       face, put those restricted vectors as well as some kind of PV vector into
+       local_edge_trace_targets after SVD.
+
+       @param ExtAgg_sigmaT (IN)
        @param local_edge_trace_targets (OUT)
     */
+    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
+                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
+
+    void BuildExtendedAggregates();
+
+    // TODO: better naming - this is not really a permutation because it is not one to one
+    // the returned matrix makes a copy of extended part (offd) and add it to local
+    std::unique_ptr<mfem::HypreParMatrix> DofPermutation(DofType dof_type);
+
+    void GetExtAggDofs(DofType dof_type, int iAgg, mfem::Array<int>& dofs);
+
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
                             const mfem::Vector& constant_rep);
@@ -243,12 +267,23 @@ private:
     const GraphTopology& graph_topology_;
     const double zero_eigenvalue_threshold_;
 
-    /// face to permuted edge relation table
-    std::unique_ptr<mfem::HypreParMatrix> face_permedge_;
+    /// Extended aggregate to vertex dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> ExtAgg_vdof_;
+    mfem::SparseMatrix ExtAgg_vdof_diag_;
+    mfem::SparseMatrix ExtAgg_vdof_offd_;
 
-    mfem::Array<HYPRE_Int> M_local_rowstart;
-    mfem::Array<HYPRE_Int> D_local_rowstart;
-    mfem::Array<HYPRE_Int> edge_ext_start;
+    /// Extended aggregate to edge dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> ExtAgg_edof_;
+    mfem::SparseMatrix ExtAgg_edof_diag_;
+    mfem::SparseMatrix ExtAgg_edof_offd_;
+
+    /// face to permuted edge dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> face_perm_edof_;
+
+    mfem::Array<HYPRE_Int> edgedof_starts;
+    mfem::Array<HYPRE_Int> vertdof_starts;
+    mfem::Array<HYPRE_Int> edgedof_ext_starts;
+    mfem::Array<int> Agg_start_;
 
     mfem::Array<int> colMapper_;
 };

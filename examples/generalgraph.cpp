@@ -65,9 +65,6 @@ int main(int argc, char* argv[])
     const char* weight_filename = "";
     args.AddOption(&weight_filename, "-w", "--weight",
                    "File to load for graph edge weights.");
-    const char* w_block_filename = "";
-    args.AddOption(&w_block_filename, "-wb", "--w_block",
-                   "File to load for w block.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -96,6 +93,7 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
+
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
@@ -118,55 +116,57 @@ int main(int argc, char* argv[])
                                        !upscale_param.hybridization);
 
     /// [Load graph from file or generate one]
-    mfem::SparseMatrix vertex_edge_global;
+    mfem::SparseMatrix global_vertex_edge;
     if (generate_graph)
     {
         mfem::SparseMatrix tmp = GenerateGraph(comm, gen_vertices, mean_degree, beta, seed);
-        vertex_edge_global.Swap(tmp);
+        global_vertex_edge.Swap(tmp);
     }
     else
     {
         mfem::SparseMatrix tmp = ReadVertexEdge(graphFileName);
-        vertex_edge_global.Swap(tmp);
+        global_vertex_edge.Swap(tmp);
     }
 
-    const int nedges_global = vertex_edge_global.Width();
-    const int nvertices_global = vertex_edge_global.Height();
+    const int nedges_global = global_vertex_edge.Width();
+    const int nvertices_global = global_vertex_edge.Height();
 
     /// [Load graph from file or generate one]
 
-    /// [Partitioning]
-    mfem::Array<int> global_partitioning;
-    if (metis_agglomeration || generate_graph)
+    /// [Load the edge weights]
+    mfem::Vector edge_weight(nedges_global);
+    if (std::strlen(weight_filename))
     {
-        MetisGraphPart(vertex_edge_global, global_partitioning, num_partitions, isolate);
+        std::ifstream weight_file(weight_filename);
+        edge_weight.Load(weight_file, nedges_global);
+    }
+    else
+    {
+        edge_weight = 1.0;
+    }
+    /// [Load the edge weights]
+
+    Graph graph(comm, global_vertex_edge, edge_weight);
+
+    /// [Partitioning]
+    mfem::Array<int> partitioning;
+    if (metis_agglomeration || generate_graph || num_procs > 1)
+    {
+        MetisGraphPart(graph.GetVertexToEdge(), partitioning,
+                       num_partitions / num_procs, isolate);
     }
     else
     {
         std::ifstream partFile(partition_filename);
-        global_partitioning.SetSize(nvertices_global);
-        global_partitioning.Load(partFile, nvertices_global);
+        partitioning.SetSize(nvertices_global);
+        partitioning.Load(partFile, nvertices_global);
     }
     /// [Partitioning]
 
-    /// [Load the edge weights]
-    mfem::Vector weight(nedges_global);
-    if (std::strlen(weight_filename))
-    {
-        std::ifstream weight_file(weight_filename);
-        weight.Load(weight_file, nedges_global);
-    }
-    else
-    {
-        weight = 1.0;
-    }
-    /// [Load the edge weights]
-
-    // Set up GraphUpscale
+    // Set up Upscale
     {
         /// [Upscale]
-        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,
-                             upscale_param, weight);
+        Upscale upscale(graph, partitioning, nullptr, nullptr, upscale_param);
 
         upscale.PrintInfo();
         upscale.ShowSetupTime();
@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);
+            rhs_u_fine = graph.ReadVertexVector(FiedlerFileName);
         }
 
         mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
@@ -207,7 +207,7 @@ int main(int argc, char* argv[])
 
         if (save_fiedler)
         {
-            upscale.WriteVertexVector(rhs_u_fine, FiedlerFileName);
+            graph.WriteVertexVector(rhs_u_fine, FiedlerFileName);
         }
     }
 
@@ -240,7 +240,7 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 
     unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
 
-    mfem::HypreParVector M_inv(pM.GetComm(), pM.GetGlobalNumRows(), pM.GetRowStarts());
+    mfem::Vector M_inv;
     pM.GetDiag(M_inv);
     MinvDT->InvScaleRows(M_inv);
 

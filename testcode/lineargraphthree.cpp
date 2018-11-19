@@ -110,10 +110,12 @@ int main(int argc, char* argv[])
 
     mfem::Vector weight(global_size - 1);
     weight = 1.0;
+
+    Graph smoothg_graph(comm, graph.GetVertexEdge(), weight);
     std::cout << "Finished constructing Graph." << std::endl;
-    GraphUpscale upscale(comm, graph.GetVertexEdge(), global_partitioning,
-                         upscale_param, weight);
-    std::cout << "Finished constructing GraphUpscale." << std::endl;
+
+    Upscale upscale(smoothg_graph, global_partitioning, nullptr, nullptr, upscale_param);
+    std::cout << "Finished constructing Upscale." << std::endl;
     upscale.PrintInfo();
 
     upscale.DumpDebug("debug/");
