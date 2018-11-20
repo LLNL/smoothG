@@ -26,10 +26,10 @@ namespace smoothg
 {
 
 Upscale::Upscale(const Graph& graph,
+                 const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning,
                  const mfem::SparseMatrix* edge_boundary_att,
                  const mfem::Array<int>* ess_attr,
-                 const UpscaleParameters& param,
                  const mfem::SparseMatrix& w_block)
     : Operator(graph.NumVertices()), comm_(graph.GetComm()), setup_time_(0.0),
       edge_boundary_att_(edge_boundary_att), ess_attr_(ess_attr), param_(param)

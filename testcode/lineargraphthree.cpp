@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
     Graph smoothg_graph(comm, graph.GetVertexEdge(), weight);
     std::cout << "Finished constructing Graph." << std::endl;
 
-    Upscale upscale(smoothg_graph, &global_partitioning, nullptr, nullptr, upscale_param);
+    Upscale upscale(smoothg_graph, upscale_param, &global_partitioning);
     std::cout << "Finished constructing Upscale." << std::endl;
     upscale.PrintInfo();
 

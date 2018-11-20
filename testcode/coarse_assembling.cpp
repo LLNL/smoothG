@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
                               : pmesh->ElementToFaceTable();
     const mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
-    // Construct agglomerated topology based on METIS or Cartesian agglomeration
+    // Construct agglomerated topology based on METIS
     mfem::Array<int> partitioning;
     PartitionAAT(vertex_edge, partitioning, upscale_param.coarse_factor);
 
@@ -131,8 +131,8 @@ int main(int argc, char* argv[])
 
     Graph graph(vertex_edge, *edge_d_td, weight);
 
-    // Create Upscaler and Solve
-    Upscale upscale(graph, &partitioning, &edge_boundary_att, &ess_attr, upscale_param);
+    // Create Upscaler
+    Upscale upscale(graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();

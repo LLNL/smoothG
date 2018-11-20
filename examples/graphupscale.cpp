@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
         mfem::Array<int> partitioning(graph.NumVertices());
         PartitionAAT(graph.GetVertexToEdge(), partitioning, param.coarse_factor);
 
-        const auto upscale = Upscale(graph, &partitioning, nullptr, nullptr, param);
+        const auto upscale = Upscale(graph, param, &partitioning);
 
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(1, rhs_u_fine);
@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 
     // vertex_edge and coarse factor
     {
-        const auto upscale = Upscale(graph, nullptr, nullptr, nullptr, param);
+        const auto upscale = Upscale(graph, param);
 
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
         const auto sol = upscale.Solve(1, rhs_u_fine);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 
     // Using coarse space
     {
-        const auto upscale = Upscale(graph, nullptr, nullptr, nullptr, param);
+        const auto upscale = Upscale(graph, param);
 
         // Start at Fine Level
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
@@ -103,7 +103,7 @@ int main(int argc, char* argv[])
 
     // Comparing Error; essentially generalgraph.cpp
     {
-        const auto upscale = Upscale(graph, nullptr, nullptr, nullptr, param);
+        const auto upscale = Upscale(graph, param);
 
         mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
         fine_rhs.GetBlock(0) = 0.0;
@@ -128,10 +128,10 @@ int main(int argc, char* argv[])
     // Compare Minres vs hybridization solvers
     {
         param.hybridization = false;
-        const auto minres_upscale = Upscale(graph, nullptr, nullptr, nullptr, param);
+        const auto minres_upscale = Upscale(graph, param);
 
         param.hybridization = true;
-        const auto hb_upscale = Upscale(graph, nullptr, nullptr, nullptr, param);
+        const auto hb_upscale = Upscale(graph, param);
 
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
 
@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
         SAAMGeParam saamge_param;
         param.coarse_components = false;
         param.saamge_param = &saamge_param;
-        const auto hbsa_upscale = Upscale(graph, nullptr, nullptr, nullptr, param);
+        const auto hbsa_upscale = Upscale(graph, param);
 
         const auto hbsa_sol = hbsa_upscale.Solve(1, rhs_u_fine);
         const auto error_sa_mr = CompareError(comm, hbsa_sol, minres_sol);

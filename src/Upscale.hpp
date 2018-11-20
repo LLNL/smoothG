@@ -38,10 +38,10 @@ class Upscale : public mfem::Operator
 {
 public:
     Upscale(const Graph& graph,
+            const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
             const mfem::SparseMatrix* edge_boundary_att = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
-            const UpscaleParameters& param = UpscaleParameters(),
             const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
     /**
