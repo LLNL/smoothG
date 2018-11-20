@@ -187,7 +187,7 @@ public:
                  std::vector<mfem::DenseMatrix>& local_vertex_targets,
                  const mfem::Vector& constant_rep);
 private:
-    enum DofType { vdof, edof }; // vertex-based and edge-based dofs
+    enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
 
     /**
        @brief Compute spectral vectex targets for each aggregate

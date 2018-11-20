@@ -157,9 +157,9 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 std::unique_ptr<mfem::HypreParMatrix>
 LocalMixedGraphSpectralTargets::DofPermutation(DofType dof_type)
 {
-    auto& ExtAgg_dof = (dof_type == vdof) ? *ExtAgg_vdof_ : *ExtAgg_edof_;
-    auto& ExtAgg_dof_diag = (dof_type == vdof) ? ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
-    auto& ExtAgg_dof_offd = (dof_type == vdof) ? ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
+    auto& ExtAgg_dof = (dof_type == VDOF) ? *ExtAgg_vdof_ : *ExtAgg_edof_;
+    auto& ExtAgg_dof_diag = (dof_type == VDOF) ? ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
+    auto& ExtAgg_dof_offd = (dof_type == VDOF) ? ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
 
     HYPRE_Int* dof_offd_map;
     ExtAgg_dof.GetDiag(ExtAgg_dof_diag);
@@ -431,8 +431,8 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
 void LocalMixedGraphSpectralTargets::GetExtAggDofs(
     DofType dof_type, int iAgg, mfem::Array<int>& dofs)
 {
-    auto& ExtAgg_dof_diag = (dof_type == vdof) ? ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
-    auto& ExtAgg_dof_offd = (dof_type == vdof) ? ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
+    auto& ExtAgg_dof_diag = (dof_type == VDOF) ? ExtAgg_vdof_diag_ : ExtAgg_edof_diag_;
+    auto& ExtAgg_dof_offd = (dof_type == VDOF) ? ExtAgg_vdof_offd_ : ExtAgg_edof_offd_;
 
     int num_ext_dofs_diag = ExtAgg_dof_diag.Width();
 
@@ -460,8 +460,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // Construct permutation matrices to obtain M, D on extended aggregates
     using ParMatrix = unique_ptr<mfem::HypreParMatrix>;
 
-    ParMatrix permute_e = DofPermutation(DofType::edof);
-    ParMatrix permute_v = DofPermutation(DofType::vdof);
+    ParMatrix permute_e = DofPermutation(DofType::EDOF);
+    ParMatrix permute_v = DofPermutation(DofType::VDOF);
 
     ParMatrix permute_eT( permute_e->Transpose() );
 
@@ -514,8 +514,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
     {
         // Extract local dofs for extended aggregates that is shared
-        GetExtAggDofs(DofType::edof, iAgg, ext_loc_edofs);
-        GetExtAggDofs(DofType::vdof, iAgg, ext_loc_vdofs);
+        GetExtAggDofs(DofType::EDOF, iAgg, ext_loc_edofs);
+        GetExtAggDofs(DofType::VDOF, iAgg, ext_loc_vdofs);
 
         // Single vertex aggregate
         if (ext_loc_edofs.Size() == 0)
@@ -751,7 +751,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             for (int i = 0; i < num_neighbor_aggs; ++i)
             {
                 const int iAgg = neighbor_aggs[i];
-                GetExtAggDofs(DofType::edof, iAgg, ext_loc_edofs);
+                GetExtAggDofs(DofType::EDOF, iAgg, ext_loc_edofs);
 
                 const mfem::DenseMatrix& sigmaT(ExtAgg_sigmaT[iAgg]);
                 ExtractColumns(sigmaT, ext_loc_edofs, iface_edofs,
