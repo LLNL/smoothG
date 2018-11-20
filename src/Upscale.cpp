@@ -26,11 +26,11 @@ namespace smoothg
 {
 
 Upscale::Upscale(const Graph& graph,
-                 const mfem::SparseMatrix& w_block,
                  const mfem::Array<int>* partitioning,
                  const mfem::SparseMatrix* edge_boundary_att,
                  const mfem::Array<int>* ess_attr,
-                 const UpscaleParameters& param)
+                 const UpscaleParameters& param,
+                 const mfem::SparseMatrix& w_block)
     : Operator(graph.NumVertices()), comm_(graph.GetComm()), setup_time_(0.0),
       edge_boundary_att_(edge_boundary_att), ess_attr_(ess_attr), param_(param)
 {
@@ -52,15 +52,6 @@ Upscale::Upscale(const Graph& graph,
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
-}
-
-Upscale::Upscale(const Graph& graph,
-                 const mfem::Array<int>* partitioning,
-                 const mfem::SparseMatrix* edge_boundary_att,
-                 const mfem::Array<int>* ess_attr,
-                 const UpscaleParameters& param)
-    : Upscale(graph, SparseIdentity(0), partitioning, edge_boundary_att, ess_attr, param)
-{
 }
 
 void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)

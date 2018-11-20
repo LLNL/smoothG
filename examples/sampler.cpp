@@ -258,7 +258,7 @@ int main(int argc, char* argv[])
 
     // Create Upscaler
     auto upscale = std::make_shared<Upscale>(
-                       graph, W_block, &partitioning, &edge_boundary_att, &ess_attr, upscale_param);
+                       graph, &partitioning, &edge_boundary_att, &ess_attr, upscale_param, W_block);
 
     upscale->MakeFineSolver();
     upscale->PrintInfo();
