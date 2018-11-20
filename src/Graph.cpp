@@ -47,7 +47,7 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
     unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
     edge_trueedge_.reset(trueedge_edge->Transpose());
 
-    if (edge_weight_local)
+    if (edge_weight_local.Size() > 0)
     {
         SplitEdgeWeight(edge_weight_local);
     }
