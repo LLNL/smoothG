@@ -27,31 +27,6 @@ std::unique_ptr<mfem::SparseMatrix> MBuilder::BuildAssembledM() const
     return BuildAssembledM(agg_weights_inverse);
 }
 
-ElementMBuilder::ElementMBuilder(const mfem::Vector& edge_weight,
-                                 const mfem::SparseMatrix& elem_edgedof)
-    : elem_edgedof_(elem_edgedof)
-{
-    const mfem::SparseMatrix edgedof_Agg = smoothg::Transpose(elem_edgedof);
-    num_aggs_ = elem_edgedof_.Height();
-    M_el_.resize(num_aggs_);
-
-    mfem::Array<int> edofs;
-    for (unsigned int agg = 0; agg < num_aggs_; agg++)
-    {
-        GetTableRow(elem_edgedof, agg, edofs);
-        mfem::DenseMatrix& agg_M = M_el_[agg];
-        agg_M.SetSize(edofs.Size());
-        agg_M = 0.0;
-        for (int i = 0; i < agg_M.Size(); i++)
-        {
-            const int edof = edofs[i];
-            const double ratio = (edgedof_Agg.RowSize(edof) > 1) ? 0.5 : 1.0;
-            MFEM_ASSERT(edge_weight[edof] != 0.0, "divide by zero!");
-            agg_M(i, i) = ratio / edge_weight[edof];
-        }
-    }
-}
-
 ElementMBuilder::ElementMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
                                  const mfem::SparseMatrix& elem_edgedof)
     : elem_edgedof_(elem_edgedof)
