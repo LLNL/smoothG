@@ -141,14 +141,11 @@ public:
        @param D_local is a divergence-like operator
        @param graph_topology the partitioning relations for coarsening
 
-       M_local should have the coefficients (edge weights) in it.
-       D_local should be all 1 and -1.
-
        And the graph Laplacian in mixed form is
        \f[
           \left( \begin{array}{cc}
             M&  D^T \\
-            D&
+            D&  -W
           \end{array} \right)
        \f]
     */
@@ -167,6 +164,13 @@ public:
         const mfem::SparseMatrix* W_local,
         const GraphTopology& graph_topology);
 
+    /**
+       @brief Construct based on containers of input of other constructors.
+
+       @param mixed_graph_laplacian container for M_local, D_local, W_local
+       @param graph_topology the partitioning relations for coarsening
+       @param param container for rel_tol, max_evects, various dual target flags
+    */
     LocalMixedGraphSpectralTargets(
         const MixedMatrix& mixed_graph_laplacian,
         const GraphTopology& graph_topology,

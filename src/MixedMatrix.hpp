@@ -31,26 +31,40 @@ namespace smoothg
 {
 
 /**
-   @brief Encapuslates the mixed form of a graph in saddle-point form.
+   @brief Container for the building blocks of some saddle-point problem.
 
-   The given data is a vertex_edge table and weights in some form.
+   This class constructs and stores the matrices M, D, and W of the block system
+   \f[
+     \begin{pmatrix}
+       M  &  D^T \\
+       D  &  -W
+     \end{pmatrix}.
+   \f]
 
-   This is essentially a container for a weight matrix and a D matrix.
+   This system may come from mixed formulation of graph Laplacian problem, mixed
+   finite element problem, or the coarse version of the aforementioned problems.
 */
 class MixedMatrix
 {
 public:
+
     /**
-       @brief Create a mixed graph in parallel mode.
+       @brief Construct a mixed graph Laplacian system from a given graph.
 
-       @param vertex_edge a matrix with rows for each vertex and columns for
-                          each edge, this is assumed undirected.
-       @param weight the weights for each edge
-       @param edge_d_td edge to true edge table
-       @param dist_weight true if edges shared between processors should be cut in half
+       @param graph the graph on which the graph Laplacian is based
+       @param w_block the matrix W. If not provided, it is assumed to be zero
     */
-    MixedMatrix(const Graph& graph, const mfem::SparseMatrix& w_block = SparseIdentity(0));
+    MixedMatrix(const Graph& graph,
+                const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
+    /**
+       @brief Construct a mixed system directly from building blocks.
+
+       @param mbuilder builder for M
+       @param D the matrix D
+       @param W the matrix W. If it is nullptr, it is assumed to be zero
+       @param edge_d_td edge dof to true edge dof table
+    */
     MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
