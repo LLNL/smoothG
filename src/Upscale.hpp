@@ -37,6 +37,21 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
+
+    /**
+       @brief Construct upscaled system and solver for graph Laplacian.
+
+       @param graph the graph on which the graph Laplacian is defined
+       @param param upscaling parameters
+       @param partitioning partitioning of vertices for the first coarsening.
+              If not provided, will call METIS to generate one based on param
+       @param edge_boundary_att edge to boundary attribute relation. If not
+              provided, will assume no boundary
+       @param ess_attr indicate which boundary attributes to impose essential
+              edge condition. If not provided, will assume no boundary
+       @param w_block the W matrix in the saddle-point system. If not provided,
+              it will assumed to be zero
+    */
     Upscale(const Graph& graph,
             const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
