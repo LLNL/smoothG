@@ -603,7 +603,6 @@ mfem::Vector LocalMixedGraphSpectralTargets::MakeOneNegOne(
 mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
     const mfem::Vector& constant_vect)
 {
-    // Gelever uses face_trueface rather than facedof_truedof (?) (I think one of us is just labeling it wrong)
     SharedEntityCommunication<mfem::Vector> sec_constant(comm_, *graph_topology_.face_trueface_);
     sec_constant.ReducePrepare();
 
