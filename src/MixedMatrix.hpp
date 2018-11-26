@@ -24,7 +24,7 @@
 #include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
-#include "Graph.hpp"
+#include "GraphSpace.hpp"
 #include "GraphCoarsenBuilder.hpp"
 
 namespace smoothg
@@ -56,6 +56,16 @@ public:
     */
     MixedMatrix(const Graph& graph,
                 const mfem::SparseMatrix& w_block = SparseIdentity(0));
+
+    /**
+       @brief Construct a mixed graph Laplacian system from a given graph space.
+
+       @param graph_space the graph space on which the graph Laplacian is based
+       @param w_block the matrix W. If not provided, it is assumed to be zero
+    */
+    MixedMatrix(const GraphSpace& graph_space,
+                const mfem::SparseMatrix& w_block = SparseIdentity(0));
+
 
     /**
        @brief Construct a mixed system directly from building blocks.

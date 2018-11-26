@@ -22,7 +22,7 @@
 #define __GRAPHSPACE_HPP__
 
 #include "mfem.hpp"
-#include "GraphTopology.hpp"
+#include "Graph.hpp"
 
 namespace smoothg
 {
