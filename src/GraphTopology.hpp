@@ -51,9 +51,9 @@ public:
 
        All of this data is local to a single processor
 
-       @param vertex_edge (unsigned) table describing graph
-       @param edge_d_td "dof_truedof" relation describing parallel data
-       @param partition partition vector for vertices
+       @param vertex_edge local vertex to edge relation of a distributed graph
+       @param edge_trueedge edge to true edge relation of a distributed graph
+       @param partition partition vector for local vertices
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
     GraphTopology(const mfem::SparseMatrix& vertex_edge,
