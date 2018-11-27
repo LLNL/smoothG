@@ -70,85 +70,15 @@ void GraphTopology::AggregateEdge2AggregateEdgeInt(
     aggregate_edge_int.Swap(tmp);
 }
 
-GraphTopology::GraphTopology(
-    const mfem::SparseMatrix& vertex_edge,
-    const mfem::HypreParMatrix& edge_trueedge,
-    const mfem::Array<int>& partition,
-    const mfem::SparseMatrix* edge_boundaryattr)
-    : vertex_edge_(vertex_edge), edge_trueedge_(edge_trueedge)
+GraphTopology::GraphTopology(const Graph& graph,
+                             const mfem::SparseMatrix* edge_boundaryattr)
+    : fine_graph_(&graph), edge_boundaryattr_(edge_boundaryattr),
+      edge_trueedge_edge_(nullptr)
 {
-    Init(partition, edge_boundaryattr, nullptr);
-}
-
-GraphTopology::GraphTopology(
-    const Graph& graph,
-    const mfem::Array<int>& partition,
-    const mfem::SparseMatrix* edge_boundaryattr)
-    : GraphTopology(graph.GetVertexToEdge(), graph.GetEdgeToTrueEdge(),
-                    partition, edge_boundaryattr)
-{
-}
-
-GraphTopology::GraphTopology(
-    const GraphTopology& finer_graph_topology, int coarsening_factor)
-    : vertex_edge_(finer_graph_topology.Agg_face_),
-      edge_trueedge_(*(finer_graph_topology.face_trueface_))
-{
-    const auto edge_boundaryattr = (finer_graph_topology.face_bdratt_.Height()) ?
-                                   &(finer_graph_topology.face_bdratt_) : nullptr;
-
-    mfem::Array<int> partitioning;
-    PartitionAAT(vertex_edge_, partitioning, coarsening_factor); // actual partition happens
-
-    const auto edge_trueedge_edge = finer_graph_topology.face_trueface_face_.get();
-    Init(partitioning, edge_boundaryattr, edge_trueedge_edge);
-}
-
-GraphTopology::GraphTopology(const mfem::SparseMatrix& vertex_edge,
-                             const mfem::SparseMatrix& face_edge,
-                             const mfem::SparseMatrix& Agg_vertex,
-                             const mfem::SparseMatrix& Agg_edge,
-                             const mfem::SparseMatrix& Agg_face,
-                             const mfem::HypreParMatrix& edge_trueedge,
-                             const mfem::HypreParMatrix& face_trueface,
-                             const mfem::HypreParMatrix& face_trueface_face)
-    : vertex_edge_(vertex_edge), edge_trueedge_(edge_trueedge), Agg_edge_(Agg_edge),
-      Agg_vertex_(Agg_vertex), Agg_face_(Agg_face), face_edge_(face_edge)
-{
-    MPI_Comm comm = edge_trueedge.GetComm();
-
-    face_trueface_ = make_unique<mfem::HypreParMatrix>();
-    face_trueface_->MakeRef(face_trueface);
-    face_trueface_face_ = make_unique<mfem::HypreParMatrix>();
-    face_trueface_face_->MakeRef(face_trueface_face);
-
-    GenerateOffsets(comm, Agg_vertex.Width(), vertex_start_);
-    GenerateOffsets(comm, Agg_vertex.Height(), aggregate_start_);
-
-    int start_size = 3;
-    if (!HYPRE_AssumedPartitionCheck())
-    {
-        MPI_Comm_size(comm, &start_size);
-        start_size++;
-    }
-
-    edge_start_.SetSize(start_size);
-    face_start_.SetSize(start_size);
-    for (int i = 0; i < start_size; i++)
-    {
-        edge_start_[i] = edge_trueedge.RowPart()[i];
-        face_start_[i] = face_trueface_face_->ColPart()[i];
-    }
-
-    mfem::SparseMatrix tmp = smoothg::Transpose(Agg_face_);
-    face_Agg_.Swap(tmp);
 }
 
 GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
-    : edge_trueedge_(graph_topology.edge_trueedge_)
 {
-    vertex_edge_.Swap(graph_topology.vertex_edge_);
-
     face_trueface_ = std::move(graph_topology.face_trueface_);
     face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
 
@@ -158,36 +88,43 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     Agg_face_.Swap(graph_topology.Agg_face_);
     face_edge_.Swap(graph_topology.face_edge_);
 
-    face_bdratt_.Swap(graph_topology.face_bdratt_);
+    face_bdratt_ = std::move(graph_topology.face_bdratt_);
 
     Swap(vertex_start_, graph_topology.GetVertexStart());
     Swap(edge_start_, graph_topology.GetEdgeStart());
     Swap(aggregate_start_, graph_topology.GetAggregateStart());
     Swap(face_start_, graph_topology.GetFaceStart());
+
+    std::swap(fine_graph_, graph_topology.fine_graph_);
+    std::swap(coarse_graph_, graph_topology.coarse_graph_);
 }
 
-void GraphTopology::Init(const mfem::Array<int>& partition,
-                         const mfem::SparseMatrix* edge_boundaryattr,
-                         const mfem::HypreParMatrix* edge_trueedge_edge_ptr)
-{
-    MPI_Comm comm = edge_trueedge_.GetComm();
 
-    unique_ptr<mfem::HypreParMatrix> trueedge_edge( edge_trueedge_.Transpose() );
+Graph GraphTopology::Coarsen(int coarsening_factor)
+{
+    mfem::Array<int> partitioning;
+    PartitionAAT(fine_graph_->GetVertexToEdge(), partitioning, coarsening_factor);
+    return Coarsen(partitioning);
+}
+
+Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
+{
+    MPI_Comm comm = fine_graph_->GetComm();
 
     unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge;
-    if (edge_trueedge_edge_ptr)
+    if (edge_trueedge_edge_)
     {
         edge_trueedge_edge = make_unique<mfem::HypreParMatrix>();
-        edge_trueedge_edge->MakeRef(*edge_trueedge_edge_ptr);
+        edge_trueedge_edge->MakeRef(*edge_trueedge_edge_);
     }
     else
     {
-        edge_trueedge_edge.reset( ParMult(&edge_trueedge_, trueedge_edge.get()) );
+        edge_trueedge_edge = smoothg::AAt(fine_graph_->GetEdgeToTrueEdge());
     }
 
-    int nvertices = vertex_edge_.Height();
-    int nedges = vertex_edge_.Width();
-    int nAggs = partition.Max() + 1;
+    int nvertices = fine_graph_->NumVertices();
+    int nedges = fine_graph_->NumEdges();
+    int nAggs = partitioning.Max() + 1;
 
     // generate the 'start' array (not true dof)
     mfem::Array<HYPRE_Int>* start[3] = {&vertex_start_, &edge_start_,
@@ -197,10 +134,10 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
     GenerateOffsets(comm, 3, nloc, start);
 
     // Construct the relation table aggregate_vertex from partition
-    mfem::SparseMatrix tmp = PartitionToMatrix(partition, nAggs);
+    mfem::SparseMatrix tmp = PartitionToMatrix(partitioning, nAggs);
     Agg_vertex_.Swap(tmp);
 
-    mfem::SparseMatrix aggregate_edge(smoothg::Mult(Agg_vertex_, vertex_edge_));
+    auto aggregate_edge = smoothg::Mult(Agg_vertex_, fine_graph_->GetVertexToEdge());
 
     // Need to sort the edge indices to prevent index problem in face_edge
     aggregate_edge.SortColumnIndices();
@@ -210,8 +147,8 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
 
     // block diagonal edge_aggregate and aggregate_edge
     auto edge_aggregate_d = make_unique<mfem::HypreParMatrix>(
-                                comm, edge_start_.Last(), aggregate_start_.Last(), edge_start_,
-                                aggregate_start_, &edge_aggregate);
+                                comm, edge_start_.Last(), aggregate_start_.Last(),
+                                edge_start_, aggregate_start_, &edge_aggregate);
     auto aggregate_edge_d = make_unique<mfem::HypreParMatrix>(
                                 comm, aggregate_start_.Last(), edge_start_.Last(),
                                 aggregate_start_, edge_start_, &aggregate_edge);
@@ -232,9 +169,9 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
     // nfaces_bdr = number of global boundary faces in this processor
     int nfaces_bdr = 0;
     mfem::SparseMatrix aggregate_boundaryattr;
-    if (edge_boundaryattr)
+    if (edge_boundaryattr_)
     {
-        mfem::SparseMatrix tmp = smoothg::Mult(aggregate_edge, *edge_boundaryattr);
+        mfem::SparseMatrix tmp = smoothg::Mult(aggregate_edge, *edge_boundaryattr_);
         aggregate_boundaryattr.Swap(tmp);
 
         nfaces_bdr = aggregate_boundaryattr.NumNonZeroElems();
@@ -295,7 +232,7 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
     // Counting the coarse faces on the global boundary
     int* agg_edge_i = aggregate_edge.GetI();
     int* agg_edge_j = aggregate_edge.GetJ();
-    if (edge_boundaryattr)
+    if (edge_boundaryattr_)
     {
         int* agg_bdr_i = aggregate_boundaryattr.GetI();
         int* agg_bdr_j = aggregate_boundaryattr.GetJ();
@@ -304,7 +241,7 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
             {
                 face_edge_i[count] = face_edge_nnz;
                 for (int k = agg_edge_i[i]; k < agg_edge_i[i + 1]; k++)
-                    if (edge_boundaryattr->Elem(agg_edge_j[k], agg_bdr_j[j]))
+                    if (edge_boundaryattr_->Elem(agg_edge_j[k], agg_bdr_j[j]))
                         face_edge_nnz++;
                 face_Agg_j[nfaces_int + (count++)] = i;
                 face_Agg_i[count] = nfaces_int + count;
@@ -352,14 +289,14 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
                 face_edge_j[face_edge_nnz++] = intface_Agg_edge_j[j];
 
     // Insert edges to the coarse faces on the global boundary
-    if (edge_boundaryattr)
+    if (edge_boundaryattr_)
     {
         int* agg_bdr_i = aggregate_boundaryattr.GetI();
         int* agg_bdr_j = aggregate_boundaryattr.GetJ();
         for (int i = 0; i < nAggs; i++)
             for (int j = agg_bdr_i[i]; j < agg_bdr_i[i + 1]; j++)
                 for (int k = agg_edge_i[i]; k < agg_edge_i[i + 1]; k++)
-                    if (edge_boundaryattr->Elem(agg_edge_j[k], agg_bdr_j[j]))
+                    if (edge_boundaryattr_->Elem(agg_edge_j[k], agg_bdr_j[j]))
                         face_edge_j[face_edge_nnz++] = agg_edge_j[k];
     }
 
@@ -389,16 +326,10 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
     face_edge_.Swap(face_edge_tmp);
 
     // TODO: face_bdratt can be built when counting boundary faces
-    if (edge_boundaryattr)
+    if (edge_boundaryattr_)
     {
-        mfem::SparseMatrix face_bdr = smoothg::Mult(face_edge_, *edge_boundaryattr);
-        face_bdratt_.Swap(face_bdr);
+        face_bdratt_.reset(mfem::Mult(face_edge_, *edge_boundaryattr_));
     }
-    face_bdratt_.Finalize(0);
-    // TODO: valgrind is reporting a memory leak for the I, J, A pointers
-    // built in the above Finalize(). I suspect some ownsGraph, ownsData
-    // members for the relevant SparseMatrix (and face_edge_, edge_boundaryattr)
-    // are set wrong
 
     // Complete face to aggregate table
     mfem::SparseMatrix face_agg_tmp(face_Agg_i, face_Agg_j,
@@ -425,27 +356,34 @@ void GraphTopology::Init(const mfem::Array<int>& partition,
 
     // Construct "face to true face" table
     face_trueface_ = BuildEntityToTrueEntity(*face_trueface_face_);
+
+    Graph coarse_graph(Agg_face_, *face_trueface_);
+    coarse_graph_ = &coarse_graph;
+    return coarse_graph;
 }
 
 std::vector<GraphTopology> MultilevelGraphTopology(
     const Graph& graph, const mfem::SparseMatrix* edge_boundaryattr,
     int num_levels, int coarsening_factor)
 {
-    std::vector<GraphTopology> graph_topologies;
-    graph_topologies.reserve(num_levels - 1);
+    std::vector<GraphTopology> topologies;
+    topologies.reserve(num_levels - 1);
+
+    std::vector<Graph> graphs;
+    graphs.reserve(num_levels);
 
     // Construct finest level graph topology
-    mfem::Array<int> partitioning;
-    PartitionAAT(graph.GetVertexToEdge(), partitioning, coarsening_factor);
-    graph_topologies.emplace_back(graph, partitioning, edge_boundaryattr);
+    graphs.push_back(graph);
 
     // Construct coarser levels graph topology by recursion
-    for (int i = 0; i < num_levels - 2; i++)
+    for (int i = 0; i < num_levels - 1; i++)
     {
-        graph_topologies.emplace_back(graph_topologies.back(), coarsening_factor);
+        topologies.emplace_back(graphs.back(), edge_boundaryattr);
+        graphs.push_back(topologies.back().Coarsen(coarsening_factor));
+        edge_boundaryattr = topologies.back().face_bdratt_.get();
     }
 
-    return graph_topologies;
+    return topologies;
 }
 
 } // namespace smoothg

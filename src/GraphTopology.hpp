@@ -51,55 +51,11 @@ public:
 
        All of this data is local to a single processor
 
-       @param vertex_edge local vertex to edge relation of a distributed graph
-       @param edge_trueedge edge to true edge relation of a distributed graph
-       @param partition partition vector for local vertices
-       @param edge_boundaryattr boundary attributes for edges with boundary conditions
-    */
-    GraphTopology(const mfem::SparseMatrix& vertex_edge,
-                  const mfem::HypreParMatrix& edge_trueedge,
-                  const mfem::Array<int>& partition,
-                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
-
-    /**
-       @brief Build agglomerated topology relation tables of a given graph
-
-       All of this data is local to a single processor
-
        @param graph graph oject containing vertex edge relation
-       @param partition partition vector for vertices
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
     GraphTopology(const Graph& graph,
-                  const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
-
-    /**
-       @brief Build agglomerated topology relation tables of the coarse level
-       graph in a given GraphTopology object
-
-       All of this data is local to a single processor
-
-       @param finer_graph_topology finer level graph topology
-       @param coarsening_factor intended number of vertices in an aggregate
-    */
-    GraphTopology(const GraphTopology& finer_graph_topology, int coarsening_factor);
-
-    /**
-       @brief Partial graph-based constructor for graph topology.
-
-       Uses given topology relations to construct the aggregated topology.
-
-       @todo the arguments to this constructor should be carefully documented
-    */
-    GraphTopology(const mfem::SparseMatrix& vertex_edge,
-                  const mfem::SparseMatrix& face_edge,
-                  const mfem::SparseMatrix& Agg_vertex,
-                  const mfem::SparseMatrix& Agg_edge,
-                  const mfem::SparseMatrix& Agg_face,
-                  const mfem::HypreParMatrix& edge_trueedge,
-                  const mfem::HypreParMatrix& face_trueface,
-                  const mfem::HypreParMatrix& face_trueface_face);
 
     /**
        @brief Move constructor
@@ -107,6 +63,24 @@ public:
     GraphTopology(GraphTopology&& graph_topology) noexcept;
 
     ~GraphTopology() {}
+
+    /**
+       @brief Coarsen fine graph
+       @param coarsening_factor intended number of vertices in an aggregate
+       @return coarse graph
+    */
+    Graph Coarsen(int coarsening_factor);
+
+    /**
+       @brief Coarsen fine graph
+       @param partitioning partitioning vector for vertices
+       @return coarse graph
+    */
+    Graph Coarsen(const mfem::Array<int>& partitioning);
+
+    const Graph& FineGraph() const { return *fine_graph_; }
+
+    const Graph& CoarseGraph() const { return *coarse_graph_; }
 
     /// Return number of faces in aggregated graph
     unsigned int NumFaces() const { return Agg_face_.Width(); }
@@ -125,12 +99,8 @@ public:
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
     ///@}
 
-    // vertex to edge table
-    mfem::SparseMatrix vertex_edge_;
-
     ///@name entity to true_entity tables for edge and face
     ///@{
-    const mfem::HypreParMatrix& edge_trueedge_;
     std::unique_ptr<mfem::HypreParMatrix> face_trueface_;
     ///@}
 
@@ -149,12 +119,15 @@ public:
     ///@}
 
     /// "face" to boundary attribute table
-    mfem::SparseMatrix face_bdratt_;
+    std::unique_ptr<mfem::SparseMatrix> face_bdratt_;
 
 private:
-    void Init(const mfem::Array<int>& partition,
-              const mfem::SparseMatrix* edge_boundaryattr,
-              const mfem::HypreParMatrix* edge_trueedge_edge_ptr);
+
+    const Graph* fine_graph_;
+    const Graph* coarse_graph_;
+
+    const mfem::SparseMatrix* edge_boundaryattr_;
+    const mfem::HypreParMatrix* edge_trueedge_edge_;
 
     mfem::Array<HYPRE_Int> vertex_start_;
     mfem::Array<HYPRE_Int> edge_start_;

@@ -62,12 +62,19 @@ void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)
     rhs_.resize(param_.max_levels);
     sol_.resize(param_.max_levels);
     std::vector<GraphTopology> gts;
-    gts.emplace_back(graph, partitioning, edge_boundary_att_);
+    gts.reserve(param_.max_levels - 1);
+    std::vector<Graph> graphs;
+    graphs.reserve(param_.max_levels);
+
+    graphs.push_back(graph);
+    gts.emplace_back(graphs.back(), edge_boundary_att_);
+    graphs.push_back(gts.back().Coarsen(partitioning));
 
     // coarser levels: topology
     for (int level = 2; level < param_.max_levels; ++level)
     {
-        gts.emplace_back(gts.back(), param_.coarse_factor);
+        gts.emplace_back(graphs.back(), gts.back().face_bdratt_.get());
+        graphs.emplace_back(gts.back().Coarsen(param_.coarse_factor));
     }
 
     // coarser levels: matrices
@@ -144,14 +151,14 @@ void Upscale::MakeSolver(int level)
     if (edge_boundary_att_)
     {
         marker.SetSize(Dref.Width());
-        MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
+        MarkDofsOnBoundary(*coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
                            coarsener_[level - 1]->construct_face_facedof_table(),
                            *ess_attr_, marker);
     }
 
     if (param_.hybridization) // Hybridization solver
     {
-        auto face_bdratt = coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
+        auto face_bdratt = *coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
         solver_[level] = make_unique<HybridSolver>(
                              comm_, GetMatrix(level), *coarsener_[level - 1],
                              &face_bdratt, &marker, 0, param_.saamge_param);
