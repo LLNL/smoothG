@@ -88,12 +88,13 @@ mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,
     return mfem::SparseMatrix(a1.SpMat());
 }
 
-unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& v_e,
+unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(const Graph& graph,
                                                      const MixedMatrix& mgL,
                                                      const mfem::Array<int>& partition,
                                                      const mfem::SparseMatrix* edge_bdratt)
 {
-    GraphTopology gt(v_e, mgL.GetEdgeDofToTrueDof(), partition, edge_bdratt);
+    GraphTopology gt(graph, edge_bdratt);
+    gt.Coarsen(partition);
     UpscaleParameters param;
     param.spect_tol = 1.0;
     param.max_evects = 3;
@@ -163,7 +164,7 @@ int main(int argc, char* argv[])
     MixedMatrix fine_mgL(graph);
 
     // Create a coarsener to build interpolation matrices and coarse M builder
-    auto coarsener = BuildCoarsener(vertex_edge, fine_mgL, partitioning, &edge_bdratt);
+    auto coarsener = BuildCoarsener(graph, fine_mgL, partitioning, &edge_bdratt);
 
     // Interpolate agg scaling (coarse level) to elements (fine level)
     mfem::Vector interp_agg_scale(pmesh->GetNE());

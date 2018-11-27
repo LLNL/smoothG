@@ -488,7 +488,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // Compute face to permuted edge relation table
     auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
     auto& edge_trueedge = const_cast<mfem::HypreParMatrix&>(
-                graph_topology_.FineGraph().GetEdgeToTrueEdge());
+                              graph_topology_.FineGraph().GetEdgeToTrueEdge());
 
     auto& face_edge = const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_);
     mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_trueedge.M(),

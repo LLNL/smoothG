@@ -36,36 +36,30 @@ public:
     /// n here is number of vertices, we will have n-1 edges in the graph
     LinearGraph(int n);
 
-    int GetN() const {return n_;}
+    int GetN() const { return n_; }
 
-    const mfem::SparseMatrix& GetM() const {return M_;}
-    const mfem::SparseMatrix& GetD() const {return D_;}
-    const mfem::SparseMatrix& GetVertexEdge() const {return vertex_edge_;}
+    const Graph& GetGraph() const { return graph_; }
 
 private:
     int n_;
-    mfem::SparseMatrix M_;
-    mfem::SparseMatrix D_;
-    mfem::SparseMatrix vertex_edge_;
+    Graph graph_;
 };
 
 LinearGraph::LinearGraph(int n) :
-    n_(n),
-    M_(n - 1, n - 1),
-    D_(n, n - 1),
-    vertex_edge_(n, n - 1)
+    n_(n)
 {
+    mfem::Vector edge_weight(n - 1);
+    mfem::SparseMatrix vertex_edge(n, n - 1);
+
     for (int i = 0; i < n - 1; ++i)
     {
-        M_.Add(i, i, 1.0);
-        D_.Add(i, i, -1.0);
-        D_.Add(i + 1, i, 1.0);
-        vertex_edge_.Add(i, i, 1.0);
-        vertex_edge_.Add(i + 1, i, 1.0);
+        edge_weight[i] = 1.0;
+        vertex_edge.Add(i, i, 1.0);
+        vertex_edge.Add(i + 1, i, 1.0);
     }
-    M_.Finalize();
-    D_.Finalize();
-    vertex_edge_.Finalize();
+    vertex_edge.Finalize();
+
+    graph_ = Graph(MPI_COMM_WORLD, vertex_edge, edge_weight);
 }
 
 int main(int argc, char* argv[])
@@ -111,10 +105,9 @@ int main(int argc, char* argv[])
     mfem::Vector weight(global_size - 1);
     weight = 1.0;
 
-    Graph smoothg_graph(comm, graph.GetVertexEdge(), weight);
     std::cout << "Finished constructing Graph." << std::endl;
 
-    Upscale upscale(smoothg_graph, upscale_param, &global_partitioning);
+    Upscale upscale(graph.GetGraph(), upscale_param, &global_partitioning);
     std::cout << "Finished constructing Upscale." << std::endl;
     upscale.PrintInfo();
 
