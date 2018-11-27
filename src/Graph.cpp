@@ -70,6 +70,18 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
     edge_trueedge_.reset(trueedge_edge->Transpose());
 }
 
+Graph::Graph(const Graph& other) noexcept
+    : vertex_edge_local_(other.vertex_edge_local_),
+      split_edge_weight_(other.split_edge_weight_)
+{
+    unique_ptr<mfem::HypreParMatrix> trueedge_edge(other.edge_trueedge_->Transpose());
+    edge_trueedge_.reset(trueedge_edge->Transpose());
+
+    other.vert_loc_to_glo_.Copy(vert_loc_to_glo_);
+    other.edge_loc_to_glo_.Copy(edge_loc_to_glo_);
+    other.vertex_starts_.Copy(vertex_starts_);
+}
+
 Graph::Graph(Graph&& other) noexcept
 {
     swap(*this, other);
