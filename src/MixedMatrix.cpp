@@ -31,73 +31,11 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         const mfem::Vector& weight,
-                         const mfem::SparseMatrix& w_block,
-                         const mfem::HypreParMatrix& edge_d_td,
-                         DistributeWeight dist_weight)
-    : edge_d_td_(&edge_d_td),
+MixedMatrix::MixedMatrix(const Graph& graph, const mfem::SparseMatrix& w_block)
+    : edge_d_td_(&graph.GetEdgeToTrueEdge()),
       edge_td_d_(edge_d_td_->Transpose())
 {
-    assert(edge_d_td);
-    assert(weight.Size() == vertex_edge.Width());
-    assert(edge_d_td_->Height() == vertex_edge.Width());
-
-    mfem::Vector weight_cut;
-
-    if (static_cast<bool>(dist_weight))
-    {
-        weight_cut = weight;
-
-        unique_ptr<mfem::HypreParMatrix> edge_d_td_d(ParMult(edge_d_td_, edge_td_d_.get()));
-        HYPRE_Int* junk_map;
-        mfem::SparseMatrix offd;
-        edge_d_td_d->GetOffd(offd, junk_map);
-
-        assert(offd.Height() == weight.Size());
-
-        for (int i = 0; i < weight_cut.Size(); i++)
-        {
-            if (offd.RowSize(i))
-            {
-                weight_cut(i) *= 2;
-            }
-        }
-    }
-    else
-    {
-        weight_cut.SetDataAndSize(weight.GetData(), weight.Size());
-    }
-
-    Init(vertex_edge, weight_cut, w_block);
-}
-
-MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         const mfem::Vector& weight,
-                         const mfem::Vector& w_block,
-                         const mfem::HypreParMatrix& edge_d_td,
-                         DistributeWeight dist_weight)
-    : MixedMatrix(vertex_edge, weight, VectorToMatrix(w_block), edge_d_td, dist_weight)
-{
-}
-
-MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         const mfem::Vector& weight,
-                         const mfem::HypreParMatrix& edge_d_td,
-                         DistributeWeight dist_weight)
-    : MixedMatrix(vertex_edge, weight, mfem::Vector(), edge_d_td, dist_weight)
-{
-}
-
-MixedMatrix::MixedMatrix(const mfem::SparseMatrix& vertex_edge,
-                         const std::vector<mfem::Vector>& local_weight,
-                         const mfem::HypreParMatrix& edge_d_td)
-    : edge_d_td_(&edge_d_td), edge_td_d_(edge_d_td.Transpose())
-{
-    mbuilder_ = make_unique<ElementMBuilder>(local_weight, vertex_edge);
-    M_ = mbuilder_->BuildAssembledM();
-    D_ = ConstructD(vertex_edge, edge_d_td);
-    GenerateRowStarts();
+    Init(graph.GetVertexToEdge(), graph.GetEdgeWeight(), w_block);
 }
 
 MixedMatrix::MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
@@ -144,14 +82,13 @@ void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
 
 /// @todo better documentation of the 1/-1 issue, make it optional?
 void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
-                       const mfem::Vector& weight,
+                       const std::vector<mfem::Vector>& edge_weight_split,
                        const mfem::SparseMatrix& w_block)
 {
-    const mfem::HypreParMatrix& edge_d_td(*edge_d_td_);
     const int nvertices = vertex_edge.Height();
 
     //    SetMFromWeightVector(weight);
-    mbuilder_ = make_unique<ElementMBuilder>(weight, vertex_edge);
+    mbuilder_ = make_unique<ElementMBuilder>(edge_weight_split, vertex_edge);
     M_ = mbuilder_->BuildAssembledM();
 
     if (w_block.Height() == nvertices && w_block.Width() == nvertices)
@@ -160,7 +97,7 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
         (*W_) *= -1.0;
     }
 
-    D_ = ConstructD(vertex_edge, edge_d_td);
+    D_ = ConstructD(vertex_edge, *edge_d_td_);
     GenerateRowStarts();
 }
 

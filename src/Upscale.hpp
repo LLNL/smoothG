@@ -37,6 +37,28 @@ namespace smoothg
 class Upscale : public mfem::Operator
 {
 public:
+
+    /**
+       @brief Construct upscaled system and solver for graph Laplacian.
+
+       @param graph the graph on which the graph Laplacian is defined
+       @param param upscaling parameters
+       @param partitioning partitioning of vertices for the first coarsening.
+              If not provided, will call METIS to generate one based on param
+       @param edge_boundary_att edge to boundary attribute relation. If not
+              provided, will assume no boundary
+       @param ess_attr indicate which boundary attributes to impose essential
+              edge condition. If not provided, will assume no boundary
+       @param w_block the W matrix in the saddle-point system. If not provided,
+              it will assumed to be zero
+    */
+    Upscale(const Graph& graph,
+            const UpscaleParameters& param = UpscaleParameters(),
+            const mfem::Array<int>* partitioning = nullptr,
+            const mfem::SparseMatrix* edge_boundary_att = nullptr,
+            const mfem::Array<int>* ess_attr = nullptr,
+            const mfem::SparseMatrix& w_block = SparseIdentity(0));
+
     /**
        @brief Apply the upscaling.
 
@@ -172,12 +194,21 @@ public:
         return coarsener_[level]->get_Pu();
     }
 
+    /// Create Fine Level Solver
+    void MakeFineSolver();
+
+    void MakeSolver(int level);
+
+    /// coeff should have the size of the number of *vertices* in the fine graph
+    void RescaleFineCoefficient(const mfem::Vector& coeff);
+
+    /// coeff should have the size of the number of *aggregates*
+    /// in the coarse graph
+    void RescaleCoarseCoefficient(const mfem::Vector& coeff);
+
 protected:
-    Upscale(MPI_Comm comm, int size)
-        : Operator(size), comm_(comm), setup_time_(0.0)
-    {
-        MPI_Comm_rank(comm_, &myid_);
-    }
+
+    void Init(const Graph& graph, const mfem::Array<int>& partitioning);
 
     void MakeVectors(int level)
     {
@@ -203,6 +234,10 @@ protected:
     /// why exactly is this mutable?
     mutable std::vector<mfem::Vector> constant_rep_;
 
+    const mfem::SparseMatrix* edge_boundary_att_;
+    const mfem::Array<int>* ess_attr_;
+
+    const UpscaleParameters& param_;
 private:
     void SetOperator(const mfem::Operator& op) {};
 };

@@ -90,8 +90,10 @@ int main(int argc, char* argv[])
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
     auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh.get());
 
+    Graph graph(vertex_edge, *edge_d_td);
+
     // Build multilevel graph topology
-    auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, &edge_boundaryattr,
+    auto graph_topos = MultilevelGraphTopology(graph, &edge_boundaryattr,
                                                num_levels, coarsening_factor);
 
     // Visualize aggregates in all levels
@@ -123,9 +125,7 @@ void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmes
         int* partitioning = vertex_Agg.GetJ();
 
         // Make better coloring (better with serial run)
-        const auto& Agg_face = graph_topos[i].Agg_face_;
-        auto face_Agg = smoothg::Transpose(Agg_face);
-        auto Agg_Agg = smoothg::Mult(Agg_face, face_Agg);
+        mfem::SparseMatrix Agg_Agg = smoothg::AAt(graph_topos[i].Agg_face_);
         mfem::Array<int> colors;
         GetElementColoring(colors, Agg_Agg);
         const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());

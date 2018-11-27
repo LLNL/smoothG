@@ -254,26 +254,24 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
-    // Create Upscaler and Solve
-    unique_ptr<FiniteVolumeMLMC> fvupscale;
-
+    unique_ptr<Graph> graph;
     if (elem_mass == false)
     {
-        fvupscale = make_unique<FiniteVolumeMLMC>(
-                        comm, vertex_edge, weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, upscale_param);
+        graph = make_unique<Graph>(vertex_edge, *edge_d_td, weight);
     }
     else
     {
-        fvupscale = make_unique<FiniteVolumeMLMC>(
-                        comm, vertex_edge, local_weight, partitioning, *edge_d_td,
-                        edge_boundary_att, ess_attr, upscale_param);
+        graph = make_unique<Graph>(vertex_edge, *edge_d_td, local_weight);
     }
-    fvupscale->PrintInfo();
-    fvupscale->ShowSetupTime();
-    fvupscale->MakeFineSolver();
 
-    mfem::BlockVector rhs_fine(fvupscale->GetBlockVector(0));
+    // Create Upscaler and Solve
+    Upscale upscale(*graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr);
+
+    upscale.PrintInfo();
+    upscale.ShowSetupTime();
+    upscale.MakeFineSolver();
+
+    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
@@ -313,16 +311,16 @@ int main(int argc, char* argv[])
         sampler->NewSample();
 
         auto coarse_coefficient = sampler->GetCoarseCoefficient();
-        fvupscale->RescaleCoarseCoefficient(coarse_coefficient);
-        auto sol_upscaled = fvupscale->Solve(1, rhs_fine);
-        fvupscale->ShowSolveInfo(1);
+        upscale.RescaleCoarseCoefficient(coarse_coefficient);
+        auto sol_upscaled = upscale.Solve(1, rhs_fine);
+        upscale.ShowSolveInfo(1);
 
         auto fine_coefficient = sampler->GetFineCoefficient();
-        fvupscale->RescaleFineCoefficient(fine_coefficient);
-        auto sol_fine = fvupscale->Solve(0, rhs_fine);
-        fvupscale->ShowSolveInfo(0);
+        upscale.RescaleFineCoefficient(fine_coefficient);
+        auto sol_fine = upscale.Solve(0, rhs_fine);
+        upscale.ShowSolveInfo(0);
 
-        auto error_info = fvupscale->ComputeErrors(sol_upscaled, sol_fine);
+        auto error_info = upscale.ComputeErrors(sol_upscaled, sol_fine);
 
         if (myid == 0)
         {

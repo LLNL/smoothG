@@ -96,7 +96,7 @@ void Visualize(const mfem::Vector& sol,
     vis_v << "keys cjl\n";
 
     MPI_Barrier(pmesh->GetComm());
-};
+}
 
 int main(int argc, char* argv[])
 {
@@ -254,19 +254,20 @@ int main(int argc, char* argv[])
     double total_coarse_time = 0.0;
     double total_fine_time = 0.0;
 
-    // Create Upscaler
-    auto fvupscale = std::make_shared<FiniteVolumeUpscale>(
-                         comm, vertex_edge, weight, W_block, partitioning, *edge_d_td,
-                         edge_boundary_att, ess_attr, upscale_param);
+    Graph graph(vertex_edge, *edge_d_td, weight);
 
-    fvupscale->MakeFineSolver();
-    fvupscale->PrintInfo();
-    fvupscale->ShowSetupTime();
+    // Create Upscaler
+    auto upscale = std::make_shared<Upscale>(
+                       graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr, W_block);
+
+    upscale->MakeFineSolver();
+    upscale->PrintInfo();
+    upscale->ShowSetupTime();
 
     const int num_aggs = partitioning.Max() + 1;
     if (myid == 0)
         std::cout << "Number of aggregates: " << num_aggs << std::endl;
-    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), num_aggs, nDimensions,
+    PDESampler pdesampler(upscale, ufespace.GetVSize(), num_aggs, nDimensions,
                           cell_volume, kappa, seed + myid);
 
     double max_p_error = 0.0;
@@ -276,13 +277,13 @@ int main(int argc, char* argv[])
         pdesampler.NewSample();
 
         auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-        auto sol_upscaled = fvupscale->Interpolate(1, sol_coarse);
+        auto sol_upscaled = upscale->Interpolate(1, sol_coarse);
         for (int i = 0; i < sol_upscaled.Size(); ++i)
             sol_upscaled(i) = std::log(sol_upscaled(i));
-        fvupscale->Orthogonalize(0, sol_upscaled);
-        int coarse_iterations = fvupscale->GetSolveIters(1);
+        upscale->Orthogonalize(0, sol_upscaled);
+        int coarse_iterations = upscale->GetSolveIters(1);
         total_coarse_iterations += coarse_iterations;
-        double coarse_time = fvupscale->GetSolveTime(1);
+        double coarse_time = upscale->GetSolveTime(1);
         total_coarse_time += coarse_time;
         for (int i = 0; i < mean_upscaled.Size(); ++i)
         {
@@ -295,9 +296,9 @@ int main(int argc, char* argv[])
         auto sol_fine = pdesampler.GetFineCoefficient();
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
-        int fine_iterations = fvupscale->GetSolveIters(0);
+        int fine_iterations = upscale->GetSolveIters(0);
         total_fine_iterations += fine_iterations;
-        double fine_time = fvupscale->GetSolveTime(0);
+        double fine_time = upscale->GetSolveTime(0);
         total_fine_time += fine_time;
         for (int i = 0; i < mean_fine.Size(); ++i)
         {

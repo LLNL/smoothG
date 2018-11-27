@@ -126,10 +126,6 @@ class ElementMBuilder : public CoarseMBuilder
 public:
     ElementMBuilder() {}
 
-    /// Fine level element M builder using edge weight
-    ElementMBuilder(const mfem::Vector& edge_weight,
-                    const mfem::SparseMatrix& elem_edgedof);
-
     /// Fine level element M builder using local edge weight
     ElementMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
                     const mfem::SparseMatrix& elem_edgedof);

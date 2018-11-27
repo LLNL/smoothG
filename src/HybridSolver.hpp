@@ -244,7 +244,6 @@ private:
     int num_edge_dofs_;
     int num_multiplier_dofs_;
 
-    bool use_spectralAMGe_;
     bool use_w_;
 
     int rescale_iter_;

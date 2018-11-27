@@ -41,6 +41,7 @@ public:
 
        @param mgL the actual mixed graph Laplacian
        @param gt the topology describing how vertices and edges are agglomerated
+       @param param upscaling parameters
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
                               GraphTopology gt,
@@ -56,7 +57,6 @@ private:
 
 private:
     const UpscaleParameters& param_;
-
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

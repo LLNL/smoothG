@@ -25,6 +25,156 @@
 namespace smoothg
 {
 
+Upscale::Upscale(const Graph& graph,
+                 const UpscaleParameters& param,
+                 const mfem::Array<int>* partitioning,
+                 const mfem::SparseMatrix* edge_boundary_att,
+                 const mfem::Array<int>* ess_attr,
+                 const mfem::SparseMatrix& w_block)
+    : Operator(graph.NumVertices()), comm_(graph.GetComm()), setup_time_(0.0),
+      edge_boundary_att_(edge_boundary_att), ess_attr_(ess_attr), param_(param)
+{
+    mfem::StopWatch chrono;
+    chrono.Start();
+
+    mixed_laplacians_.emplace_back(graph, w_block);
+
+    if (partitioning)
+    {
+        Init(graph, *partitioning);
+    }
+    else
+    {
+        mfem::Array<int> partition;
+        PartitionAAT(graph.GetVertexToEdge(), partition, param_.coarse_factor);
+        Init(graph, partition);
+    }
+
+    chrono.Stop();
+    setup_time_ += chrono.RealTime();
+}
+
+void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)
+{
+    MPI_Comm_rank(comm_, &myid_);
+
+    solver_.resize(param_.max_levels);
+    rhs_.resize(param_.max_levels);
+    sol_.resize(param_.max_levels);
+    std::vector<GraphTopology> gts;
+    gts.emplace_back(graph, partitioning, edge_boundary_att_);
+
+    // coarser levels: topology
+    for (int level = 2; level < param_.max_levels; ++level)
+    {
+        gts.emplace_back(gts.back(), param_.coarse_factor);
+    }
+
+    // coarser levels: matrices
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                    mixed_laplacians_[level - 1],
+                                    std::move(gts[level - 1]), param_));
+        coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
+
+        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
+        if (level < param_.max_levels - 1 || !param_.hybridization)
+        {
+            mixed_laplacians_.back().BuildM();
+        }
+    }
+
+    // fine level: solver
+    MakeFineSolver();
+    MakeVectors(0);
+
+    // coarser levels: solver
+    for (int level = 1; level < param_.max_levels; ++level)
+    {
+        MakeSolver(level);
+    }
+}
+
+void Upscale::MakeFineSolver()
+{
+    mfem::Array<int> marker;
+    if (edge_boundary_att_)
+    {
+        BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
+    }
+
+    if (param_.hybridization) // Hybridization solver
+    {
+        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
+                                               edge_boundary_att_, &marker);
+    }
+    else // L2-H1 block diagonal preconditioner
+    {
+        mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
+        mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
+
+        for (int mm = 0; mm < marker.Size(); ++mm)
+        {
+            if (marker[mm])
+            {
+                //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
+
+                const bool set_diag = true;
+                Mref.EliminateRow(mm, set_diag);
+            }
+        }
+        if (marker.Size())
+        {
+            Dref.EliminateCols(marker);
+        }
+
+        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
+    }
+}
+
+void Upscale::MakeSolver(int level)
+{
+    // TODO: unify construction of solvers in all levels
+    assert(level > 0);
+
+    mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
+    mfem::Array<int> marker;
+
+    if (edge_boundary_att_)
+    {
+        marker.SetSize(Dref.Width());
+        MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
+                           coarsener_[level - 1]->construct_face_facedof_table(),
+                           *ess_attr_, marker);
+    }
+
+    if (param_.hybridization) // Hybridization solver
+    {
+        auto face_bdratt = coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
+        solver_[level] = make_unique<HybridSolver>(
+                             comm_, GetMatrix(level), *coarsener_[level - 1],
+                             &face_bdratt, &marker, 0, param_.saamge_param);
+    }
+    else // L2-H1 block diagonal preconditioner
+    {
+        GetMatrix(level).BuildM();
+        mfem::SparseMatrix& Mref = GetMatrix(level).GetM();
+        for (int mm = 0; mm < marker.Size(); ++mm)
+        {
+            // Assume M diagonal, no ess data
+            if (marker[mm])
+                Mref.EliminateRow(mm, true);
+        }
+        if (marker.Size())
+        {
+            Dref.EliminateCols(marker);
+        }
+        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level));
+    }
+    MakeVectors(level);
+}
+
 void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     // restrict right-hand-side x
@@ -490,6 +640,38 @@ void Upscale::DumpDebug(const std::string& prefix) const
         std::ofstream outPu(s.str().c_str());
         outPu << std::scientific << std::setprecision(15);
         c->get_Pu().Print(outPu, 1);
+    }
+}
+
+/// this implementation is sloppy (also, @todo should be combined with
+/// RescaleCoarseCoefficient with int level argument)
+void Upscale::RescaleFineCoefficient(const mfem::Vector& coeff)
+{
+    GetMatrix(0).UpdateM(coeff);
+    if (!param_.hybridization)
+    {
+        MakeFineSolver();
+    }
+    else
+    {
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[0].get());
+        assert(hybrid_solver);
+        hybrid_solver->UpdateAggScaling(coeff);
+    }
+}
+
+void Upscale::RescaleCoarseCoefficient(const mfem::Vector& coeff)
+{
+    if (!param_.hybridization)
+    {
+        GetMatrix(1).UpdateM(coeff);
+        MakeSolver(1);
+    }
+    else
+    {
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[1].get());
+        assert(hybrid_solver);
+        hybrid_solver->UpdateAggScaling(coeff);
     }
 }
 

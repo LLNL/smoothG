@@ -15,6 +15,7 @@
 
 /**
    @file coarse_assembling.cpp
+
    @brief Test if the coarse M and D constructed in GraphCoarsen coincide
    with the RAP approach.
 */
@@ -120,7 +121,7 @@ int main(int argc, char* argv[])
                               : pmesh->ElementToFaceTable();
     const mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
-    // Construct agglomerated topology based on METIS or Cartesian agglomeration
+    // Construct agglomerated topology based on METIS
     mfem::Array<int> partitioning;
     PartitionAAT(vertex_edge, partitioning, upscale_param.coarse_factor);
 
@@ -128,22 +129,23 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
-    // Create Upscaler and Solve
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                                  edge_boundary_att, ess_attr, upscale_param);
+    Graph graph(vertex_edge, *edge_d_td, weight);
 
-    fvupscale.PrintInfo();
-    fvupscale.ShowSetupTime();
+    // Create Upscaler
+    Upscale upscale(graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr);
+
+    upscale.PrintInfo();
+    upscale.ShowSetupTime();
 
     for (int level = 1; level < upscale_param.max_levels; ++level)
     {
-        fvupscale.GetMatrix(level - 1).BuildM();
-        const mfem::SparseMatrix& Mfine(fvupscale.GetMatrix(level - 1).GetM());
-        mfem::SparseMatrix PsigmaT = smoothg::Transpose(fvupscale.GetPsigma(level - 1));
+        upscale.GetMatrix(level - 1).BuildM();
+        const mfem::SparseMatrix& Mfine(upscale.GetMatrix(level - 1).GetM());
+        mfem::SparseMatrix PsigmaT = smoothg::Transpose(upscale.GetPsigma(level - 1));
         unique_ptr<mfem::SparseMatrix> Mcoarse_RAP( mfem::RAP(Mfine, PsigmaT) );
 
-        fvupscale.GetMatrix(level).BuildM();
-        const mfem::SparseMatrix& Mcoarse_smoothG = fvupscale.GetMatrix(level).GetM();
+        upscale.GetMatrix(level).BuildM();
+        const mfem::SparseMatrix& Mcoarse_smoothG = upscale.GetMatrix(level).GetM();
 
         Mcoarse_RAP->Add(-1.0, Mcoarse_smoothG);
         double diff_maxnorm_loc = Mcoarse_RAP->MaxNorm();
@@ -164,12 +166,12 @@ int main(int argc, char* argv[])
 
     for (int level = 1; level < upscale_param.max_levels; ++level)
     {
-        const mfem::SparseMatrix& Dfine(fvupscale.GetMatrix(level - 1).GetD());
-        const mfem::SparseMatrix& Psigma = fvupscale.GetPsigma(level - 1);
+        const mfem::SparseMatrix& Dfine(upscale.GetMatrix(level - 1).GetD());
+        const mfem::SparseMatrix& Psigma = upscale.GetPsigma(level - 1);
         unique_ptr<mfem::SparseMatrix> Dcoarse_RAP(
-            mfem::RAP(fvupscale.GetPu(level - 1), Dfine, Psigma) );
+            mfem::RAP(upscale.GetPu(level - 1), Dfine, Psigma) );
 
-        const mfem::SparseMatrix& Dcoarse_smoothG = fvupscale.GetMatrix(level).GetD();
+        const mfem::SparseMatrix& Dcoarse_smoothG = upscale.GetMatrix(level).GetD();
 
         Dcoarse_RAP->Add(-1.0, Dcoarse_smoothG);
         double diff_maxnorm_loc = Dcoarse_RAP->MaxNorm();

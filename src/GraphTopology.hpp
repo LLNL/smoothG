@@ -25,6 +25,7 @@
 #include <assert.h>
 
 #include "mfem.hpp"
+#include "Graph.hpp"
 
 namespace smoothg
 {
@@ -50,13 +51,26 @@ public:
 
        All of this data is local to a single processor
 
-       @param vertex_edge (unsigned) table describing graph
-       @param edge_d_td "dof_truedof" relation describing parallel data
+       @param vertex_edge local vertex to edge relation of a distributed graph
+       @param edge_trueedge edge to true edge relation of a distributed graph
+       @param partition partition vector for local vertices
+       @param edge_boundaryattr boundary attributes for edges with boundary conditions
+    */
+    GraphTopology(const mfem::SparseMatrix& vertex_edge,
+                  const mfem::HypreParMatrix& edge_trueedge,
+                  const mfem::Array<int>& partition,
+                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
+
+    /**
+       @brief Build agglomerated topology relation tables of a given graph
+
+       All of this data is local to a single processor
+
+       @param graph graph oject containing vertex edge relation
        @param partition partition vector for vertices
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
-    GraphTopology(mfem::SparseMatrix& vertex_edge,
-                  const mfem::HypreParMatrix& edge_d_td,
+    GraphTopology(const Graph& graph,
                   const mfem::Array<int>& partition,
                   const mfem::SparseMatrix* edge_boundaryattr = nullptr);
 
@@ -69,7 +83,7 @@ public:
        @param finer_graph_topology finer level graph topology
        @param coarsening_factor intended number of vertices in an aggregate
     */
-    GraphTopology(GraphTopology& finer_graph_topology, int coarsening_factor);
+    GraphTopology(const GraphTopology& finer_graph_topology, int coarsening_factor);
 
     /**
        @brief Partial graph-based constructor for graph topology.
@@ -78,15 +92,14 @@ public:
 
        @todo the arguments to this constructor should be carefully documented
     */
-    GraphTopology(const mfem::SparseMatrix& face_edge,
+    GraphTopology(const mfem::SparseMatrix& vertex_edge,
+                  const mfem::SparseMatrix& face_edge,
                   const mfem::SparseMatrix& Agg_vertex,
                   const mfem::SparseMatrix& Agg_edge,
-                  const mfem::HypreParMatrix& pAggExt_vertex,
-                  const mfem::HypreParMatrix& pAggExt_edge,
                   const mfem::SparseMatrix& Agg_face,
-                  const mfem::HypreParMatrix& edge_d_td,
-                  const mfem::HypreParMatrix& face_d_td,
-                  const mfem::HypreParMatrix& face_d_td_d);
+                  const mfem::HypreParMatrix& edge_trueedge,
+                  const mfem::HypreParMatrix& face_trueface,
+                  const mfem::HypreParMatrix& face_trueface_face);
 
     /**
        @brief Move constructor
@@ -96,9 +109,9 @@ public:
     ~GraphTopology() {}
 
     /// Return number of faces in aggregated graph
-    unsigned int get_num_faces() const { return Agg_face_.Width(); }
+    unsigned int NumFaces() const { return Agg_face_.Width(); }
     /// Return number of aggregates in coarse graph
-    unsigned int get_num_aggregates() const { return Agg_face_.Height(); }
+    unsigned int NumAggs() const { return Agg_face_.Height(); }
 
     ///@name Getters for row/column partitions of tables
     ///@{
@@ -112,15 +125,18 @@ public:
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
     ///@}
 
-    ///@name dof to true_dof tables for edge and face
+    // vertex to edge table
+    mfem::SparseMatrix vertex_edge_;
+
+    ///@name entity to true_entity tables for edge and face
     ///@{
-    const mfem::HypreParMatrix& edge_d_td_;
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_;
+    const mfem::HypreParMatrix& edge_trueedge_;
+    std::unique_ptr<mfem::HypreParMatrix> face_trueface_;
     ///@}
 
-    ///@name dof_truedof_dof tables, which connect dofs across processors that share a true dof
+    ///@name entity_trueentity_entity tables, which connect dofs across processors that share a true entity
     ///@{
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_d_;
+    std::unique_ptr<mfem::HypreParMatrix> face_trueface_face_;
     ///@}
 
     ///@name topology relation tables, connecting aggregates, edges, faces, and vertices
@@ -132,20 +148,13 @@ public:
     mfem::SparseMatrix face_edge_;
     ///@}
 
-    ///@name extended aggregate relation tables, using "true dofs"
-    ///@{
-    std::unique_ptr<mfem::HypreParMatrix> pAggExt_vertex_;
-    std::unique_ptr<mfem::HypreParMatrix> pAggExt_edge_;
-    ///@}
-
     /// "face" to boundary attribute table
     mfem::SparseMatrix face_bdratt_;
 
 private:
-    void Init(mfem::SparseMatrix& vertex_edge,
-              const mfem::Array<int>& partition,
+    void Init(const mfem::Array<int>& partition,
               const mfem::SparseMatrix* edge_boundaryattr,
-              const mfem::HypreParMatrix* edge_d_td_d);
+              const mfem::HypreParMatrix* edge_trueedge_edge_ptr);
 
     mfem::Array<HYPRE_Int> vertex_start_;
     mfem::Array<HYPRE_Int> edge_start_;
@@ -154,8 +163,8 @@ private:
 }; // class GraphTopology
 
 std::vector<GraphTopology> MultilevelGraphTopology(
-    mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_d_td,
-    const mfem::SparseMatrix* edge_boundaryattr, int num_levels, int coarsening_factor);
+    const Graph& graph, const mfem::SparseMatrix* edge_boundaryattr,
+    int num_levels, int coarsening_factor);
 
 } // namespace smoothg
 

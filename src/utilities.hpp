@@ -169,73 +169,6 @@ int MarkDofsOnBoundary(
     const mfem::Array<int>& bndrAttributesMarker, mfem::Array<int>& dofMarker);
 
 /**
-    @brief Manage topological information for the coarsening
-
-    Extract the local submatrix of the global vertex to edge relation table
-    Each vertex belongs to one and only one processor, while some edges are
-    shared by two processors, indicated by the edge to true edge
-    HypreParMatrix edge_e_te
-*/
-class ParGraph
-{
-public:
-    /**
-       @brief Distribute a graph to the communicator.
-
-       Generally we read a global graph on one processor, and then distribute
-       it. This constructor handles that process.
-
-       @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which agglomerate it
-              is in. Can be obtained from MetisGraphPartitioner. This class
-              will somehow localize these agglomerates to processors?
-    */
-    ParGraph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Array<int>& partition_global);
-
-    ///@name Getters for tables that describe parallel graph
-    ///@{
-    mfem::SparseMatrix& GetLocalVertexToEdge()
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::SparseMatrix& GetLocalVertexToEdge() const
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::Array<int>& GetLocalPartition() const
-    {
-        return partition_local_;
-    }
-
-    const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
-    {
-        return *edge_e_te_;
-    }
-
-    const mfem::Array<int>& GetVertexLocalToGlobalMap() const
-    {
-        return vert_local2global_;
-    }
-
-    const mfem::Array<int>& GetEdgeLocalToGlobalMap() const
-    {
-        return edge_local2global_;
-    }
-    ///@}
-private:
-    mfem::SparseMatrix vertex_edge_local_;
-    mfem::Array<int> partition_local_;
-    std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
-    mfem::Array<int> vert_local2global_;
-    mfem::Array<int> edge_local2global_;
-};
-
-/**
    @brief Treat a SparseMatrix as a (boolean) table, and return the column
    indices of a given row in the Array J
 
@@ -416,6 +349,8 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
    @param el_el element connectivity matrix (assuming nonzero diagonal)
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
+std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 
 void FVMeshCartesianPartition(
     mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
