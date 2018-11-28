@@ -450,6 +450,12 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
 */
 void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
                  mfem::Array<int>& out);
+
+/**
+   @brief Make a copy of mfem::HypreParMatrix
+*/
+std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

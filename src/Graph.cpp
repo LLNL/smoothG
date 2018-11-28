@@ -41,12 +41,8 @@ Graph::Graph(MPI_Comm comm,
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
              const mfem::Vector& edge_weight_local)
-    : vertex_edge_local_(vertex_edge_local)
+    : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge))
 {
-    // temporary work-around (TODO: make a copy function for HypreParMatrix)
-    unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
-    edge_trueedge_.reset(trueedge_edge->Transpose());
-
     if (edge_weight_local.Size() > 0)
     {
         SplitEdgeWeight(edge_weight_local);
@@ -63,20 +59,15 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
              const std::vector<mfem::Vector>& split_edge_weight)
-    : vertex_edge_local_(vertex_edge_local), split_edge_weight_(split_edge_weight)
-{
-    // temporary work-around (TODO: make a copy function for HypreParMatrix)
-    unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
-    edge_trueedge_.reset(trueedge_edge->Transpose());
-}
+    : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge)),
+      split_edge_weight_(split_edge_weight)
+{ }
 
 Graph::Graph(const Graph& other) noexcept
     : vertex_edge_local_(other.vertex_edge_local_),
+      edge_trueedge_(Copy(*other.edge_trueedge_)),
       split_edge_weight_(other.split_edge_weight_)
 {
-    unique_ptr<mfem::HypreParMatrix> trueedge_edge(other.edge_trueedge_->Transpose());
-    edge_trueedge_.reset(trueedge_edge->Transpose());
-
     other.vert_loc_to_glo_.Copy(vert_loc_to_glo_);
     other.edge_loc_to_glo_.Copy(edge_loc_to_glo_);
     other.vertex_starts_.Copy(vertex_starts_);
