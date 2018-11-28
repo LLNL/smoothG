@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
 
     // Assembled rescaled fine and coarse M through direct assembling and RAP
     auto fine_M2 = RescaledFineM(sigmafespace, elem_scale, interp_agg_scale);
-    auto& Psigma = coarsener->get_Psigma();
+    auto& Psigma = coarsener->GetPsigma();
     unique_ptr<mfem::SparseMatrix> coarse_M2(mfem::RAP(Psigma, fine_M2, Psigma));
 
     // Check relative differences measured in Frobenius norm

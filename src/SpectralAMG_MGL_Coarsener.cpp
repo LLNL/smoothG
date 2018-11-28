@@ -71,8 +71,8 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(const mfem::Vector&
                                        Pu_, Psigma_, face_facedof_table_,
                                        *coarse_m_builder_, constant_rep);
 
-    CoarseD_ = graph_coarsen_->GetCoarseD();
-    CoarseW_ = graph_coarsen_->GetCoarseW();
+    coarse_D_ = graph_coarsen_->GetCoarseD();
+    coarse_W_ = graph_coarsen_->GetCoarseW();
 }
 
 } // namespace smoothg

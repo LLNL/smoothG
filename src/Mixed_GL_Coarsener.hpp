@@ -67,55 +67,21 @@ public:
         is_coarse_subspace_constructed_ = true;
     }
 
-    const mfem::SparseMatrix& get_Psigma() const;
-    const mfem::SparseMatrix& get_Pu() const;
-    const std::vector<mfem::DenseMatrix>& get_CM_el() const;
-
-    /// Restrict (coarsen) the (block) right-hand side by multiplying by \f$ P_\sigma, P_u \f$
-    std::unique_ptr<mfem::BlockVector> restrict_rhs(
-        const mfem::BlockVector& rhs) const;
+    const mfem::SparseMatrix& GetPsigma() const;
+    const mfem::SparseMatrix& GetPu() const;
 
     // Mixed form
-    void restrict(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
-    void interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
+    void Restrict(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
+    void Interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
 
     // Primal form
-    void restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
-    void interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
+    void Restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
+    void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
     const mfem::SparseMatrix& construct_Agg_cvertexdof_table() const;
-    const mfem::SparseMatrix& construct_Agg_cedgedof_table() const;
     const mfem::SparseMatrix& construct_face_facedof_table() const;
 
     const mfem::HypreParMatrix& get_face_dof_truedof_table() const;
-
-    /**
-        @brief Get the Array of offsets representing the block structure of
-        the coarse matrix.
-
-        The Array is of length 3. The first element is the starting
-        index of the first block (always 0), the second element is the
-        starting index of the second block, and the third element is
-        the total number of rows in the matrix.
-    */
-    mfem::Array<int>& get_blockoffsets() const;
-
-    unsigned int get_num_faces()
-    {
-        return graph_topology_.NumFaces();
-    }
-    unsigned int get_num_aggregates()
-    {
-        return graph_topology_.NumAggs();
-    }
-    const GraphTopology& get_GraphTopology_ref() const
-    {
-        return graph_topology_;
-    }
-    const GraphCoarsen& get_GraphCoarsen_ref() const
-    {
-        return *graph_coarsen_;
-    }
 
     /**
        @brief Get the coarse M matrix
@@ -130,7 +96,7 @@ public:
     */
     std::unique_ptr<mfem::SparseMatrix> GetCoarseD()
     {
-        return std::move(CoarseD_);
+        return std::move(coarse_D_);
     }
 
     /**
@@ -138,7 +104,7 @@ public:
     */
     std::unique_ptr<mfem::SparseMatrix> GetCoarseW()
     {
-        return std::move(CoarseW_);
+        return std::move(coarse_W_);
     }
 
     /**
@@ -168,17 +134,16 @@ protected:
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;
 
-    mutable std::unique_ptr<mfem::Array<int>> coarseBlockOffsets_;
     mutable std::unique_ptr<mfem::HypreParMatrix> face_dof_truedof_table_;
 
     /// Builder for coarse M operator
     std::unique_ptr<CoarseMBuilder> coarse_m_builder_;
 
     /// Coarse D operator
-    std::unique_ptr<mfem::SparseMatrix> CoarseD_;
+    std::unique_ptr<mfem::SparseMatrix> coarse_D_;
 
     /// Coarse W operator
-    std::unique_ptr<mfem::SparseMatrix> CoarseW_;
+    std::unique_ptr<mfem::SparseMatrix> coarse_W_;
 
     Graph coarse_graph_;
 }; // class Mixed_GL_Coarsener

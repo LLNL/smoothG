@@ -186,12 +186,12 @@ public:
 
     const mfem::SparseMatrix& GetPsigma(int level) const
     {
-        return coarsener_[level]->get_Psigma();
+        return coarsener_[level]->GetPsigma();
     }
 
     const mfem::SparseMatrix& GetPu(int level) const
     {
-        return coarsener_[level]->get_Pu();
+        return coarsener_[level]->GetPu();
     }
 
     /// Create Fine Level Solver

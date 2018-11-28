@@ -78,10 +78,8 @@ void UpscalingStatistics::ComputeErrorSquare(
     for (int j = k; j > 0; --j)
     {
         MFEM_ASSERT(j == 1, "Only a two-level method is considered");
-        mgLc.get_Psigma().Mult(help_[j]->GetBlock(0),
-                               help_[j - 1]->GetBlock(0));
-        mgLc.get_Pu().Mult(help_[j]->GetBlock(1),
-                           help_[j - 1]->GetBlock(1));
+        mgLc.GetPsigma().Mult(help_[j]->GetBlock(0), help_[j - 1]->GetBlock(0));
+        mgLc.GetPu().Mult(help_[j]->GetBlock(1), help_[j - 1]->GetBlock(1));
     }
 
     if (!mgL[0].CheckW())
@@ -93,8 +91,7 @@ void UpscalingStatistics::ComputeErrorSquare(
     for (int j(0); j <= k; ++j)
     {
         MFEM_ASSERT(help_[j]->Size() == sol[j]->Size() &&
-                    sol[j]->GetBlock(0).Size()
-                    == mgL[j].GetD().Width(),
+                    sol[j]->GetBlock(0).Size() == mgL[j].GetD().Width(),
                     "Graph Laplacian");
 
         int sigmasize = sol[0]->GetBlock(0).Size();

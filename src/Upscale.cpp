@@ -170,7 +170,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     rhs_[0]->GetBlock(1) = x;
     for (int i = 0; i < level; ++i)
     {
-        coarsener_[i]->restrict(rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
+        coarsener_[i]->Restrict(rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
     }
 
     // solve
@@ -188,7 +188,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
     {
-        coarsener_[i]->interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
+        coarsener_[i]->Interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
     y = sol_[0]->GetBlock(1);
     Orthogonalize(0, y);
@@ -222,7 +222,7 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     *rhs_[0] = x;
     for (int i = 0; i < level; ++i)
     {
-        coarsener_[i]->restrict(*rhs_[i], * rhs_[i + 1]);
+        coarsener_[i]->Restrict(*rhs_[i], * rhs_[i + 1]);
     }
 
     // solve
@@ -236,7 +236,7 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
     {
-        coarsener_[i]->interpolate(*sol_[i + 1], *sol_[i]);
+        coarsener_[i]->Interpolate(*sol_[i + 1], *sol_[i]);
     }
     y = *sol_[0];
 }
@@ -287,7 +287,7 @@ mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) c
 void Upscale::Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(coarsener_[level - 1]);
-    coarsener_[level - 1]->interpolate(x, y);
+    coarsener_[level - 1]->Interpolate(x, y);
 }
 
 mfem::Vector Upscale::Interpolate(int level, const mfem::Vector& x) const
@@ -303,7 +303,7 @@ void Upscale::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVect
 {
     assert(coarsener_[level - 1]);
 
-    coarsener_[level - 1]->interpolate(x, y);
+    coarsener_[level - 1]->Interpolate(x, y);
 }
 
 mfem::BlockVector Upscale::Interpolate(int level, const mfem::BlockVector& x) const
@@ -319,7 +319,7 @@ void Upscale::Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(coarsener_[level - 1]);
 
-    coarsener_[level - 1]->restrict(x, y);
+    coarsener_[level - 1]->Restrict(x, y);
 }
 
 mfem::Vector Upscale::Restrict(int level, const mfem::Vector& x) const
@@ -334,7 +334,7 @@ void Upscale::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector&
 {
     assert(coarsener_[level - 1]);
 
-    coarsener_[level - 1]->restrict(x, y);
+    coarsener_[level - 1]->Restrict(x, y);
 }
 
 mfem::BlockVector Upscale::Restrict(int level, const mfem::BlockVector& x) const
@@ -623,12 +623,12 @@ void Upscale::DumpDebug(const std::string& prefix) const
         s << prefix << "Psigma" << counter << ".sparsematrix";
         std::ofstream outPsigma(s.str().c_str());
         outPsigma << std::scientific << std::setprecision(15);
-        c->get_Psigma().Print(outPsigma, 1);
+        c->GetPsigma().Print(outPsigma, 1);
         s.str("");
         s << prefix << "Pu" << counter++ << ".sparsematrix";
         std::ofstream outPu(s.str().c_str());
         outPu << std::scientific << std::setprecision(15);
-        c->get_Pu().Print(outPu, 1);
+        c->GetPu().Print(outPu, 1);
     }
 }
 
