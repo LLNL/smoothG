@@ -96,7 +96,6 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     Swap(face_start_, graph_topology.GetFaceStart());
 
     std::swap(fine_graph_, graph_topology.fine_graph_);
-    std::swap(coarse_graph_, graph_topology.coarse_graph_);
 
     edge_boundaryattr_ = graph_topology.edge_boundaryattr_;
     edge_trueedge_edge_ = graph_topology.edge_trueedge_edge_;
@@ -360,9 +359,7 @@ Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
     // Construct "face to true face" table
     face_trueface_ = BuildEntityToTrueEntity(*face_trueface_face_);
 
-    Graph coarse_graph(Agg_face_, *face_trueface_);
-    coarse_graph_ = &coarse_graph;
-    return coarse_graph;
+    return Graph(Agg_face_, *face_trueface_);
 }
 
 std::vector<GraphTopology> MultilevelGraphTopology(

@@ -39,7 +39,7 @@ MixedMatrix::MixedMatrix(const Graph& graph, const mfem::SparseMatrix& w_block,
     Init(graph.GetVertexToEdge(), graph.GetEdgeWeight(), w_block);
 }
 
-MixedMatrix::MixedMatrix(const Graph &graph, std::unique_ptr<MBuilder> mbuilder,
+MixedMatrix::MixedMatrix(const Graph& graph, std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,
                          const mfem::HypreParMatrix& edge_d_td,

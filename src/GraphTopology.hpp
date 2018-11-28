@@ -80,8 +80,6 @@ public:
 
     const Graph& FineGraph() const { return *fine_graph_; }
 
-    const Graph& CoarseGraph() const { return *coarse_graph_; }
-
     /// Return number of faces in aggregated graph
     unsigned int NumFaces() const { return Agg_face_.Width(); }
     /// Return number of aggregates in coarse graph
@@ -124,7 +122,6 @@ public:
 private:
 
     const Graph* fine_graph_;
-    const Graph* coarse_graph_;
 
     const mfem::SparseMatrix* edge_boundaryattr_;
     const mfem::HypreParMatrix* edge_trueedge_edge_;
