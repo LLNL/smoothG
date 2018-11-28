@@ -44,8 +44,8 @@ public:
        @param param upscaling parameters
     */
     SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                              GraphTopology gt,
-                              const UpscaleParameters& param = UpscaleParameters());
+                              const UpscaleParameters& param = UpscaleParameters(),
+                              const mfem::Array<int>* partitioning = nullptr);
 
 private:
     /**
@@ -57,6 +57,7 @@ private:
 
 private:
     const UpscaleParameters& param_;
+    const mfem::Array<int>* partitioning_;
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

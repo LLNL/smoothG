@@ -96,7 +96,8 @@ const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_face_facedof_table() con
 
 MixedMatrix Mixed_GL_Coarsener::GetCoarse()
 {
-    return MixedMatrix(GetCoarseMBuilder(), GetCoarseD(), GetCoarseW(), get_face_dof_truedof_table());
+    return MixedMatrix(coarse_graph_, GetCoarseMBuilder(), GetCoarseD(), GetCoarseW(),
+                       get_face_dof_truedof_table(), graph_topology_.face_bdratt_.get());
 }
 
 const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() const

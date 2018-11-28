@@ -208,7 +208,7 @@ public:
 
 protected:
 
-    void Init(const Graph& graph, const mfem::Array<int>& partitioning);
+    void Init(const mfem::Array<int>* partitioning);
 
     void MakeVectors(int level)
     {

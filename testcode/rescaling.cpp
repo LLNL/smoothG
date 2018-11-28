@@ -88,13 +88,9 @@ mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,
     return mfem::SparseMatrix(a1.SpMat());
 }
 
-unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(const Graph& graph,
-                                                     const MixedMatrix& mgL,
-                                                     const mfem::Array<int>& partition,
-                                                     const mfem::SparseMatrix* edge_bdratt)
+unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(const MixedMatrix& mgL,
+                                                     const mfem::Array<int>& partition)
 {
-    GraphTopology gt(graph, edge_bdratt);
-    gt.Coarsen(partition);
     UpscaleParameters param;
     param.spect_tol = 1.0;
     param.max_evects = 3;
@@ -102,8 +98,7 @@ unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(const Graph& graph,
     param.scaled_dual = false;
     param.energy_dual = false;
     param.coarse_components = false;
-    auto coarsener = make_unique<SpectralAMG_MGL_Coarsener>(
-                         mgL, std::move(gt), param);
+    auto coarsener = make_unique<SpectralAMG_MGL_Coarsener>(mgL, param, &partition);
     mfem::Vector constant_rep(mgL.GetD().Height());
     constant_rep = 1.0;
     coarsener->construct_coarse_subspace(constant_rep);
@@ -161,10 +156,10 @@ int main(int argc, char* argv[])
 
     // Create a fine level MixedMatrix corresponding to piecewise constant coefficient
     Graph graph = SetupFVGraph(sigmafespace, vertex_edge, elem_scale);
-    MixedMatrix fine_mgL(graph);
+    MixedMatrix fine_mgL(graph, SparseIdentity(0), &edge_bdratt);
 
     // Create a coarsener to build interpolation matrices and coarse M builder
-    auto coarsener = BuildCoarsener(graph, fine_mgL, partitioning, &edge_bdratt);
+    auto coarsener = BuildCoarsener(fine_mgL, partitioning);
 
     // Interpolate agg scaling (coarse level) to elements (fine level)
     mfem::Vector interp_agg_scale(pmesh->GetNE());

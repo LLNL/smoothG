@@ -37,52 +37,34 @@ Upscale::Upscale(const Graph& graph,
     mfem::StopWatch chrono;
     chrono.Start();
 
-    mixed_laplacians_.emplace_back(graph, w_block);
-
-    if (partitioning)
-    {
-        Init(graph, *partitioning);
-    }
-    else
-    {
-        mfem::Array<int> partition;
-        PartitionAAT(graph.GetVertexToEdge(), partition, param_.coarse_factor);
-        Init(graph, partition);
-    }
+    mixed_laplacians_.emplace_back(graph, w_block, edge_boundary_att_);
+    Init(partitioning);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
-void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)
+void Upscale::Init(const mfem::Array<int>* partitioning)
 {
     MPI_Comm_rank(comm_, &myid_);
 
     solver_.resize(param_.max_levels);
     rhs_.resize(param_.max_levels);
     sol_.resize(param_.max_levels);
-    std::vector<GraphTopology> gts;
-    gts.reserve(param_.max_levels - 1);
-    std::vector<Graph> graphs;
-    graphs.reserve(param_.max_levels);
-
-    graphs.push_back(graph);
-    gts.emplace_back(graphs.back(), edge_boundary_att_);
-    graphs.push_back(gts.back().Coarsen(partitioning));
-
-    // coarser levels: topology
-    for (int level = 2; level < param_.max_levels; ++level)
-    {
-        gts.emplace_back(graphs.back(), gts.back().face_bdratt_.get());
-        graphs.emplace_back(gts.back().Coarsen(param_.coarse_factor));
-    }
 
     // coarser levels: matrices
     for (int level = 1; level < param_.max_levels; ++level)
     {
-        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                    mixed_laplacians_[level - 1],
-                                    std::move(gts[level - 1]), param_));
+        if (level == 1)
+        {
+            coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                        mixed_laplacians_[level - 1], param_, partitioning));
+        }
+        else
+        {
+            coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
+                                        mixed_laplacians_[level - 1], param_));
+        }
         coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
 
         mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
@@ -148,20 +130,20 @@ void Upscale::MakeSolver(int level)
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
     mfem::Array<int> marker;
 
-    if (edge_boundary_att_)
+    auto face_bdratt = mixed_laplacians_[level].GetEdgeBdrAtt();
+    if (face_bdratt)
     {
         marker.SetSize(Dref.Width());
-        MarkDofsOnBoundary(*coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
+        MarkDofsOnBoundary(*face_bdratt,
                            coarsener_[level - 1]->construct_face_facedof_table(),
                            *ess_attr_, marker);
     }
 
     if (param_.hybridization) // Hybridization solver
     {
-        auto face_bdratt = *coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
         solver_[level] = make_unique<HybridSolver>(
                              comm_, GetMatrix(level), *coarsener_[level - 1],
-                             &face_bdratt, &marker, 0, param_.saamge_param);
+                             face_bdratt, &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {

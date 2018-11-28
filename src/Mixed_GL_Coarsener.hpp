@@ -43,9 +43,8 @@ public:
        @brief Build a coarsener from the graph Laplacian and the
        agglomerated topology.
     */
-    Mixed_GL_Coarsener(const MixedMatrix& mgL,
-                       GraphTopology gt)
-        : mgL_(mgL), graph_topology_(std::move(gt)) {}
+    Mixed_GL_Coarsener(const MixedMatrix& mgL)
+        : mgL_(mgL), graph_topology_(mgL.GetGraph(), mgL.GetEdgeBdrAtt()) {}
 
     virtual ~Mixed_GL_Coarsener() {}
 
@@ -180,6 +179,8 @@ protected:
 
     /// Coarse W operator
     std::unique_ptr<mfem::SparseMatrix> CoarseW_;
+
+    Graph coarse_graph_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

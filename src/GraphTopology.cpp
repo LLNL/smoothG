@@ -97,6 +97,9 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
 
     std::swap(fine_graph_, graph_topology.fine_graph_);
     std::swap(coarse_graph_, graph_topology.coarse_graph_);
+
+    edge_boundaryattr_ = graph_topology.edge_boundaryattr_;
+    edge_trueedge_edge_ = graph_topology.edge_trueedge_edge_;
 }
 
 
