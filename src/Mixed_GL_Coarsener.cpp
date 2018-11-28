@@ -19,57 +19,45 @@
    @brief Implements Mixed_GL_Coarsener
 */
 
-#ifndef __MIXED_GL_COARSENER_IMPL_HPP__
-#define __MIXED_GL_COARSENER_IMPL_HPP__
-
 #include "Mixed_GL_Coarsener.hpp"
 #include <assert.h>
 
 namespace smoothg
 {
 
-const mfem::SparseMatrix& Mixed_GL_Coarsener::get_Pu() const
+const mfem::SparseMatrix& Mixed_GL_Coarsener::GetPu() const
 {
     check_subspace_construction_("Pu");
     return Pu_;
 }
 
-const mfem::SparseMatrix& Mixed_GL_Coarsener::get_Psigma() const
+const mfem::SparseMatrix& Mixed_GL_Coarsener::GetPsigma() const
 {
     check_subspace_construction_("Psigma");
     return Psigma_;
 }
 
-std::unique_ptr<mfem::BlockVector> Mixed_GL_Coarsener::restrict_rhs(
-    const mfem::BlockVector& rhs) const
-{
-    auto coarse_rhs = make_unique<mfem::BlockVector>(get_blockoffsets());
-    restrict(rhs, *coarse_rhs);
-
-    return coarse_rhs;
-}
-
-void Mixed_GL_Coarsener::restrict(const mfem::BlockVector& fine_vect,
+void Mixed_GL_Coarsener::Restrict(const mfem::BlockVector& fine_vect,
                                   mfem::BlockVector& coarse_vect) const
 {
     Psigma_.MultTranspose(fine_vect.GetBlock(0), coarse_vect.GetBlock(0));
     Pu_.MultTranspose(fine_vect.GetBlock(1), coarse_vect.GetBlock(1));
 }
 
-void Mixed_GL_Coarsener::interpolate(const mfem::BlockVector& coarse_vect,
+void Mixed_GL_Coarsener::Interpolate(const mfem::BlockVector& coarse_vect,
                                      mfem::BlockVector& fine_vect) const
 {
     Psigma_.Mult(coarse_vect.GetBlock(0), fine_vect.GetBlock(0));
     Pu_.Mult(coarse_vect.GetBlock(1), fine_vect.GetBlock(1));
 }
 
-void Mixed_GL_Coarsener::restrict(const mfem::Vector& fine_vect,
+void Mixed_GL_Coarsener::Restrict(const mfem::Vector& fine_vect,
                                   mfem::Vector& coarse_vect) const
 {
     Pu_.MultTranspose(fine_vect, coarse_vect);
 }
 
-void Mixed_GL_Coarsener::interpolate(const mfem::Vector& coarse_vect,
+void Mixed_GL_Coarsener::Interpolate(const mfem::Vector& coarse_vect,
                                      mfem::Vector& fine_vect) const
 {
     Pu_.Mult(coarse_vect, fine_vect);
@@ -82,12 +70,6 @@ const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_Agg_cvertexdof_table() c
     return graph_coarsen_->GetAggToCoarseVertexDof();
 }
 
-const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_Agg_cedgedof_table() const
-{
-    check_subspace_construction_("Agg_cedgedof_table");
-    return graph_coarsen_->GetAggToCoarseEdgeDof();
-}
-
 const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_face_facedof_table() const
 {
     check_subspace_construction_("face_facedof_table");
@@ -96,7 +78,8 @@ const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_face_facedof_table() con
 
 MixedMatrix Mixed_GL_Coarsener::GetCoarse()
 {
-    return MixedMatrix(GetCoarseMBuilder(), GetCoarseD(), GetCoarseW(), get_face_dof_truedof_table());
+    return MixedMatrix(coarse_graph_, GetCoarseMBuilder(), GetCoarseD(), GetCoarseW(),
+                       get_face_dof_truedof_table(), graph_topology_.face_bdratt_.get());
 }
 
 const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() const
@@ -105,7 +88,7 @@ const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() con
     if (!face_dof_truedof_table_)
     {
         face_dof_truedof_table_ = graph_coarsen_->BuildEdgeCoarseDofTruedof(
-                                      face_facedof_table_, get_Psigma());
+                                      face_facedof_table_, GetPsigma());
         face_dof_truedof_table_->CopyRowStarts();
         face_dof_truedof_table_->CopyColStarts();
     }
@@ -114,20 +97,5 @@ const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() con
     return *face_dof_truedof_table_;
 }
 
-mfem::Array<int>& Mixed_GL_Coarsener::get_blockoffsets() const
-{
-    assert(face_dof_truedof_table_);
-
-    if (!coarseBlockOffsets_)
-    {
-        coarseBlockOffsets_ = make_unique<mfem::Array<int>>(3);
-        (*coarseBlockOffsets_)[0] = 0;
-        (*coarseBlockOffsets_)[1] = face_dof_truedof_table_->GetNumRows();
-        (*coarseBlockOffsets_)[2] = (*coarseBlockOffsets_)[1] + Pu_.Width();
-    }
-    return *coarseBlockOffsets_;
-}
-
 } // namespace smoothg
 
-#endif /* __MIXED_GL_COARSENER_IMPL_HPP__ */

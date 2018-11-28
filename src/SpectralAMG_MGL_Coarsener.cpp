@@ -31,23 +31,29 @@ namespace smoothg
 {
 
 SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                                                     GraphTopology gt,
-                                                     const UpscaleParameters& param)
-    : Mixed_GL_Coarsener(mgL, std::move(gt)),
-      param_(param)
+                                                     const UpscaleParameters& param,
+                                                     const mfem::Array<int>* partitioning)
+    : Mixed_GL_Coarsener(mgL), param_(param), partitioning_(partitioning)
 {
 }
 
 void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(const mfem::Vector& constant_rep)
 {
+    if (partitioning_)
+    {
+        coarse_graph_ = graph_topology_.Coarsen(*partitioning_);
+    }
+    else
+    {
+        coarse_graph_ = graph_topology_.Coarsen(param_.coarse_factor);
+    }
+
     using LMGST = LocalMixedGraphSpectralTargets;
 
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LMGST localtargets(param_.spect_tol, param_.max_evects, param_.dual_target,
-                       param_.scaled_dual, param_.energy_dual, mgL_.GetM(),
-                       mgL_.GetD(), mgL_.GetW(), graph_topology_);
+    LMGST localtargets(mgL_, graph_topology_, param_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets,
                          constant_rep);
 
@@ -65,8 +71,8 @@ void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(const mfem::Vector&
                                        Pu_, Psigma_, face_facedof_table_,
                                        *coarse_m_builder_, constant_rep);
 
-    CoarseD_ = graph_coarsen_->GetCoarseD();
-    CoarseW_ = graph_coarsen_->GetCoarseW();
+    coarse_D_ = graph_coarsen_->GetCoarseD();
+    coarse_W_ = graph_coarsen_->GetCoarseW();
 }
 
 } // namespace smoothg

@@ -55,7 +55,8 @@ public:
        @param w_block the matrix W. If not provided, it is assumed to be zero
     */
     MixedMatrix(const Graph& graph,
-                const mfem::SparseMatrix& w_block = SparseIdentity(0));
+                const mfem::SparseMatrix& w_block = SparseIdentity(0),
+                const mfem::SparseMatrix* edge_bdratt = nullptr);
 
     /**
        @brief Construct a mixed graph Laplacian system from a given graph space.
@@ -75,10 +76,16 @@ public:
        @param W the matrix W. If it is nullptr, it is assumed to be zero
        @param edge_d_td edge dof to true edge dof table
     */
-    MixedMatrix(std::unique_ptr<MBuilder> mbuilder,
+    MixedMatrix(const Graph& graph,
+                std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
-                const mfem::HypreParMatrix& edge_d_td);
+                const mfem::HypreParMatrix& edge_d_td,
+                const mfem::SparseMatrix* edge_bdratt);
+
+    const Graph& GetGraph() const { return *graph_; }
+
+    const mfem::SparseMatrix* GetEdgeBdrAtt() const { return edge_bdratt_; }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -355,6 +362,9 @@ private:
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
 
     std::unique_ptr<MBuilder> mbuilder_;
+
+    const Graph* graph_;
+    const mfem::SparseMatrix* edge_bdratt_;
 }; // class MixedMatrix
 
 } // namespace smoothg

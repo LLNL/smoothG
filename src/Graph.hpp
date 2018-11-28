@@ -100,6 +100,9 @@ public:
     /// Default constructor
     Graph() = default;
 
+    /// Copy constructor
+    Graph(const Graph& other) noexcept;
+
     /// Move constructor
     Graph(Graph&& other) noexcept;
 
