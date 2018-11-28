@@ -120,24 +120,19 @@ public:
 
     ///@name Getters for tables/arrays that describe parallel graph
     ///@{
-    const mfem::SparseMatrix& GetVertexToEdge() const
+    const mfem::SparseMatrix& VertexToEdge() const
     {
         return vertex_edge_local_;
     }
 
-    const std::vector<mfem::Vector>& GetEdgeWeight() const
+    const std::vector<mfem::Vector>& EdgeWeight() const
     {
         return split_edge_weight_;
     }
 
-    const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
+    const mfem::HypreParMatrix& EdgeToTrueEdge() const
     {
         return *edge_trueedge_;
-    }
-
-    const mfem::Array<int>& GetVertexStarts() const
-    {
-        return vertex_starts_;
     }
 
     const int NumVertices() const

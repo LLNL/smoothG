@@ -33,10 +33,10 @@ namespace smoothg
 
 MixedMatrix::MixedMatrix(const Graph& graph, const mfem::SparseMatrix& w_block,
                          const mfem::SparseMatrix* edge_bdratt)
-    : edge_d_td_(&graph.GetEdgeToTrueEdge()), edge_td_d_(edge_d_td_->Transpose()),
+    : edge_d_td_(&graph.EdgeToTrueEdge()), edge_td_d_(edge_d_td_->Transpose()),
       graph_(&graph), edge_bdratt_(edge_bdratt)
 {
-    Init(graph.GetVertexToEdge(), graph.GetEdgeWeight(), w_block);
+    Init(graph.VertexToEdge(), graph.EdgeWeight(), w_block);
 }
 
 MixedMatrix::MixedMatrix(const Graph& graph, std::unique_ptr<MBuilder> mbuilder,

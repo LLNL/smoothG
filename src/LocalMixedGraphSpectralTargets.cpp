@@ -98,7 +98,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 
     mfem::HypreParMatrix M_d(comm_, edgedof_starts.Last(), edgedof_starts, M_local_ptr);
 
-    const mfem::HypreParMatrix& edge_trueedge(graph_topology.FineGraph().GetEdgeToTrueEdge());
+    const mfem::HypreParMatrix& edge_trueedge(graph_topology.FineGraph().EdgeToTrueEdge());
     M_global_.reset(smoothg::RAP(M_d, edge_trueedge));
 
     mfem::HypreParMatrix D_d(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
@@ -126,10 +126,10 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 {
     mfem::HypreParMatrix edge_trueedge;
-    edge_trueedge.MakeRef(graph_topology_.FineGraph().GetEdgeToTrueEdge());
+    edge_trueedge.MakeRef(graph_topology_.FineGraph().EdgeToTrueEdge());
 
     // hypre may modify the matrix, so make a deep copy
-    mfem::SparseMatrix vertex_edge(graph_topology_.FineGraph().GetVertexToEdge());
+    mfem::SparseMatrix vertex_edge(graph_topology_.FineGraph().VertexToEdge());
 
     // Construct extended aggregate to vertex dofs relation tables
     mfem::HypreParMatrix vertex_edge_bd(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
@@ -488,7 +488,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // Compute face to permuted edge relation table
     auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
     auto& edge_trueedge = const_cast<mfem::HypreParMatrix&>(
-                              graph_topology_.FineGraph().GetEdgeToTrueEdge());
+                              graph_topology_.FineGraph().EdgeToTrueEdge());
 
     auto& face_edge = const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_);
     mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_trueedge.M(),

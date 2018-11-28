@@ -28,11 +28,11 @@ namespace smoothg
 
 GraphSpace::GraphSpace(Graph graph)
     : vertex_vdof_(SparseIdentity(graph.NumVertices())),
-      vertex_edof_(graph.GetVertexToEdge(), false),
+      vertex_edof_(graph.VertexToEdge(), false),
       edge_edof_(SparseIdentity(graph.NumEdges())), graph_(std::move(graph))
 {
     edof_trueedof_ = std::make_shared<mfem::HypreParMatrix>();
-    edof_trueedof_->MakeRef(graph_.GetEdgeToTrueEdge());
+    edof_trueedof_->MakeRef(graph_.EdgeToTrueEdge());
 }
 
 GraphSpace::GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,

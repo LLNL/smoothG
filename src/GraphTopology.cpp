@@ -105,7 +105,7 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
 Graph GraphTopology::Coarsen(int coarsening_factor)
 {
     mfem::Array<int> partitioning;
-    PartitionAAT(fine_graph_->GetVertexToEdge(), partitioning, coarsening_factor);
+    PartitionAAT(fine_graph_->VertexToEdge(), partitioning, coarsening_factor);
     return Coarsen(partitioning);
 }
 
@@ -121,7 +121,7 @@ Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
     }
     else
     {
-        edge_trueedge_edge = smoothg::AAt(fine_graph_->GetEdgeToTrueEdge());
+        edge_trueedge_edge = AAt(fine_graph_->EdgeToTrueEdge());
     }
 
     int nvertices = fine_graph_->NumVertices();
@@ -139,7 +139,7 @@ Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
     mfem::SparseMatrix tmp = PartitionToMatrix(partitioning, nAggs);
     Agg_vertex_.Swap(tmp);
 
-    auto aggregate_edge = smoothg::Mult(Agg_vertex_, fine_graph_->GetVertexToEdge());
+    auto aggregate_edge = smoothg::Mult(Agg_vertex_, fine_graph_->VertexToEdge());
 
     // Need to sort the edge indices to prevent index problem in face_edge
     aggregate_edge.SortColumnIndices();

@@ -47,10 +47,10 @@ public:
                mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
                std::shared_ptr<mfem::HypreParMatrix> edof_trueedof);
 
-    const mfem::SparseMatrix& GetVertexToVDof() const { return vertex_vdof_; }
-    const mfem::SparseMatrix& GetVertexToEDof() const { return vertex_edof_; }
-    const mfem::SparseMatrix& GetEdgeToEDof() const { return edge_edof_; }
-    const mfem::HypreParMatrix& GetEDofToTrueEDof() const { return *edof_trueedof_; }
+    const mfem::SparseMatrix& VertexToVDof() const { return vertex_vdof_; }
+    const mfem::SparseMatrix& VertexToEDof() const { return vertex_edof_; }
+    const mfem::SparseMatrix& EdgeToEDof() const { return edge_edof_; }
+    const mfem::HypreParMatrix& EDofToTrueEDof() const { return *edof_trueedof_; }
     const Graph& GetGraph() const { return graph_; }
 
 private:
