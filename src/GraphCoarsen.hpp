@@ -104,7 +104,7 @@ public:
     */
     const mfem::SparseMatrix& GetAggToCoarseVertexDof()
     {
-        return *Agg_cdof_vertex_;
+        return *agg_coarse_vdof_;
     }
 
     /**
@@ -112,8 +112,13 @@ public:
     */
     const mfem::SparseMatrix& GetAggToCoarseEdgeDof()
     {
-        return *Agg_cdof_edge_;
+        return *agg_coarse_edof_;
     }
+
+    /**
+       @brief Get the coarse graph space
+    */
+    GraphSpace MakeCoarseGraphSpace(Graph coarse_graph);
 
     /**
        @brief construct edge coarse dof to true dof relation table
@@ -147,23 +152,18 @@ public:
     }
 
 private:
-    /// @brief take vertex-based target functions and assemble them in matrix
-    void BuildPVertices(std::vector<mfem::DenseMatrix>& vertex_targets,
-                        mfem::SparseMatrix& Pvertices,
-                        CoarseMBuilder& coarse_m_builder);
+    /// Construct aggregate to coarse vertex dofs relation table
+    mfem::SparseMatrix BuildAggToCoarseVertexDof(
+            const std::vector<mfem::DenseMatrix>& vertex_targets);
 
-    /**
-       Method called from BuildPEdges
 
-       @param[in] nfaces number of faces
-       @param[in] edge_traces lives on a face
-       @param[out] face_cdof the coarseface_coarsedof relation table
+    /// Construct face to coarse edge dofs relation table
+    mfem::SparseMatrix BuildFaceToCoarseEdgeDof(
+            const std::vector<mfem::DenseMatrix> &edge_traces);
 
-       @return total_num_traces on all faces
-    */
-    int BuildCoarseFaceCoarseDof(unsigned int nfaces,
-                                 std::vector<mfem::DenseMatrix>& edge_traces,
-                                 mfem::SparseMatrix& face_cdof);
+    /// take vertex-based target functions and assemble them in matrix
+    mfem::SparseMatrix BuildPVertices(
+            const std::vector<mfem::DenseMatrix>& vertex_targets);
 
     /**
        Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
@@ -228,10 +228,9 @@ private:
        @param[out] CM_el the coarse element mass matrices in case build_coarse_relation is true
        @param[in] constant_rep representation of vertex constants on finer level
     */
-    void BuildPEdges(
-        std::vector<mfem::DenseMatrix>& edge_traces,
+    void BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
-        mfem::SparseMatrix& face_cdof,
+        const mfem::SparseMatrix &face_cdof,
         mfem::SparseMatrix& Pedges,
         CoarseMBuilder& coarse_mbuilder,
         const mfem::Vector& constant_rep);
@@ -254,10 +253,13 @@ private:
     const GraphTopology& graph_topology_;
 
     /// Aggregate-to-coarse vertex dofs relation table
-    std::unique_ptr<mfem::SparseMatrix> Agg_cdof_vertex_;
+    std::unique_ptr<mfem::SparseMatrix> agg_coarse_vdof_;
 
     /// Aggregate-to-coarse edge dofs relation table
-    std::unique_ptr<mfem::SparseMatrix> Agg_cdof_edge_;
+    std::unique_ptr<mfem::SparseMatrix> agg_coarse_edof_;
+
+    /// face-to-coarse edge dofs relation table
+    std::unique_ptr<mfem::SparseMatrix> face_coarse_edof_;
 
     /// basically just some storage to allocate
     mfem::Array<int> colMapper_;
