@@ -36,6 +36,7 @@ Upscale::Upscale(const Graph& graph,
     mfem::StopWatch chrono;
     chrono.Start();
 
+    mixed_laplacians_.reserve(param_.max_levels);
     mixed_laplacians_.emplace_back(graph, w_block);
     Init(partitioning);
 
@@ -140,8 +141,7 @@ void Upscale::MakeSolver(int level)
     if (param_.hybridization) // Hybridization solver
     {
         solver_[level] = make_unique<HybridSolver>(
-                             comm_, GetMatrix(level), *coarsener_[level - 1],
-                             &marker, 0, param_.saamge_param);
+                             comm_, GetMatrix(level), &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {

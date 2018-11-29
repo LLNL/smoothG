@@ -103,27 +103,6 @@ public:
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);
 
-    /**
-       @brief Constructor for coarse-level hybridiziation solver.
-
-       @param comm MPI communicator
-       @param mgL Mixed matrices for the graph Laplacian in the coarse level
-       @param mgLc Mixed graph Laplacian Coarsener from fine to coarse level
-       @param face_bdrattr Boundary edge to boundary attribute table
-       @param ess_edge_dofs An array indicating essential edge dofs
-       @param rescale_iter number of iterations to compute diagonal scaling
-              vector for hybridized system. No rescaling if set to 0.
-       @param saamge_param SAAMGe parameters. Use SAAMGe as preconditioner for
-              hybridized system if saamge_param is not nullptr, otherwise
-              BoomerAMG is used instead.
-    */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgL,
-                 const Mixed_GL_Coarsener& mgLc,
-                 const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 const int rescale_iter = 0,
-                 const SAAMGeParam* saamge_param = nullptr);
-
     virtual ~HybridSolver();
 
     /// Wrapper for solving the saddle point system through hybridization

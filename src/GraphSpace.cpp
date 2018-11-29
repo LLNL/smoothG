@@ -70,8 +70,8 @@ GraphSpace& GraphSpace::operator=(GraphSpace other) noexcept
 void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept
 {
     lhs.vertex_vdof_.Swap(rhs.vertex_vdof_);
-    lhs.vertex_vdof_.Swap(rhs.vertex_edof_);
-    lhs.vertex_vdof_.Swap(rhs.edge_edof_);
+    lhs.vertex_edof_.Swap(rhs.vertex_edof_);
+    lhs.edge_edof_.Swap(rhs.edge_edof_);
     std::swap(lhs.edof_trueedof_, rhs.edof_trueedof_);
     lhs.edof_bdratt_.Swap(rhs.edof_bdratt_);
 

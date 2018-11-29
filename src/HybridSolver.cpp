@@ -45,54 +45,17 @@ HybridSolver::HybridSolver(MPI_Comm comm,
 {
     MPI_Comm_rank(comm, &myid_);
 
-    // TODO(gelever1): use operator= when mfem version is updated
-    mfem::SparseMatrix tmp = SparseIdentity(D_.Height());
-    Agg_vertexdof_.Swap(tmp);
-
-    const mfem::SparseMatrix edge_edgedof = SparseIdentity(D_.Width());
-
     auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
     {
         std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
         std::abort();
     }
-    Agg_edgedof_.MakeRef(mbuilder->GetElemEdgeDofTable());
 
-    Init(edge_edgedof, mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), mgL.EdgeBdrAtt(), ess_edge_dofs);
-}
+    Agg_vertexdof_.MakeRef(mgL.GetGraphSpace().VertexToVDof());
+    Agg_edgedof_.MakeRef(mgL.GetGraphSpace().VertexToEDof());
 
-HybridSolver::HybridSolver(MPI_Comm comm,
-                           const MixedMatrix& mgL,
-                           const Mixed_GL_Coarsener& mgLc,
-                           const mfem::Array<int>* ess_edge_dofs,
-                           const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
-    :
-    MixedLaplacianSolver(mgL.GetBlockOffsets()),
-    comm_(comm),
-    D_(mgL.GetD()),
-    W_(mgL.GetW()),
-    use_w_(mgL.CheckW()),
-    rescale_iter_(rescale_iter),
-    saamge_param_(saamge_param)
-{
-    MPI_Comm_rank(comm, &myid_);
-    const mfem::SparseMatrix& face_edgedof(mgLc.construct_face_facedof_table());
-
-    Agg_vertexdof_.MakeRef(mgLc.construct_Agg_cvertexdof_table());
-
-    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
-    if (!mbuilder)
-    {
-        std::cout << "HybridSolver requires coarse level M builder to be ElementMBuilder!\n";
-        std::abort();
-    }
-
-    Agg_edgedof_.MakeRef(mbuilder->GetElemEdgeDofTable());
-
-    Init(face_edgedof, mbuilder->GetElementMatrices(),
+    Init(mgL.GetGraphSpace().EdgeToEDof(), mbuilder->GetElementMatrices(),
          mgL.GetEdgeDofToTrueDof(), mgL.EdgeBdrAtt(), ess_edge_dofs);
 }
 
