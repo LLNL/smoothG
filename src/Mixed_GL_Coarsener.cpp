@@ -87,8 +87,9 @@ const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() con
     check_subspace_construction_("face_dof_truedof_table");
     if (!face_dof_truedof_table_)
     {
-        face_dof_truedof_table_ = graph_coarsen_->BuildEdgeCoarseDofTruedof(
-                                      face_facedof_table_, GetPsigma());
+        const int num_bubbles = GetPu().Width() - graph_topology_.NumAggs();
+        face_dof_truedof_table_ = graph_coarsen_->BuildCoarseEdgeDofTruedof(
+                                      face_facedof_table_, num_bubbles);
         face_dof_truedof_table_->CopyRowStarts();
         face_dof_truedof_table_->CopyColStarts();
     }

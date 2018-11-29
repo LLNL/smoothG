@@ -659,13 +659,15 @@ void GraphCoarsen::BuildInterpolation(
                 coarse_m_builder, constant_rep);
 
     BuildW(Pvertices);
+
+
 }
 
-unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
-    const mfem::SparseMatrix& face_cdof, const mfem::SparseMatrix& Pedges)
+unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
+    const mfem::SparseMatrix& face_cdof, int num_bubbles)
 {
-    int ncdofs = Pedges.Width();
-    int nfaces = face_cdof.Height();
+    const int ncdofs = face_cdof.Width() + num_bubbles;
+    const int nfaces = face_cdof.Height();
 
     // count edge coarse true dofs (if the dof is a bubble or on a true face)
     mfem::SparseMatrix face_d_td_diag;

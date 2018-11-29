@@ -123,9 +123,9 @@ public:
     /**
        @brief construct edge coarse dof to true dof relation table
     */
-    std::unique_ptr<mfem::HypreParMatrix> BuildEdgeCoarseDofTruedof(
+    std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
         const mfem::SparseMatrix& face_cdof,
-        const mfem::SparseMatrix& Pedges);
+        int num_bubbles);
 
     /**
        @brief Get the coarse M matrix
