@@ -49,6 +49,18 @@ public:
                mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
                std::unique_ptr<mfem::HypreParMatrix> edof_trueedof);
 
+    /// Default constructor
+    GraphSpace() = default;
+
+    /// Move constructor
+    GraphSpace(GraphSpace&& other) noexcept;
+
+    /// Move assignment
+    GraphSpace& operator=(GraphSpace other) noexcept;
+
+    /// Swap two graph spaces
+    friend void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept;
+
     const mfem::SparseMatrix& VertexToVDof() const { return vertex_vdof_; }
     const mfem::SparseMatrix& VertexToEDof() const { return vertex_edof_; }
     const mfem::SparseMatrix& EdgeToEDof() const { return edge_edof_; }

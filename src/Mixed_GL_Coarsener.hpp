@@ -145,7 +145,7 @@ protected:
     /// Coarse W operator
     std::unique_ptr<mfem::SparseMatrix> coarse_W_;
 
-    Graph coarse_graph_;
+    GraphSpace coarse_graph_space_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

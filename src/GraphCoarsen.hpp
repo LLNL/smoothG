@@ -118,7 +118,10 @@ public:
     /**
        @brief Get the coarse graph space
     */
-    GraphSpace MakeCoarseGraphSpace(Graph coarse_graph);
+    GraphSpace BuildCoarseGraphSpace(
+            const std::vector<mfem::DenseMatrix>& vertex_targets,
+            const std::vector<mfem::DenseMatrix>& edge_traces,
+            Graph coarse_graph);
 
     /**
        @brief construct edge coarse dof to true dof relation table

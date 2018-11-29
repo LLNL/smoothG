@@ -55,5 +55,28 @@ GraphSpace::GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
     }
 }
 
+GraphSpace::GraphSpace(GraphSpace&& other) noexcept
+{
+    swap(*this, other);
+}
+
+GraphSpace& GraphSpace::operator=(GraphSpace other) noexcept
+{
+    swap(*this, other);
+
+    return *this;
+}
+
+void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept
+{
+    lhs.vertex_vdof_.Swap(rhs.vertex_vdof_);
+    lhs.vertex_vdof_.Swap(rhs.vertex_edof_);
+    lhs.vertex_vdof_.Swap(rhs.edge_edof_);
+    std::swap(lhs.edof_trueedof_, rhs.edof_trueedof_);
+    lhs.edof_bdratt_.Swap(rhs.edof_bdratt_);
+
+    swap(lhs.graph_, rhs.graph_);
+}
+
 } // namespace smoothg
 

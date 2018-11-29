@@ -800,14 +800,20 @@ mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
     return mfem::SparseMatrix(I, J, Data, num_aggs, edof_counter);
 }
 
-GraphSpace GraphCoarsen::MakeCoarseGraphSpace(Graph coarse_graph)
+GraphSpace GraphCoarsen::BuildCoarseGraphSpace(
+        const std::vector<mfem::DenseMatrix>& vertex_targets,
+        const std::vector<mfem::DenseMatrix>& edge_traces,
+        Graph coarse_graph)
 {
-    //    unique_ptr<mfem::HypreParMatrix>  BuildEdgeCoarseDofTruedof(
-    //        const mfem::SparseMatrix& face_cdof,
-    //        const mfem::SparseMatrix& Pedges);
-    //    return GraphSpace(std::move(coarse_graph), std::move(agg_coarse_vdof_),
-    //                      std::move(agg_coarse_edof_), std::move(face_coarse_edof_),
-    //                      std::move(face);
+    auto agg_coarse_vdof = BuildAggToCoarseVertexDof(vertex_targets);
+    auto face_coarse_edof = BuildFaceToCoarseEdgeDof(edge_traces);
+    auto agg_coarse_edof = BuildAggToCoarseEdgeDof(agg_coarse_vdof, face_coarse_edof);
+    auto coarse_edof_trueedof =
+            BuildCoarseEdgeDofTruedof(face_coarse_edof, face_coarse_edof.NumCols());
+
+    return GraphSpace(std::move(coarse_graph), std::move(agg_coarse_vdof),
+                      std::move(agg_coarse_edof), std::move(face_coarse_edof),
+                      std::move(coarse_edof_trueedof));
 }
 
 } // namespace smoothg
