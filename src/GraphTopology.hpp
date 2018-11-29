@@ -54,8 +54,7 @@ public:
        @param graph graph oject containing vertex edge relation
        @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
-    GraphTopology(const Graph& graph,
-                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
+    GraphTopology(const Graph& graph);
 
     /**
        @brief Move constructor
@@ -116,14 +115,10 @@ public:
     mfem::SparseMatrix face_edge_;
     ///@}
 
-    /// "face" to boundary attribute table
-    std::unique_ptr<mfem::SparseMatrix> face_bdratt_;
-
 private:
 
     const Graph* fine_graph_;
 
-    const mfem::SparseMatrix* edge_boundaryattr_;
     const mfem::HypreParMatrix* edge_trueedge_edge_;
 
     mfem::Array<HYPRE_Int> vertex_start_;
@@ -131,10 +126,6 @@ private:
     mfem::Array<HYPRE_Int> aggregate_start_;
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology
-
-std::vector<GraphTopology> MultilevelGraphTopology(
-    const Graph& graph, const mfem::SparseMatrix* edge_boundaryattr,
-    int num_levels, int coarsening_factor);
 
 } // namespace smoothg
 

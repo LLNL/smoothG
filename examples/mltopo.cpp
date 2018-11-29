@@ -30,6 +30,9 @@
 
 using namespace smoothg;
 
+std::vector<GraphTopology> MultilevelGraphTopology(
+        const Graph& graph, int num_levels, int coarsening_factor);
+
 void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh);
 
 int main(int argc, char* argv[])
@@ -90,11 +93,10 @@ int main(int argc, char* argv[])
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
     auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh.get());
 
-    Graph graph(vertex_edge, *edge_d_td);
+    Graph graph(vertex_edge, *edge_d_td, mfem::Vector(), &edge_boundaryattr);
 
     // Build multilevel graph topology
-    auto graph_topos = MultilevelGraphTopology(graph, &edge_boundaryattr,
-                                               num_levels, coarsening_factor);
+    auto graph_topos = MultilevelGraphTopology(graph, num_levels, coarsening_factor);
 
     // Visualize aggregates in all levels
     if (visualization)
@@ -103,6 +105,28 @@ int main(int argc, char* argv[])
     }
 
     return EXIT_SUCCESS;
+}
+
+std::vector<GraphTopology> MultilevelGraphTopology(
+    const Graph& graph, int num_levels, int coarsening_factor)
+{
+    std::vector<GraphTopology> topologies;
+    topologies.reserve(num_levels - 1);
+
+    std::vector<Graph> graphs;
+    graphs.reserve(num_levels);
+
+    // Construct finest level graph topology
+    graphs.push_back(graph);
+
+    // Construct coarser levels graph topology by recursion
+    for (int i = 0; i < num_levels - 1; i++)
+    {
+        topologies.emplace_back(graphs.back());
+        graphs.push_back(topologies.back().Coarsen(coarsening_factor));
+    }
+
+    return topologies;
 }
 
 void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)

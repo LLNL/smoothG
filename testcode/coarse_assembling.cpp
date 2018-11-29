@@ -129,10 +129,10 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
-    Graph graph(vertex_edge, *edge_d_td, weight);
+    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
 
     // Create Upscaler
-    Upscale upscale(graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr);
+    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();

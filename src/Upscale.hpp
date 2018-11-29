@@ -55,7 +55,6 @@ public:
     Upscale(const Graph& graph,
             const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
-            const mfem::SparseMatrix* edge_boundary_att = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
@@ -234,7 +233,6 @@ protected:
     /// why exactly is this mutable?
     mutable std::vector<mfem::Vector> constant_rep_;
 
-    const mfem::SparseMatrix* edge_boundary_att_;
     const mfem::Array<int>* ess_attr_;
 
     const UpscaleParameters& param_;

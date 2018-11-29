@@ -116,14 +116,6 @@ public:
     }
 
     /**
-       @brief Get the vertex coarse dofs start array (for HypreParMatrix)
-    */
-    const mfem::Array<HYPRE_Int>& GetVertexCoarseDofStart() const
-    {
-        return vertex_cd_start_;
-    }
-
-    /**
        @brief construct edge coarse dof to true dof relation table
     */
     std::unique_ptr<mfem::HypreParMatrix> BuildEdgeCoarseDofTruedof(
@@ -269,13 +261,6 @@ private:
 
     /// basically just some storage to allocate
     mfem::Array<int> colMapper_;
-
-    /// edge coarse dof start array (for HypreParMatrix)
-    mfem::Array<HYPRE_Int> edge_cd_start_;
-
-    /// vertex coarse dof start array (for HypreParMatrix)
-    /// note that vertex coarse dof and coarse true dof is the same
-    mfem::Array<HYPRE_Int> vertex_cd_start_;
 
     /// Coarse D operator
     std::unique_ptr<mfem::SparseMatrix> CoarseD_;

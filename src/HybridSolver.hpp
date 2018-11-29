@@ -99,7 +99,6 @@ public:
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
-                 const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);
@@ -121,7 +120,6 @@ public:
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
                  const Mixed_GL_Coarsener& mgLc,
-                 const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);
@@ -185,7 +183,7 @@ protected:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
-              const mfem::SparseMatrix* face_bdrattr,
+              const mfem::SparseMatrix& face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
     void AssembleHybridSystem(

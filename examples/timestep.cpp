@@ -214,9 +214,9 @@ int main(int argc, char* argv[])
 
     // Time Stepping
     {
-        Graph graph(vertex_edge, *edge_d_td, weight);
+        Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
         Upscale fvupscale(graph, upscale_param, &partitioning,
-                          &edge_boundary_att, &ess_attr, W_block);
+                          &ess_attr, W_block);
 
         fvupscale.PrintInfo();
 

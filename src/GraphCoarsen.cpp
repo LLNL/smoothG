@@ -107,12 +107,8 @@ void GraphCoarsen::BuildPVertices(
                                     nvertices, coarse_vertex_dof_counter);
     Pvertices.Swap(newPvertices);
 
-    // Generate the "start" array for coarse vertex dofs
-    MPI_Comm comm = graph_topology_.face_trueface_->GetComm();
-    GenerateOffsets(comm, coarse_vertex_dof_counter, vertex_cd_start_);
-
     // Construct the aggregate to coarse vertex dofs relation table
-    if (coarse_m_builder.NeedsCoarseVertexDofs())
+//    if (coarse_m_builder.NeedsCoarseVertexDofs())
     {
         int* Agg_dof_i = new int[nAggs + 1];
         Agg_dof_i[0] = 0;
@@ -343,8 +339,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     // construct face to coarse edge dof relation table
     int total_num_traces = BuildCoarseFaceCoarseDof(nfaces, edge_traces, face_cdof);
 
-    Agg_cdof_edge_Builder agg_dof_builder(edge_traces, vertex_target, Agg_face,
-                                          coarse_mbuilder.NeedsCoarseVertexDofs());
+    Agg_cdof_edge_Builder agg_dof_builder(edge_traces, vertex_target, Agg_face, true);
+//                                          coarse_mbuilder.NeedsCoarseVertexDofs());
 
     int* Pedges_i = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
                                         face_edge, Agg_face);
@@ -671,7 +667,8 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
     face_trueface_.GetDiag(face_d_td_diag);
 
     MPI_Comm comm = face_trueface_.GetComm();
-    GenerateOffsets(comm, ncdofs, edge_cd_start_);
+    mfem::Array<HYPRE_Int> edge_cd_start;
+    GenerateOffsets(comm, ncdofs, edge_cd_start);
 
     mfem::Array<HYPRE_Int>& face_start =
         const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
@@ -681,8 +678,8 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
                                      false, false, false);
 
     mfem::HypreParMatrix face_cdof_d(comm, face_start.Last(),
-                                     edge_cd_start_.Last(), face_start,
-                                     edge_cd_start_, &face_cdof_tmp);
+                                     edge_cd_start.Last(), face_start,
+                                     edge_cd_start, &face_cdof_tmp);
 
     unique_ptr<mfem::HypreParMatrix> d_td_d_tmp(smoothg::RAP(face_trueface_face_, face_cdof_d));
 
@@ -737,8 +734,8 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildEdgeCoarseDofTruedof(
                                    true, false, false);
 
     mfem::HypreParMatrix d_td_d(
-        comm, edge_cd_start_.Last(), edge_cd_start_.Last(), edge_cd_start_,
-        edge_cd_start_, &d_td_d_diag, &d_td_d_offd, d_td_d_map);
+        comm, edge_cd_start.Last(), edge_cd_start.Last(), edge_cd_start,
+        edge_cd_start, &d_td_d_diag, &d_td_d_offd, d_td_d_map);
 
     return BuildEntityToTrueEntity(d_td_d);
 }

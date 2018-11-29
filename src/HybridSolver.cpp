@@ -31,7 +31,6 @@ namespace smoothg
 
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
-                           const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
@@ -61,13 +60,12 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(mbuilder->GetElemEdgeDofTable());
 
     Init(edge_edgedof, mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
+         mgL.GetEdgeDofToTrueDof(), mgL.EdgeBdrAtt(), ess_edge_dofs);
 }
 
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
                            const Mixed_GL_Coarsener& mgLc,
-                           const mfem::SparseMatrix* face_bdrattr,
                            const mfem::Array<int>* ess_edge_dofs,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
@@ -95,7 +93,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(mbuilder->GetElemEdgeDofTable());
 
     Init(face_edgedof, mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), face_bdrattr, ess_edge_dofs);
+         mgL.GetEdgeDofToTrueDof(), mgL.EdgeBdrAtt(), ess_edge_dofs);
 }
 
 HybridSolver::~HybridSolver()
@@ -113,7 +111,7 @@ void HybridSolver::Init(
     const mfem::SparseMatrix& face_edgedof,
     const std::vector<mfem::DenseMatrix>& M_el,
     const mfem::HypreParMatrix& edgedof_d_td,
-    const mfem::SparseMatrix* face_bdrattr,
+    const mfem::SparseMatrix& face_bdrattr,
     const mfem::Array<int>* ess_edge_dofs)
 {
     mfem::StopWatch chrono;
@@ -136,10 +134,10 @@ void HybridSolver::Init(
     agg_weights_ = 1.0;
 
     mfem::SparseMatrix edgedof_bdrattr;
-    if (face_bdrattr && face_bdrattr->Width())
+    if (face_bdrattr.Width())
     {
         mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
-        mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, *face_bdrattr);
+        mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, face_bdrattr);
         edgedof_bdrattr.Swap(tmp);
     }
 
@@ -206,7 +204,7 @@ void HybridSolver::Init(
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
     ess_multiplier_bc_ = false;
-    if (face_bdrattr && face_bdrattr->Width() && ess_edge_dofs)
+    if (face_bdrattr.Width() && ess_edge_dofs)
     {
         ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
         for (int i = 0; i < num_multiplier_dofs_; i++)

@@ -28,20 +28,31 @@ namespace smoothg
 
 GraphSpace::GraphSpace(Graph graph)
     : vertex_vdof_(SparseIdentity(graph.NumVertices())),
-      vertex_edof_(graph.VertexToEdge(), false),
       edge_edof_(SparseIdentity(graph.NumEdges())), graph_(std::move(graph))
+
 {
-    edof_trueedof_ = std::make_shared<mfem::HypreParMatrix>();
+    vertex_edof_.MakeRef(graph_.VertexToEdge());
+    edof_trueedof_ = make_unique<mfem::HypreParMatrix>();
     edof_trueedof_->MakeRef(graph_.EdgeToTrueEdge());
+    if (graph_.HasBoundary())
+    {
+        edof_bdratt_.MakeRef(graph_.EdgeToBdrAtt());
+    }
 }
 
 GraphSpace::GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
                        mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
-                       std::shared_ptr<mfem::HypreParMatrix> edof_trueedof)
+                       std::unique_ptr<mfem::HypreParMatrix> edof_trueedof)
     : vertex_vdof_(std::move(vertex_vdof)), vertex_edof_(std::move(vertex_edof)),
       edge_edof_(std::move(edge_edof)), edof_trueedof_(std::move(edof_trueedof)),
       graph_(std::move(graph))
 {
+    if (graph_.HasBoundary())
+    {
+        mfem::SparseMatrix edof_edge = smoothg::Transpose(edge_edof_);
+        mfem::SparseMatrix tmp = smoothg::Mult(edof_edge, graph_.EdgeToBdrAtt());
+        edof_bdratt_.Swap(tmp);
+    }
 }
 
 } // namespace smoothg

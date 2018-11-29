@@ -44,7 +44,7 @@ public:
        agglomerated topology.
     */
     Mixed_GL_Coarsener(const MixedMatrix& mgL)
-        : mgL_(mgL), graph_topology_(mgL.GetGraph(), mgL.GetEdgeBdrAtt()) {}
+        : mgL_(mgL), graph_topology_(mgL.GetGraph()) {}
 
     virtual ~Mixed_GL_Coarsener() {}
 

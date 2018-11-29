@@ -28,16 +28,15 @@ namespace smoothg
 Upscale::Upscale(const Graph& graph,
                  const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning,
-                 const mfem::SparseMatrix* edge_boundary_att,
                  const mfem::Array<int>* ess_attr,
                  const mfem::SparseMatrix& w_block)
     : Operator(graph.NumVertices()), comm_(graph.GetComm()), setup_time_(0.0),
-      edge_boundary_att_(edge_boundary_att), ess_attr_(ess_attr), param_(param)
+      ess_attr_(ess_attr), param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
 
-    mixed_laplacians_.emplace_back(graph, w_block, edge_boundary_att_);
+    mixed_laplacians_.emplace_back(graph, w_block);
     Init(partitioning);
 
     chrono.Stop();
@@ -88,15 +87,14 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
 void Upscale::MakeFineSolver()
 {
     mfem::Array<int> marker;
-    if (edge_boundary_att_)
+    if (mixed_laplacians_[0].GetGraph().HasBoundary())
     {
-        BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
+        BooleanMult(GetMatrix(0).EdgeBdrAtt(), *ess_attr_, marker);
     }
 
     if (param_.hybridization) // Hybridization solver
     {
-        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
-                                               edge_boundary_att_, &marker);
+        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0), &marker);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -130,11 +128,11 @@ void Upscale::MakeSolver(int level)
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
     mfem::Array<int> marker;
 
-    auto face_bdratt = mixed_laplacians_[level].GetEdgeBdrAtt();
-    if (face_bdratt)
+    auto& face_bdratt = mixed_laplacians_[level].EdgeBdrAtt();
+    if (face_bdratt.Width() > 0)
     {
         marker.SetSize(Dref.Width());
-        MarkDofsOnBoundary(*face_bdratt,
+        MarkDofsOnBoundary(face_bdratt,
                            coarsener_[level - 1]->construct_face_facedof_table(),
                            *ess_attr_, marker);
     }
@@ -143,7 +141,7 @@ void Upscale::MakeSolver(int level)
     {
         solver_[level] = make_unique<HybridSolver>(
                              comm_, GetMatrix(level), *coarsener_[level - 1],
-                             face_bdratt, &marker, 0, param_.saamge_param);
+                             &marker, 0, param_.saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {

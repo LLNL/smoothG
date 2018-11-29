@@ -29,14 +29,16 @@ namespace smoothg
 
 /**
    @brief Contains information about degrees of freedom to vertex/edge
+
+   For brevity, vdof/edof refer to vertex/edge-based degree of freedom
 */
 class GraphSpace
 {
 public:
     /**
-       @brief Construct GraphSpace from Graph, entity and dof are 1-1
+       @brief Construct GraphSpace from Graph, entity and dof are one-to-one
 
-       @param graph The graph on which the GraphSpace is based.
+       @param graph the graph on which the GraphSpace is based.
     */
     GraphSpace(Graph graph);
 
@@ -45,19 +47,21 @@ public:
     */
     GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
                mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
-               std::shared_ptr<mfem::HypreParMatrix> edof_trueedof);
+               std::unique_ptr<mfem::HypreParMatrix> edof_trueedof);
 
     const mfem::SparseMatrix& VertexToVDof() const { return vertex_vdof_; }
     const mfem::SparseMatrix& VertexToEDof() const { return vertex_edof_; }
     const mfem::SparseMatrix& EdgeToEDof() const { return edge_edof_; }
     const mfem::HypreParMatrix& EDofToTrueEDof() const { return *edof_trueedof_; }
+    const mfem::SparseMatrix& EDofToBdrAtt() const { return edof_bdratt_; }
     const Graph& GetGraph() const { return graph_; }
 
 private:
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix vertex_edof_;
     mfem::SparseMatrix edge_edof_;
-    std::shared_ptr<mfem::HypreParMatrix> edof_trueedof_;
+    std::unique_ptr<mfem::HypreParMatrix> edof_trueedof_;
+    mfem::SparseMatrix edof_bdratt_;
 
     Graph graph_;
 }; // class GraphSpace

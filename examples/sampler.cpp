@@ -254,11 +254,11 @@ int main(int argc, char* argv[])
     double total_coarse_time = 0.0;
     double total_fine_time = 0.0;
 
-    Graph graph(vertex_edge, *edge_d_td, weight);
+    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
 
     // Create Upscaler
     auto upscale = std::make_shared<Upscale>(
-                       graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr, W_block);
+                       graph, upscale_param, &partitioning, &ess_attr, W_block);
 
     upscale->MakeFineSolver();
     upscale->PrintInfo();
