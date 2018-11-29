@@ -31,7 +31,7 @@
 using namespace smoothg;
 
 std::vector<GraphTopology> MultilevelGraphTopology(
-        const Graph& graph, int num_levels, int coarsening_factor);
+    const Graph& graph, int num_levels, int coarsening_factor);
 
 void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh);
 

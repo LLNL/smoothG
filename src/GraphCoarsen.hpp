@@ -154,16 +154,21 @@ public:
 private:
     /// Construct aggregate to coarse vertex dofs relation table
     mfem::SparseMatrix BuildAggToCoarseVertexDof(
-            const std::vector<mfem::DenseMatrix>& vertex_targets);
+        const std::vector<mfem::DenseMatrix>& vertex_targets);
 
 
     /// Construct face to coarse edge dofs relation table
     mfem::SparseMatrix BuildFaceToCoarseEdgeDof(
-            const std::vector<mfem::DenseMatrix> &edge_traces);
+        const std::vector<mfem::DenseMatrix>& edge_traces);
+
+    /// Construct aggregate to coarse edge dofs relation table
+    mfem::SparseMatrix BuildAggToCoarseEdgeDof(
+        const mfem::SparseMatrix& agg_coarse_vdof,
+        const mfem::SparseMatrix& face_coarse_edof);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices(
-            const std::vector<mfem::DenseMatrix>& vertex_targets);
+        const std::vector<mfem::DenseMatrix>& vertex_targets);
 
     /**
        Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
@@ -229,11 +234,11 @@ private:
        @param[in] constant_rep representation of vertex constants on finer level
     */
     void BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix &face_cdof,
-        mfem::SparseMatrix& Pedges,
-        CoarseMBuilder& coarse_mbuilder,
-        const mfem::Vector& constant_rep);
+                     std::vector<mfem::DenseMatrix>& vertex_target,
+                     const mfem::SparseMatrix& face_cdof,
+                     mfem::SparseMatrix& Pedges,
+                     CoarseMBuilder& coarse_mbuilder,
+                     const mfem::Vector& constant_rep);
 
     void BuildW(const mfem::SparseMatrix& Pvertices);
 
