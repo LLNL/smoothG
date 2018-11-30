@@ -242,8 +242,6 @@ int main(int argc, char* argv[])
 
         if (k == 0)
         {
-            fvupscale.MakeFineSolver();
-
             work_rhs = fine_rhs;
             work_u = fine_u;
         }

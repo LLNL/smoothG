@@ -269,7 +269,6 @@ int main(int argc, char* argv[])
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();
-    upscale.MakeFineSolver();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;

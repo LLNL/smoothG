@@ -74,60 +74,19 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
         }
     }
 
-    // fine level: solver
-    MakeFineSolver();
-    MakeVectors(0);
 
-    // coarser levels: solver
-    for (int level = 1; level < param_.max_levels; ++level)
+    // make solver on each level
+    for (int level = 0; level < param_.max_levels; ++level)
     {
         MakeSolver(level);
     }
 }
 
-void Upscale::MakeFineSolver()
-{
-    mfem::Array<int> marker(GetMatrix(0).GetD().Width());marker = 0;
-    if (mixed_laplacians_[0].GetGraph().HasBoundary())
-    {
-        BooleanMult(GetMatrix(0).EDofToBdrAtt(), *ess_attr_, marker);
-    }
-
-    if (param_.hybridization) // Hybridization solver
-    {
-        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0), &marker);
-    }
-    else // L2-H1 block diagonal preconditioner
-    {
-        mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
-        mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
-
-        for (int mm = 0; mm < marker.Size(); ++mm)
-        {
-            if (marker[mm])
-            {
-                //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
-
-                const bool set_diag = true;
-                Mref.EliminateRow(mm, set_diag);
-            }
-        }
-        if (marker.Size())
-        {
-            Dref.EliminateCols(marker);
-        }
-
-        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
-    }
-}
-
 void Upscale::MakeSolver(int level)
 {
-    // TODO: unify construction of solvers in all levels
-    assert(level > 0);
-
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
-    mfem::Array<int> marker(Dref.Width());marker = 0;
+    mfem::Array<int> marker(Dref.Width());
+    marker = 0;
     if (GetMatrix(level).GetGraph().HasBoundary())
     {
         BooleanMult(GetMatrix(level).EDofToBdrAtt(), *ess_attr_, marker);
@@ -136,8 +95,9 @@ void Upscale::MakeSolver(int level)
 
     if (param_.hybridization) // Hybridization solver
     {
+        SAAMGeParam* saamge_param = level > 0 ? param_.saamge_param : nullptr;
         solver_[level] = make_unique<HybridSolver>(
-                             comm_, GetMatrix(level), &marker, 0, param_.saamge_param);
+                             comm_, GetMatrix(level), &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -633,7 +593,7 @@ void Upscale::RescaleFineCoefficient(const mfem::Vector& coeff)
     GetMatrix(0).UpdateM(coeff);
     if (!param_.hybridization)
     {
-        MakeFineSolver();
+        MakeSolver(0);
     }
     else
     {

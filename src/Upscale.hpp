@@ -193,9 +193,7 @@ public:
         return coarsener_[level]->GetPu();
     }
 
-    /// Create Fine Level Solver
-    void MakeFineSolver();
-
+    /// Create solver on level
     void MakeSolver(int level);
 
     /// coeff should have the size of the number of *vertices* in the fine graph

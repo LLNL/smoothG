@@ -260,7 +260,6 @@ int main(int argc, char* argv[])
     auto upscale = std::make_shared<Upscale>(
                        graph, upscale_param, &partitioning, &ess_attr, W_block);
 
-    upscale->MakeFineSolver();
     upscale->PrintInfo();
     upscale->ShowSetupTime();
 
