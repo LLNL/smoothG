@@ -124,8 +124,8 @@ void PDESampler::Initialize(int dimension, double kappa)
 {
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
     {
-        // rhs_[level] = fvupscale_->GetVector(level);
-        rhs_[level].SetSize(num_aggs_[level]);
+        rhs_[level] = fvupscale_->GetVector(level);
+        // rhs_[level].SetSize(num_aggs_[level]);
         coefficient_[level].SetSize(num_aggs_[level]);
     }
 
