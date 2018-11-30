@@ -109,8 +109,8 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
 
     graph_ = Graph(vertex_edge, edge_d_td, weight);
     fvupscale_ = std::make_shared<Upscale>(
-                     graph_, W_block, partitioning, &edge_boundary_att, &ess_attr,
-                     param);
+                     graph_, param, &partitioning, &edge_boundary_att, &ess_attr,
+                     W_block);
     fvupscale_->MakeFineSolver();
 
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
