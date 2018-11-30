@@ -56,7 +56,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(mgL.GetGraphSpace().VertexToEDof());
 
     Init(mgL.GetGraphSpace().EdgeToEDof(), mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), mgL.EdgeBdrAtt(), ess_edge_dofs);
+         mgL.GetEdgeDofToTrueDof(), mgL.EDofToBdrAtt(), ess_edge_dofs);
 }
 
 HybridSolver::~HybridSolver()
@@ -74,7 +74,7 @@ void HybridSolver::Init(
     const mfem::SparseMatrix& face_edgedof,
     const std::vector<mfem::DenseMatrix>& M_el,
     const mfem::HypreParMatrix& edgedof_d_td,
-    const mfem::SparseMatrix& face_bdrattr,
+    const mfem::SparseMatrix& edgedof_bdrattr,
     const mfem::Array<int>* ess_edge_dofs)
 {
     mfem::StopWatch chrono;
@@ -96,17 +96,7 @@ void HybridSolver::Init(
     agg_weights_.SetSize(nAggs_);
     agg_weights_ = 1.0;
 
-    mfem::SparseMatrix edgedof_bdrattr;
-    if (face_bdrattr.Width())
-    {
-        mfem::SparseMatrix edgedof_face(smoothg::Transpose(face_edgedof));
-        mfem::SparseMatrix tmp = smoothg::Mult(edgedof_face, face_bdrattr);
-        edgedof_bdrattr.Swap(tmp);
-    }
-
-    mfem::HypreParMatrix edgedof_d_td_;
-    edgedof_d_td_.MakeRef(edgedof_d_td);
-    edgedof_d_td_.GetDiag(edgedof_IsOwned_);
+    edgedof_d_td.GetDiag(edgedof_IsOwned_);
 
     // Constructing the relation table (in SparseMatrix format) between edge
     // dof and multiplier dof. For every edge dof that is associated with a
@@ -114,9 +104,6 @@ void HybridSolver::Init(
     mfem::Array<int> j_multiplier_edgedof;
 
     // construct multiplier dof to true dof table
-    unique_ptr<mfem::HypreParMatrix> edgedof_td_d(edgedof_d_td_.Transpose());
-    unique_ptr<mfem::HypreParMatrix> edgedof_d_td_d(ParMult(&edgedof_d_td_, edgedof_td_d.get()));
-
     num_multiplier_dofs_ = face_edgedof.Width();
 
     int* i_edgedof_multiplier = new int[num_edge_dofs_ + 1];
@@ -145,14 +132,9 @@ void HybridSolver::Init(
 
     GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
 
-    auto edgedof_multiplier_d = make_unique<mfem::HypreParMatrix>(
-                                    comm_, edgedof_d_td_.GetGlobalNumRows(),
-                                    multiplier_start_.Last(), edgedof_d_td_.RowPart(),
-                                    multiplier_start_, &edgedof_multiplier);
-
-    assert(edgedof_d_td_d && edgedof_multiplier_d);
-    unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(
-        smoothg::RAP(*edgedof_d_td_d, *edgedof_multiplier_d) );
+    unique_ptr<mfem::HypreParMatrix> multiplier_trueedgedof(
+                edgedof_d_td.LeftDiagMult(multiplier_edgedof, multiplier_start_) );
+    unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(AAt(*multiplier_trueedgedof));
 
     // Construct multiplier "dof to true dof" table
     multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
@@ -167,7 +149,7 @@ void HybridSolver::Init(
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
     ess_multiplier_bc_ = false;
-    if (face_bdrattr.Width() && ess_edge_dofs)
+    if (edgedof_bdrattr.Width() && ess_edge_dofs)
     {
         ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
         for (int i = 0; i < num_multiplier_dofs_; i++)

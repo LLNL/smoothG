@@ -665,9 +665,9 @@ void GraphCoarsen::BuildInterpolation(
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
-    const mfem::SparseMatrix& face_cdof, int num_bubbles)
+    const mfem::SparseMatrix& face_cdof, int total_num_coarse_edofs)
 {
-    const int ncdofs = face_cdof.Width() + num_bubbles;
+    const int ncdofs = total_num_coarse_edofs;
     const int nfaces = face_cdof.Height();
 
     // count edge coarse true dofs (if the dof is a bubble or on a true face)
@@ -809,7 +809,7 @@ GraphSpace GraphCoarsen::BuildCoarseGraphSpace(
     auto face_coarse_edof = BuildFaceToCoarseEdgeDof(edge_traces);
     auto agg_coarse_edof = BuildAggToCoarseEdgeDof(agg_coarse_vdof, face_coarse_edof);
     auto coarse_edof_trueedof =
-            BuildCoarseEdgeDofTruedof(face_coarse_edof, face_coarse_edof.NumCols());
+            BuildCoarseEdgeDofTruedof(face_coarse_edof, agg_coarse_edof.NumCols());
 
     return GraphSpace(std::move(coarse_graph), std::move(agg_coarse_vdof),
                       std::move(agg_coarse_edof), std::move(face_coarse_edof),

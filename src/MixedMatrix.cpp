@@ -32,8 +32,8 @@ namespace smoothg
 {
 
 MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& w_block)
-    : edge_d_td_(&graph.EdgeToTrueEdge()), edge_td_d_(edge_d_td_->Transpose()),
-      graph_space_(std::move(graph))
+    : graph_space_(std::move(graph)), edge_d_td_(&graph_space_.EDofToTrueEDof()),
+      edge_td_d_(edge_d_td_->Transpose())
 {
     const Graph& graph_ref = graph_space_.GetGraph();
     Init(graph_ref.VertexToEdge(), graph_ref.EdgeWeight(), w_block);
@@ -41,11 +41,10 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& w_block)
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
-                         std::unique_ptr<mfem::SparseMatrix> W,
-                         const mfem::HypreParMatrix& edge_d_td)
-    : D_(std::move(D)), W_(std::move(W)), edge_d_td_(&edge_d_td),
-      edge_td_d_(edge_d_td.Transpose()), mbuilder_(std::move(mbuilder)),
-      graph_space_(std::move(graph_space))
+                         std::unique_ptr<mfem::SparseMatrix> W)
+    : graph_space_(std::move(graph_space)),
+      D_(std::move(D)), W_(std::move(W)), edge_d_td_(&graph_space_.EDofToTrueEDof()),
+      edge_td_d_(edge_d_td_->Transpose()), mbuilder_(std::move(mbuilder))
 {
     GenerateRowStarts();
 }

@@ -128,7 +128,7 @@ public:
     */
     std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
         const mfem::SparseMatrix& face_cdof,
-        int num_bubbles);
+        int total_num_coarse_edofs);
 
     /**
        @brief Get the coarse M matrix

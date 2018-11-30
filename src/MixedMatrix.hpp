@@ -68,14 +68,16 @@ public:
     MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
-                std::unique_ptr<mfem::SparseMatrix> W,
-                const mfem::HypreParMatrix& edge_d_td);
+                std::unique_ptr<mfem::SparseMatrix> W);
 
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
 
     const Graph& GetGraph() const { return graph_space_.GetGraph(); }
 
-    const mfem::SparseMatrix& EdgeBdrAtt() const { return GetGraph().EdgeToBdrAtt(); }
+    const mfem::SparseMatrix& EDofToBdrAtt() const
+    {
+        return GetGraphSpace().EDofToBdrAtt();
+    }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -334,6 +336,8 @@ private:
 
     void GenerateRowStarts();
 
+    GraphSpace graph_space_;
+
     std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
     std::unique_ptr<mfem::SparseMatrix> W_;
@@ -352,8 +356,6 @@ private:
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
 
     std::unique_ptr<MBuilder> mbuilder_;
-
-    GraphSpace graph_space_;
 }; // class MixedMatrix
 
 } // namespace smoothg

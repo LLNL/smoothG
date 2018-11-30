@@ -87,10 +87,10 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
 
 void Upscale::MakeFineSolver()
 {
-    mfem::Array<int> marker;
+    mfem::Array<int> marker(GetMatrix(0).GetD().Width());marker = 0;
     if (mixed_laplacians_[0].GetGraph().HasBoundary())
     {
-        BooleanMult(GetMatrix(0).EdgeBdrAtt(), *ess_attr_, marker);
+        BooleanMult(GetMatrix(0).EDofToBdrAtt(), *ess_attr_, marker);
     }
 
     if (param_.hybridization) // Hybridization solver
@@ -127,15 +127,11 @@ void Upscale::MakeSolver(int level)
     assert(level > 0);
 
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
-    mfem::Array<int> marker;
-
-    auto& face_bdratt = mixed_laplacians_[level].EdgeBdrAtt();
-    if (face_bdratt.Width() > 0)
+    mfem::Array<int> marker(Dref.Width());marker = 0;
+    if (GetMatrix(level).GetGraph().HasBoundary())
     {
+        BooleanMult(GetMatrix(level).EDofToBdrAtt(), *ess_attr_, marker);
         marker.SetSize(Dref.Width());
-        MarkDofsOnBoundary(face_bdratt,
-                           coarsener_[level - 1]->construct_face_facedof_table(),
-                           *ess_attr_, marker);
     }
 
     if (param_.hybridization) // Hybridization solver
@@ -151,7 +147,7 @@ void Upscale::MakeSolver(int level)
         {
             // Assume M diagonal, no ess data
             if (marker[mm])
-                Mref.EliminateRow(mm, true);
+                Mref.EliminateRowCol(mm, true);
         }
         if (marker.Size())
         {

@@ -78,11 +78,6 @@ public:
     void Restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
     void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
-    const mfem::SparseMatrix& construct_Agg_cvertexdof_table() const;
-    const mfem::SparseMatrix& construct_face_facedof_table() const;
-
-    const mfem::HypreParMatrix& get_face_dof_truedof_table() const;
-
     /**
        @brief Get the coarse M matrix
     */

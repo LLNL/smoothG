@@ -63,39 +63,10 @@ void Mixed_GL_Coarsener::Interpolate(const mfem::Vector& coarse_vect,
     Pu_.Mult(coarse_vect, fine_vect);
 }
 
-
-const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_Agg_cvertexdof_table() const
-{
-    check_subspace_construction_("Agg_cvertexdof_table");
-    return graph_coarsen_->GetAggToCoarseVertexDof();
-}
-
-const mfem::SparseMatrix& Mixed_GL_Coarsener::construct_face_facedof_table() const
-{
-    check_subspace_construction_("face_facedof_table");
-    return face_facedof_table_;
-}
-
 MixedMatrix Mixed_GL_Coarsener::GetCoarse()
 {
     return MixedMatrix(std::move(coarse_graph_space_), GetCoarseMBuilder(),
-                       GetCoarseD(), GetCoarseW(), get_face_dof_truedof_table());
-}
-
-const mfem::HypreParMatrix& Mixed_GL_Coarsener::get_face_dof_truedof_table() const
-{
-    check_subspace_construction_("face_dof_truedof_table");
-    if (!face_dof_truedof_table_)
-    {
-        const int num_bubbles = GetPu().Width() - graph_topology_.NumAggs();
-        face_dof_truedof_table_ = graph_coarsen_->BuildCoarseEdgeDofTruedof(
-                                      face_facedof_table_, num_bubbles);
-        face_dof_truedof_table_->CopyRowStarts();
-        face_dof_truedof_table_->CopyColStarts();
-    }
-
-    assert(face_dof_truedof_table_);
-    return *face_dof_truedof_table_;
+                       GetCoarseD(), GetCoarseW());
 }
 
 } // namespace smoothg
