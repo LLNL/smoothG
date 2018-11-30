@@ -100,9 +100,6 @@ unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(const MixedMatrix& mgL,
     param.energy_dual = false;
     param.coarse_components = false;
     auto coarsener = make_unique<SpectralAMG_MGL_Coarsener>(mgL, param, &partition);
-    mfem::Vector constant_rep(mgL.GetD().Height());
-    constant_rep = 1.0;
-    coarsener->construct_coarse_subspace(constant_rep);
     return coarsener;
 }
 
@@ -170,7 +167,10 @@ int main(int argc, char* argv[])
     // Assemble rescaled fine and coarse M through MixedMatrix
     fine_mgL.UpdateM(interp_agg_scale);
     auto& fine_M1 = fine_mgL.GetM();
-    auto coarse_mgL = coarsener->GetCoarse();
+
+    mfem::Vector constant_rep(fine_mgL.GetD().Height());
+    constant_rep = 1.0;
+    auto coarse_mgL = coarsener->BuildCoarseMixedMatrix(constant_rep);
     coarse_mgL.UpdateM(agg_scale);
     auto& coarse_M1 = coarse_mgL.GetM();
 

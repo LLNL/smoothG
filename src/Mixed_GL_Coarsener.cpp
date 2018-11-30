@@ -63,11 +63,5 @@ void Mixed_GL_Coarsener::Interpolate(const mfem::Vector& coarse_vect,
     Pu_.Mult(coarse_vect, fine_vect);
 }
 
-MixedMatrix Mixed_GL_Coarsener::GetCoarse()
-{
-    return MixedMatrix(std::move(coarse_graph_space_), GetCoarseMBuilder(),
-                       GetCoarseD(), GetCoarseW());
-}
-
 } // namespace smoothg
 

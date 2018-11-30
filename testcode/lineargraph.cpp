@@ -83,6 +83,8 @@ public:
 
     GraphTopology graph_topology_;
 
+    Graph coarse_graph_;
+
     mfem::SparseMatrix face_identity_;
 };
 
@@ -149,6 +151,8 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
 
     auto face_trueface = make_unique<mfem::HypreParMatrix>(
                              MPI_COMM_WORLD, partitions - 1, graph_topology_.GetFaceStart(), &face_identity_);
+
+    coarse_graph_ = Graph(Agg_face, *face_trueface);
 
     graph_topology_.face_trueface_face_ = smoothg::AAt(*face_trueface);
 
@@ -238,12 +242,15 @@ int main(int argc, char* argv[])
 
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
-    mfem::SparseMatrix face_dof; // not used in this example
 
     GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
-    ElementMBuilder builder;
+    GraphSpace coarse_graph_space =
+            graph_coarsen.BuildCoarseGraphSpace(local_edge_traces, local_spectral_vertex_targets,
+                                                std::move(partition.coarse_graph_));
+    bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, face_dof, builder, constant_rep);
+                                     Pp, Pu, coarse_graph_space,
+                                     build_coarse_components, constant_rep);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;
