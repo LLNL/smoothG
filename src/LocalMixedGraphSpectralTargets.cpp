@@ -86,7 +86,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     W_local_(W_local),
     graph_topology_(graph_topology),
     zero_eigenvalue_threshold_(1.e-8), // note we also use this for singular values
-    colMapper_(0)
+    col_map_(0)
 {
     // Assemble the parallel global M and D
     // TODO: D and M starts should in terms of dofs
@@ -498,7 +498,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     face_perm_edof_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
 
     // Column map for submatrix extraction
-    colMapper_.SetSize(std::max(permute_e->Height(), permute_v->Height()), -1);
+    col_map_.SetSize(std::max(permute_e->Height(), permute_v->Height()), -1);
 
     mfem::Array<int> ext_loc_edofs, ext_loc_vdofs, loc_vdofs;
     mfem::Vector first_evect;
@@ -527,7 +527,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         }
 
         MixedBlockEigensystem mbe(ext_loc_vdofs, ext_loc_edofs,
-                                  eigs, colMapper_, D_ext, M_ext, W_ext,
+                                  eigs, col_map_, D_ext, M_ext, W_ext,
                                   scaled_dual_, energy_dual_);
         mbe.ComputeEigenvectors(evects);
 
@@ -550,7 +550,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
         evects_T.Transpose(evects);
         evects_restricted_T.SetSize(nevects, loc_vdofs.Size());
-        ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, colMapper_, evects_restricted_T);
+        ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, col_map_, evects_restricted_T);
         evects_restricted.Transpose(evects_restricted_T);
 
         // Apply SVD to the restricted vectors (first vector is always kept)
@@ -755,7 +755,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 const mfem::DenseMatrix& sigmaT(ExtAgg_sigmaT[iAgg]);
                 ExtractColumns(sigmaT, ext_loc_edofs, iface_edofs,
-                               colMapper_, face_sigma_tmp, start);
+                               col_map_, face_sigma_tmp, start);
                 start += sigmaT.Height();
             }
 
@@ -818,7 +818,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             }
 
             auto Dloc = ExtractRowAndColumns(D_local_, vertex_local_dof,
-                                             face_nbh_dofs, colMapper_);
+                                             face_nbh_dofs, col_map_);
             sec_D.ReduceSend(iface, Dloc);
         }
         else // only 1 dof on face
@@ -860,7 +860,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             }
 
             auto Mloc = ExtractRowAndColumns(M_local_, face_nbh_dofs,
-                                             face_nbh_dofs, colMapper_);
+                                             face_nbh_dofs, col_map_);
             sec_M.ReduceSend(iface, Mloc);
         }
         else // only 1 dof on face

@@ -44,7 +44,7 @@ public:
        agglomerated topology.
     */
     Mixed_GL_Coarsener(const MixedMatrix& mgL)
-        : mgL_(mgL), graph_topology_(mgL.GetGraph()) {}
+        : mgL_(mgL), topology_(mgL.GetGraph()), graph_coarsen_(mgL_, topology_) {}
 
     virtual ~Mixed_GL_Coarsener() {}
 
@@ -62,7 +62,6 @@ public:
     */
     MixedMatrix BuildCoarseMixedMatrix(const mfem::Vector& constant_rep)
     {
-        graph_coarsen_ = make_unique<GraphCoarsen>(mgL_, graph_topology_);
         is_coarse_subspace_constructed_ = true;
         return do_construct_coarse_subspace(constant_rep);
     }
@@ -93,8 +92,8 @@ private:
 
 protected:
     const MixedMatrix& mgL_;
-    GraphTopology graph_topology_;
-    std::unique_ptr<GraphCoarsen> graph_coarsen_;
+    GraphTopology topology_;
+    GraphCoarsen graph_coarsen_;
 
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;

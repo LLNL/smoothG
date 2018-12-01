@@ -133,7 +133,7 @@ void HybridSolver::Init(
     GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
 
     unique_ptr<mfem::HypreParMatrix> multiplier_trueedgedof(
-                edgedof_d_td.LeftDiagMult(multiplier_edgedof, multiplier_start_) );
+        edgedof_d_td.LeftDiagMult(multiplier_edgedof, multiplier_start_) );
     unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(AAt(*multiplier_trueedgedof));
 
     // Construct multiplier "dof to true dof" table

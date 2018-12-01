@@ -84,13 +84,11 @@ public:
 
        @param[out] Pedges the returned interpolator on edge space.
 
-       @param[out] CM_el coarse mass matrices on the coarse aggregates, used for
-                    hybridizatin
-
-       @param[in] build_coarse_relation indicates whether the coarse relation tables
-       will be constructed, default value is false.
+       @param[in] build_coarse_components indicates whether to build components
+       for the coarse M matrix
     */
-    void BuildInterpolation(std::vector<mfem::DenseMatrix>& edge_trace,
+    void BuildInterpolation(
+        std::vector<mfem::DenseMatrix>& edge_trace,
         std::vector<mfem::DenseMatrix>& vertex_targets,
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,
@@ -102,24 +100,16 @@ public:
        @brief Get the coarse graph space
     */
     GraphSpace BuildCoarseGraphSpace(
-            const std::vector<mfem::DenseMatrix>& vertex_targets,
-            const std::vector<mfem::DenseMatrix>& edge_traces,
-            Graph coarse_graph);
+        const std::vector<mfem::DenseMatrix>& edge_traces,
+        const std::vector<mfem::DenseMatrix>& vertex_targets,
+        Graph coarse_graph);
 
     MixedMatrix BuildCoarseMixedMatrix(GraphSpace coarse_graph_space);
-
-    /**
-       @brief construct edge coarse dof to true dof relation table
-    */
-    std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
-        const mfem::SparseMatrix& face_cdof,
-        int total_num_coarse_edofs);
 
 private:
     /// Construct aggregate to coarse vertex dofs relation table
     mfem::SparseMatrix BuildAggToCoarseVertexDof(
         const std::vector<mfem::DenseMatrix>& vertex_targets);
-
 
     /// Construct face to coarse edge dofs relation table
     mfem::SparseMatrix BuildFaceToCoarseEdgeDof(
@@ -129,6 +119,11 @@ private:
     mfem::SparseMatrix BuildAggToCoarseEdgeDof(
         const mfem::SparseMatrix& agg_coarse_vdof,
         const mfem::SparseMatrix& face_coarse_edof);
+
+    /// Construct edge coarse dof to true dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
+        const mfem::SparseMatrix& face_cdof,
+        int total_num_coarse_edofs);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices(
@@ -201,7 +196,6 @@ private:
                      std::vector<mfem::DenseMatrix>& vertex_target,
                      const GraphSpace& coarse_graph_space,
                      mfem::SparseMatrix& Pedges,
-                     CoarseMBuilder& coarse_mbuilder,
                      const mfem::Vector& constant_rep);
 
     void BuildCoarseW(const mfem::SparseMatrix& Pvertices);
@@ -222,7 +216,7 @@ private:
     const GraphTopology& graph_topology_;
 
     /// basically just some storage to allocate
-    mfem::Array<int> colMapper_;
+    mfem::Array<int> col_map_;
 
     /// Coarse D operator
     std::unique_ptr<mfem::SparseMatrix> coarse_D_;

@@ -179,11 +179,9 @@ int main(int argc, char* argv[])
     int global_size = 4;
     args.AddOption(&global_size, "-s", "--size", "Size of fine linear graph.");
     const int num_partitions = 2;
-    const int max_evects = 1;
-    const double spect_tol = 0.0;
-    const bool dual_target = false;
-    const bool scaled_dual = false;
-    const bool energy_dual = false;
+    UpscaleParameters param;
+    param.max_evects = 1;
+    param.spect_tol = 0.0;
     const double test_tol = 1.e-8;
     args.Parse();
     if (myid == 0)
@@ -199,9 +197,7 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LocalMixedGraphSpectralTargets localtargets(
-        spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-        mgL.GetM(), mgL.GetD(), partition.graph_topology_);
+    LocalMixedGraphSpectralTargets localtargets(mgL, partition.graph_topology_, param);
 
     mfem::Vector constant_rep(mgL.GetD().Height());
     constant_rep = 1.0;
@@ -245,8 +241,8 @@ int main(int argc, char* argv[])
 
     GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
     GraphSpace coarse_graph_space =
-            graph_coarsen.BuildCoarseGraphSpace(local_edge_traces, local_spectral_vertex_targets,
-                                                std::move(partition.coarse_graph_));
+        graph_coarsen.BuildCoarseGraphSpace(local_edge_traces, local_spectral_vertex_targets,
+                                            std::move(partition.coarse_graph_));
     bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
                                      Pp, Pu, coarse_graph_space,

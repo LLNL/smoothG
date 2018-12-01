@@ -386,6 +386,7 @@ void GetTableRow(
     const int begin = mat.GetI()[rownum];
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
+    assert(size >= 0);
     J.MakeRef(mat.GetJ() + begin, size);
 }
 

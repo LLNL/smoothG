@@ -289,7 +289,7 @@ private:
     mfem::Array<HYPRE_Int> edgedof_ext_starts;
     mfem::Array<int> Agg_start_;
 
-    mfem::Array<int> colMapper_;
+    mfem::Array<int> col_map_;
 };
 
 } // namespace smoothg
