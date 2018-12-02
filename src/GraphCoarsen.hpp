@@ -87,14 +87,12 @@ public:
        @param[in] build_coarse_components indicates whether to build components
        for the coarse M matrix
     */
-    void BuildInterpolation(
-        std::vector<mfem::DenseMatrix>& edge_trace,
+    void BuildInterpolation(std::vector<mfem::DenseMatrix>& edge_trace,
         std::vector<mfem::DenseMatrix>& vertex_targets,
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,
         const GraphSpace& graph_space,
-        bool build_coarse_components,
-        const mfem::Vector& constant_rep);
+        bool build_coarse_components);
 
     /**
        @brief Get the coarse graph space
@@ -104,7 +102,8 @@ public:
         const std::vector<mfem::DenseMatrix>& vertex_targets,
         Graph coarse_graph);
 
-    MixedMatrix BuildCoarseMixedMatrix(GraphSpace coarse_graph_space);
+    MixedMatrix BuildCoarseMixedMatrix(GraphSpace coarse_graph_space,
+                                       mfem::Vector coarse_constant_rep);
 
 private:
     /// Construct aggregate to coarse vertex dofs relation table
@@ -195,8 +194,7 @@ private:
     void BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                      std::vector<mfem::DenseMatrix>& vertex_target,
                      const GraphSpace& coarse_graph_space,
-                     mfem::SparseMatrix& Pedges,
-                     const mfem::Vector& constant_rep);
+                     mfem::SparseMatrix& Pedges);
 
     void BuildCoarseW(const mfem::SparseMatrix& Pvertices);
 
@@ -212,6 +210,7 @@ private:
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix* W_proc_;
+    const mfem::Vector& constant_rep_;
     const ElementMBuilder* fine_mbuilder_;
     const GraphTopology& graph_topology_;
 

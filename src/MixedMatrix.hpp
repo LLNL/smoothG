@@ -68,7 +68,9 @@ public:
     MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
-                std::unique_ptr<mfem::SparseMatrix> W);
+                std::unique_ptr<mfem::SparseMatrix> W,
+                mfem::Vector constant_rep);
+
 
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
 
@@ -78,6 +80,8 @@ public:
     {
         return GetGraphSpace().EDofToBdrAtt();
     }
+
+    const mfem::Vector& GetConstantRep() const { return constant_rep_; }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -356,6 +360,8 @@ private:
     mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
 
     std::unique_ptr<MBuilder> mbuilder_;
+
+    mfem::Vector constant_rep_;
 }; // class MixedMatrix
 
 } // namespace smoothg

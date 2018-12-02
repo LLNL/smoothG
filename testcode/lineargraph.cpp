@@ -198,12 +198,7 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(mgL, partition.graph_topology_, param);
-
-    mfem::Vector constant_rep(mgL.GetD().Height());
-    constant_rep = 1.0;
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets,
-                         constant_rep);
-
+    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
         throw std::logic_error(
@@ -245,8 +240,7 @@ int main(int argc, char* argv[])
                                             std::move(partition.coarse_graph_));
     bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, coarse_graph_space,
-                                     build_coarse_components, constant_rep);
+                                     Pp, Pu, coarse_graph_space, build_coarse_components);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;

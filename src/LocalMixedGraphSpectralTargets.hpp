@@ -129,17 +129,9 @@ public:
     /**
        @brief Construct based on mixed form graph Laplacian.
 
-       @param rel_tol tolerance for including small eigenvectors
-       @param max_evects max eigenvectors to include per aggregate
-       @param dual_target get traces from eigenvectors of dual graph Laplacian
-       @param scaled_dual scale dual graph Laplacian by inverse edge weight.
-              Typically coarse problem gets better accuracy but becomes harder
-              to solve when this option is turned on.
-       @param energy_dual use energy matrix in (RHS of) dual graph eigen problem
-              (guarantees approximation property in edge energy norm)
-       @param M_local is mass matrix on edge-based (velocity) space
-       @param D_local is a divergence-like operator
+       @param mixed_graph_laplacian container for M, D, W
        @param graph_topology the partitioning relations for coarsening
+       @param param container for rel_tol, max_evects, various dual target flags
 
        And the graph Laplacian in mixed form is
        \f[
@@ -148,28 +140,6 @@ public:
             D&  -W
           \end{array} \right)
        \f]
-    */
-    LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects,
-        bool dual_target, bool scaled_dual, bool energy_dual,
-        const mfem::SparseMatrix& M_local,
-        const mfem::SparseMatrix& D_local,
-        const GraphTopology& graph_topology);
-
-    LocalMixedGraphSpectralTargets(
-        double rel_tol, int max_evects,
-        bool dual_target, bool scaled_dual, bool energy_dual,
-        const mfem::SparseMatrix& M_local,
-        const mfem::SparseMatrix& D_local,
-        const mfem::SparseMatrix* W_local,
-        const GraphTopology& graph_topology);
-
-    /**
-       @brief Construct based on containers of input of other constructors.
-
-       @param mixed_graph_laplacian container for M_local, D_local, W_local
-       @param graph_topology the partitioning relations for coarsening
-       @param param container for rel_tol, max_evects, various dual target flags
     */
     LocalMixedGraphSpectralTargets(
         const MixedMatrix& mixed_graph_laplacian,
@@ -188,8 +158,7 @@ public:
                            space
     */
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                 std::vector<mfem::DenseMatrix>& local_vertex_targets,
-                 const mfem::Vector& constant_rep);
+                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
 private:
     enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
 
@@ -230,10 +199,6 @@ private:
 
     void GetExtAggDofs(DofType dof_type, int iAgg, mfem::Array<int>& dofs);
 
-    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& AggExt_sigmaT,
-                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                            const mfem::Vector& constant_rep);
-
     void Orthogonalize(mfem::DenseMatrix& vectors, mfem::Vector& single_vec,
                        int offset, mfem::DenseMatrix& out);
 
@@ -263,6 +228,7 @@ private:
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
     const mfem::SparseMatrix* W_local_;
+    const mfem::Vector& constant_rep_;
 
     std::unique_ptr<mfem::HypreParMatrix> M_global_;
     std::unique_ptr<mfem::HypreParMatrix> D_global_;

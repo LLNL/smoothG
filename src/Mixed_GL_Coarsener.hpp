@@ -60,10 +60,10 @@ public:
        versions of the derivative matrix \f$ D \f$ and the weighting
        matrix \f$ M \f$.
     */
-    MixedMatrix BuildCoarseMixedMatrix(const mfem::Vector& constant_rep)
+    MixedMatrix BuildCoarseMixedMatrix()
     {
         is_coarse_subspace_constructed_ = true;
-        return do_construct_coarse_subspace(constant_rep);
+        return do_construct_coarse_subspace();
     }
 
     const mfem::SparseMatrix& GetPsigma() const;
@@ -78,7 +78,7 @@ public:
     void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
 private:
-    virtual MixedMatrix do_construct_coarse_subspace(const mfem::Vector& constant_rep) = 0;
+    virtual MixedMatrix do_construct_coarse_subspace() = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;

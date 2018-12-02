@@ -135,7 +135,10 @@ public:
     /// Get a vector of coefficients that represents a constant vector on
     /// the graph; that is, return a vector v such that P_{vertices} v = 1
     /// GetConstantRep(0) will normally return a vector of all 1s
-    const mfem::Vector& GetConstantRep(unsigned int level) const;
+    const mfem::Vector& GetConstantRep(unsigned int level) const
+    {
+        return GetMatrix(level).GetConstantRep();
+    }
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
@@ -227,9 +230,6 @@ protected:
 
     std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
-
-    /// why exactly is this mutable?
-    mutable std::vector<mfem::Vector> constant_rep_;
 
     const mfem::Array<int>* ess_attr_;
 

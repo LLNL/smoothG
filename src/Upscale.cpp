@@ -65,8 +65,7 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
             coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
                                         mixed_laplacians_[level - 1], param_));
         }
-        mixed_laplacians_.push_back(coarsener_[level - 1]->BuildCoarseMixedMatrix(GetConstantRep(
-                                                                                      level - 1)));
+        mixed_laplacians_.push_back(coarsener_[level - 1]->BuildCoarseMixedMatrix());
         if (level < param_.max_levels - 1 || !param_.hybridization)
         {
             mixed_laplacians_.back().BuildM();
@@ -359,23 +358,6 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
 {
     assert(level >= 0 && level < static_cast<int>(mixed_laplacians_.size()));
     return mixed_laplacians_[level];
-}
-
-const mfem::Vector& Upscale::GetConstantRep(unsigned int level) const
-{
-    for (unsigned int i = constant_rep_.size(); i < level + 1; ++i)
-    {
-        constant_rep_.emplace_back(GetVector(i));
-        if (i == 0)
-        {
-            constant_rep_.back() = 1.0;
-        }
-        else
-        {
-            Restrict(i, constant_rep_[i - 1], constant_rep_.back());
-        }
-    }
-    return constant_rep_[level];
 }
 
 void Upscale::PrintInfo(std::ostream& out) const

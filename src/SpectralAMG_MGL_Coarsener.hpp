@@ -53,7 +53,7 @@ private:
 
        @param constant_rep representation of constant on finer level
     */
-    MixedMatrix do_construct_coarse_subspace(const mfem::Vector& constant_rep);
+    MixedMatrix do_construct_coarse_subspace();
 
 private:
     const UpscaleParameters& param_;
