@@ -87,7 +87,8 @@ public:
        @param[in] build_coarse_components indicates whether to build components
        for the coarse M matrix
     */
-    void BuildInterpolation(std::vector<mfem::DenseMatrix>& edge_trace,
+    void BuildInterpolation(
+        std::vector<mfem::DenseMatrix>& edge_trace,
         std::vector<mfem::DenseMatrix>& vertex_targets,
         mfem::SparseMatrix& Pvertices,
         mfem::SparseMatrix& Pedges,

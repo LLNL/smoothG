@@ -146,8 +146,8 @@ int main(int argc, char* argv[])
     UpscaleParameters param;
     param.spect_tol = 1.0;
     param.max_evects = 3;
-    SpectralAMG_MGL_Coarsener coarsener(fine_mgL, param, &partitioning);
-    auto coarse_mgL = coarsener.BuildCoarseMixedMatrix();
+    SpectralAMG_MGL_Coarsener coarsener(param);
+    auto coarse_mgL = coarsener.BuildCoarseMixedMatrix(fine_mgL, &partitioning);
 
     // Interpolate agg scaling (coarse level) to elements (fine level)
     mfem::Vector interp_agg_scale(pmesh->GetNE());

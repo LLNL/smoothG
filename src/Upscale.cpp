@@ -55,18 +55,17 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
     // coarser levels: matrices
     for (int level = 1; level < param_.max_levels; ++level)
     {
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(param_));
         if (level == 1)
         {
-            coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                        mixed_laplacians_[level - 1], param_, partitioning));
+            mixed_laplacians_.push_back(
+                        coarsener_[level - 1]->BuildCoarseMixedMatrix(mixed_laplacians_.back(), partitioning));
         }
         else
         {
-            coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                        mixed_laplacians_[level - 1], param_));
+            mixed_laplacians_.push_back(coarsener_[level - 1]->BuildCoarseMixedMatrix(mixed_laplacians_.back()));
         }
-        mixed_laplacians_.push_back(coarsener_[level - 1]->BuildCoarseMixedMatrix());
-        if (level < param_.max_levels - 1 || !param_.hybridization)
+        if (level < param_.max_levels - 1)
         {
             mixed_laplacians_.back().BuildM();
         }

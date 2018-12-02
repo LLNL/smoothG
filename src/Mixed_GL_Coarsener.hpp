@@ -43,8 +43,7 @@ public:
        @brief Build a coarsener from the graph Laplacian and the
        agglomerated topology.
     */
-    Mixed_GL_Coarsener(const MixedMatrix& mgL)
-        : mgL_(mgL), topology_(mgL.GetGraph()), graph_coarsen_(mgL_, topology_) {}
+    Mixed_GL_Coarsener() = default;
 
     virtual ~Mixed_GL_Coarsener() {}
 
@@ -60,10 +59,11 @@ public:
        versions of the derivative matrix \f$ D \f$ and the weighting
        matrix \f$ M \f$.
     */
-    MixedMatrix BuildCoarseMixedMatrix()
+    MixedMatrix BuildCoarseMixedMatrix(
+            const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
     {
         is_coarse_subspace_constructed_ = true;
-        return do_construct_coarse_subspace();
+        return do_construct_coarse_subspace(mgL, partitioning);
     }
 
     const mfem::SparseMatrix& GetPsigma() const;
@@ -78,7 +78,8 @@ public:
     void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
 private:
-    virtual MixedMatrix do_construct_coarse_subspace() = 0;
+    virtual MixedMatrix do_construct_coarse_subspace(
+            const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr) = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;
@@ -91,14 +92,8 @@ private:
     }
 
 protected:
-    const MixedMatrix& mgL_;
-    GraphTopology topology_;
-    GraphCoarsen graph_coarsen_;
-
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;
-
-    GraphSpace coarse_graph_space_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

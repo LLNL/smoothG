@@ -43,9 +43,7 @@ public:
        @param gt the topology describing how vertices and edges are agglomerated
        @param param upscaling parameters
     */
-    SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                              const UpscaleParameters& param = UpscaleParameters(),
-                              const mfem::Array<int>* partitioning = nullptr);
+    SpectralAMG_MGL_Coarsener(const UpscaleParameters& param = UpscaleParameters());
 
 private:
     /**
@@ -53,7 +51,8 @@ private:
 
        @param constant_rep representation of constant on finer level
     */
-    MixedMatrix do_construct_coarse_subspace();
+    MixedMatrix do_construct_coarse_subspace(
+            const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr);
 
 private:
     const UpscaleParameters& param_;
