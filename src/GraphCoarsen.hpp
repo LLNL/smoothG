@@ -98,13 +98,13 @@ public:
     /**
        @brief Get the coarse graph space
     */
-    GraphSpace BuildCoarseGraphSpace(
+    GraphSpace BuildCoarseSpace(
         const std::vector<mfem::DenseMatrix>& edge_traces,
         const std::vector<mfem::DenseMatrix>& vertex_targets,
         Graph coarse_graph);
 
-    MixedMatrix BuildCoarseMixedMatrix(GraphSpace coarse_graph_space,
-                                       mfem::Vector coarse_constant_rep);
+    MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
+                                  mfem::Vector coarse_constant_rep);
 
 private:
     /// Construct aggregate to coarse vertex dofs relation table

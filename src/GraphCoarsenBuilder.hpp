@@ -232,6 +232,8 @@ private:
                            const mfem::DenseMatrix& P);
 
     const GraphTopology& topology_;
+    mfem::SparseMatrix Agg_face_ref_;
+    mfem::SparseMatrix face_Agg_;
 
     int total_num_traces_;
     int ncoarse_vertexdofs_;

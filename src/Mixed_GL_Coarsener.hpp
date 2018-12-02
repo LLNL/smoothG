@@ -39,10 +39,7 @@ namespace smoothg
 class Mixed_GL_Coarsener
 {
 public:
-    /**
-       @brief Build a coarsener from the graph Laplacian and the
-       agglomerated topology.
-    */
+    /// Default constructor
     Mixed_GL_Coarsener() = default;
 
     virtual ~Mixed_GL_Coarsener() {}
@@ -59,7 +56,7 @@ public:
        versions of the derivative matrix \f$ D \f$ and the weighting
        matrix \f$ M \f$.
     */
-    MixedMatrix BuildCoarseMixedMatrix(
+    MixedMatrix Coarsen(
             const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
     {
         is_coarse_subspace_constructed_ = true;

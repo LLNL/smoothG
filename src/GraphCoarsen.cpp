@@ -329,7 +329,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     const mfem::SparseMatrix& Agg_edge(graph_topology_.Agg_edge_);
     const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
     const mfem::SparseMatrix& face_edge(graph_topology_.face_edge_);
-    const mfem::SparseMatrix& Agg_face(graph_topology_.Agg_face_);
+    const mfem::SparseMatrix& Agg_face(coarse_graph_space.GetGraph().VertexToEdge());
     const mfem::SparseMatrix& face_cdof(coarse_graph_space.EdgeToEDof());
 
     const unsigned int nAggs = vertex_target.size();
@@ -780,7 +780,7 @@ mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
     return mfem::SparseMatrix(I, J, Data, num_aggs, edof_counter);
 }
 
-GraphSpace GraphCoarsen::BuildCoarseGraphSpace(
+GraphSpace GraphCoarsen::BuildCoarseSpace(
     const std::vector<mfem::DenseMatrix>& edge_traces,
     const std::vector<mfem::DenseMatrix>& vertex_targets,
     Graph coarse_graph)
@@ -796,8 +796,8 @@ GraphSpace GraphCoarsen::BuildCoarseGraphSpace(
                       std::move(coarse_edof_trueedof));
 }
 
-MixedMatrix GraphCoarsen::BuildCoarseMixedMatrix(GraphSpace coarse_graph_space,
-                                                 mfem::Vector coarse_constant_rep)
+MixedMatrix GraphCoarsen::BuildCoarseMatrix(GraphSpace coarse_graph_space,
+                                            mfem::Vector coarse_constant_rep)
 {
     return MixedMatrix(std::move(coarse_graph_space), std::move(coarse_m_builder_),
                        std::move(coarse_D_), std::move(coarse_W_), std::move(coarse_constant_rep));

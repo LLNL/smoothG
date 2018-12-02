@@ -87,6 +87,10 @@ void CoefficientMBuilder::Setup(
     {
         coarse_agg_dof_offsets_[i] = coarse_agg_dof_offsets_[i - 1] + vertex_target[i - 1].Width() - 1;
     }
+
+    Agg_face_ref_.MakeRef(Agg_face);
+    mfem::SparseMatrix tmp = smoothg::Transpose(Agg_face);
+    face_Agg_.Swap(tmp);
 }
 
 void ElementMBuilder::RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter)
@@ -304,8 +308,8 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
 std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
     const mfem::Vector& agg_weights_inverse) const
 {
-    const int num_aggs = topology_.Agg_face_.Height();
-    const int num_faces = topology_.Agg_face_.Width();
+    const int num_aggs = Agg_face_ref_.Height();
+    const int num_faces = Agg_face_ref_.Width();
 
     // ---
     // assemble from components...
@@ -320,7 +324,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
     for (int face = 0; face < num_faces; ++face)
     {
         double face_weight;
-        GetTableRow(topology_.face_Agg_, face, neighbor_aggs);
+        GetTableRow(face_Agg_, face, neighbor_aggs);
         MFEM_ASSERT(neighbor_aggs.Size() <= 2, "Face has three or more aggregates!");
         if (neighbor_aggs.Size() == 1)
         {
@@ -344,7 +348,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
     for (int agg = 0; agg < num_aggs; ++agg)
     {
         double agg_weight = 1. / agg_weights_inverse[agg];
-        GetTableRow(topology_.Agg_face_, agg, local_faces);
+        GetTableRow(Agg_face_ref_, agg, local_faces);
         for (int f = 0; f < local_faces.Size(); ++f)
         {
             int face = local_faces[f];
@@ -377,7 +381,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
         GetCoarseAggDofs(agg, coarse_agg_dofs);
         AddScaledSubMatrix(*CoarseM, coarse_agg_dofs, coarse_agg_dofs,
                            comp_E_E_[agg], agg_weight);
-        GetTableRow(topology_.Agg_face_, agg, local_faces);
+        GetTableRow(Agg_face_ref_, agg, local_faces);
         for (int af = 0; af < local_faces.Size(); ++af)
         {
             int face = local_faces[af];

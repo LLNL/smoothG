@@ -49,7 +49,7 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     GraphCoarsen graph_coarsen(mgL, topology);
-    GraphSpace coarse_space = graph_coarsen.BuildCoarseGraphSpace(
+    GraphSpace coarse_space = graph_coarsen.BuildCoarseSpace(
                 local_edge_traces, local_spectral_vertex_targets, std::move(coarse_graph));
 
     graph_coarsen.BuildInterpolation(local_edge_traces,
@@ -60,7 +60,7 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
     mfem::Vector coarse_const_rep(Pu_.NumCols());
     Pu_.MultTranspose(mgL.GetConstantRep(), coarse_const_rep);
 
-    return graph_coarsen.BuildCoarseMixedMatrix(
+    return graph_coarsen.BuildCoarseMatrix(
                std::move(coarse_space), std::move(coarse_const_rep));
 }
 

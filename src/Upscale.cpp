@@ -53,24 +53,20 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
     sol_.resize(param_.max_levels);
 
     // coarser levels: matrices
-    for (int level = 1; level < param_.max_levels; ++level)
+    for (int level = 0; level < param_.max_levels - 1; ++level)
     {
+        mixed_laplacians_.back().BuildM();
         coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(param_));
-        if (level == 1)
+        if (level == 0)
         {
             mixed_laplacians_.push_back(
-                        coarsener_[level - 1]->BuildCoarseMixedMatrix(mixed_laplacians_.back(), partitioning));
+                        coarsener_[level]->Coarsen(GetMatrix(level), partitioning));
         }
         else
         {
-            mixed_laplacians_.push_back(coarsener_[level - 1]->BuildCoarseMixedMatrix(mixed_laplacians_.back()));
-        }
-        if (level < param_.max_levels - 1)
-        {
-            mixed_laplacians_.back().BuildM();
+            mixed_laplacians_.push_back(coarsener_[level]->Coarsen(GetMatrix(level)));
         }
     }
-
 
     // make solver on each level
     for (int level = 0; level < param_.max_levels; ++level)

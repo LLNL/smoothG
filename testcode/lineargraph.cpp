@@ -236,7 +236,7 @@ int main(int argc, char* argv[])
 
     GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
     GraphSpace coarse_graph_space =
-        graph_coarsen.BuildCoarseGraphSpace(local_edge_traces, local_spectral_vertex_targets,
+        graph_coarsen.BuildCoarseSpace(local_edge_traces, local_spectral_vertex_targets,
                                             std::move(partition.coarse_graph_));
     bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
