@@ -101,7 +101,7 @@ public:
     GraphSpace BuildCoarseSpace(
         const std::vector<mfem::DenseMatrix>& edge_traces,
         const std::vector<mfem::DenseMatrix>& vertex_targets,
-        Graph coarse_graph);
+        std::unique_ptr<Graph> coarse_graph);
 
     MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
                                   mfem::Vector coarse_constant_rep);

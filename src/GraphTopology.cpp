@@ -77,13 +77,10 @@ GraphTopology::GraphTopology(const Graph& graph)
 
 GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
 {
-    face_trueface_ = std::move(graph_topology.face_trueface_);
     face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
 
     Agg_edge_.Swap(graph_topology.Agg_edge_);
     Agg_vertex_.Swap(graph_topology.Agg_vertex_);
-    face_Agg_.Swap(graph_topology.face_Agg_);
-    Agg_face_.Swap(graph_topology.Agg_face_);
     face_edge_.Swap(graph_topology.face_edge_);
 
     Swap(vertex_start_, graph_topology.GetVertexStart());
@@ -97,14 +94,14 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
 }
 
 
-Graph GraphTopology::Coarsen(int coarsening_factor)
+std::unique_ptr<Graph> GraphTopology::Coarsen(int coarsening_factor)
 {
     mfem::Array<int> partitioning;
     PartitionAAT(fine_graph_->VertexToEdge(), partitioning, coarsening_factor);
     return Coarsen(partitioning);
 }
 
-Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
+std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
 {
     MPI_Comm comm = fine_graph_->GetComm();
 
@@ -332,12 +329,9 @@ Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
     }
 
     // Complete face to aggregate table
-    mfem::SparseMatrix face_agg_tmp(face_Agg_i, face_Agg_j,
-                                    face_Agg_data, nfaces, nAggs);
-    face_Agg_.Swap(face_agg_tmp);
-
-    mfem::SparseMatrix agg_face_tmp = smoothg::Transpose(face_Agg_);
-    Agg_face_.Swap(agg_face_tmp);
+    mfem::SparseMatrix f_A(face_Agg_i, face_Agg_j, face_Agg_data, nfaces, nAggs);
+    face_Agg_.Swap(f_A);
+    mfem::SparseMatrix Agg_face = smoothg::Transpose(face_Agg_);
 
     // Build face "dof-true dof-dof" table from local face_edge and
     // the edge "dof-true dof-dof" table
@@ -355,9 +349,12 @@ Graph GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
     SetConstantValue(*face_trueface_face_, 1.0);
 
     // Construct "face to true face" table
-    face_trueface_ = BuildEntityToTrueEntity(*face_trueface_face_);
+    auto face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
-    return Graph(Agg_face_, *face_trueface_, mfem::Vector(), face_bdratt.get());
+    auto coarse_graph = make_unique<Graph>(
+                Agg_face, *face_trueface, mfem::Vector(), face_bdratt.get());
+    coarse_graph_ = coarse_graph.get();
+    return coarse_graph;
 }
 
 } // namespace smoothg

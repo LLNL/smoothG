@@ -83,7 +83,7 @@ public:
 
     GraphTopology graph_topology_;
 
-    Graph coarse_graph_;
+    unique_ptr<Graph> coarse_graph_;
 
     mfem::SparseMatrix face_identity_;
 };
@@ -152,16 +152,15 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     auto face_trueface = make_unique<mfem::HypreParMatrix>(
                              MPI_COMM_WORLD, partitions - 1, graph_topology_.GetFaceStart(), &face_identity_);
 
-    coarse_graph_ = Graph(Agg_face, *face_trueface);
+    coarse_graph_ = make_unique<Graph>(Agg_face, *face_trueface);
+    graph_topology_.coarse_graph_ = coarse_graph_.get();
 
     graph_topology_.face_trueface_face_ = smoothg::AAt(*face_trueface);
 
-    graph_topology_.Agg_face_.Swap(Agg_face);
     graph_topology_.Agg_vertex_.Swap(Agg_vertex);
     graph_topology_.Agg_edge_.Swap(Agg_edge);
     graph_topology_.face_edge_.Swap(face_edge);
     graph_topology_.face_Agg_.Swap(face_Agg);
-    std::swap(graph_topology_.face_trueface_, face_trueface);
 }
 
 int main(int argc, char* argv[])
@@ -235,9 +234,8 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pp;
 
     GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
-    GraphSpace coarse_graph_space =
-        graph_coarsen.BuildCoarseSpace(local_edge_traces, local_spectral_vertex_targets,
-                                            std::move(partition.coarse_graph_));
+    GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
+        local_edge_traces, local_spectral_vertex_targets, std::move(partition.coarse_graph_));
     bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
                                      Pp, Pu, coarse_graph_space, build_coarse_components);

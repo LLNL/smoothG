@@ -79,9 +79,9 @@ void CoefficientMBuilder::Setup(
 {
     total_num_traces_ = total_num_traces;
     ncoarse_vertexdofs_ = ncoarse_vertexdofs;
-    coarse_agg_dof_offsets_.SetSize(topology_.Agg_face_.Height() + 1);
+    num_aggs_ = topology_.NumAggs();
 
-    num_aggs_ = topology_.Agg_face_.Height();
+    coarse_agg_dof_offsets_.SetSize(num_aggs_ + 1);
     coarse_agg_dof_offsets_[0] = total_num_traces;
     for (unsigned int i = 1; i < num_aggs_ + 1; ++i)
     {
@@ -218,12 +218,11 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     // in future MFEM releases when SparseMatrix::GetSubMatrix is const-correct,
     // the next line will no longer be necessary
     mfem::SparseMatrix& Pedges_noconst = const_cast<mfem::SparseMatrix&>(Pedges);
-
     face_cdof_ref_.MakeRef(face_cdof);
 
     // F_F block
-    const int num_faces = topology_.Agg_face_.Width();
-    const int num_aggs = topology_.Agg_face_.Height();
+    const int num_faces = topology_.NumFaces();
+    const int num_aggs = topology_.NumAggs();
     mfem::Array<int> local_fine_dofs;
     mfem::Array<int> local_coarse_dofs;
     mfem::Vector local_fine_weight;
@@ -245,7 +244,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     mfem::Array<int> local_coarse_dofs_prime;
     for (int agg = 0; agg < num_aggs; ++agg)
     {
-        GetTableRowCopy(topology_.Agg_face_, agg, local_faces);
+        GetTableRowCopy(Agg_face_ref_, agg, local_faces);
         GetTableRowCopy(topology_.Agg_edge_, agg, local_fine_dofs);
         fineMdiag.GetSubVector(local_fine_dofs, local_fine_weight);
         for (int f = 0; f < local_faces.Size(); ++f)
@@ -270,7 +269,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     comp_E_E_.resize(num_aggs);
     for (int agg = 0; agg < num_aggs; ++agg)
     {
-        GetTableRowCopy(topology_.Agg_face_, agg, local_faces);
+        GetTableRowCopy(Agg_face_ref_, agg, local_faces);
         GetCoarseAggDofs(agg, local_coarse_dofs);
         if (local_coarse_dofs.Size() == 0)
         {
