@@ -225,14 +225,11 @@ private:
     const bool scaled_dual_;
     const bool energy_dual_;
 
+    const MixedMatrix& mgL_;
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
     const mfem::SparseMatrix* W_local_;
     const mfem::Vector& constant_rep_;
-
-    std::unique_ptr<mfem::HypreParMatrix> M_global_;
-    std::unique_ptr<mfem::HypreParMatrix> D_global_;
-    std::unique_ptr<mfem::HypreParMatrix> W_global_;
 
     const GraphTopology& graph_topology_;
     const double zero_eigenvalue_threshold_;
@@ -253,7 +250,6 @@ private:
     mfem::Array<HYPRE_Int> edgedof_starts;
     mfem::Array<HYPRE_Int> vertdof_starts;
     mfem::Array<HYPRE_Int> edgedof_ext_starts;
-    mfem::Array<int> Agg_start_;
 
     mfem::Array<int> col_map_;
 };

@@ -138,7 +138,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
 {
     MPI_Comm_rank(comm_, &myid_);
 
-    mfem::Array<int>& D_row_start(mgL.GetDrowStart());
+    mfem::Array<int>& D_row_start(mgL.GetDrowStarts());
 
     const mfem::HypreParMatrix& edge_d_td(mgL.GetEdgeDofToTrueDof());
     const mfem::HypreParMatrix& edge_td_d(mgL.GetEdgeTrueDofToDof());

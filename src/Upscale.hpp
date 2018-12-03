@@ -146,9 +146,6 @@ public:
     /// Compute Operator Complexity
     double OperatorComplexity() const;
 
-    /// Get Row Starts
-    virtual mfem::Array<HYPRE_Int>& GetDrowStart() const { return GetMatrix(0).GetDrowStart();}
-
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
 

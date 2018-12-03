@@ -80,6 +80,13 @@ mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
 std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A);
 
 /**
+    @brief Compute the product A * B
+*/
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
+                                              const mfem::SparseMatrix& B,
+                                              const mfem::Array<int>& B_colpart);
+
+/**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense.
 */

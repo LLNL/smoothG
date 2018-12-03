@@ -69,6 +69,7 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     dual_target_(param.dual_target),
     scaled_dual_(param.scaled_dual),
     energy_dual_(param.energy_dual),
+    mgL_(mgL),
     M_local_(mgL.GetM()),
     D_local_(mgL.GetD()),
     W_local_(mgL.GetW()),
@@ -77,61 +78,39 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     zero_eigenvalue_threshold_(1.e-8), // note we also use this for singular values
     col_map_(0)
 {
-    // Assemble the parallel global M and D
-    // TODO: D and M starts should in terms of dofs
-    graph_topology.GetVertexStart().Copy(vertdof_starts);
-    graph_topology.GetEdgeStart().Copy(edgedof_starts);
-
-    auto M_local_ptr = const_cast<mfem::SparseMatrix*>(&M_local_);
-    auto D_local_ptr = const_cast<mfem::SparseMatrix*>(&D_local_);
-
-    mfem::HypreParMatrix M_d(comm_, edgedof_starts.Last(), edgedof_starts, M_local_ptr);
-
-    const mfem::HypreParMatrix& edge_trueedge(graph_topology.FineGraph().EdgeToTrueEdge());
-    M_global_.reset(smoothg::RAP(M_d, edge_trueedge));
-
-    mfem::HypreParMatrix D_d(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
-                             vertdof_starts, edgedof_starts, D_local_ptr);
-    D_global_.reset( ParMult(&D_d, &edge_trueedge) );
-
-    if (W_local_)
-    {
-        auto W_local_ptr = const_cast<mfem::SparseMatrix*>(W_local_);
-        W_global_ = make_unique<mfem::HypreParMatrix>(
-                        comm_, vertdof_starts.Last(),
-                        vertdof_starts, W_local_ptr);
-    }
 }
 
 void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 {
-    mfem::HypreParMatrix edge_trueedge;
-    edge_trueedge.MakeRef(graph_topology_.FineGraph().EdgeToTrueEdge());
-
-    // hypre may modify the matrix, so make a deep copy
-    mfem::SparseMatrix vertex_edge(graph_topology_.FineGraph().VertexToEdge());
-
     // Construct extended aggregate to vertex dofs relation tables
-    mfem::HypreParMatrix vertex_edge_bd(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
-                                        vertdof_starts, edgedof_starts, &vertex_edge);
-    unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_bd, &edge_trueedge) );
-    unique_ptr<mfem::HypreParMatrix> pvertex_vertex( AAt(*pvertex_edge) );
+    auto& vertex_trueedge = graph_topology_.FineGraph().VertexToTrueEdge();
+    std::unique_ptr<mfem::HypreParMatrix> vertex_vertex = AAt(vertex_trueedge);
 
-    graph_topology_.GetAggregateStart().Copy(Agg_start_);
+    mfem::Array<int> Agg_start, vert_start;
+    Agg_start.MakeRef(graph_topology_.GetAggregateStarts());
+    vert_start.MakeRef(graph_topology_.FineGraph().VertexStarts());
 
-    mfem::SparseMatrix Agg_vertex(graph_topology_.Agg_vertex_);
-    mfem::HypreParMatrix Agg_vertex_bd(comm_, Agg_start_.Last(), vertdof_starts.Last(),
-                                       Agg_start_, vertdof_starts, &Agg_vertex);
-    ExtAgg_vdof_.reset( ParMult(&Agg_vertex_bd, pvertex_vertex.get()) );
+    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
+    std::unique_ptr<mfem::HypreParMatrix> ExtAgg_vert(
+                vertex_vertex->LeftDiagMult(Agg_vertex, Agg_start) );
+
+    const mfem::SparseMatrix& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
+    ExtAgg_vdof_ = ParMult(*ExtAgg_vert, vert_vdof, mgL_.GetDrowStarts());
     ExtAgg_vdof_->CopyColStarts();
 
     // Construct extended aggregate to (interior) edge relation tables
-    SetConstantValue(*ExtAgg_vdof_, 1.);
-    ExtAgg_edof_.reset(ParMult(ExtAgg_vdof_.get(), pvertex_edge.get()));
+    SetConstantValue(*ExtAgg_vert, 1.);
+    const mfem::SparseMatrix& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
+    std::unique_ptr<mfem::HypreParMatrix> vert_trueedof(
+                mgL_.GetGraphSpace().EDofToTrueEDof().LeftDiagMult(vert_edof, vert_start) );
+    ExtAgg_edof_.reset(mfem::ParMult(ExtAgg_vert.get(), vert_trueedof.get()));
+    ExtAgg_edof_->CopyColStarts();
+    ExtAgg_edof_->CopyRowStarts();
 
     // Note that boundary edges on an extended aggregate have value 1, while
     // interior edges have value 2, and the goal is to keep only interior edges
-    ExtAgg_edof_->Threshold(1.5);
+    ExtAgg_edof_->Threshold(1.5);ExtAgg_edof_->CopyColStarts();
+    ExtAgg_edof_->CopyRowStarts();
 }
 
 std::unique_ptr<mfem::HypreParMatrix>
@@ -406,8 +385,6 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
     }
 }
 
-
-
 void LocalMixedGraphSpectralTargets::GetExtAggDofs(
     DofType dof_type, int iAgg, mfem::Array<int>& dofs)
 {
@@ -445,10 +422,10 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     ParMatrix permute_eT( permute_e->Transpose() );
 
-    ParMatrix tmpM(ParMult(permute_e.get(), M_global_.get()) );
+    ParMatrix tmpM(ParMult(permute_e.get(), &mgL_.GetParallelM()) );
     ParMatrix pM_ext(ParMult(tmpM.get(), permute_eT.get()) );
 
-    ParMatrix tmpD(ParMult(permute_v.get(), D_global_.get()) );
+    ParMatrix tmpD(ParMult(permute_v.get(), &mgL_.GetParallelD()) );
     ParMatrix pD_ext(ParMult(tmpD.get(), permute_eT.get()) );
 
     mfem::SparseMatrix M_ext, D_ext, W_ext;
@@ -456,17 +433,17 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     pD_ext->GetDiag(D_ext);
 
     ParMatrix pW_ext;
-    if (W_global_)
+    if (mgL_.CheckW())
     {
         ParMatrix permute_vT( permute_v->Transpose() );
-        ParMatrix tmpW(ParMult(permute_v.get(), W_global_.get()) );
+        ParMatrix tmpW(ParMult(permute_v.get(), mgL_.GetParallelW()) );
 
         pW_ext.reset(ParMult(tmpW.get(), permute_vT.get()));
         pW_ext->GetDiag(W_ext);
     }
 
     // Compute face to permuted edge relation table
-    auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
+    auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStarts());
     auto& edge_trueedge = const_cast<mfem::HypreParMatrix&>(
                               graph_topology_.FineGraph().EdgeToTrueEdge());
 
@@ -486,7 +463,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     mfem::DenseMatrix evects_T, evects_restricted_T;
 
     // SET W in eigenvalues
-    const bool use_w = false && W_global_;
+    const bool use_w = false && mgL_.CheckW();
 
     // ---
     // solve eigenvalue problem on each extended aggregate, our (3.1)

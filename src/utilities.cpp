@@ -85,7 +85,7 @@ void UpscalingStatistics::ComputeErrorSquare(
     if (!mgL[0].CheckW())
     {
         par_orthogonalize_from_constant(help_[0]->GetBlock(1),
-                                        mgL[0].GetDrowStart().Last());
+                                        mgL[0].GetDrowStarts().Last());
     }
 
     for (int j(0); j <= k; ++j)

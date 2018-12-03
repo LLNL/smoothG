@@ -257,7 +257,7 @@ public:
     }
 
     /// return the row starts (parallel row partitioning) of \f$ D \f$
-    mfem::Array<HYPRE_Int>& GetDrowStart() const
+    mfem::Array<HYPRE_Int>& GetDrowStarts() const
     {
         if (!Drow_start_)
             Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
@@ -275,7 +275,7 @@ public:
                                         edge_d_td_->GetRowStarts(), M_.get());
 
             std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M_diag, edge_d_td_));
-            pM_.reset(ParMult(const_cast<mfem::HypreParMatrix*>(edge_td_d_.get()), M_tmp.get()));
+            pM_.reset(ParMult(edge_td_d_.get(), M_tmp.get()));
             hypre_ParCSRMatrixSetNumNonzeros(*pM_);
         }
 
@@ -348,9 +348,6 @@ private:
 
     const mfem::HypreParMatrix* edge_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> edge_td_d_;
-
-    int nedges_;
-    int ntrue_edges_;
 
     mutable std::unique_ptr<mfem::HypreParMatrix> pM_;
     mutable std::unique_ptr<mfem::HypreParMatrix> pD_;

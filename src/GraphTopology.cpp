@@ -83,10 +83,8 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     Agg_vertex_.Swap(graph_topology.Agg_vertex_);
     face_edge_.Swap(graph_topology.face_edge_);
 
-    Swap(vertex_start_, graph_topology.GetVertexStart());
-    Swap(edge_start_, graph_topology.GetEdgeStart());
-    Swap(aggregate_start_, graph_topology.GetAggregateStart());
-    Swap(face_start_, graph_topology.GetFaceStart());
+    Swap(aggregate_start_, graph_topology.GetAggregateStarts());
+    Swap(face_start_, graph_topology.GetFaceStarts());
 
     std::swap(fine_graph_, graph_topology.fine_graph_);
 
@@ -118,15 +116,15 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
         edge_trueedge_edge = AAt(fine_graph_->EdgeToTrueEdge());
     }
 
-    int nvertices = fine_graph_->NumVertices();
     int nedges = fine_graph_->NumEdges();
     int nAggs = partitioning.Max() + 1;
 
+    mfem::Array<HYPRE_Int> vertex_start, edge_start;
+    vertex_start.MakeRef(fine_graph_->VertexStarts());
+
     // generate the 'start' array (not true dof)
-    mfem::Array<HYPRE_Int>* start[3] = {&vertex_start_, &edge_start_,
-                                        &aggregate_start_
-                                       };
-    HYPRE_Int nloc[3] = {nvertices, nedges, nAggs};
+    mfem::Array<HYPRE_Int>* start[3] = {&edge_start, &aggregate_start_};
+    HYPRE_Int nloc[3] = {nedges, nAggs};
     GenerateOffsets(comm, 3, nloc, start);
 
     // Construct the relation table aggregate_vertex from partition
@@ -143,11 +141,11 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
 
     // block diagonal edge_aggregate and aggregate_edge
     auto edge_aggregate_d = make_unique<mfem::HypreParMatrix>(
-                                comm, edge_start_.Last(), aggregate_start_.Last(),
-                                edge_start_, aggregate_start_, &edge_aggregate);
+                                comm, edge_start.Last(), aggregate_start_.Last(),
+                                edge_start, aggregate_start_, &edge_aggregate);
     auto aggregate_edge_d = make_unique<mfem::HypreParMatrix>(
-                                comm, aggregate_start_.Last(), edge_start_.Last(),
-                                aggregate_start_, edge_start_, &aggregate_edge);
+                                comm, aggregate_start_.Last(), edge_start.Last(),
+                                aggregate_start_, edge_start, &aggregate_edge);
 
     unique_ptr<mfem::HypreParMatrix> edge_trueedge_Agg(
         ParMult(edge_trueedge_edge.get(), edge_aggregate_d.get()) );
@@ -340,8 +338,8 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     mfem::SparseMatrix edge_face(smoothg::Transpose(face_edge_));
 
     // block diagonal edge_face
-    mfem::HypreParMatrix edge_face_d(comm, edge_start_.Last(), face_start_.Last(),
-                                     edge_start_, face_start_, &edge_face);
+    mfem::HypreParMatrix edge_face_d(comm, edge_start.Last(), face_start_.Last(),
+                                     edge_start, face_start_, &edge_face);
 
     assert(edge_trueedge_edge && edge_face_d);
     face_trueface_face_.reset(smoothg::RAP(*edge_trueedge_edge, edge_face_d));

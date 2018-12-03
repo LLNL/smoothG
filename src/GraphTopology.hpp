@@ -87,14 +87,10 @@ public:
 
     ///@name Getters for row/column partitions of tables
     ///@{
-    mfem::Array<HYPRE_Int>& GetVertexStart() { return vertex_start_; }
-    mfem::Array<HYPRE_Int>& GetEdgeStart() { return edge_start_; }
-    mfem::Array<HYPRE_Int>& GetAggregateStart() { return aggregate_start_; }
-    mfem::Array<HYPRE_Int>& GetFaceStart() { return face_start_; }
-    const mfem::Array<HYPRE_Int>& GetVertexStart() const { return vertex_start_; }
-    const mfem::Array<HYPRE_Int>& GetEdgeStart() const { return edge_start_; }
-    const mfem::Array<HYPRE_Int>& GetAggregateStart() const { return aggregate_start_; }
-    const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
+    mfem::Array<HYPRE_Int>& GetAggregateStarts() { return aggregate_start_; }
+    mfem::Array<HYPRE_Int>& GetFaceStarts() { return face_start_; }
+    const mfem::Array<HYPRE_Int>& GetAggregateStarts() const { return aggregate_start_; }
+    const mfem::Array<HYPRE_Int>& GetFaceStarts() const { return face_start_; }
     ///@}
 
     ///@name entity_trueentity_entity tables, which connect dofs across processors that share a true entity
@@ -117,8 +113,6 @@ private:
     const Graph* fine_graph_;
     const mfem::HypreParMatrix* edge_trueedge_edge_;
 
-    mfem::Array<HYPRE_Int> vertex_start_;
-    mfem::Array<HYPRE_Int> edge_start_;
     mfem::Array<HYPRE_Int> aggregate_start_;
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology

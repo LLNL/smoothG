@@ -664,7 +664,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
     GenerateOffsets(comm, ncdofs, edge_cd_start);
 
     mfem::Array<HYPRE_Int>& face_start =
-        const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
+        const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStarts());
 
     mfem::SparseMatrix face_cdof_tmp(face_cdof.GetI(), face_cdof.GetJ(),
                                      face_cdof.GetData(), nfaces, ncdofs,

@@ -103,6 +103,19 @@ std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A)
     return std::unique_ptr<mfem::HypreParMatrix>(AAt);
 }
 
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
+                                              const mfem::SparseMatrix& B,
+                                              const mfem::Array<int>& B_colpart)
+{
+    assert(A.NumCols() == B.NumRows());
+    int* B_rowpart = const_cast<int*>(A.ColPart());
+    mfem::SparseMatrix* B_ptr = const_cast<mfem::SparseMatrix*>(&B);
+    mfem::HypreParMatrix pB(A.GetComm(), A.N(), B_colpart.Last(), B_rowpart,
+                            const_cast<mfem::Array<int>&>(B_colpart), B_ptr);
+    return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&A, &pB));
+}
+
+
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
 {
     // TODO(gelever1): Perform this more better
