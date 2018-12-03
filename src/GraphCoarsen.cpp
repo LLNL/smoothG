@@ -798,10 +798,13 @@ GraphSpace GraphCoarsen::BuildCoarseSpace(
 }
 
 MixedMatrix GraphCoarsen::BuildCoarseMatrix(GraphSpace coarse_graph_space,
-                                            mfem::Vector coarse_constant_rep)
+                                            const mfem::SparseMatrix& Pvertices)
 {
+    mfem::Vector coarse_const_rep(Pvertices.NumCols());
+    Pvertices.MultTranspose(constant_rep_, coarse_const_rep);
+
     return MixedMatrix(std::move(coarse_graph_space), std::move(coarse_m_builder_),
-                       std::move(coarse_D_), std::move(coarse_W_), std::move(coarse_constant_rep));
+                       std::move(coarse_D_), std::move(coarse_W_), std::move(coarse_const_rep));
 }
 
 } // namespace smoothg

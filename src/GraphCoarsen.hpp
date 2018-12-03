@@ -104,7 +104,7 @@ public:
         std::unique_ptr<Graph> coarse_graph);
 
     MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
-                                  mfem::Vector coarse_constant_rep);
+                                  const mfem::SparseMatrix& Pvertices);
 
 private:
     /// Construct aggregate to coarse vertex dofs relation table
