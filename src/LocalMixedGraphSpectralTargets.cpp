@@ -82,35 +82,26 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
 
 void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
 {
-    // Construct extended aggregate to vertex dofs relation tables
-    auto& vertex_trueedge = graph_topology_.FineGraph().VertexToTrueEdge();
-    std::unique_ptr<mfem::HypreParMatrix> vertex_vertex = AAt(vertex_trueedge);
+    const GraphSpace& space = mgL_.GetGraphSpace();
 
     mfem::Array<int> Agg_start, vert_start;
     Agg_start.MakeRef(graph_topology_.GetAggregateStarts());
-    vert_start.MakeRef(graph_topology_.FineGraph().VertexStarts());
+    vert_start.MakeRef(space.GetGraph().VertexStarts());
 
-    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
-    std::unique_ptr<mfem::HypreParMatrix> ExtAgg_vert(
-                vertex_vertex->LeftDiagMult(Agg_vertex, Agg_start) );
-
-    const mfem::SparseMatrix& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
-    ExtAgg_vdof_ = ParMult(*ExtAgg_vert, vert_vdof, mgL_.GetDrowStarts());
-    ExtAgg_vdof_->CopyColStarts();
-
-    // Construct extended aggregate to (interior) edge relation tables
+    // Construct extended aggregate to vertex relation table
+    auto vertex_vertex = AAt(space.GetGraph().VertexToTrueEdge());
+    auto ExtAgg_vert = ParMult(graph_topology_.Agg_vertex_, *vertex_vertex, Agg_start);
     SetConstantValue(*ExtAgg_vert, 1.);
-    const mfem::SparseMatrix& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
-    std::unique_ptr<mfem::HypreParMatrix> vert_trueedof(
-                mgL_.GetGraphSpace().EDofToTrueEDof().LeftDiagMult(vert_edof, vert_start) );
-    ExtAgg_edof_.reset(mfem::ParMult(ExtAgg_vert.get(), vert_trueedof.get()));
-    ExtAgg_edof_->CopyColStarts();
-    ExtAgg_edof_->CopyRowStarts();
 
-    // Note that boundary edges on an extended aggregate have value 1, while
-    // interior edges have value 2, and the goal is to keep only interior edges
-    ExtAgg_edof_->Threshold(1.5);ExtAgg_edof_->CopyColStarts();
-    ExtAgg_edof_->CopyRowStarts();
+    // Construct extended aggregate to "interior" dofs relation tables
+    ExtAgg_vdof_ = ParMult(*ExtAgg_vert, space.VertexToVDof(), mgL_.GetDrowStarts());
+
+    auto vert_trueedof = ParMult(space.VertexToEDof(), space.EDofToTrueEDof(), vert_start);
+    ExtAgg_edof_.reset(mfem::ParMult(ExtAgg_vert.get(), vert_trueedof.get()));
+
+    // Note that edofs on an extended aggregate boundary have value 1, while
+    // interior edofs have value 2, and the goal is to keep only interior edofs
+    ExtAgg_edof_->Threshold(1.5);
 }
 
 std::unique_ptr<mfem::HypreParMatrix>
