@@ -145,14 +145,15 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     edge_start[1] = n_ - 1; edge_start[2] = n_ - 1;
 
     agg_start.Copy(graph_topology_.GetAggregateStarts());
+    face_start.Copy(graph_topology_.GetFaceStarts());
 
-    auto face_trueface = make_unique<mfem::HypreParMatrix>(
-                             MPI_COMM_WORLD, partitions - 1, face_start, &face_identity_);
+    mfem::HypreParMatrix face_trueface(MPI_COMM_WORLD, partitions - 1,
+                                       graph_topology_.GetFaceStarts(), &face_identity_);
 
-    coarse_graph_ = make_unique<Graph>(Agg_face, *face_trueface);
+    coarse_graph_ = make_unique<Graph>(Agg_face, face_trueface);
     graph_topology_.coarse_graph_ = coarse_graph_.get();
 
-    graph_topology_.face_trueface_face_ = smoothg::AAt(*face_trueface);
+    graph_topology_.face_trueface_face_ = smoothg::AAt(face_trueface);
 
     graph_topology_.Agg_vertex_.Swap(Agg_vertex);
     graph_topology_.Agg_edge_.Swap(Agg_edge);
