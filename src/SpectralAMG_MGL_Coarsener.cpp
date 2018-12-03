@@ -36,11 +36,11 @@ SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const UpscaleParameters& pa
 }
 
 MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
-        const MixedMatrix& mgL, const mfem::Array<int>* partitioning)
+    const MixedMatrix& mgL, const mfem::Array<int>* partitioning)
 {
     GraphTopology topology(mgL.GetGraph());
-    auto coarse_graph = partitioning ? topology.Coarsen(*partitioning) :
-                                       topology.Coarsen(param_.coarse_factor);
+    auto coarse_graph = partitioning ? topology.Coarsen(*partitioning)
+                        : topology.Coarsen(param_.coarse_factor);
 
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
@@ -49,13 +49,14 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     GraphCoarsen graph_coarsen(mgL, topology);
-    GraphSpace coarse_space = graph_coarsen.BuildCoarseSpace(
-                local_edge_traces, local_spectral_vertex_targets, std::move(coarse_graph));
+    GraphSpace coarse_space = graph_coarsen.BuildCoarseSpace(local_edge_traces,
+                                                             local_spectral_vertex_targets,
+                                                             std::move(coarse_graph));
 
     graph_coarsen.BuildInterpolation(local_edge_traces,
-                                      local_spectral_vertex_targets,
-                                      Pu_, Psigma_, coarse_space,
-                                      param_.coarse_components);
+                                     local_spectral_vertex_targets,
+                                     Pu_, Psigma_, coarse_space,
+                                     param_.coarse_components);
 
     return graph_coarsen.BuildCoarseMatrix(std::move(coarse_space), Pu_);
 }

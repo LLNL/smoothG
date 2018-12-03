@@ -52,7 +52,7 @@ private:
        @param constant_rep representation of constant on finer level
     */
     MixedMatrix do_construct_coarse_subspace(
-            const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr);
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr);
 
 private:
     const UpscaleParameters& param_;

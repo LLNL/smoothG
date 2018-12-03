@@ -654,7 +654,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
     // count edge coarse true dofs (if the dof is a bubble or on a true face)
     mfem::SparseMatrix face_d_td_diag;
     const mfem::HypreParMatrix& face_trueface_ =
-            graph_topology_.CoarseGraph().EdgeToTrueEdge();
+        graph_topology_.CoarseGraph().EdgeToTrueEdge();
     mfem::HypreParMatrix& face_trueface_face_ =
         const_cast<mfem::HypreParMatrix&>(*graph_topology_.face_trueface_face_);
     face_trueface_.GetDiag(face_d_td_diag);

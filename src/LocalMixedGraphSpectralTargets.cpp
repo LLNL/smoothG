@@ -585,7 +585,7 @@ mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
     const mfem::Vector& constant_vect)
 {
     SharedEntityCommunication<mfem::Vector> sec_constant(
-                comm_, graph_topology_.CoarseGraph().EdgeToTrueEdge());
+        comm_, graph_topology_.CoarseGraph().EdgeToTrueEdge());
     sec_constant.ReducePrepare();
 
     unsigned int num_faces = graph_topology_.NumFaces();
@@ -696,7 +696,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
     // Send and receive traces
     const mfem::HypreParMatrix& face_trueface =
-            graph_topology_.CoarseGraph().EdgeToTrueEdge();
+        graph_topology_.CoarseGraph().EdgeToTrueEdge();
     SharedEntityCommunication<mfem::DenseMatrix> sec_trace(comm_, face_trueface);
     sec_trace.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)

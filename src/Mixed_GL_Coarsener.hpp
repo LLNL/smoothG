@@ -57,7 +57,7 @@ public:
        matrix \f$ M \f$.
     */
     MixedMatrix Coarsen(
-            const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
     {
         is_coarse_subspace_constructed_ = true;
         return do_construct_coarse_subspace(mgL, partitioning);
@@ -76,7 +76,7 @@ public:
 
 private:
     virtual MixedMatrix do_construct_coarse_subspace(
-            const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr) = 0;
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr) = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;

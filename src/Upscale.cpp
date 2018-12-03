@@ -60,7 +60,7 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
         if (level == 0)
         {
             mixed_laplacians_.push_back(
-                        coarsener_[level]->Coarsen(GetMatrix(level), partitioning));
+                coarsener_[level]->Coarsen(GetMatrix(level), partitioning));
         }
         else
         {

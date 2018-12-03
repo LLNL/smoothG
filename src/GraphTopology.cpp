@@ -352,7 +352,7 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     auto face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
     auto coarse_graph = make_unique<Graph>(
-                Agg_face, *face_trueface, mfem::Vector(), face_bdratt.get());
+                            Agg_face, *face_trueface, mfem::Vector(), face_bdratt.get());
     coarse_graph_ = coarse_graph.get();
     return coarse_graph;
 }
