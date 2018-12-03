@@ -131,6 +131,11 @@ public:
         return vertex_edge_local_;
     }
 
+    const mfem::HypreParMatrix& VertexToTrueEdge() const
+    {
+        return *vertex_trueedge_;
+    }
+
     const mfem::HypreParMatrix& EdgeToTrueEdge() const
     {
         return *edge_trueedge_;
@@ -144,6 +149,11 @@ public:
     const mfem::SparseMatrix& EdgeToBdrAtt() const
     {
         return edge_bdratt_;
+    }
+
+    const mfem::Array<int>& VertexStarts() const
+    {
+        return vertex_starts_;
     }
 
     const int NumVertices() const
@@ -162,6 +172,8 @@ public:
     /// Indicate if the graph has "boundary"
     bool HasBoundary() const { return edge_bdratt_.Width() > 0; }
 private:
+    void Init(const mfem::SparseMatrix* edge_bdratt);
+
     void Distribute(MPI_Comm comm,
                     const mfem::SparseMatrix& vertex_edge_global,
                     const mfem::Vector& edge_weight_global);
