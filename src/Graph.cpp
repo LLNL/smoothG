@@ -1,11 +1,11 @@
 /*BHEADER**********************************************************************
  *
- * Copyright (c) 2017,  Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2018, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
- * LLNL-CODE-XXXXXX. All Rights reserved.
+ * LLNL-CODE-745247. All Rights reserved. See file COPYRIGHT for details.
  *
- * This file is part of smoothG.  See file COPYRIGHT for details.
- * For more information and source code availability see XXXXX.
+ * This file is part of smoothG. For more information and source code
+ * availability, see https://www.github.com/llnl/smoothG.
  *
  * smoothG is free software; you can redistribute it and/or modify it under the
  * terms of the GNU Lesser General Public License (as published by the Free
@@ -47,7 +47,7 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
     unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
     edge_trueedge_.reset(trueedge_edge->Transpose());
 
-    if (edge_weight_local)
+    if (edge_weight_local.Size() > 0)
     {
         SplitEdgeWeight(edge_weight_local);
     }
@@ -62,8 +62,8 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
-             const std::vector<mfem::Vector>& edge_weight_split)
-    : vertex_edge_local_(vertex_edge_local), edge_weight_split_(edge_weight_split)
+             const std::vector<mfem::Vector>& split_edge_weight)
+    : vertex_edge_local_(vertex_edge_local), split_edge_weight_(split_edge_weight)
 {
     // temporary work-around (TODO: make a copy function for HypreParMatrix)
     unique_ptr<mfem::HypreParMatrix> trueedge_edge(edge_trueedge.Transpose());
@@ -85,7 +85,7 @@ Graph& Graph::operator=(Graph other) noexcept
 void swap(Graph& lhs, Graph& rhs) noexcept
 {
     lhs.vertex_edge_local_.Swap(rhs.vertex_edge_local_);
-    std::swap(lhs.edge_weight_split_, rhs.edge_weight_split_);
+    std::swap(lhs.split_edge_weight_, rhs.split_edge_weight_);
     std::swap(lhs.edge_trueedge_, rhs.edge_trueedge_);
     std::swap(lhs.vertex_trueedge_, rhs.vertex_trueedge_);
 
@@ -262,20 +262,19 @@ void Graph::FixSharedEdgeWeight(mfem::Vector& edge_weight_local)
 
 void Graph::SplitEdgeWeight(const mfem::Vector& edge_weight_local)
 {
-    // for edges having two vertices, multiply the weight by 2 (M is divided by 2)
     const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge_local_);
-    edge_weight_split_.resize(edge_vert.Width());
+    split_edge_weight_.resize(edge_vert.Width());
 
     mfem::Array<int> edges;
     for (int vert = 0; vert < edge_vert.Width(); vert++)
     {
         GetTableRow(vertex_edge_local_, vert, edges);
-        edge_weight_split_[vert].SetSize(edges.Size());
+        split_edge_weight_[vert].SetSize(edges.Size());
         for (int i = 0; i < edges.Size(); i++)
         {
             const int edge = edges[i];
             double ratio = edge_vert.RowSize(edge) == 2 ? 2.0 : 1.0;
-            edge_weight_split_[vert][i] = edge_weight_local[edge] * ratio;
+            split_edge_weight_[vert][i] = edge_weight_local[edge] * ratio;
         }
     }
 }
