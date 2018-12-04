@@ -236,51 +236,47 @@ double GraphCoarsen::DTTraceProduct(const mfem::SparseMatrix& DtransferT,
    @todo: modify this to if/else (or have another method) so that we
    do a 1/2, 1/2 split if element matrices are not available.
  */
-void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face,
-                                       const mfem::SparseMatrix& vert_Agg,
-                                       const mfem::SparseMatrix& edge_vert,
+void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
+                                       const mfem::SparseMatrix& vert_agg,
+                                       const mfem::SparseMatrix& edof_vert,
                                        const int agg,
                                        mfem::DenseMatrix& Mloc)
 {
-    Mloc.SetSize(edge_dofs_on_face.Size());
+    Mloc.SetSize(face_edofs.Size());
     Mloc = 0.0;
-    mfem::Array<int> partition(vert_Agg.GetJ(), vert_Agg.Height());
-    mfem::Array<int> verts, elmat_edge_dofs;
-    mfem::Array<int> kmap(edge_dofs_on_face.Size());
+    mfem::Array<int> partition(vert_agg.GetJ(), vert_agg.Height());
+    mfem::Array<int> verts, vert_edofs;
+    mfem::Array<int> kmap(face_edofs.Size());
 
-    for (int i = 0; i < edge_dofs_on_face.Size(); i++)
+    // TODO: only need to make edge to vert (that is in agg) map
+    mfem::Array<int> edof_to_vert_map(face_edofs.Size());
+    for (int i = 0; i < face_edofs.Size(); i++)
     {
-        int face_edge_dof_i = edge_dofs_on_face[i];
-        GetTableRow(edge_vert, face_edge_dof_i, verts);
-        int vert_i = (partition[verts[0]] == agg) ? verts[0] : verts[1];
-        GetTableRow(fine_mbuilder_->GetElemEdgeDofTable(), vert_i, elmat_edge_dofs);
+        int edof = face_edofs[i];
+        GetTableRow(edof_vert, edof, verts);
+        edof_to_vert_map[i] = partition[verts[0]] == agg ? verts[0] : verts[1];
+        GetTableRow(space_.VertexToEDof(), edof_to_vert_map[i], vert_edofs);
         int k;
         // this loop is a search
-        for (k = 0; k < elmat_edge_dofs.Size(); k++)
+        for (k = 0; k < vert_edofs.Size(); k++)
         {
-            if (elmat_edge_dofs[k] == face_edge_dof_i)
+            if (vert_edofs[k] == edof)
             {
                 kmap[i] = k;
                 break;
             }
         }
-        assert(k < elmat_edge_dofs.Size());
+        assert(k < vert_edofs.Size());
     }
 
-    for (int i = 0; i < edge_dofs_on_face.Size(); i++)
+    for (int i = 0; i < face_edofs.Size(); i++)
     {
-        int face_edge_dof_i = edge_dofs_on_face[i];
-        GetTableRow(edge_vert, face_edge_dof_i, verts);
-        int vert_i = (partition[verts[0]] == agg) ? verts[0] : verts[1];
-        for (int j = 0; j < edge_dofs_on_face.Size(); j++)
+        const int vert_i = edof_to_vert_map[i];
+        const mfem::DenseMatrix& M_el = fine_mbuilder_->GetElementMatrices()[vert_i];
+        for (int j = 0; j < face_edofs.Size(); j++)
         {
-            int face_edge_dof_j = edge_dofs_on_face[j];
-            GetTableRow(edge_vert, face_edge_dof_j, verts);
-            int vert_j = (partition[verts[0]] == agg) ? verts[0] : verts[1];
-            if (vert_i == vert_j)
+            if (vert_i == edof_to_vert_map[j])
             {
-                const mfem::DenseMatrix& M_el =
-                    fine_mbuilder_->GetElementMatrices()[vert_i];
                 Mloc(i, j) += M_el(kmap[i], kmap[j]);
             }
         }
@@ -528,8 +524,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
 
-    auto edge_vert = smoothg::Transpose(D_proc_);
-    auto vert_Agg = smoothg::Transpose(agg_vdof);
+    auto edof_vert = smoothg::Transpose(space_.VertexToEDof());
+    auto vert_agg = smoothg::Transpose(topology_.Agg_vertex_);
 
     mfem::DenseMatrix Mloc_dm;
     mfem::Array<int> Aggs;
@@ -556,7 +552,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         GetTableRow(face_Agg, i, Aggs);
         for (int a = 0; a < Aggs.Size(); a++)
         {
-            BuildAggregateFaceM(local_edofs, vert_Agg, edge_vert, Aggs[a], Mloc_dm);
+            BuildAggregateFaceM(local_edofs, vert_agg, edof_vert, Aggs[a], Mloc_dm);
             for (int l = 0; l < facecdofs.Size(); l++)
             {
                 const int row = facecdofs[l];
@@ -619,9 +615,9 @@ void GraphCoarsen::BuildInterpolation(
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
-    const mfem::SparseMatrix& face_cdof, int total_num_coarse_edofs)
+        const mfem::SparseMatrix& face_cdof, int num_coarse_edofs)
 {
-    const int ncdofs = total_num_coarse_edofs;
+    const int ncdofs = num_coarse_edofs;
     const int nfaces = face_cdof.Height();
 
     // count edge coarse true dofs (if the dof is a bubble or on a true face)

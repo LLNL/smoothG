@@ -121,8 +121,7 @@ private:
 
     /// Construct edge coarse dof to true dof relation table
     std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
-        const mfem::SparseMatrix& face_cdof,
-        int total_num_coarse_edofs);
+        const mfem::SparseMatrix& face_cdof, int num_coarse_edofs);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices(
@@ -200,9 +199,9 @@ private:
     /**
        @brief Build fine-level aggregate sub-M corresponding to dofs on a face
     */
-    void BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face,
-                             const mfem::SparseMatrix& vert_Agg,
-                             const mfem::SparseMatrix& edge_vert,
+    void BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
+                             const mfem::SparseMatrix& vert_agg,
+                             const mfem::SparseMatrix& edof_vert,
                              const int agg,
                              mfem::DenseMatrix& Mloc);
 
