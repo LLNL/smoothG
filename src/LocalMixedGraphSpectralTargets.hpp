@@ -213,7 +213,8 @@ private:
     mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
 
     /// given an assembled vector on vertices, return extracted value on (possibly shared) faces
-    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect);
+    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect,
+                                   const mfem::SparseMatrix& agg_vdof);
 
     /// shared_constant expected to be an array of legth 2, just returns them
     /// stacked on top of each other

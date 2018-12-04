@@ -548,7 +548,7 @@ mfem::Vector LocalMixedGraphSpectralTargets::MakeOneNegOne(
 
 /// implementation copied from Stephan Gelever's GraphCoarsen::CollectConstant
 mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
-    const mfem::Vector& constant_vect)
+    const mfem::Vector& constant_vect, const mfem::SparseMatrix& agg_vdof)
 {
     SharedEntityCommunication<mfem::Vector> sec_constant(
         comm_, topology_.CoarseGraph().EdgeToTrueEdge());
@@ -564,10 +564,10 @@ mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
         for (int k = 0; k < topology_.face_Agg_.RowSize(face); ++k) //  agg : neighbors)
         {
             int agg = neighbors[k];
-            mfem::Array<int> agg_vertices;
-            GetTableRow(topology_.Agg_vertex_, agg, agg_vertices);
+            mfem::Array<int> local_vdofs;
+            GetTableRow(agg_vdof, agg, local_vdofs);
             mfem::Vector sub_vect;
-            constant_vect.GetSubVector(agg_vertices, sub_vect);
+            constant_vect.GetSubVector(local_vdofs, sub_vect);
 
             for (int l = 0; l < sub_vect.Size(); ++l)
                 constant_data.push_back(sub_vect(l));
@@ -831,7 +831,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     int capacity;
     mfem::Vector PV_sigma;
     mfem::SparseMatrix Mloc_neighbor;
-    mfem::Vector** shared_constant = CollectConstant(constant_rep_);
+    mfem::Vector** shared_constant = CollectConstant(constant_rep_, agg_vdof);
     for (int iface = 0; iface < nfaces; ++iface)
     {
         int num_iface_edge_dof = face_edof.RowSize(iface);
