@@ -52,27 +52,24 @@ GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_to
     col_map_ = -1;
 }
 
-mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseVertexDof(
-    const std::vector<mfem::DenseMatrix>& vertex_targets)
+mfem::SparseMatrix GraphCoarsen::BuildCoarseEntityToCoarseDof(
+    const std::vector<mfem::DenseMatrix>& local_targets)
 {
-    const unsigned int num_aggs = vertex_targets.size();
-    int* I = new int[num_aggs + 1];
-    I[0] = 0;
-    for (unsigned int agg = 0; agg < num_aggs; ++agg)
+    const unsigned int num_entities = local_targets.size();
+    int* I = new int[num_entities + 1]();
+    for (unsigned int entity = 0; entity < num_entities; ++entity)
     {
-        // columns of vertex_targets[agg] are basis vectors on each aggregate
-        I[agg + 1] = I[agg] + vertex_targets[agg].Width();
+        I[entity + 1] = I[entity] + local_targets[entity].Width();
     }
 
-    // each coarse vertex dof is associated with one and only one aggregate
-    int agg_coarse_vdof_nnz = I[num_aggs];
-    int* J = new int[agg_coarse_vdof_nnz];
-    std::iota(J, J + agg_coarse_vdof_nnz, 0);
+    int nnz = I[num_entities];
+    int* J = new int[nnz];
+    std::iota(J, J + nnz, 0);
 
-    double* Data = new double[agg_coarse_vdof_nnz];
-    std::fill_n(Data, agg_coarse_vdof_nnz, 1.);
+    double* Data = new double[nnz];
+    std::fill_n(Data, nnz, 1.);
 
-    return mfem::SparseMatrix(I, J, Data, num_aggs, agg_coarse_vdof_nnz);
+    return mfem::SparseMatrix(I, J, Data, num_entities, nnz);
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildPVertices(
@@ -126,23 +123,6 @@ mfem::SparseMatrix GraphCoarsen::BuildPVertices(
 
     return mfem::SparseMatrix(Pvertices_i, Pvertices_j, Pvertices_data,
                               nvertices, coarse_vertex_dof_counter);
-}
-
-mfem::SparseMatrix GraphCoarsen::BuildFaceToCoarseEdgeDof(
-    const std::vector<mfem::DenseMatrix>& edge_traces)
-{
-    const unsigned int nfaces = edge_traces.size();
-    int* face_cdof_i = new int[nfaces + 1];
-    face_cdof_i[0] = 0;
-    for (unsigned int i = 0; i < nfaces; ++i)
-        face_cdof_i[i + 1] = face_cdof_i[i] + edge_traces[i].Width();
-    int total_num_traces = face_cdof_i[nfaces];
-    int* face_cdof_j = new int[total_num_traces];
-    std::iota(face_cdof_j, face_cdof_j + total_num_traces, 0);
-    double* face_cdof_data = new double[total_num_traces];
-    std::fill_n(face_cdof_data, total_num_traces, 1.0);
-    return mfem::SparseMatrix(face_cdof_i, face_cdof_j, face_cdof_data,
-                              nfaces, total_num_traces);
 }
 
 void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
@@ -786,8 +766,8 @@ GraphSpace GraphCoarsen::BuildCoarseSpace(
     const std::vector<mfem::DenseMatrix>& vertex_targets,
     unique_ptr<Graph> coarse_graph)
 {
-    auto agg_coarse_vdof = BuildAggToCoarseVertexDof(vertex_targets);
-    auto face_coarse_edof = BuildFaceToCoarseEdgeDof(edge_traces);
+    auto agg_coarse_vdof = BuildCoarseEntityToCoarseDof(vertex_targets);
+    auto face_coarse_edof = BuildCoarseEntityToCoarseDof(edge_traces);
     auto agg_coarse_edof = BuildAggToCoarseEdgeDof(agg_coarse_vdof, face_coarse_edof);
     auto coarse_edof_trueedof =
         BuildCoarseEdgeDofTruedof(face_coarse_edof, agg_coarse_edof.NumCols());
