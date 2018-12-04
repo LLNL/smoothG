@@ -185,36 +185,32 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
     }
 }
 
-int* GraphCoarsen::InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_traces,
-                                       std::vector<mfem::DenseMatrix>& vertex_target,
-                                       const mfem::SparseMatrix& agg_edof,
-                                       const mfem::SparseMatrix& face_edof,
-                                       const mfem::SparseMatrix& Agg_face)
+int* GraphCoarsen::InitializePEdgesNNZ(const mfem::SparseMatrix& agg_coarse_edof,
+                                       const mfem::SparseMatrix& agg_fine_edof,
+                                       const mfem::SparseMatrix& face_coares_edof,
+                                       const mfem::SparseMatrix& face_fine_edof)
 {
-    const unsigned int num_aggs = vertex_target.size();
-    const unsigned int num_faces = face_edof.Height();
-    const unsigned int num_edofs = agg_edof.Width();
+    const unsigned int num_aggs = agg_fine_edof.NumRows();
+    const unsigned int num_faces = face_fine_edof.NumRows();
+    const unsigned int num_edofs = agg_fine_edof.NumCols();
 
     int* Pedges_i = new int[num_edofs + 1]();
-    int num_local_coarse_dofs;
-    mfem::Array<int> local_fine_dofs;
-    mfem::Array<int> faces;
-    // interior fine edges
+    mfem::Array<int> local_fine_edofs;
+    // interior fine edge dofs
     for (unsigned int i = 0; i < num_aggs; i++)
     {
-        GetTableRow(agg_edof, i, local_fine_dofs);
-        GetTableRow(Agg_face, i, faces);
-        num_local_coarse_dofs = agg_edof.RowSize(i);
-        for (int j = 0; j < local_fine_dofs.Size(); ++j)
-            Pedges_i[local_fine_dofs[j] + 1] = num_local_coarse_dofs;
+        GetTableRow(agg_fine_edof, i, local_fine_edofs);
+        int num_local_coarse_dofs = agg_coarse_edof.RowSize(i);
+        for (int edof : local_fine_edofs)
+            Pedges_i[edof + 1] = num_local_coarse_dofs;
     }
-    // fine edges on faces between aggs
+    // fine edge dofs on faces between aggs
     for (unsigned int i = 0; i < num_faces; i++)
     {
-        GetTableRow(face_edof, i, local_fine_dofs);
-        num_local_coarse_dofs = edge_traces[i].Width();
-        for (int j = 0; j < local_fine_dofs.Size(); j++)
-            Pedges_i[local_fine_dofs[j] + 1] = num_local_coarse_dofs;
+        GetTableRow(face_fine_edof, i, local_fine_edofs);
+        int num_local_coarse_dofs = face_coares_edof.RowSize(i);
+        for (int edof : local_fine_edofs)
+            Pedges_i[edof + 1] = num_local_coarse_dofs;
     }
     // partial sum
     for (unsigned int i = 0; i < num_edofs; i++)
@@ -300,7 +296,6 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     // the coarse dof numbering is as follows: first loop over each face, count
     // the traces, then loop over each aggregate, count the bubble functions
 
-    const mfem::SparseMatrix& Agg_edge(topology_.Agg_edge_);
     const mfem::SparseMatrix& Agg_face(coarse_graph_space.GetGraph().VertexToEdge());
     const mfem::SparseMatrix& face_cdof(coarse_graph_space.EdgeToEDof());
 
@@ -319,8 +314,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
     int num_traces = face_cdof.Width();
 
-    int* I = InitializePEdgesNNZ(edge_traces, vertex_target, Agg_edge,
-                                        face_edof, Agg_face);
+    int* I = InitializePEdgesNNZ(coarse_graph_space.VertexToEDof(), agg_edof,
+                                 coarse_graph_space.EdgeToEDof(), face_edof);
     int* J = new int[I[num_fine_edofs]];
     double* data = new double[I[num_fine_edofs]];
 

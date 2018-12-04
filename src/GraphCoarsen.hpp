@@ -144,11 +144,10 @@ private:
 
        @return the I array of PEdges for CSR format.
     */
-    int* InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_traces,
-                             std::vector<mfem::DenseMatrix>& vertex_target,
-                             const mfem::SparseMatrix& Agg_edge,
-                             const mfem::SparseMatrix& face_edge,
-                             const mfem::SparseMatrix& Agg_face);
+    int* InitializePEdgesNNZ(const mfem::SparseMatrix& agg_coarse_edof,
+                             const mfem::SparseMatrix& agg_fine_edof,
+                             const mfem::SparseMatrix& face_coares_edof,
+                             const mfem::SparseMatrix& face_fine_edof);
 
     /**
        @brief takes the column 'j' from the matrix 'potentials',
