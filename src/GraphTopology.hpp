@@ -100,7 +100,6 @@ public:
 
     ///@name topology relation tables, connecting aggregates, edges, faces, and vertices
     ///@{
-    mfem::SparseMatrix Agg_edge_;
     mfem::SparseMatrix Agg_vertex_;
     mfem::SparseMatrix face_Agg_;
     mfem::SparseMatrix face_edge_;

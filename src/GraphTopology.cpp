@@ -79,7 +79,6 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
 {
     face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
 
-    Agg_edge_.Swap(graph_topology.Agg_edge_);
     Agg_vertex_.Swap(graph_topology.Agg_vertex_);
     face_edge_.Swap(graph_topology.face_edge_);
 
@@ -132,10 +131,9 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     // Need to sort the edge indices to prevent index problem in face_edge
     aggregate_edge.SortColumnIndices();
 
-    AggregateEdge2AggregateEdgeInt(aggregate_edge, Agg_edge_);
-    mfem::SparseMatrix edge_aggregate(smoothg::Transpose(aggregate_edge));
+    mfem::SparseMatrix edge_agg(smoothg::Transpose(aggregate_edge));
 
-    auto edge_trueedge_Agg = ParMult(*edge_trueedge_edge, edge_aggregate, agg_start_);
+    auto edge_trueedge_Agg = ParMult(*edge_trueedge_edge, edge_agg, agg_start_);
     auto Agg_Agg = ParMult(aggregate_edge, *edge_trueedge_Agg, agg_start_);
 
     auto Agg_Agg_d = ((hypre_ParCSRMatrix*) *Agg_Agg)->diag;
