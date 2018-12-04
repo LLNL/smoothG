@@ -615,7 +615,7 @@ void GraphCoarsen::BuildInterpolation(
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
-        const mfem::SparseMatrix& face_cdof, int num_coarse_edofs)
+    const mfem::SparseMatrix& face_cdof, int num_coarse_edofs)
 {
     const int ncdofs = num_coarse_edofs;
     const int nfaces = face_cdof.Height();
