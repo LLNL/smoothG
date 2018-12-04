@@ -286,6 +286,7 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
 void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                std::vector<mfem::DenseMatrix>& vertex_target,
                                const GraphSpace& coarse_graph_space,
+                               bool build_coarse_components,
                                mfem::SparseMatrix& Pedges)
 {
     // put trace_extensions and bubble_functions in Pedges
@@ -293,7 +294,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     // the traces, then loop over each aggregate, count the bubble functions
 
     const mfem::SparseMatrix& Agg_face(coarse_graph_space.GetGraph().VertexToEdge());
-    const mfem::SparseMatrix& face_cdof(coarse_graph_space.EdgeToEDof());
+    const mfem::SparseMatrix& face_coarse_edof(coarse_graph_space.EdgeToEDof());
 
     // TODO: avoid repeated computation of tables
     auto face_edof = smoothg::Mult(topology_.face_edge_, space_.EdgeToEDof());
@@ -307,8 +308,16 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     const unsigned int num_aggs = vertex_target.size();
     const unsigned int num_faces = face_edof.Height();
     const unsigned int num_fine_edofs = agg_edof.Width();
+    const int num_traces = face_coarse_edof.Width();
 
-    int num_traces = face_cdof.Width();
+    if (build_coarse_components)
+    {
+        coarse_m_builder_ = make_unique<CoefficientMBuilder>(topology_, agg_edof);
+    }
+    else
+    {
+        coarse_m_builder_ = make_unique<ElementMBuilder>();
+    }
 
     int* I = InitializePEdgesNNZ(coarse_graph_space.VertexToEDof(), agg_edof,
                                  coarse_graph_space.EdgeToEDof(), face_edof);
@@ -324,8 +333,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     // this is Gelever's "ScaleEdgeTargets"
     NormalizeTraces(edge_traces, agg_vdof, face_edof, constant_rep_);
 
-    coarse_m_builder_->Setup(edge_traces, vertex_target, Agg_face, num_traces,
-                             num_coarse_vdofs);
+    coarse_m_builder_->Setup(coarse_graph_space);
 
     int bubble_counter = 0;
     double entry_value;
@@ -377,7 +385,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         int nlocal_traces = 0;
         for (int j = 0; j < faces.Size(); j++)
         {
-            nlocal_traces += face_cdof.RowSize(faces[j]);
+            nlocal_traces += face_coarse_edof.RowSize(faces[j]);
         }
         traces_extensions.SetSize(num_local_edofs, nlocal_traces);
         F_potentials.SetSize(num_local_vdofs, nlocal_traces);
@@ -391,7 +399,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         for (int j = 0; j < faces.Size(); j++)
         {
             const int face = faces[j];
-            GetTableRow(face_cdof, face, facecdofs);
+            GetTableRow(face_coarse_edof, face, facecdofs);
             GetTableRow(face_edof, face, facefdofs[j]);
 
             auto Dtransfer = ExtractRowAndColumns(D_proc_, local_vdofs,
@@ -516,12 +524,6 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
     coarse_D_->Finalize();
 
-    auto elem_mbuilder_ptr = dynamic_cast<ElementMBuilder*>(coarse_m_builder_.get());
-    if (elem_mbuilder_ptr)
-    {
-        elem_mbuilder_ptr->SetAggToEdgeDofsTableReference(coarse_graph_space.VertexToEDof());
-    }
-
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
 
     auto edof_vert = smoothg::Transpose(space_.VertexToEDof());
@@ -534,7 +536,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         // put edge_traces (original, non-extended) into Pedges
         mfem::DenseMatrix& edge_traces_i(edge_traces[i]);
         GetTableRow(face_edof, i, local_edofs);
-        GetTableRow(face_cdof, i, facecdofs);
+        GetTableRow(face_coarse_edof, i, facecdofs);
 
         for (int j = 0; j < local_edofs.Size(); j++)
         {
@@ -579,7 +581,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     {
         // next line assumes M_proc_ is diagonal
         mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width());
-        coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_cdof);
+        coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_edof, face_coarse_edof);
     }
 }
 
@@ -595,21 +597,13 @@ void GraphCoarsen::BuildInterpolation(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_targets,
     mfem::SparseMatrix& Pvertices, mfem::SparseMatrix& Pedges,
-    const GraphSpace& graph_space, bool build_coarse_components)
+    const GraphSpace& coarse_space, bool build_coarse_components)
 {
-    if (build_coarse_components)
-    {
-        coarse_m_builder_ = make_unique<CoefficientMBuilder>(topology_);
-    }
-    else
-    {
-        coarse_m_builder_ = make_unique<ElementMBuilder>();
-    }
-
     auto Pu = BuildPVertices(vertex_targets);
     Pvertices.Swap(Pu);
 
-    BuildPEdges(edge_traces, vertex_targets, graph_space, Pedges);
+    BuildPEdges(edge_traces, vertex_targets, coarse_space,
+                build_coarse_components, Pedges);
 
     BuildCoarseW(Pvertices);
 }

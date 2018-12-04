@@ -23,6 +23,7 @@
 
 #include "smoothG_config.h"
 #include "utilities.hpp"
+#include "GraphSpace.hpp"
 #include "mfem.hpp"
 
 namespace smoothg
@@ -82,11 +83,7 @@ class CoarseMBuilder : public MBuilder
 public:
     /// this is arguably poor design, most implementations of this interface
     /// do not need all these arguments
-    virtual void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int num_traces, int num_coarse_vdofs) = 0;
+    virtual void Setup(const GraphSpace& coarse_space) = 0;
 
     virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) {}
 
@@ -131,11 +128,7 @@ public:
                     const mfem::SparseMatrix& elem_edgedof);
 
     /// Setting up coarse level element M builder
-    void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int num_traces, int num_coarse_vdofs);
+    void Setup(const GraphSpace& coarse_space);
 
     void RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter);
 
@@ -154,11 +147,6 @@ public:
 
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
-
-    void SetAggToEdgeDofsTableReference(const mfem::SparseMatrix& elem_edgedof)
-    {
-        elem_edgedof_.MakeRef(elem_edgedof);
-    }
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
@@ -194,16 +182,13 @@ private:
 class CoefficientMBuilder : public CoarseMBuilder
 {
 public:
-    CoefficientMBuilder(const GraphTopology& topology) :
-        topology_(topology),
-        components_built_(false)
-    {}
+    CoefficientMBuilder(const GraphTopology& topology, const mfem::SparseMatrix& Agg_edof)
+        : topology_(topology), components_built_(false)
+    {
+        Agg_edof_ref_.MakeRef(Agg_edof);
+    }
 
-    void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int num_traces, int num_coarse_vdofs);
+    void Setup(const GraphSpace& coarse_space);
 
     /**
        @brief Assemble local components, independent of coefficient.
@@ -214,7 +199,8 @@ public:
     */
     void BuildComponents(const mfem::Vector& fineMdiag,
                          const mfem::SparseMatrix& Pedges,
-                         const mfem::SparseMatrix& face_cdof);
+                         const mfem::SparseMatrix& face_fine_edof_,
+                         const mfem::SparseMatrix& face_coarse_edof);
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
@@ -233,6 +219,7 @@ private:
 
     const GraphTopology& topology_;
     mfem::SparseMatrix Agg_face_ref_;
+    mfem::SparseMatrix Agg_edof_ref_;
     mfem::SparseMatrix face_Agg_;
 
     int total_num_traces_;
