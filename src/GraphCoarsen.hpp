@@ -107,13 +107,12 @@ public:
                                   const mfem::SparseMatrix& Pvertices);
 
 private:
-    /// Construct aggregate to coarse vertex dofs relation table
-    mfem::SparseMatrix BuildAggToCoarseVertexDof(
-        const std::vector<mfem::DenseMatrix>& vertex_targets);
-
-    /// Construct face to coarse edge dofs relation table
-    mfem::SparseMatrix BuildFaceToCoarseEdgeDof(
-        const std::vector<mfem::DenseMatrix>& edge_traces);
+    /**
+       Construct coarse entities to coarse dofs table in the case when each dof
+       belongs to one and only one entity (coarse vertex_vdof, edge_edof)
+    */
+    mfem::SparseMatrix BuildCoarseEntityToCoarseDof(
+        const std::vector<mfem::DenseMatrix>& local_targets);
 
     /// Construct aggregate to coarse edge dofs relation table
     mfem::SparseMatrix BuildAggToCoarseEdgeDof(
