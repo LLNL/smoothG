@@ -51,38 +51,40 @@ void ElementMBuilder::Setup(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
     const mfem::SparseMatrix& Agg_face,
-    int total_num_traces, int ncoarse_vertexdofs)
+    int num_traces, int num_coarse_vdofs)
 {
-    total_num_traces_ = total_num_traces;
+    total_num_traces_ = num_traces;
     num_aggs_ = vertex_target.size();
 
     M_el_.resize(num_aggs_);
     mfem::Array<int> faces;
     for (unsigned int i = 0; i < num_aggs_; i++)
     {
-        int nlocal_coarse_dofs = vertex_target[i].Width() - 1;
+        int num_local_coarse_edofs = vertex_target[i].Width() - 1;
         GetTableRow(Agg_face, i, faces);
-        for (int j = 0; j < faces.Size(); ++j)
-            nlocal_coarse_dofs += edge_traces[faces[j]].Width();
-        M_el_[i].SetSize(nlocal_coarse_dofs);
+        for (int face : faces)
+        {
+            num_local_coarse_edofs += edge_traces[face].Width();
+        }
+        M_el_[i].SetSize(num_local_coarse_edofs);
     }
 
     edge_dof_markers_.resize(2);
-    ResetEdgeCdofMarkers(total_num_traces + ncoarse_vertexdofs - num_aggs_);
+    ResetEdgeCdofMarkers(num_traces + num_coarse_vdofs - num_aggs_);
 }
 
 void CoefficientMBuilder::Setup(
     std::vector<mfem::DenseMatrix>& edge_traces,
     std::vector<mfem::DenseMatrix>& vertex_target,
     const mfem::SparseMatrix& Agg_face,
-    int total_num_traces, int ncoarse_vertexdofs)
+    int num_traces, int num_coarse_vdofs)
 {
-    total_num_traces_ = total_num_traces;
-    ncoarse_vertexdofs_ = ncoarse_vertexdofs;
+    total_num_traces_ = num_traces;
+    ncoarse_vertexdofs_ = num_coarse_vdofs;
     num_aggs_ = topology_.NumAggs();
 
     coarse_agg_dof_offsets_.SetSize(num_aggs_ + 1);
-    coarse_agg_dof_offsets_[0] = total_num_traces;
+    coarse_agg_dof_offsets_[0] = num_traces;
     for (unsigned int i = 1; i < num_aggs_ + 1; ++i)
     {
         coarse_agg_dof_offsets_[i] = coarse_agg_dof_offsets_[i - 1] + vertex_target[i - 1].Width() - 1;

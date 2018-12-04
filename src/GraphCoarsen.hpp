@@ -134,8 +134,8 @@ private:
        Helper for BuildPEdges
     */
     void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
-                         const mfem::SparseMatrix& Agg_vertex,
-                         const mfem::SparseMatrix& face_edge,
+                         const mfem::SparseMatrix& agg_vdof,
+                         const mfem::SparseMatrix& face_edof,
                          const mfem::Vector& constant_rep);
 
     /**

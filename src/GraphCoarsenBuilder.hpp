@@ -86,7 +86,7 @@ public:
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs) = 0;
+        int num_traces, int num_coarse_vdofs) = 0;
 
     virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) {}
 
@@ -135,7 +135,7 @@ public:
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs);
+        int num_traces, int num_coarse_vdofs);
 
     void RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter);
 
@@ -203,7 +203,7 @@ public:
         std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_target,
         const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs);
+        int num_traces, int num_coarse_vdofs);
 
     /**
        @brief Assemble local components, independent of coefficient.
