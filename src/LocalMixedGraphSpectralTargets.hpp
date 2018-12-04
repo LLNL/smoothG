@@ -30,6 +30,7 @@
 
 #include "mfem.hpp"
 #include "GraphTopology.hpp"
+#include "GraphSpace.hpp"
 #include "LocalEigenSolver.hpp"
 
 namespace smoothg
@@ -191,7 +192,8 @@ private:
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
-    void BuildExtendedAggregates();
+    /// Build extended aggregates to vertex-based and edge-based dofs relation
+    void BuildExtendedAggregates(const GraphSpace& space);
 
     // TODO: better naming - this is not really a permutation because it is not one to one
     // the returned matrix makes a copy of extended part (offd) and add it to local
@@ -231,7 +233,7 @@ private:
     const mfem::SparseMatrix* W_local_;
     const mfem::Vector& constant_rep_;
 
-    const GraphTopology& graph_topology_;
+    const GraphTopology& topology_;
     const double zero_eigenvalue_threshold_;
 
     /// Extended aggregate to vertex dof relation table

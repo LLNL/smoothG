@@ -737,28 +737,42 @@ mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
 
     const int nnz = I[num_aggs];
     int* J = new int[nnz];
-    int* begin_ptr = J;
+    double* data = new double[nnz];
+
     int edof_counter = face_coarse_edof.NumCols(); // start with num_traces
+
+    int* J_begin = J;
+    double* data_begin = data;
+
+    // data values are chosen for the ease of extended aggregate construction
     for (unsigned int agg = 0; agg < num_aggs; agg++)
     {
         const int num_bubbles_agg = agg_coarse_vdof.RowSize(agg) - 1;
-        int* end_ptr = begin_ptr + num_bubbles_agg;
-        std::iota(begin_ptr, end_ptr, edof_counter);
-        begin_ptr = end_ptr;
+
+        int* J_end = J_begin + num_bubbles_agg;
+        std::iota(J_begin, J_end, edof_counter);
+        J_begin = J_end;
+
+        double* data_end = data_begin + num_bubbles_agg;
+        std::fill(data_begin, data_end, 2.0);
+        data_begin = data_end;
+
         edof_counter += num_bubbles_agg;
 
         GetTableRow(agg_face, agg, faces);
         for (int& face : faces)
         {
-            end_ptr += face_coarse_edof.RowSize(face);
-            std::iota(begin_ptr, end_ptr, *face_coarse_edof.GetRowColumns(face));
-            begin_ptr = end_ptr;
+            J_end += face_coarse_edof.RowSize(face);
+            std::iota(J_begin, J_end, *face_coarse_edof.GetRowColumns(face));
+            J_begin = J_end;
+
+            data_end += face_coarse_edof.RowSize(face);
         }
+        std::fill(data_begin, data_end, 1.0);
+        data_begin = data_end;
     }
 
-    double* Data = new double[nnz];
-    std::fill(Data, Data + nnz, 1.);
-    return mfem::SparseMatrix(I, J, Data, num_aggs, edof_counter);
+    return mfem::SparseMatrix(I, J, data, num_aggs, edof_counter);
 }
 
 GraphSpace GraphCoarsen::BuildCoarseSpace(
