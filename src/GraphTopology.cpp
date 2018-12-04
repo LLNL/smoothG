@@ -83,7 +83,7 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     Agg_vertex_.Swap(graph_topology.Agg_vertex_);
     face_edge_.Swap(graph_topology.face_edge_);
 
-    Swap(aggregate_start_, graph_topology.GetAggregateStarts());
+    Swap(agg_start_, graph_topology.GetAggregateStarts());
     Swap(face_start_, graph_topology.GetFaceStarts());
 
     std::swap(fine_graph_, graph_topology.fine_graph_);
@@ -121,7 +121,7 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
 
     // generate the 'start' array
     int nAggs = partitioning.Max() + 1;
-    GenerateOffsets(comm, nAggs, aggregate_start_);
+    GenerateOffsets(comm, nAggs, agg_start_);
 
     // Construct the relation table aggregate_vertex from partition
     mfem::SparseMatrix tmp = PartitionToMatrix(partitioning, nAggs);
@@ -135,18 +135,8 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     AggregateEdge2AggregateEdgeInt(aggregate_edge, Agg_edge_);
     mfem::SparseMatrix edge_aggregate(smoothg::Transpose(aggregate_edge));
 
-    // block diagonal edge_aggregate and aggregate_edge
-    auto edge_aggregate_d = make_unique<mfem::HypreParMatrix>(
-                                comm, edge_trueedge.M(), aggregate_start_.Last(),
-                                edge_start, aggregate_start_, &edge_aggregate);
-    auto aggregate_edge_d = make_unique<mfem::HypreParMatrix>(
-                                comm, aggregate_start_.Last(), edge_trueedge.M(),
-                                aggregate_start_, edge_start, &aggregate_edge);
-
-    unique_ptr<mfem::HypreParMatrix> edge_trueedge_Agg(
-        ParMult(edge_trueedge_edge.get(), edge_aggregate_d.get()) );
-    unique_ptr<mfem::HypreParMatrix> Agg_Agg(
-        ParMult(aggregate_edge_d.get(), edge_trueedge_Agg.get()) );
+    auto edge_trueedge_Agg = ParMult(*edge_trueedge_edge, edge_aggregate, agg_start_);
+    auto Agg_Agg = ParMult(aggregate_edge, *edge_trueedge_Agg, agg_start_);
 
     auto Agg_Agg_d = ((hypre_ParCSRMatrix*) *Agg_Agg)->diag;
     auto Agg_Agg_o = ((hypre_ParCSRMatrix*) *Agg_Agg)->offd;

@@ -276,7 +276,6 @@ public:
 
             std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M_diag, edge_d_td_));
             pM_.reset(ParMult(edge_td_d_.get(), M_tmp.get()));
-            hypre_ParCSRMatrixSetNumNonzeros(*pM_);
         }
 
         assert(pM_);
@@ -289,7 +288,7 @@ public:
         if (!pD_ || recompute)
         {
             assert(D_);
-            pD_.reset(edge_d_td_->LeftDiagMult(*D_, *Drow_start_));
+            pD_ = ParMult(*D_, *edge_d_td_, *Drow_start_);
         }
 
         assert(pD_);

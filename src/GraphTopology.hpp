@@ -87,9 +87,9 @@ public:
 
     ///@name Getters for row/column partitions of tables
     ///@{
-    mfem::Array<HYPRE_Int>& GetAggregateStarts() { return aggregate_start_; }
+    mfem::Array<HYPRE_Int>& GetAggregateStarts() { return agg_start_; }
     mfem::Array<HYPRE_Int>& GetFaceStarts() { return face_start_; }
-    const mfem::Array<HYPRE_Int>& GetAggregateStarts() const { return aggregate_start_; }
+    const mfem::Array<HYPRE_Int>& GetAggregateStarts() const { return agg_start_; }
     const mfem::Array<HYPRE_Int>& GetFaceStarts() const { return face_start_; }
     ///@}
 
@@ -113,7 +113,7 @@ private:
     const Graph* fine_graph_;
     const mfem::HypreParMatrix* edge_trueedge_edge_;
 
-    mfem::Array<HYPRE_Int> aggregate_start_;
+    mfem::Array<HYPRE_Int> agg_start_;
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology
 

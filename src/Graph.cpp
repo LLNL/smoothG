@@ -117,8 +117,7 @@ void Graph::Init(const mfem::SparseMatrix* edge_bdratt)
     }
 
     GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
-    vertex_trueedge_.reset(
-                edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
+    vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
 }
 
 void Graph::Distribute(MPI_Comm comm,
