@@ -286,7 +286,6 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
 void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                                std::vector<mfem::DenseMatrix>& vertex_target,
                                const GraphSpace& coarse_graph_space,
-                               bool build_coarse_components,
                                mfem::SparseMatrix& Pedges)
 {
     // put trace_extensions and bubble_functions in Pedges
@@ -309,15 +308,6 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     const unsigned int num_faces = face_edof.Height();
     const unsigned int num_fine_edofs = agg_edof.Width();
     const int num_traces = face_coarse_edof.Width();
-
-    if (build_coarse_components)
-    {
-        coarse_m_builder_ = make_unique<CoefficientMBuilder>(topology_, agg_edof);
-    }
-    else
-    {
-        coarse_m_builder_ = make_unique<ElementMBuilder>();
-    }
 
     int* I = InitializePEdgesNNZ(coarse_graph_space.VertexToEDof(), agg_edof,
                                  coarse_graph_space.EdgeToEDof(), face_edof);
@@ -581,7 +571,8 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     {
         // next line assumes M_proc_ is diagonal
         mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width());
-        coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_edof, face_coarse_edof);
+        coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_edof,
+                                           face_coarse_edof, agg_edof);
     }
 }
 
@@ -602,8 +593,16 @@ void GraphCoarsen::BuildInterpolation(
     auto Pu = BuildPVertices(vertex_targets);
     Pvertices.Swap(Pu);
 
-    BuildPEdges(edge_traces, vertex_targets, coarse_space,
-                build_coarse_components, Pedges);
+    if (build_coarse_components)
+    {
+        coarse_m_builder_ = make_unique<CoefficientMBuilder>();
+    }
+    else
+    {
+        coarse_m_builder_ = make_unique<ElementMBuilder>();
+    }
+
+    BuildPEdges(edge_traces, vertex_targets, coarse_space, Pedges);
 
     BuildCoarseW(Pvertices);
 }

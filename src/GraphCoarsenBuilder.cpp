@@ -203,7 +203,8 @@ mfem::DenseMatrix CoefficientMBuilder::RTDP(const mfem::DenseMatrix& R,
 void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
                                           const mfem::SparseMatrix& Pedges,
                                           const mfem::SparseMatrix& face_fine_edof_,
-                                          const mfem::SparseMatrix& face_coarse_edof)
+                                          const mfem::SparseMatrix& face_coarse_edof,
+                                          const mfem::SparseMatrix& agg_edof)
 {
     // in future MFEM releases when SparseMatrix::GetSubMatrix is const-correct,
     // the next line will no longer be necessary
@@ -211,8 +212,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     face_cdof_ref_.MakeRef(face_coarse_edof);
 
     // F_F block
-    const int num_faces = topology_.NumFaces();
-    const int num_aggs = topology_.NumAggs();
+    const int num_faces = face_cdof_ref_.NumRows();
     mfem::Array<int> local_fine_dofs;
     mfem::Array<int> local_coarse_dofs;
     mfem::Vector local_fine_weight;
@@ -232,10 +232,10 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     mfem::Array<int> local_faces;
     mfem::Array<int> local_fine_dofs_prime;
     mfem::Array<int> local_coarse_dofs_prime;
-    for (int agg = 0; agg < num_aggs; ++agg)
+    for (unsigned int agg = 0; agg < num_aggs_; ++agg)
     {
         GetTableRowCopy(Agg_face_ref_, agg, local_faces);
-        GetTableRowCopy(Agg_edof_ref_, agg, local_fine_dofs);
+        GetTableRowCopy(agg_edof, agg, local_fine_dofs);
         fineMdiag.GetSubVector(local_fine_dofs, local_fine_weight);
         for (int f = 0; f < local_faces.Size(); ++f)
         {
@@ -256,8 +256,8 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
     }
 
     // EF_E block and E_E block
-    comp_E_E_.resize(num_aggs);
-    for (int agg = 0; agg < num_aggs; ++agg)
+    comp_E_E_.resize(num_aggs_);
+    for (unsigned int agg = 0; agg < num_aggs_; ++agg)
     {
         GetTableRowCopy(Agg_face_ref_, agg, local_faces);
         GetCoarseAggDofs(agg, local_coarse_dofs);
@@ -272,7 +272,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
         }
         else
         {
-            GetTableRowCopy(Agg_edof_ref_, agg, local_fine_dofs);
+            GetTableRowCopy(agg_edof, agg, local_fine_dofs);
             fineMdiag.GetSubVector(local_fine_dofs, local_fine_weight);
             mfem::DenseMatrix P_E(local_fine_dofs.Size(), local_coarse_dofs.Size());
             Pedges_noconst.GetSubMatrix(local_fine_dofs, local_coarse_dofs, P_E);

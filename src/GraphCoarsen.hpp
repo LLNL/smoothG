@@ -192,7 +192,6 @@ private:
     void BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                      std::vector<mfem::DenseMatrix>& vertex_target,
                      const GraphSpace& coarse_graph_space,
-                     bool build_coarse_components,
                      mfem::SparseMatrix& Pedges);
 
     void BuildCoarseW(const mfem::SparseMatrix& Pvertices);

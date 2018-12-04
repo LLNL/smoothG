@@ -182,11 +182,9 @@ private:
 class CoefficientMBuilder : public CoarseMBuilder
 {
 public:
-    CoefficientMBuilder(const GraphTopology& topology, const mfem::SparseMatrix& Agg_edof)
-        : topology_(topology), components_built_(false)
-    {
-        Agg_edof_ref_.MakeRef(Agg_edof);
-    }
+    CoefficientMBuilder()
+        : components_built_(false)
+    { }
 
     void Setup(const GraphSpace& coarse_space);
 
@@ -200,7 +198,8 @@ public:
     void BuildComponents(const mfem::Vector& fineMdiag,
                          const mfem::SparseMatrix& Pedges,
                          const mfem::SparseMatrix& face_fine_edof_,
-                         const mfem::SparseMatrix& face_coarse_edof);
+                         const mfem::SparseMatrix& face_coarse_edof,
+                         const mfem::SparseMatrix& agg_edof);
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
@@ -217,9 +216,7 @@ private:
                            const mfem::Vector& D,
                            const mfem::DenseMatrix& P);
 
-    const GraphTopology& topology_;
     mfem::SparseMatrix Agg_face_ref_;
-    mfem::SparseMatrix Agg_edof_ref_;
     mfem::SparseMatrix face_Agg_;
 
     int total_num_traces_;
