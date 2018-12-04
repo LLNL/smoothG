@@ -38,14 +38,15 @@ namespace smoothg
 
   Maybe use the example in parelag-notes.
 */
-GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_topology)
+GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& topology)
     :
     M_proc_(mgL.GetM()),
     D_proc_(mgL.GetD()),
     W_proc_(mgL.GetW()),
     constant_rep_(mgL.GetConstantRep()),
     fine_mbuilder_(dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()))),
-    graph_topology_(graph_topology),
+    topology_(topology),
+    space_(mgL.GetGraphSpace()),
     col_map_(D_proc_.Width())
 {
     assert(fine_mbuilder_);
@@ -75,54 +76,50 @@ mfem::SparseMatrix GraphCoarsen::BuildCoarseEntityToCoarseDof(
 mfem::SparseMatrix GraphCoarsen::BuildPVertices(
     const std::vector<mfem::DenseMatrix>& vertex_target)
 {
-    const unsigned int nAggs = vertex_target.size();
-    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
-    const int nvertices = Agg_vertex.Width();
+    const unsigned int num_aggs = vertex_target.size();
+    auto Agg_vdof = smoothg::Mult(topology_.Agg_vertex_, space_.VertexToVDof());
+    const int num_vdofs = Agg_vdof.Width();
     int nlocal_fine_dofs, nlocal_coarse_dofs;
     mfem::Array<int> local_fine_dofs;
 
-    int* Pvertices_i = new int[nvertices + 1];
-    Pvertices_i[0] = 0;
-    int total_coarse_dofs = 0;
-    for (unsigned int i = 0; i < nAggs; ++i)
+    int* I = new int[num_vdofs + 1]();
+    for (unsigned int i = 0; i < num_aggs; ++i)
     {
-        GetTableRow(Agg_vertex, i, local_fine_dofs);
+        GetTableRow(Agg_vdof, i, local_fine_dofs);
         nlocal_coarse_dofs = vertex_target[i].Width();
-        total_coarse_dofs += nlocal_coarse_dofs;
         nlocal_fine_dofs = local_fine_dofs.Size();
         for (int j = 0; j < nlocal_fine_dofs; ++j)
-            Pvertices_i[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
+            I[local_fine_dofs[j] + 1] = nlocal_coarse_dofs;
     }
-    for (int i = 0; i < nvertices; ++i)
-        Pvertices_i[i + 1] += Pvertices_i[i];
+    for (int i = 1; i < num_vdofs; ++i)
+        I[i + 1] += I[i];
 
-    int* Pvertices_j = new int[Pvertices_i[nvertices]];
-    double* Pvertices_data = new double[Pvertices_i[nvertices]];
+    int* J = new int[I[num_vdofs]];
+    double* data = new double[I[num_vdofs]];
 
-    int coarse_vertex_dof_counter = 0;
+    int coarse_vdof_counter = 0;
     int ptr;
-    for (unsigned int i = 0; i < nAggs; ++i)
+    for (unsigned int i = 0; i < num_aggs; ++i)
     {
         nlocal_coarse_dofs = vertex_target[i].Width();
-        GetTableRow(Agg_vertex, i, local_fine_dofs);
+        GetTableRow(Agg_vdof, i, local_fine_dofs);
         nlocal_fine_dofs = local_fine_dofs.Size();
         const mfem::DenseMatrix& target_i = vertex_target[i];
         MFEM_ASSERT(nlocal_fine_dofs == target_i.Height(),
                     "target_i has wrong size!");
         for (int j = 0; j < nlocal_fine_dofs; ++j)
         {
-            ptr = Pvertices_i[local_fine_dofs[j]];
+            ptr = I[local_fine_dofs[j]];
             for (int k = 0; k < nlocal_coarse_dofs; k++)
             {
-                Pvertices_j[ptr] = coarse_vertex_dof_counter + k;
-                Pvertices_data[ptr++] = target_i(j, k);
+                J[ptr] = coarse_vdof_counter + k;
+                data[ptr++] = target_i(j, k);
             }
         }
-        coarse_vertex_dof_counter += nlocal_coarse_dofs;
+        coarse_vdof_counter += nlocal_coarse_dofs;
     }
 
-    return mfem::SparseMatrix(Pvertices_i, Pvertices_j, Pvertices_data,
-                              nvertices, coarse_vertex_dof_counter);
+    return mfem::SparseMatrix(I, J, data, num_vdofs, coarse_vdof_counter);
 }
 
 void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
@@ -136,7 +133,7 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::Array<int> local_verts, facefdofs;
     for (unsigned int iface = 0; iface < nfaces; iface++)
     {
-        int Agg0 = graph_topology_.face_Agg_.GetRowColumns(iface)[0];
+        int Agg0 = topology_.face_Agg_.GetRowColumns(iface)[0];
 
         // extract local matrices
         GetTableRow(Agg_vertex, Agg0, local_verts);
@@ -306,9 +303,9 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     // the coarse dof numbering is as follows: first loop over each face, count
     // the traces, then loop over each aggregate, count the bubble functions
 
-    const mfem::SparseMatrix& Agg_edge(graph_topology_.Agg_edge_);
-    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
-    const mfem::SparseMatrix& face_edge(graph_topology_.face_edge_);
+    const mfem::SparseMatrix& Agg_edge(topology_.Agg_edge_);
+    const mfem::SparseMatrix& Agg_vertex(topology_.Agg_vertex_);
+    const mfem::SparseMatrix& face_edge(topology_.face_edge_);
     const mfem::SparseMatrix& Agg_face(coarse_graph_space.GetGraph().VertexToEdge());
     const mfem::SparseMatrix& face_cdof(coarse_graph_space.EdgeToEDof());
 
@@ -610,7 +607,7 @@ void GraphCoarsen::BuildInterpolation(
 {
     if (build_coarse_components)
     {
-        coarse_m_builder_ = make_unique<CoefficientMBuilder>(graph_topology_);
+        coarse_m_builder_ = make_unique<CoefficientMBuilder>(topology_);
     }
     else
     {
@@ -634,9 +631,9 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
     // count edge coarse true dofs (if the dof is a bubble or on a true face)
     mfem::SparseMatrix face_d_td_diag;
     const mfem::HypreParMatrix& face_trueface_ =
-        graph_topology_.CoarseGraph().EdgeToTrueEdge();
+        topology_.CoarseGraph().EdgeToTrueEdge();
     mfem::HypreParMatrix& face_trueface_face_ =
-        const_cast<mfem::HypreParMatrix&>(*graph_topology_.face_trueface_face_);
+        const_cast<mfem::HypreParMatrix&>(*topology_.face_trueface_face_);
     face_trueface_.GetDiag(face_d_td_diag);
 
     MPI_Comm comm = face_trueface_.GetComm();
@@ -644,7 +641,7 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
     GenerateOffsets(comm, ncdofs, edge_cd_start);
 
     mfem::Array<HYPRE_Int>& face_start =
-        const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStarts());
+        const_cast<mfem::Array<HYPRE_Int>&>(topology_.GetFaceStarts());
 
     mfem::SparseMatrix face_cdof_tmp(face_cdof.GetI(), face_cdof.GetJ(),
                                      face_cdof.GetData(), nfaces, ncdofs,
@@ -718,7 +715,7 @@ mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
     const mfem::SparseMatrix& face_coarse_edof)
 {
     const unsigned int num_aggs = agg_coarse_vdof.NumRows();
-    const mfem::SparseMatrix& agg_face = graph_topology_.CoarseGraph().VertexToEdge();
+    const mfem::SparseMatrix& agg_face = topology_.CoarseGraph().VertexToEdge();
 
     int* I = new int[num_aggs + 1];
     I[0] = 0;

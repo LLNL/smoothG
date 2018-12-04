@@ -600,10 +600,10 @@ mfem::Vector LocalMixedGraphSpectralTargets::ConstantLocal(
 // are summed together, and the rest are simply copied
 mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
                             const mfem::SparseMatrix& M1,
-                            int num_face_edges)
+                            int num_face_edofs)
 {
-    int size = M0.Height() + M1.Height() - num_face_edges;
-    int offset = M0.Height() - num_face_edges;
+    int size = M0.Height() + M1.Height() - num_face_edofs;
+    int offset = M0.Height() - num_face_edofs;
 
     mfem::SparseMatrix M_combine(size, size);
 
@@ -628,8 +628,8 @@ mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
         for (int j = M1_i[i]; j < M1_i[i + 1]; ++j)
         {
             int col = M1_j[j];
-            int combine_row = i < num_face_edges ? i : i + offset;
-            int combine_col = col < num_face_edges ? col : col + offset;
+            int combine_row = i < num_face_edofs ? i : i + offset;
+            int combine_col = col < num_face_edofs ? col : col + offset;
             M_combine.Add(combine_row, combine_col, M1_data[j]);
         }
     }
@@ -834,7 +834,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     mfem::Vector** shared_constant = CollectConstant(constant_rep_, agg_vdof);
     for (int iface = 0; iface < nfaces; ++iface)
     {
-        int num_iface_edge_dof = face_edof.RowSize(iface);
+        int num_iface_edofs = face_edof.RowSize(iface);
 
         // if this face is owned by this processor
         if (sec_trace.OwnedByMe(iface))
@@ -848,7 +848,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_proc; ++i)
                 total_vects += shared_sigma_f[i].Width();
-            collected_sigma.SetSize(num_iface_edge_dof, total_vects);
+            collected_sigma.SetSize(num_iface_edofs, total_vects);
 
             total_vects = 0;
             for (int i = 0; i < num_neighbor_proc; ++i)
@@ -863,10 +863,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             // compute the PV vector
             mfem::Vector PV_sigma_on_face;
 
-            if (num_iface_edge_dof == 1)
+            if (num_iface_edofs == 1)
             {
                 // only 1 dof on face
-                PV_sigma_on_face.SetSize(num_iface_edge_dof);
+                PV_sigma_on_face.SetSize(num_iface_edofs);
                 PV_sigma_on_face = 1.; // should inherit something from contant_rep?
             }
             else if (face_IsShared.RowSize(iface))
@@ -886,10 +886,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 // each shared_Mloc_f[i] contains edge dofs on the face
                 int nedge_local_dofs =
-                    Mloc_0.Size() + Mloc_1.Size() - num_iface_edge_dof;
+                    Mloc_0.Size() + Mloc_1.Size() - num_iface_edofs;
 
                 // assemble contributions from each processor for shared dofs
-                mfem::SparseMatrix combined_M = CombineM(Mloc_0, Mloc_1, num_iface_edge_dof);
+                mfem::SparseMatrix combined_M = CombineM(Mloc_0, Mloc_1, num_iface_edofs);
                 Mloc_neighbor.Swap(combined_M);
 
                 int Dloc_0_nnz = Dloc_0.NumNonZeroElems();
@@ -907,11 +907,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                     Dloc_nb_i[nvertex_neighbor0 + i] = Dloc_0_nnz + Dloc_1_i[i];
 
                 std::copy_n(Dloc_0.GetJ(), Dloc_0_nnz, Dloc_nb_j);
-                int offset = Dloc_0_ncols - num_iface_edge_dof;
+                int offset = Dloc_0_ncols - num_iface_edofs;
                 for (int j = 0; j < Dloc_1_nnz; j++)
                 {
                     int col = Dloc_1_j[j];
-                    if (col < num_iface_edge_dof)
+                    if (col < num_iface_edofs)
                         Dloc_nb_j[Dloc_0_nnz + j] = col;
                     else
                         Dloc_nb_j[Dloc_0_nnz + j] = col + offset;
@@ -929,7 +929,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 PV_sigma.SetSize(Mloc_neighbor.Height());
                 LocalGraphEdgeSolver solver(Mloc_neighbor, Dloc_neighbor);
                 solver.Mult(OneNegOne, PV_sigma);
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
             else
             {
@@ -947,7 +947,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 LocalGraphEdgeSolver solver(Mloc_0, Dloc_0);
                 solver.Mult(OneNegOne, PV_sigma);
 
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
 
             // add PV vector to other vectors and orthogonalize
@@ -958,7 +958,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         else
         {
             assert(shared_sigma[iface] == nullptr);
-            local_edge_trace_targets[iface].SetSize(num_iface_edge_dof, 0);
+            local_edge_trace_targets[iface].SetSize(num_iface_edofs, 0);
         }
     }
     delete [] shared_sigma;

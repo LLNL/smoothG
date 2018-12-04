@@ -64,7 +64,7 @@ public:
        @param mgL describes fine graph
        @param graph_topology describes vertex partitioning, agglomeration, etc.
     */
-    GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_topology);
+    GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& topology);
 
     /**
        @brief Given edge_trace and vertex_targets functions, construct the
@@ -212,7 +212,8 @@ private:
     const mfem::SparseMatrix* W_proc_;
     const mfem::Vector& constant_rep_;
     const ElementMBuilder* fine_mbuilder_;
-    const GraphTopology& graph_topology_;
+    const GraphTopology& topology_;
+    const GraphSpace& space_;
 
     /// basically just some storage to allocate
     mfem::Array<int> col_map_;
