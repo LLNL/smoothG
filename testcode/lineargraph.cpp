@@ -100,7 +100,6 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
 {
     mfem::SparseMatrix face_edge(partitions - 1, n_ - 1);
     mfem::SparseMatrix Agg_vertex(partitions, n_);
-    mfem::SparseMatrix Agg_edge(partitions, n_ - 1);
     mfem::SparseMatrix Agg_face(partitions, partitions - 1);
 
     // dividing line between partitions
@@ -109,19 +108,11 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     for (int i = 0; i < line; ++i)
     {
         Agg_vertex.Add(p, i, 1.0);
-        if (i < line - 1)
-        {
-            Agg_edge.Add(p, i, 1.0);
-        }
     }
     face_edge.Add(0, line - 1, 1.0);
     p = 1;
     for (int i = line; i < graph.GetN(); ++i)
     {
-        if (i < graph.GetN() - 1)
-        {
-            Agg_edge.Add(p, i, 1.0);
-        }
         Agg_vertex.Add(p, i, 1.0);
     }
 
@@ -129,7 +120,6 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     Agg_face.Add(1, 0, 1.0);
 
     Agg_vertex.Finalize();
-    Agg_edge.Finalize();
     face_edge.Finalize();
     Agg_face.Finalize();
     mfem::SparseMatrix face_Agg = smoothg::Transpose(Agg_face);
@@ -156,7 +146,6 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     graph_topology_.face_trueface_face_ = smoothg::AAt(face_trueface);
 
     graph_topology_.Agg_vertex_.Swap(Agg_vertex);
-    graph_topology_.Agg_edge_.Swap(Agg_edge);
     graph_topology_.face_edge_.Swap(face_edge);
     graph_topology_.face_Agg_.Swap(face_Agg);
 }
