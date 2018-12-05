@@ -183,7 +183,8 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LocalMixedGraphSpectralTargets localtargets(mgL, partition.graph_topology_, param);
+    DofAggregate dof_agg(partition.graph_topology_, mgL.GetGraphSpace());
+    LocalMixedGraphSpectralTargets localtargets(mgL, dof_agg, param);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
@@ -220,7 +221,7 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
 
-    GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
+    GraphCoarsen graph_coarsen(mgL, dof_agg);
     GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
                                         local_edge_traces, local_spectral_vertex_targets,
                                         std::move(partition.coarse_graph_));

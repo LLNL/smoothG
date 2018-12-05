@@ -42,13 +42,15 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
     auto coarse_graph = partitioning ? topology.Coarsen(*partitioning)
                         : topology.Coarsen(param_.coarse_factor);
 
+    DofAggregate dof_agg(topology, mgL.GetGraphSpace());
+
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LocalMixedGraphSpectralTargets localtargets(mgL, topology, param_);
+    LocalMixedGraphSpectralTargets localtargets(mgL, dof_agg, param_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
-    GraphCoarsen graph_coarsen(mgL, topology);
+    GraphCoarsen graph_coarsen(mgL, dof_agg);
     GraphSpace coarse_space = graph_coarsen.BuildCoarseSpace(local_edge_traces,
                                                              local_spectral_vertex_targets,
                                                              std::move(coarse_graph));

@@ -38,14 +38,15 @@ namespace smoothg
 
   Maybe use the example in parelag-notes.
 */
-GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& topology)
+GraphCoarsen::GraphCoarsen(const MixedMatrix& mgL, const DofAggregate& dof_agg)
     :
     M_proc_(mgL.GetM()),
     D_proc_(mgL.GetD()),
     W_proc_(mgL.GetW()),
     constant_rep_(mgL.GetConstantRep()),
     fine_mbuilder_(dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()))),
-    topology_(topology),
+    topology_(*dof_agg.topology_),
+    dof_agg_(dof_agg),
     space_(mgL.GetGraphSpace()),
     col_map_(D_proc_.Width())
 {
@@ -77,7 +78,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPVertices(
     const std::vector<mfem::DenseMatrix>& vertex_target)
 {
     const unsigned int num_aggs = vertex_target.size();
-    auto agg_vdof = smoothg::Mult(topology_.Agg_vertex_, space_.VertexToVDof());
+    const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
     const int num_vdofs = agg_vdof.Width();
     int num_local_fine_dofs, num_local_coarse_dofs;
     mfem::Array<int> local_fine_dofs;
@@ -294,15 +295,9 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
 
     const mfem::SparseMatrix& Agg_face(coarse_graph_space.GetGraph().VertexToEdge());
     const mfem::SparseMatrix& face_coarse_edof(coarse_graph_space.EdgeToEDof());
-
-    // TODO: avoid repeated computation of tables
-    auto face_edof = smoothg::Mult(topology_.face_edge_, space_.EdgeToEDof());
-    auto agg_vdof = smoothg::Mult(topology_.Agg_vertex_, space_.VertexToVDof());
-    mfem::SparseMatrix agg_edof;
-    {
-        auto tmp = smoothg::Mult(topology_.Agg_vertex_, space_.VertexToEDof());
-        GraphTopology::AggregateEdge2AggregateEdgeInt(tmp, agg_edof);
-    }
+    const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
+    const mfem::SparseMatrix& agg_edof = dof_agg_.agg_edof_;
+    const mfem::SparseMatrix& face_edof = dof_agg_.face_edof_;
 
     const unsigned int num_aggs = vertex_target.size();
     const unsigned int num_faces = face_edof.Height();
