@@ -333,7 +333,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::Vector local_rhs_trace0, local_rhs_trace1, local_rhs_bubble, local_sol, trace;
     mfem::Array<int> local_vdofs, local_edofs, faces;
     mfem::Array<int> facecdofs, local_facecdofs;
-    mfem::Vector one, first_vert_target;
+    mfem::Vector one;
     mfem::SparseMatrix Mbb;
     for (unsigned int i = 0; i < num_aggs; i++)
     {
@@ -343,15 +343,16 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         GetTableRow(Agg_face, i, faces);
         auto Mloc = ExtractRowAndColumns(M_proc_, local_edofs, local_edofs, col_map_);
         auto Dloc = ExtractRowAndColumns(D_proc_, local_vdofs, local_edofs, col_map_);
-        constant_rep_.GetSubVector(local_vdofs, one);
+        // constant_rep_.GetSubVector(local_vdofs, one);
+        // TODO: make constant_rep_ up to precision
+        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
+        vertex_target_i.GetColumnReference(0, one);
 
         // next line does *not* assume M_proc_ is diagonal
         LocalGraphEdgeSolver solver(Mloc, Dloc, one);
 
         int num_local_vdofs = local_vdofs.Size();
         local_rhs_trace1.SetSize(num_local_vdofs);
-
-        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
 
         // ---
         // solving bubble functions (vertex_target -> bubbles)
@@ -416,9 +417,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 // compute and store local coarse D
                 if (k == 0)
                 {
-                    vertex_target_i.GetColumnReference(0, first_vert_target);
-                    coarse_D_->Set(bubble_counter + i, row,
-                                   (local_rhs_trace1 * first_vert_target) * -1.);
+                    coarse_D_->Set(bubble_counter + i, row, -(local_rhs_trace1 * one));
                 }
 
                 // instead of doing local_rhs *= -1, we store -trace later
