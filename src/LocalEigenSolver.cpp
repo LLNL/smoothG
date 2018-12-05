@@ -249,6 +249,20 @@ void LocalEigenSolver::Compute(
     dtrtrs_(&uplo_, &trans_, &diag_, &n, &m, b, &n, evects.Data(), &n, &info_);
 }
 
+template<>
+void LocalEigenSolver::BlockCompute(
+    mfem::DenseMatrix& M, mfem::DenseMatrix& D,
+    mfem::Vector& evals, mfem::DenseMatrix& evects)
+{
+    M.Invert();
+    mfem::DenseMatrix DMinv(D.Height(), M.Width());
+    mfem::Mult(D, M, DMinv);
+    mfem::DenseMatrix DMinvDt(D.Height());
+    MultABt(DMinv, D, DMinvDt);
+
+    Compute(DMinvDt, evals, evects);
+}
+
 #if SMOOTHG_USE_ARPACK
 /// Adapter for applying the action of a certain operator in ARPACK
 class ARPACK_operator_adapter
@@ -527,6 +541,7 @@ void LocalEigenSolver::Compute(
     }
 }
 
+template<>
 void LocalEigenSolver::BlockCompute(
     mfem::SparseMatrix& M, mfem::SparseMatrix& D,
     mfem::Vector& evals, mfem::DenseMatrix& evects)
@@ -546,18 +561,18 @@ void LocalEigenSolver::BlockCompute(
     CheckNotConverged(max_num_evects, num_converged);
 
     // TODO: a fast way of computing largest eigenvalue?
-//    if (rel_tol_ < 1.0)
-//    {
-//        // Find the largest eigenvalue
-//        A_adapter adapter_A(A);
-//        ARSymStdEig_<double, A_adapter>
-//        eigvalueprob(n, 1, &adapter_A, &A_adapter::MultOP,
-//                     "LM", ncv, tolerance_, max_iterations_);
-//        eigvalueprob.Eigenvalues(eig_max_ptr_);
+    //    if (rel_tol_ < 1.0)
+    //    {
+    //        // Find the largest eigenvalue
+    //        A_adapter adapter_A(A);
+    //        ARSymStdEig_<double, A_adapter>
+    //        eigvalueprob(n, 1, &adapter_A, &A_adapter::MultOP,
+    //                     "LM", ncv, tolerance_, max_iterations_);
+    //        eigvalueprob.Eigenvalues(eig_max_ptr_);
 
-//        int num_evects = FindNumberOfEigenPairs(evals, max_num_evects, eig_max_);
-//        EigenPairsSetSizeAndData(n, num_evects, evals, evects);
-//    }
+    //        int num_evects = FindNumberOfEigenPairs(evals, max_num_evects, eig_max_);
+    //        EigenPairsSetSizeAndData(n, num_evects, evals, evects);
+    //    }
 }
 #endif // SMOOTHG_USE_ARPACK
 
@@ -607,6 +622,24 @@ double LocalEigenSolver::Compute(
     {
         return Compute(mat[0], mat[1], evects);
     }
+}
+
+double LocalEigenSolver::BlockCompute(
+    mfem::SparseMatrix& M, mfem::SparseMatrix& D, mfem::DenseMatrix& evects)
+{
+#if SMOOTHG_USE_ARPACK
+    if (D.NumRows() > size_offset_)
+    {
+        BlockCompute(M, D, evals_, evects);
+    }
+    else
+#endif
+    {
+        Full(M, dense_A_);
+        Full(D, dense_B_);
+        BlockCompute(dense_A_, dense_B_, evals_, evects);
+    }
+    return evals_(0);
 }
 
 } // namespace smoothg

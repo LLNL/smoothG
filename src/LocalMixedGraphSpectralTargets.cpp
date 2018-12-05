@@ -255,39 +255,7 @@ MixedBlockEigensystem::MixedBlockEigensystem(
                                          edge_local_dof_ext, colMapper);
         Mloc_.Swap(Mloc);
 
-        mfem::Vector evals;
-
-#if SMOOTHG_USE_ARPACK
-        if (Dloc_.Height() > 20) // call sparse eigensolver
-        {
-            eigs_.BlockCompute(Mloc_, Dloc_, evals, evects_);
-        }
-        else // call dense eigensolver
-#endif
-        {
-            mfem::DenseMatrix denseD;
-            Full(Dloc_, denseD);
-
-            mfem::DenseMatrix denseMinv;
-            Full(Mloc_, denseMinv);
-            denseMinv.Invert();
-
-            mfem::DenseMatrix DMinv(denseD.Height(), denseMinv.Width());
-            mfem::Mult(denseD, denseMinv, DMinv);
-            mfem::DenseMatrix DMinvDt_dense(denseD.Height());
-            MultABt(DMinv, denseD, DMinvDt_dense);
-
-            if (use_w_)
-            {
-                for (int i = 0; i < Wloc.Height(); ++i)
-                {
-                    DMinvDt_dense(i, i) += Wloc.GetData()[i];
-                }
-            }
-            eigs_.Compute(DMinvDt_dense, evals, evects_);
-        }
-
-        eval_min_ = evals.Min();
+        eval_min_ = eigs_.BlockCompute(Mloc_, Dloc_, evects_);
 
         mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
         DlocT_.Swap(DlocT_tmp);
