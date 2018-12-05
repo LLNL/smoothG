@@ -161,7 +161,7 @@ public:
        @brief Construct based on mixed form graph Laplacian.
 
        @param mixed_graph_laplacian container for M, D, W
-       @param graph_topology the partitioning relations for coarsening
+       @param dof_agg container for various dofs aggregation
        @param param container for rel_tol, max_evects, various dual target flags
 
        And the graph Laplacian in mixed form is

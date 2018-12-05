@@ -62,7 +62,7 @@ public:
        This doesn't do much, just sets up the object to be coarsened.
 
        @param mgL describes fine graph
-       @param graph_topology describes vertex partitioning, agglomeration, etc.
+       @param dof_agg describes various dofs aggregation
     */
     GraphCoarsen(const MixedMatrix& mgL, const DofAggregate& dof_agg);
 

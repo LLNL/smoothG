@@ -370,6 +370,8 @@ public:
 
        @param M matrix \f$ M \f$ in the formula in the class description
        @param D matrix \f$ D \f$ in the formula in the class description
+       @param const_rep a vector which solution u is set to be orthogonal to.
+       If not provided, there will be NO orthogonalization step in solving stage
 
        We construct the matrix \f$ A = D M^{-1} D^T \f$, eliminate the zeroth
        degree of freedom to ensure it is solvable. LU factorization of \f$ A \f$
@@ -378,10 +380,7 @@ public:
     */
     LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                          const mfem::SparseMatrix& D,
-                         const mfem::Vector& const_rep);
-
-    /// solution u will not be orthogonalized to const_rep in solving stage
-    LocalGraphEdgeSolver(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
+                         const mfem::Vector& const_rep = mfem::Vector());
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
