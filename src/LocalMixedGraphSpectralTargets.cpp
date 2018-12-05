@@ -170,10 +170,13 @@ private:
 
     LocalEigenSolver& eigs_;
     bool use_w_;
+    bool M_is_diag_;
     mfem::SparseMatrix Dloc_;
     mfem::SparseMatrix DlocT_;
+    mfem::SparseMatrix Mloc_;
     mfem::SparseMatrix DMinvDt_;
     mfem::Vector Mloc_diag_inv_;
+    mfem::UMFPackSolver M_inv_;
     mfem::DenseMatrix evects_;
     double eval_min_;
     bool scaled_dual_;
@@ -224,10 +227,9 @@ MixedBlockEigensystem::MixedBlockEigensystem(
     }
 
     // build local (weighted) graph Laplacian
-
-    if (IsDiag(M_ext))
+    M_is_diag_ = IsDiag(M_ext);
+    if (M_is_diag_)  // M is diagonal
     {
-        // M is diagonal (we assume---the check in the if is not great
         const double* M_diag_data = M_ext.GetData();
 
         Mloc_diag_inv_.SetSize(edge_local_dof_ext.Size());
@@ -247,47 +249,50 @@ MixedBlockEigensystem::MixedBlockEigensystem(
         }
         eval_min_ = eigs_.Compute(DMinvDt_, evects_);
     }
-#if SMOOTHG_USE_ARPACK
-    else if (Dloc_.Height() > 20)
+    else // general M
     {
         auto Mloc = ExtractRowAndColumns(M_ext, edge_local_dof_ext,
                                          edge_local_dof_ext, colMapper);
+        Mloc_.Swap(Mloc);
+
         mfem::Vector evals;
-        eigs_.BlockCompute(Mloc, Dloc_, evals, evects_);
-        eval_min_ = evals.Min();
 
-        // temporarily added to match dimension (TODO: compute MinvDT)
-        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
-        DlocT_.Swap(DlocT_tmp);
-    }
-#endif // SMOOTHG_USE_ARPACK
-    else
-    {
-        // general M (explicit dense inverse for now, which is a mistake) (@todo)
-        mfem::DenseMatrix denseD(Dloc_.Height(), Dloc_.Width());
-        Full(Dloc_, denseD);
-        mfem::DenseMatrix denseMinv(denseD.Width());
-        M_ext.GetSubMatrix(edge_local_dof_ext, edge_local_dof_ext, denseMinv);
-        denseMinv.Invert();
-
-        mfem::DenseMatrix DMinv(denseD.Height(), denseMinv.Width());
-        Mult(denseD, denseMinv, DMinv);
-        mfem::DenseMatrix DMinvDt_dense(denseD.Height());
-        MultABt(DMinv, denseD, DMinvDt_dense);
-        if (use_w_)
+#if SMOOTHG_USE_ARPACK
+        if (Dloc_.Height() > 20) // call sparse eigensolver
         {
-            for (int i = 0; i < Wloc.Height(); ++i)
-            {
-                DMinvDt_dense(i, i) += Wloc.GetData()[i];
-            }
+            eigs_.BlockCompute(Mloc_, Dloc_, evals, evects_);
         }
-        mfem::Vector evals;
-        eigs_.Compute(DMinvDt_dense, evals, evects_);
+        else // call dense eigensolver
+#endif
+        {
+            mfem::DenseMatrix denseD;
+            Full(Dloc_, denseD);
+
+            mfem::DenseMatrix denseMinv;
+            Full(Mloc_, denseMinv);
+            denseMinv.Invert();
+
+            mfem::DenseMatrix DMinv(denseD.Height(), denseMinv.Width());
+            mfem::Mult(denseD, denseMinv, DMinv);
+            mfem::DenseMatrix DMinvDt_dense(denseD.Height());
+            MultABt(DMinv, denseD, DMinvDt_dense);
+
+            if (use_w_)
+            {
+                for (int i = 0; i < Wloc.Height(); ++i)
+                {
+                    DMinvDt_dense(i, i) += Wloc.GetData()[i];
+                }
+            }
+            eigs_.Compute(DMinvDt_dense, evals, evects_);
+        }
+
         eval_min_ = evals.Min();
 
-        // temporarily added to match dimension (TODO: compute MinvDT)
         mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
         DlocT_.Swap(DlocT_tmp);
+
+        M_inv_.SetOperator(Mloc_);
     }
 
     if (!use_w_)
@@ -369,8 +374,26 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
 
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later
-        AggExt_sigmaT.SetSize(evects_tmp.Width(), DlocT_.Height());
-        MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
+        if (M_is_diag_)
+        {
+            AggExt_sigmaT.SetSize(evects_tmp.Width(), DlocT_.Height());
+            MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
+        }
+        else
+        {
+            mfem::DenseMatrix DT_evects;
+            MultSparseDense(DlocT_, evects_tmp, DT_evects);
+
+            AggExt_sigmaT.SetSize(DT_evects.Height(), DT_evects.Width());
+            mfem::Vector in_col, out_col;
+            for (int j = 0; j < DT_evects.Width(); ++j)
+            {
+                DT_evects.GetColumnReference(j, in_col);
+                AggExt_sigmaT.GetColumnReference(j, out_col);
+                M_inv_.Mult(in_col, out_col);
+            }
+            AggExt_sigmaT.Transpose();
+        }
     }
     else
     {
