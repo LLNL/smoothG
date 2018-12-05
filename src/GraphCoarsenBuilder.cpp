@@ -72,9 +72,9 @@ void CoefficientMBuilder::Setup(const GraphSpace& coarse_space)
 
     coarse_agg_dof_offsets_.SetSize(num_aggs_ + 1);
     coarse_agg_dof_offsets_[0] = total_num_traces_;
-    for (unsigned int i = 1; i < num_aggs_ + 1; ++i)
+    for (unsigned int i = 0; i < num_aggs_; ++i)
     {
-        coarse_agg_dof_offsets_[i] = coarse_agg_dof_offsets_[i - 1] + agg_coarse_vdof.RowSize(i);
+        coarse_agg_dof_offsets_[i + 1] = coarse_agg_dof_offsets_[i] + agg_coarse_vdof.RowSize(i) - 1;
     }
 
     Agg_face_ref_.MakeRef(coarse_space.GetGraph().VertexToEdge());
