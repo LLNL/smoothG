@@ -430,17 +430,19 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     solver.Mult(local_rhs_trace0, local_rhs_trace1, local_sol, F_potential);
 
-                    // compute and store off diagonal block of coarse M
-                    for (int l = 0; l < num_bubbles_i; l++)
-                    {
-                        entry_value = DTTraceProduct(DtransferT, B_potentials, l, trace);
-                        coarse_m_builder_->SetTraceBubbleBlock(l, entry_value);
-                    }
-
                     // compute and store diagonal block of coarse M
                     entry_value = DTTraceProduct(DtransferT, F_potentials, nlocal_traces, trace);
                     entry_value -= MtransferT.InnerProduct(local_sol, trace);
                     coarse_m_builder_->AddTraceTraceBlockDiag(entry_value);
+
+                    // compute and store off diagonal block of coarse M
+                    for (int l = 0; l < num_bubbles_i; l++)
+                    {
+                        entry_value = DTTraceProduct(DtransferT, B_potentials, l, trace);
+                        bubbles.GetColumnReference(l, local_sol);
+                        entry_value -= MtransferT.InnerProduct(local_sol, trace);
+                        coarse_m_builder_->SetTraceBubbleBlock(l, entry_value);
+                    }
 
                     int other_j = -1;
                     for (int l = 0; l < nlocal_traces; l++)
@@ -449,13 +451,16 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                         entry_value -= DTTraceProduct(MtransferT, traces_extensions, l, trace);
 
                         std::pair<int, int>& loc_map = agg_trace_map[l];
-                        if (loc_map.first != other_j && loc_map.first != j)
+                        if (loc_map.first != j)
                         {
-                            other_j = loc_map.first;
-                            // TODO: avoid repeated extraction in high order coarsening
-                            auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
-                                                            facefdofs[other_j], col_map_);
-                            Mbb.Swap(tmp);
+                            // note other_j increases with l, so no repeated extraction
+                            if (loc_map.first != other_j)
+                            {
+                                other_j = loc_map.first;
+                                auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
+                                                                facefdofs[other_j], col_map_);
+                                Mbb.Swap(tmp);
+                            }
                             entry_value += DTTraceProduct(Mbb, edge_traces[faces[other_j]],
                                                           loc_map.second, trace);
                         }
