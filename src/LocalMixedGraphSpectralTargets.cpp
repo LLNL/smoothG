@@ -143,15 +143,12 @@ class MixedBlockEigensystem
 {
 public:
     MixedBlockEigensystem(
-        const mfem::Array<int>& vertex_local_dof_ext,
-        const mfem::Array<int>& edge_local_dof_ext,
-        LocalEigenSolver& eigs, mfem::Array<int>& colMapper,
-        mfem::SparseMatrix& D_ext,
-        mfem::SparseMatrix& M_ext, mfem::SparseMatrix& W_ext,
-        bool scaled_dual, bool energy_dual);
+        int max_evects, double spec_tol, bool scaled_dual, bool energy_dual);
 
-    /// returns minimum eigenvalue
-    double ComputeEigenvectors(mfem::DenseMatrix& evects);
+    /// compute eigenvectors of the matrix DM^{-1}D^T + W
+    void ComputeEigenvectors(
+            mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
+            mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects);
 
     /// @todo should scaled_dual and energy_dual be arguments here?
     void ComputeEdgeTraces(mfem::DenseMatrix& evects,
@@ -168,12 +165,11 @@ private:
         const mfem::SparseMatrix& D,
         const mfem::Vector& M_diag_inv);
 
-    LocalEigenSolver& eigs_;
+    LocalEigenSolver eigs_;
     bool use_w_;
     bool M_is_diag_;
-    mfem::SparseMatrix Dloc_;
     mfem::SparseMatrix DlocT_;
-    mfem::SparseMatrix Mloc_;
+    mfem::SparseMatrix Dloc_ref_;
     mfem::SparseMatrix DMinvDt_;
     mfem::Vector Mloc_diag_inv_;
     mfem::UMFPackSolver M_inv_;
@@ -197,82 +193,54 @@ void MixedBlockEigensystem::CheckMinimalEigenvalue(
 }
 
 MixedBlockEigensystem::MixedBlockEigensystem(
-    const mfem::Array<int>& vertex_local_dof_ext,
-    const mfem::Array<int>& edge_local_dof_ext,
-    LocalEigenSolver& eigs, mfem::Array<int>& colMapper,
-    mfem::SparseMatrix& D_ext,
-    mfem::SparseMatrix& M_ext, mfem::SparseMatrix& W_ext,
-    bool scaled_dual, bool energy_dual)
+    int max_evects, double spec_tol, bool scaled_dual, bool energy_dual)
     :
-    eigs_(eigs),
-    use_w_((W_ext.Height() > 0)),
+    eigs_(max_evects, spec_tol),
     scaled_dual_(scaled_dual),
     energy_dual_(energy_dual),
     zero_eigenvalue_threshold_(1.e-8)
 {
-    // extract local D corresponding to iAgg-th extended aggregate
-    mfem::SparseMatrix Dloc_tmp =
-        ExtractRowAndColumns(D_ext, vertex_local_dof_ext, edge_local_dof_ext, colMapper);
-    Dloc_.Swap(Dloc_tmp);
-    mfem::SparseMatrix Wloc;
+}
 
-    if (use_w_)
-    {
-        // Wloc assumed to be diagonal
-        auto Wloc_tmp = ExtractRowAndColumns(
-                            W_ext, vertex_local_dof_ext, vertex_local_dof_ext, colMapper) ;
-        Wloc.Swap(Wloc_tmp);
-        assert(Wloc.NumNonZeroElems() == Wloc.Height());
-        assert(Wloc.Height() == Wloc.Width());
-    }
+void MixedBlockEigensystem::ComputeEigenvectors(
+        mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
+        mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects)
+{
+    use_w_ = (Wloc.Height() > 0);
+    Dloc_ref_.MakeRef(Dloc);
 
     // build local (weighted) graph Laplacian
-    M_is_diag_ = IsDiag(M_ext);
+    mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc);
+    DlocT_.Swap(DlocT_tmp);
+
+    M_is_diag_ = IsDiag(Mloc);
     if (M_is_diag_)  // M is diagonal
     {
-        const double* M_diag_data = M_ext.GetData();
-
-        Mloc_diag_inv_.SetSize(edge_local_dof_ext.Size());
-        for (int i = 0; i < Dloc_.Width(); i++)
+        Mloc_diag_inv_.SetSize(Mloc.Height());
+        for (int i = 0; i < Mloc.Height(); i++)
         {
-            Mloc_diag_inv_(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
+            Mloc_diag_inv_(i) = 1.0 / Mloc(i, i);
         }
-
-        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
-        DlocT_.Swap(DlocT_tmp);
         DlocT_.ScaleRows(Mloc_diag_inv_);
-        mfem::SparseMatrix DMinvDt_tmp = smoothg::Mult(Dloc_, DlocT_);
+        mfem::SparseMatrix DMinvDt_tmp = smoothg::Mult(Dloc, DlocT_);
         DMinvDt_.Swap(DMinvDt_tmp);
         if (use_w_)
         {
             DMinvDt_.Add(-1.0, Wloc);
         }
-        eval_min_ = eigs_.Compute(DMinvDt_, evects_);
+        eval_min_ = eigs_.Compute(DMinvDt_, evects);
     }
     else // general M
     {
-        auto Mloc = ExtractRowAndColumns(M_ext, edge_local_dof_ext,
-                                         edge_local_dof_ext, colMapper);
-        Mloc_.Swap(Mloc);
-
-        eval_min_ = eigs_.BlockCompute(Mloc_, Dloc_, evects_);
-
-        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
-        DlocT_.Swap(DlocT_tmp);
-
-        M_inv_.SetOperator(Mloc_);
+        assert(!use_w_); // TODO: consider W in eigensolver
+        M_inv_.SetOperator(Mloc);
+        eval_min_ = eigs_.BlockCompute(Mloc, Dloc, evects);
     }
 
     if (!use_w_)
     {
         CheckMinimalEigenvalue(eval_min_, "vertex");
     }
-}
-
-double MixedBlockEigensystem::ComputeEigenvectors(mfem::DenseMatrix& evects)
-{
-    evects = evects_;
-    return eval_min_;
 }
 
 std::vector<mfem::SparseMatrix>
@@ -366,14 +334,14 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
     else
     {
         /// @todo
-        MFEM_ASSERT(DMinvDt_.Height() > 0,
+        MFEM_ASSERT(M_is_diag_,
                     "Edge eigensystem only works with diagonal M! (ie, two-level)");
-        double eval_min = 0.0;
-        // Collect trace samples from eigenvectors of dual graph Laplacian
-        auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_, Mloc_diag_inv_);
-        eval_min = eigs_.Compute(EES, evects);
 
-        CheckMinimalEigenvalue(eval_min, "edge");
+        // Collect trace samples from eigenvectors of dual graph Laplacian
+        auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_ref_, Mloc_diag_inv_);
+        eval_min_ = eigs_.Compute(EES, evects);
+
+        CheckMinimalEigenvalue(eval_min_, "edge");
 
         // Transpose all edge eigenvectors for extraction later
         AggExt_sigmaT.Transpose(evects);
@@ -462,7 +430,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // ---
     // solve eigenvalue problem on each extended aggregate, our (3.1)
     // ---
-    LocalEigenSolver eigs(max_evects_, rel_tol_);
+    MixedBlockEigensystem mbe(max_evects_, rel_tol_, scaled_dual_, energy_dual_);
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
     {
         // Extract local dofs for extended aggregates that is shared
@@ -477,10 +445,20 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             continue;
         }
 
-        MixedBlockEigensystem mbe(ext_loc_vdofs, ext_loc_edofs,
-                                  eigs, col_map_, D_ext, M_ext, W_ext,
-                                  scaled_dual_, energy_dual_);
-        mbe.ComputeEigenvectors(evects);
+        // Extract local matrices
+        auto Mloc = ExtractRowAndColumns(M_ext, ext_loc_edofs,
+                                         ext_loc_edofs, col_map_);
+        auto Dloc = ExtractRowAndColumns(D_ext, ext_loc_vdofs,
+                                         ext_loc_edofs, col_map_);
+        mfem::SparseMatrix Wloc;
+        if (use_w)
+        {
+            auto Wloc_tmp = ExtractRowAndColumns(W_ext, ext_loc_vdofs,
+                                                 ext_loc_vdofs, col_map_) ;
+            Wloc.Swap(Wloc_tmp);
+        }
+
+        mbe.ComputeEigenvectors(Mloc, Dloc, Wloc, evects);
 
         if (use_w)
         {
