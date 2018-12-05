@@ -225,7 +225,7 @@ MixedBlockEigensystem::MixedBlockEigensystem(
 
     // build local (weighted) graph Laplacian
 
-    if (M_ext.NumNonZeroElems() == M_ext.Height())
+    if (IsDiag(M_ext))
     {
         // M is diagonal (we assume---the check in the if is not great
         const double* M_diag_data = M_ext.GetData();
@@ -247,6 +247,20 @@ MixedBlockEigensystem::MixedBlockEigensystem(
         }
         eval_min_ = eigs_.Compute(DMinvDt_, evects_);
     }
+#if SMOOTHG_USE_ARPACK
+    else if (Dloc_.Height() > 20)
+    {
+        auto Mloc = ExtractRowAndColumns(M_ext, edge_local_dof_ext,
+                                         edge_local_dof_ext, colMapper);
+        mfem::Vector evals;
+        eigs_.BlockCompute(Mloc, Dloc_, evals, evects_);
+        eval_min_ = evals.Min();
+
+        // temporarily added to match dimension (TODO: compute MinvDT)
+        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
+        DlocT_.Swap(DlocT_tmp);
+    }
+#endif // SMOOTHG_USE_ARPACK
     else
     {
         // general M (explicit dense inverse for now, which is a mistake) (@todo)

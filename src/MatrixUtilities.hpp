@@ -420,7 +420,7 @@ private:
     /// Setup matrix and solver when M is not diagonal
     void Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
 
-    std::unique_ptr<mfem::UMFPackSolver> solver_;
+    mfem::UMFPackSolver solver_;
     mfem::SparseMatrix A_;
     mfem::SparseMatrix MinvDT_;
     bool M_is_diag_;

@@ -1075,7 +1075,7 @@ void LocalGraphEdgeSolver::Init(const mfem::Vector& M_diag, const mfem::SparseMa
 
     // Eliminate the first unknown so that A_ is invertible
     A_.EliminateRowCol(0);
-    solver_ = make_unique<mfem::UMFPackSolver>(A_);
+    solver_.SetOperator(A_);
 }
 
 void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D)
@@ -1102,7 +1102,7 @@ void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseM
     unique_ptr<mfem::SparseMatrix> tmp_A(block_A.CreateMonolithic());
     A_.Swap(*tmp_A);
 
-    solver_ = make_unique<mfem::UMFPackSolver>(A_);
+    solver_.SetOperator(A_);
 
     rhs_ = make_unique<mfem::BlockVector>(offsets_);
     sol_ = make_unique<mfem::BlockVector>(offsets_);
@@ -1120,13 +1120,13 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sig
     if (M_is_diag_)
     {
         mfem::Vector sol_u(rhs_u.Size());
-        solver_->Mult(rhs_u_copy, sol_u);
+        solver_.Mult(rhs_u_copy, sol_u);
         MinvDT_.Mult(sol_u, sol_sigma);
     }
     else
     {
         rhs_->GetBlock(1) = rhs_u_copy;
-        solver_->Mult(*rhs_, *sol_);
+        solver_.Mult(*rhs_, *sol_);
         sol_sigma = sol_->GetBlock(0);
     }
 
@@ -1144,7 +1144,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
         add(-1.0, rhs, 1.0, rhs_u, rhs);
         rhs(0) = 0.0;
 
-        solver_->Mult(rhs, sol_u);
+        solver_.Mult(rhs, sol_u);
 
         MinvDT_.Mult(sol_u, sol_sigma);
         mfem::Vector Minv_rhs_sigma(rhs_sigma);
@@ -1157,7 +1157,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
         rhs_->GetBlock(1) = rhs_u;
         rhs_->GetBlock(1)[0] = 0.0;
 
-        solver_->Mult(*rhs_, *sol_);
+        solver_.Mult(*rhs_, *sol_);
 
         sol_sigma = sol_->GetBlock(0);
         sol_u = sol_->GetBlock(1);
