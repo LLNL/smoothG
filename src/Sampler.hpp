@@ -66,7 +66,6 @@ public:
 class SimpleSampler : public MultilevelSampler
 {
 public:
-    SimpleSampler(int fine_size, int coarse_size);
     SimpleSampler(std::vector<int>& size);
 
     void NewSample();
@@ -74,8 +73,6 @@ public:
     mfem::Vector& GetCoefficient(int level);
 
 private:
-    std::vector<int> size_;
-
     int sample_;
 
     std::vector<mfem::Vector> helper_;

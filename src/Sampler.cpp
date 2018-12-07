@@ -36,23 +36,13 @@ double NormalDistribution::Sample()
     return out;
 }
 
-SimpleSampler::SimpleSampler(int fine_size, int coarse_size)
-    :
-    size_(2), sample_(-1), helper_(2)
-{
-    size_[0] = fine_size;
-    size_[1] = coarse_size;
-    helper_[0].SetSize(size_[0]);
-    helper_[1].SetSize(size_[1]);
-}
-
 SimpleSampler::SimpleSampler(std::vector<int>& size)
     :
-    size_(size), sample_(-1)
+    sample_(-1), helper_(size.size())
 {
     for (unsigned int level = 0; level < size.size(); ++level)
     {
-        helper_[level].SetSize(size_[level]);
+        helper_[level].SetSize(size[level]);
     }
 }
 

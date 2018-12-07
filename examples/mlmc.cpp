@@ -282,8 +282,8 @@ int main(int argc, char* argv[])
     unique_ptr<MultilevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {
-        MFEM_ASSERT(num_levels == 2, "SimpleSampler only implemented 2-level here!");
-        sampler = make_unique<SimpleSampler>(vertex_edge.Height(), partitioning.Max() + 1);
+        std::vector<int> vertex_sizes = upscale.GetVertexSizes();
+        sampler = make_unique<SimpleSampler>(vertex_sizes);
     }
     else if (std::string(sampler_type) == "pde")
     {

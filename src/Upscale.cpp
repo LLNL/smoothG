@@ -662,4 +662,26 @@ void Upscale::RescaleCoefficient(int level, const mfem::Vector& coeff)
     }
 }
 
+int Upscale::GetNumVertices(int level) const
+{
+    if (level == 0)
+    {
+        return rhs_[level]->GetBlock(1).Size();
+    }
+    else
+    {
+        return coarsener_[level - 1]->get_num_aggregates();
+    }
+}
+
+std::vector<int> Upscale::GetVertexSizes() const
+{
+    std::vector<int> out(GetNumLevels());
+    for (int level = 0; level < GetNumLevels(); ++level)
+    {
+        out[level] = GetNumVertices(level);
+    }
+    return out;
+}
+
 } // namespace smoothg

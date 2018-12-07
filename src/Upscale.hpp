@@ -204,18 +204,12 @@ public:
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
     int GetNumLevels() const { return rhs_.size(); }
-    int GetNumVertices(int level) const
-    {
-        // return rhs_[level]->GetBlock(1).Size();
-        if (level == 0)
-        {
-            return rhs_[level]->GetBlock(1).Size();
-        }
-        else
-        {
-            return coarsener_[level - 1]->get_num_aggregates();
-        }
-    }
+
+    /// returns the number of vertices at a given level
+    int GetNumVertices(int level) const;
+
+    /// return vector with number of vertices on each level
+    std::vector<int> GetVertexSizes() const;
 
 protected:
 
