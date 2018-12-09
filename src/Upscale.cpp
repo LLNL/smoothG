@@ -562,36 +562,34 @@ void Upscale::DumpDebug(const std::string& prefix) const
     }
 }
 
-/// this implementation is sloppy (also, @todo should be combined with
-/// RescaleCoarseCoefficient with int level argument)
-void Upscale::RescaleFineCoefficient(const mfem::Vector& coeff)
+void Upscale::RescaleCoefficient(int level, const mfem::Vector& coeff)
 {
-    GetMatrix(0).UpdateM(coeff);
     if (!param_.hybridization)
     {
-        MakeSolver(0);
+        GetMatrix(level).UpdateM(coeff);
+        MakeSolver(level);
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[0].get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[level].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
 }
 
-void Upscale::RescaleCoarseCoefficient(const mfem::Vector& coeff)
+int Upscale::GetNumVertices(int level) const
 {
-    if (!param_.hybridization)
+    return GetMatrix(level).GetGraph().NumVertices();
+}
+
+std::vector<int> Upscale::GetVertexSizes() const
+{
+    std::vector<int> out(GetNumLevels());
+    for (int level = 0; level < GetNumLevels(); ++level)
     {
-        GetMatrix(1).UpdateM(coeff);
-        MakeSolver(1);
+        out[level] = GetNumVertices(level);
     }
-    else
-    {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[1].get());
-        assert(hybrid_solver);
-        hybrid_solver->UpdateAggScaling(coeff);
-    }
+    return out;
 }
 
 } // namespace smoothg

@@ -121,6 +121,7 @@ else()
 endif()
 add_test(isolate_coarsen python stest.py isolate-coarsen)
 add_test(sampler python stest.py sampler)
+add_test(ml-sampler python stest.py ml-sampler)
 
 add_test(vgraph-small-usegenerator python stest.py vgraph-small-usegenerator)
 add_test(vgraph-small-usegenerator-hb python stest.py vgraph-small-usegenerator-hb)
