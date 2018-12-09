@@ -653,14 +653,7 @@ void Upscale::RescaleCoefficient(int level, const mfem::Vector& coeff)
 
 int Upscale::GetNumVertices(int level) const
 {
-    if (level == 0)
-    {
-        return rhs_[level]->GetBlock(1).Size();
-    }
-    else
-    {
-        return coarsener_[level - 1]->get_num_aggregates();
-    }
+    return GetMatrix(level).GetGraph().NumVertices();
 }
 
 std::vector<int> Upscale::GetVertexSizes() const
