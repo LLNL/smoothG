@@ -38,30 +38,30 @@ public:
     /// n here is number of vertices, we will have n-1 edges in the graph
     LinearGraph(int n);
 
-    int GetN() const {return n_;}
+    int GetN() const { return n_; }
 
-    const mfem::SparseMatrix& GetM() const {return M_;}
-    const mfem::SparseMatrix& GetD() const {return D_;}
+    const Graph& GetGraph() const { return graph_; }
 
 private:
     int n_;
-    mfem::SparseMatrix M_;
-    mfem::SparseMatrix D_;
+    Graph graph_;
 };
 
 LinearGraph::LinearGraph(int n) :
-    n_(n),
-    M_(n - 1, n - 1),
-    D_(n, n - 1)
+    n_(n)
 {
+    mfem::Vector edge_weight(n - 1);
+    mfem::SparseMatrix vertex_edge(n, n - 1);
+
     for (int i = 0; i < n - 1; ++i)
     {
-        M_.Add(i, i, 1.0);
-        D_.Add(i, i, -1.0);
-        D_.Add(i + 1, i, 1.0);
+        edge_weight[i] = 1.0;
+        vertex_edge.Add(i, i, 1.0);
+        vertex_edge.Add(i + 1, i, 1.0);
     }
-    M_.Finalize();
-    D_.Finalize();
+    vertex_edge.Finalize();
+
+    graph_ = Graph(MPI_COMM_WORLD, vertex_edge, edge_weight);
 }
 
 /**
@@ -81,24 +81,9 @@ public:
 
     int n_;
 
-    mfem::SparseMatrix vertex_edge;
-    mfem::SparseMatrix face_edge;
-    mfem::SparseMatrix Agg_vertex;
-    mfem::SparseMatrix Agg_edge;
-    mfem::SparseMatrix AggExt_vertex;
-    mfem::SparseMatrix AggExt_edge;
-    mfem::SparseMatrix Agg_face;
+    GraphTopology graph_topology_;
 
-    std::shared_ptr<mfem::HypreParMatrix> edge_d_td;
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td;
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_d;
-
-    mfem::SparseMatrix edge_identity_;
     mfem::SparseMatrix face_identity_;
-
-    mfem::Array<HYPRE_Int> face_start;
-    mfem::Array<HYPRE_Int> vertex_start;
-    mfem::Array<HYPRE_Int> edge_start;
 };
 
 /**
@@ -108,15 +93,13 @@ public:
 LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     :
     n_(graph.GetN()),
-    vertex_edge(graph.GetD(), true),
-    face_edge(partitions - 1, n_ - 1),
-    Agg_vertex(partitions, n_),
-    Agg_edge(partitions, n_ - 1),
-    Agg_face(partitions, partitions - 1),
-    edge_identity_(SparseIdentity(n_ - 1)),
+    graph_topology_(graph.GetGraph()),
     face_identity_(SparseIdentity(partitions - 1))
 {
-    vertex_edge = 1.0;
+    mfem::SparseMatrix face_edge(partitions - 1, n_ - 1);
+    mfem::SparseMatrix Agg_vertex(partitions, n_);
+    mfem::SparseMatrix Agg_edge(partitions, n_ - 1);
+    mfem::SparseMatrix Agg_face(partitions, partitions - 1);
 
     // dividing line between partitions
     int line = graph.GetN() / partitions;
@@ -147,21 +130,34 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     Agg_edge.Finalize();
     face_edge.Finalize();
     Agg_face.Finalize();
+    mfem::SparseMatrix face_Agg = smoothg::Transpose(Agg_face);
 
-    face_start.SetSize(3);
-    vertex_start.SetSize(3);
-    edge_start.SetSize(3);
-    face_start[0] = vertex_start[0] = edge_start[0] = 0;
+    mfem::Array<HYPRE_Int> agg_start(3);
+    mfem::Array<HYPRE_Int> face_start(3);
+    mfem::Array<HYPRE_Int> vertex_start(3);
+    mfem::Array<HYPRE_Int> edge_start(3);
+    agg_start[0] = face_start[0] = vertex_start[0] = edge_start[0] = 0;
+    agg_start[1] = agg_start[2] = partitions;
     face_start[1] = face_start[2] = partitions - 1;
     vertex_start[1] = vertex_start[2] = n_;
     edge_start[1] = n_ - 1; edge_start[2] = n_ - 1;
 
-    edge_d_td = make_unique<mfem::HypreParMatrix>(
-                    MPI_COMM_WORLD, n_ - 1, edge_start, &edge_identity_);
-    face_d_td = make_unique<mfem::HypreParMatrix>(
-                    MPI_COMM_WORLD, partitions - 1, face_start, &face_identity_);
-    face_d_td_d = make_unique<mfem::HypreParMatrix>(
-                      MPI_COMM_WORLD, partitions - 1, face_start, &face_identity_);
+    agg_start.Copy(graph_topology_.GetAggregateStart());
+    face_start.Copy(graph_topology_.GetFaceStart());
+    vertex_start.Copy(graph_topology_.GetVertexStart());
+    edge_start.Copy(graph_topology_.GetEdgeStart());
+
+    auto face_trueface = make_unique<mfem::HypreParMatrix>(
+                             MPI_COMM_WORLD, partitions - 1, graph_topology_.GetFaceStart(), &face_identity_);
+
+    graph_topology_.face_trueface_face_ = smoothg::AAt(*face_trueface);
+
+    graph_topology_.Agg_face_.Swap(Agg_face);
+    graph_topology_.Agg_vertex_.Swap(Agg_vertex);
+    graph_topology_.Agg_edge_.Swap(Agg_edge);
+    graph_topology_.face_edge_.Swap(face_edge);
+    graph_topology_.face_Agg_.Swap(face_Agg);
+    std::swap(graph_topology_.face_trueface_, face_trueface);
 }
 
 int main(int argc, char* argv[])
@@ -192,27 +188,22 @@ int main(int argc, char* argv[])
     }
 
     LinearGraph graph(global_size);
+    MixedMatrix mgL(graph.GetGraph());
+
     LinearPartition partition(graph, num_partitions);
-    GraphTopology graph_topology(partition.vertex_edge,
-                                 partition.face_edge,
-                                 partition.Agg_vertex,
-                                 partition.Agg_edge,
-                                 partition.Agg_face,
-                                 *partition.edge_d_td,
-                                 *partition.face_d_td,
-                                 *partition.face_d_td_d);
 
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(
         spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-        graph.GetM(), graph.GetD(), graph_topology);
+        mgL.GetM(), mgL.GetD(), partition.graph_topology_);
 
-    mfem::Vector constant_rep(graph.GetD().Height());
+    mfem::Vector constant_rep(mgL.GetD().Height());
     constant_rep = 1.0;
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets,
                          constant_rep);
+
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
         throw std::logic_error(
@@ -249,21 +240,14 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pp;
     mfem::SparseMatrix face_dof; // not used in this example
 
-    mfem::Vector weight(graph.GetM().Size());
-    for (int i = 0; i < weight.Size(); i++)
-    {
-        weight(i) = 1.0 / graph.GetM()(i, i);
-    }
-    Graph smoothg_graph(graph.GetD(), *partition.edge_d_td, weight);
-    MixedMatrix mgL(smoothg_graph);
-    GraphCoarsen graph_coarsen(mgL, graph_topology);
+    GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
     ElementMBuilder builder;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
                                      Pp, Pu, face_dof, builder, constant_rep);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;
-    mfem::SparseMatrix left_mat = smoothg::Mult(graph.GetD(), Pu);
+    mfem::SparseMatrix left_mat = smoothg::Mult(mgL.GetD(), Pu);
     mfem::SparseMatrix minusone_one(2, 1);
     if (local_spectral_vertex_targets[0].Elem(0, 0) > 0)
         minusone_one.Add(0, 0, -1.0);
