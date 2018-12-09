@@ -36,7 +36,9 @@ class GraphSpace
 {
 public:
     /**
-       @brief Construct GraphSpace from Graph, entity and dof are one-to-one
+       @brief Construct GraphSpace from Graph
+
+       Entity and dof are one-to-one.
 
        @param graph the graph on which the GraphSpace is based.
     */
@@ -61,13 +63,15 @@ public:
     /// Swap two graph spaces
     friend void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept;
 
+    ///@name Getters for entity-to-dof relation tables
+    ///@{
     const mfem::SparseMatrix& VertexToVDof() const { return vertex_vdof_; }
     const mfem::SparseMatrix& VertexToEDof() const { return vertex_edof_; }
     const mfem::SparseMatrix& EdgeToEDof() const { return edge_edof_; }
     const mfem::HypreParMatrix& EDofToTrueEDof() const { return *edof_trueedof_; }
     const mfem::SparseMatrix& EDofToBdrAtt() const { return edof_bdratt_; }
     const Graph& GetGraph() const { return graph_; }
-
+    ///@}
 private:
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix vertex_edof_;
