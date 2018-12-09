@@ -227,7 +227,7 @@ int main(int argc, char* argv[])
                                         std::move(partition.coarse_graph_));
     bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, coarse_graph_space, build_coarse_components);
+                                     coarse_graph_space, build_coarse_components, Pp, Pu);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;

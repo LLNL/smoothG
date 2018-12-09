@@ -72,40 +72,40 @@ public:
 
        The key method of the GraphCoarsen class.
 
-       The aggregate to coarse dofs relation tables Agg_cdof_vertex_ and
-       Agg_cdof_edge_ will be constructed only if the flag build_coarse_relation
-       is true.
-
-       @param[in] edge_trace edge-based traces on interfaces between aggregates.
+       @param[in] edge_traces edge-based traces on interfaces between aggregates.
 
        @param[in]  vertex_targets vertex-based traces on aggregates.
+
+       @param[in] graph_space coarse graph space
+
+       @param[in] build_coarse_components whether to build coarse M components
 
        @param[out] Pvertices the returned interpolator on vertex space.
 
        @param[out] Pedges the returned interpolator on edge space.
 
-       @param[in] build_coarse_components indicates whether to build components
-       for the coarse M matrix
     */
     void BuildInterpolation(
-        std::vector<mfem::DenseMatrix>& edge_trace,
+        std::vector<mfem::DenseMatrix>& edge_traces,
         std::vector<mfem::DenseMatrix>& vertex_targets,
-        mfem::SparseMatrix& Pvertices,
-        mfem::SparseMatrix& Pedges,
         const GraphSpace& coarse_space,
-        bool build_coarse_components);
+        bool build_coarse_components,
+        mfem::SparseMatrix& Pvertices,
+        mfem::SparseMatrix& Pedges);
 
     /**
-       @brief Get the coarse graph space
+       @brief Build coarse graph space (coarse entities to coarse dofs tables)
     */
     GraphSpace BuildCoarseSpace(
         const std::vector<mfem::DenseMatrix>& edge_traces,
         const std::vector<mfem::DenseMatrix>& vertex_targets,
         std::unique_ptr<Graph> coarse_graph);
 
+    /**
+       @brief Build coarse mixed system
+    */
     MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
                                   const mfem::SparseMatrix& Pvertices);
-
 private:
     /**
        Construct coarse entities to coarse dofs table in the case when each dof
@@ -191,7 +191,7 @@ private:
     */
     void BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                      std::vector<mfem::DenseMatrix>& vertex_target,
-                     const GraphSpace& coarse_graph_space,
+                     const GraphSpace& coarse_space,
                      mfem::SparseMatrix& Pedges);
 
     void BuildCoarseW(const mfem::SparseMatrix& Pvertices);

@@ -71,16 +71,19 @@ public:
                 std::unique_ptr<mfem::SparseMatrix> W,
                 mfem::Vector constant_rep);
 
-
+    /// Get the associated graph space
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
 
+    /// Get the associated graph
     const Graph& GetGraph() const { return graph_space_.GetGraph(); }
 
+    /// Get edge-based dofs to boundary attribute
     const mfem::SparseMatrix& EDofToBdrAtt() const
     {
         return GetGraphSpace().EDofToBdrAtt();
     }
 
+    /// Get constant representation (null vector of D)
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
 
     /**

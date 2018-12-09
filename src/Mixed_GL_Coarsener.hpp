@@ -52,9 +52,10 @@ public:
        \f$ P_u \f$ and \f$ P_\sigma \f$ whose columns represent the coarse
        degrees of freedom on the fine spaces.
 
-       This routine also uses matrix triple products to produce coarse
-       versions of the derivative matrix \f$ D \f$ and the weighting
-       matrix \f$ M \f$.
+       This routine also produces coarse versions of the derivative matrix
+       \f$ D \f$ and the weighting matrix \f$ M \f$.
+
+       @return coarse mixed system
     */
     MixedMatrix Coarsen(
         const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
@@ -63,7 +64,10 @@ public:
         return do_construct_coarse_subspace(mgL, partitioning);
     }
 
+    /// Get the interpolation matrix for edge space
     const mfem::SparseMatrix& GetPsigma() const;
+
+    /// Get the interpolation matrix for vertex space
     const mfem::SparseMatrix& GetPu() const;
 
     // Mixed form

@@ -196,12 +196,17 @@ public:
     /// Create solver on level
     void MakeSolver(int level);
 
-    /// coeff should have the size of the number of *vertices* in the fine graph
-    void RescaleFineCoefficient(const mfem::Vector& coeff);
-
     /// coeff should have the size of the number of *aggregates*
-    /// in the coarse graph
-    void RescaleCoarseCoefficient(const mfem::Vector& coeff);
+    /// in the coarse graph, or *vertices* in the finest graph
+    void RescaleCoefficient(int level, const mfem::Vector& coeff);
+
+    int GetNumLevels() const { return rhs_.size(); }
+
+    /// returns the number of vertices at a given level
+    int GetNumVertices(int level) const;
+
+    /// return vector with number of vertices on each level
+    std::vector<int> GetVertexSizes() const;
 
 protected:
 

@@ -31,6 +31,9 @@
    examples/sampler --visualization --kappa 0.001 --cartesian-factor 2
 */
 
+// previously used command line here for multilevel (vary kappa to see nice pictures)
+// ./sampler --visualization --kappa 0.001 --max-levels 3
+
 #include <fstream>
 #include <sstream>
 #include <random>
@@ -96,6 +99,18 @@ void Visualize(const mfem::Vector& sol,
     vis_v << "keys cjl\n";
 
     MPI_Barrier(pmesh->GetComm());
+};
+
+mfem::Vector InterpolateToFine(const Upscale& upscale, int level, const mfem::Vector& in)
+{
+    mfem::Vector vec1, vec2;
+    vec1 = in;
+    for (int k = level; k > 0; k--)
+    {
+        vec2 = upscale.Interpolate(k, vec1);
+        vec2.Swap(vec1);
+    }
+    return vec1;
 }
 
 int main(int argc, char* argv[])
@@ -240,136 +255,157 @@ int main(int argc, char* argv[])
     const double cell_volume = spe10problem.CellVolume(nDimensions);
     W_block *= cell_volume * kappa * kappa;
 
-    mfem::Vector mean_fine(ufespace.GetVSize());
-    mean_fine = 0.0;
-    mfem::Vector mean_upscaled(ufespace.GetVSize());
-    mean_upscaled = 0.0;
-    mfem::Vector m2_fine(ufespace.GetVSize());
-    m2_fine = 0.0;
-    mfem::Vector m2_upscaled(ufespace.GetVSize());
-    m2_upscaled = 0.0;
-
-    int total_coarse_iterations = 0;
-    int total_fine_iterations = 0;
-    double total_coarse_time = 0.0;
-    double total_fine_time = 0.0;
-
-    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
+    const int num_levels = upscale_param.max_levels;
+    std::vector<mfem::Vector> mean(num_levels);
+    std::vector<mfem::Vector> m2(num_levels);
+    std::vector<int> total_iterations(num_levels);
+    std::vector<double> total_time(num_levels);
+    std::vector<double> p_error(num_levels);
+    for (int level = 0; level < num_levels; ++level)
+    {
+        mean[level].SetSize(ufespace.GetVSize());
+        mean[level] = 0.0;
+        m2[level].SetSize(ufespace.GetVSize());
+        m2[level] = 0.0;
+        total_iterations[level] = 0;
+        total_time[level] = 0.0;
+    }
 
     // Create Upscaler
+    upscale_param.coarse_factor = 4;
+    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
     auto upscale = std::make_shared<Upscale>(
                        graph, upscale_param, &partitioning, &ess_attr, W_block);
 
     upscale->PrintInfo();
     upscale->ShowSetupTime();
 
-    const int num_aggs = partitioning.Max() + 1;
-    if (myid == 0)
-        std::cout << "Number of aggregates: " << num_aggs << std::endl;
-    PDESampler pdesampler(upscale, ufespace.GetVSize(), num_aggs, nDimensions,
-                          cell_volume, kappa, seed + myid);
+    PDESampler pdesampler(upscale, nDimensions, cell_volume, kappa, seed + myid);
+    // PDESampler pdesampler(upscale, ufespace.GetVSize(), num_aggs, nDimensions,
+    //                   cell_volume, kappa, seed + myid);
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)
     {
-        double count = static_cast<double>(sample) + 1.0;
-        pdesampler.NewSample();
-
-        auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-        auto sol_upscaled = upscale->Interpolate(1, sol_coarse);
-        for (int i = 0; i < sol_upscaled.Size(); ++i)
-            sol_upscaled(i) = std::log(sol_upscaled(i));
-        upscale->Orthogonalize(0, sol_upscaled);
-        int coarse_iterations = upscale->GetSolveIters(1);
-        total_coarse_iterations += coarse_iterations;
-        double coarse_time = upscale->GetSolveTime(1);
-        total_coarse_time += coarse_time;
-        for (int i = 0; i < mean_upscaled.Size(); ++i)
-        {
-            const double delta = (sol_upscaled(i) - mean_upscaled(i));
-            mean_upscaled(i) += delta / count;
-            const double delta2 = (sol_upscaled(i) - mean_upscaled(i));
-            m2_upscaled(i) += delta * delta2;
-        }
-
-        auto sol_fine = pdesampler.GetFineCoefficient();
-        for (int i = 0; i < sol_fine.Size(); ++i)
-            sol_fine(i) = std::log(sol_fine(i));
-        int fine_iterations = upscale->GetSolveIters(0);
-        total_fine_iterations += fine_iterations;
-        double fine_time = upscale->GetSolveTime(0);
-        total_fine_time += fine_time;
-        for (int i = 0; i < mean_fine.Size(); ++i)
-        {
-            const double delta = (sol_fine(i) - mean_fine(i));
-            mean_fine(i) += delta / count;
-            const double delta2 = (sol_fine(i) - mean_fine(i));
-            m2_fine(i) += delta * delta2;
-        }
-
-        double finest_p_error = CompareError(comm, sol_upscaled, sol_fine);
-        max_p_error = (max_p_error > finest_p_error) ? max_p_error : finest_p_error;
-
-        if (save_samples)
-        {
-            std::stringstream coarsename;
-            coarsename << "coarse_" << sample;
-            SaveFigure(sol_upscaled, ufespace, coarsename.str());
-            std::stringstream finename;
-            finename << "fine_" << sample;
-            SaveFigure(sol_fine, ufespace, finename.str());
-        }
-
         if (myid == 0)
         {
             std::cout << "  Sample " << sample << ":" << std::endl;
-            std::cout << "    fine: iterations: " << fine_iterations
-                      << ", time: " << fine_time << std::endl;
-            std::cout << "    coarse: iterations: " << coarse_iterations
-                      << ", time: " << coarse_time << std::endl;
-            std::cout << "    p_error: " << finest_p_error << std::endl;
+        }
+        double count = static_cast<double>(sample) + 1.0;
+        pdesampler.NewSample();
+
+        auto sol_fine = pdesampler.GetCoefficient(0);
+        for (int i = 0; i < sol_fine.Size(); ++i)
+            sol_fine(i) = std::log(sol_fine(i));
+        int iterations = upscale->GetSolveIters(0);
+        total_iterations[0] += iterations;
+        double time = upscale->GetSolveTime(0);
+        total_time[0] += time;
+        for (int i = 0; i < mean[0].Size(); ++i)
+        {
+            const double delta = (sol_fine(i) - mean[0](i));
+            mean[0](i) += delta / count;
+            const double delta2 = (sol_fine(i) - mean[0](i));
+            m2[0](i) += delta * delta2;
+        }
+        p_error[0] = 0.0;
+
+        for (int level = 1; level < num_levels; ++level)
+        {
+            auto sol_coarse = pdesampler.GetCoefficientForVisualization(level);
+            auto sol_upscaled = InterpolateToFine(*upscale, level, sol_coarse);
+            for (int i = 0; i < sol_upscaled.Size(); ++i)
+                sol_upscaled(i) = std::log(sol_upscaled(i));
+            upscale->Orthogonalize(0, sol_upscaled);
+            iterations = upscale->GetSolveIters(level);
+            total_iterations[level] += iterations;
+            time = upscale->GetSolveTime(level);
+            total_time[level] += time;
+            for (int i = 0; i < mean[level].Size(); ++i)
+            {
+                const double delta = (sol_upscaled(i) - mean[level](i));
+                mean[level](i) += delta / count;
+                const double delta2 = (sol_upscaled(i) - mean[level](i));
+                m2[level](i) += delta * delta2;
+            }
+            p_error[level] = CompareError(comm, sol_upscaled, sol_fine);
+            if (myid == 0)
+            {
+                std::cout << "    p_error_level_" << level << ": " << p_error[level] << std::endl;
+            }
+
+            if (level == 1)
+            {
+                max_p_error = (max_p_error > p_error[level]) ? max_p_error : p_error[level];
+            }
+
+            if (save_samples)
+            {
+                std::stringstream name;
+                name << "sample_l" << level << "_s" << sample;
+                if (level == 0)
+                {
+                    SaveFigure(sol_fine, ufespace, name.str());
+                }
+                else
+                {
+                    SaveFigure(sol_upscaled, ufespace, name.str());
+                }
+            }
         }
     }
 
     double count = static_cast<double>(num_samples);
     if (count > 1.1)
     {
-        m2_upscaled *= (1.0 / (count - 1.0));
-        m2_fine *= (1.0 / (count - 1.0));
+        for (int level = 0; level < num_levels; ++level)
+            m2[level] *= (1.0 / (count - 1.0));
     }
 
-    serialize["total-coarse-iterations"] = picojson::value((double) total_coarse_iterations);
-    serialize["total-fine-iterations"] = picojson::value((double) total_fine_iterations);
+    serialize["total-coarse-iterations"] = picojson::value((double) total_iterations[1]);
+    serialize["total-fine-iterations"] = picojson::value((double) total_iterations[0]);
     serialize["fine-mean-typical"] = picojson::value(
-                                         mean_fine[mean_fine.Size() / 2]);
+                                         mean[0][mean[0].Size() / 2]);
     serialize["fine-mean-l1"] = picojson::value(
-                                    mean_fine.Norml1() / static_cast<double>(mean_fine.Size()));
+                                    mean[0].Norml1() / static_cast<double>(mean[0].Size()));
     serialize["coarse-mean-l1"] = picojson::value(
-                                      mean_upscaled.Norml1() / static_cast<double>(mean_upscaled.Size()));
+                                      mean[1].Norml1() / static_cast<double>(mean[1].Size()));
     serialize["coarse-mean-typical"] = picojson::value(
-                                           mean_upscaled[mean_upscaled.Size() / 2]);
+                                           mean[1][mean[1].Size() / 2]);
     serialize["fine-variance-mean"] = picojson::value(
-                                          m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
+                                          m2[0].Sum() / static_cast<double>(m2[0].Size()));
     serialize["coarse-variance-mean"] = picojson::value(
-                                            m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
+                                            m2[1].Sum() / static_cast<double>(m2[1].Size()));
     serialize["max-p-error"] = picojson::value(max_p_error);
+    for (int i = 0; i < num_levels; ++i)
+    {
+        std::stringstream s;
+        s << "p-error-level-" << i;
+        serialize[s.str()] = picojson::value(p_error[i]);
+    }
 
     if (visualization)
     {
-        Visualize(mean_upscaled, ufespace, 1);
-        Visualize(mean_fine, ufespace, 0);
-        if (count > 1.1)
+        for (int level = 0; level < num_levels; ++level)
         {
-            Visualize(m2_upscaled, ufespace, 11);
-            Visualize(m2_fine, ufespace, 10);
+            Visualize(mean[level], ufespace, level);
+            if (count > 1.1)
+            {
+                Visualize(m2[level], ufespace, 10 + level);
+            }
         }
     }
     if (save_statistics)
     {
-        SaveFigure(mean_upscaled, ufespace, "coarse_mean");
-        SaveFigure(mean_fine, ufespace, "fine_mean");
-        SaveFigure(m2_upscaled, ufespace, "coarse_variance");
-        SaveFigure(m2_fine, ufespace, "fine_variance");
+        for (int level = 0; level < num_levels; ++level)
+        {
+            std::stringstream filename;
+            filename << "level_" << level << "_mean";
+            SaveFigure(mean[level], ufespace, filename.str());
+            filename.str("");
+            filename << "level_" << level << "_variance";
+            SaveFigure(m2[level], ufespace, filename.str());
+        }
     }
 
     if (myid == 0)
