@@ -29,7 +29,7 @@ import json
 import sys
 
 
-def json_parse_lines(lines, max_depth=10, max_height=6):
+def json_parse_lines(lines, max_depth=10, max_height=36):
     for index in range(-1, -max_depth, -1):
         for i in range(max_height):
             try:

@@ -644,7 +644,14 @@ def make_tests():
           "--kappa", "0.01",
           "--num-samples", "2"],
          {"fine-mean-l1": 0.54961180496539375,
-          "max-p-error": 0.39869063097389679}]
+          "p-error-level-1": 0.39869063097389679}]
+
+    tests["ml-sampler"] = \
+        [["./sampler",
+          "--num-samples", "1",
+          "--max-levels", "3"],
+         {"p-error-level-1": 0.20833920382939719,
+          "p-error-level-2": 0.40118441747952621}]
 
     if "tux" in platform.node():
         tests["veigenvector"] = \

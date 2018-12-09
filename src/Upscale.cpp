@@ -124,8 +124,12 @@ void Upscale::MakeFineSolver()
 
 void Upscale::MakeSolver(int level)
 {
-    // TODO: unify construction of solvers in all levels
-    assert(level > 0);
+    if (level == 0)
+    {
+        /// todo: better unification of multilevel MakeSolver()
+        MakeFineSolver();
+        return;
+    }
 
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
     mfem::Array<int> marker;
@@ -632,36 +636,41 @@ void Upscale::DumpDebug(const std::string& prefix) const
     }
 }
 
-/// this implementation is sloppy (also, @todo should be combined with
-/// RescaleCoarseCoefficient with int level argument)
-void Upscale::RescaleFineCoefficient(const mfem::Vector& coeff)
+void Upscale::RescaleCoefficient(int level, const mfem::Vector& coeff)
 {
-    GetMatrix(0).UpdateM(coeff);
     if (!param_.hybridization)
     {
-        MakeFineSolver();
+        GetMatrix(level).UpdateM(coeff);
+        MakeSolver(level);
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[0].get());
+        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[level].get());
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
 }
 
-void Upscale::RescaleCoarseCoefficient(const mfem::Vector& coeff)
+int Upscale::GetNumVertices(int level) const
 {
-    if (!param_.hybridization)
+    if (level == 0)
     {
-        GetMatrix(1).UpdateM(coeff);
-        MakeSolver(1);
+        return rhs_[level]->GetBlock(1).Size();
     }
     else
     {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(solver_[1].get());
-        assert(hybrid_solver);
-        hybrid_solver->UpdateAggScaling(coeff);
+        return coarsener_[level - 1]->get_num_aggregates();
     }
+}
+
+std::vector<int> Upscale::GetVertexSizes() const
+{
+    std::vector<int> out(GetNumLevels());
+    for (int level = 0; level < GetNumLevels(); ++level)
+    {
+        out[level] = GetNumVertices(level);
+    }
+    return out;
 }
 
 } // namespace smoothg
