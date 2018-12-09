@@ -55,8 +55,8 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
 
     graph_coarsen.BuildInterpolation(local_edge_traces,
                                      local_spectral_vertex_targets,
-                                     Pu_, Psigma_, coarse_space,
-                                     param_.coarse_components);
+                                     coarse_space, param_.coarse_components,
+                                     Pu_, Psigma_);
 
     return graph_coarsen.BuildCoarseMatrix(std::move(coarse_space), Pu_);
 }
