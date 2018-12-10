@@ -38,7 +38,7 @@ public:
     /**
        @brief Construct GraphSpace from Graph
 
-       Entity and dof are one-to-one.
+       Each entity has exactly one dof (as on the finest level).
 
        @param graph the graph on which the GraphSpace is based.
     */
