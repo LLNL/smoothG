@@ -79,18 +79,16 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    const int nbdr = nDimensions == 3 ? 6 : 4;
-    mfem::Array<int> ess_attr(nbdr);
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
     ess_attr = 1;
 
     const bool metis_agglomeration = true;
     const double proc_part_ubal = 2.0;
-    mfem::Array<int> coarseningFactor(3);
+    mfem::Array<int> junk(3);
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, proc_part_ubal, coarseningFactor);
-
+                              metis_agglomeration, proc_part_ubal, junk);
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
     // Construct "finite volume mass" matrix using mfem instead of parelag
@@ -126,58 +124,40 @@ int main(int argc, char* argv[])
     upscale.PrintInfo();
     upscale.ShowSetupTime();
 
-    for (int level = 1; level < upscale_param.max_levels; ++level)
+    auto CoarseNotEqualRAP = [&](const char* name)
     {
-        upscale.GetMatrix(level - 1).BuildM();
-        const mfem::SparseMatrix& Mfine(upscale.GetMatrix(level - 1).GetM());
-        mfem::SparseMatrix PsigmaT = smoothg::Transpose(upscale.GetPsigma(level - 1));
-        unique_ptr<mfem::SparseMatrix> Mcoarse_RAP( mfem::RAP(Mfine, PsigmaT) );
-
-        upscale.GetMatrix(level).BuildM();
-        const mfem::SparseMatrix& Mcoarse_smoothG = upscale.GetMatrix(level).GetM();
-
-        Mcoarse_RAP->Add(-1.0, Mcoarse_smoothG);
-        double diff_maxnorm_loc = Mcoarse_RAP->MaxNorm();
-        double diff_maxnorm;
-        MPI_Allreduce(&diff_maxnorm_loc, &diff_maxnorm, 1, MPI_DOUBLE, MPI_MAX, comm);
-
-        if (diff_maxnorm > 1e-8)
+        bool out = EXIT_SUCCESS;
+        const bool is_M = !(std::strcmp(name, "M"));
+        for (int level = 1; level < upscale_param.max_levels; ++level)
         {
-            if (myid == 0)
+            auto& fine_system = upscale.GetMatrix(level - 1);
+            auto& coarse_system = upscale.GetMatrix(level);
+            auto& fine_mat = is_M ? fine_system.GetM() : fine_system.GetD();
+
+            auto& P = upscale.GetPsigma(level - 1);
+            auto& R = is_M ? P : upscale.GetPu(level - 1);
+            unique_ptr<mfem::SparseMatrix> coarse_mat_RAP(mfem::RAP(R, fine_mat, P));
+
+            coarse_system.BuildM();
+            auto& coarse_mat_smoothG = is_M ? coarse_system.GetM() : coarse_system.GetD();
+
+            coarse_mat_RAP->Add(-1.0, coarse_mat_smoothG);
+            double diff_maxnorm_loc = coarse_mat_RAP->MaxNorm();
+            double diff_maxnorm;
+            MPI_Allreduce(&diff_maxnorm_loc, &diff_maxnorm, 1, MPI_DOUBLE, MPI_MAX, comm);
+
+            if (diff_maxnorm > 1e-8)
             {
-                std::cout << "Level " << level << ": || M_smoothG - M_RAP ||_inf = "
-                          << diff_maxnorm << "\n";
+                if (myid == 0)
+                {
+                    std::cout << "Level " << level << ": || " << name << "_smoothG - "
+                              << name << "_RAP ||_inf = " << diff_maxnorm << "\n";
+                }
+                out = EXIT_FAILURE;
             }
-
-            return EXIT_FAILURE;
         }
-    }
+        return out;
+    };
 
-    for (int level = 1; level < upscale_param.max_levels; ++level)
-    {
-        const mfem::SparseMatrix& Dfine(upscale.GetMatrix(level - 1).GetD());
-        const mfem::SparseMatrix& Psigma = upscale.GetPsigma(level - 1);
-        unique_ptr<mfem::SparseMatrix> Dcoarse_RAP(
-            mfem::RAP(upscale.GetPu(level - 1), Dfine, Psigma) );
-
-        const mfem::SparseMatrix& Dcoarse_smoothG = upscale.GetMatrix(level).GetD();
-
-        Dcoarse_RAP->Add(-1.0, Dcoarse_smoothG);
-        double diff_maxnorm_loc = Dcoarse_RAP->MaxNorm();
-        double diff_maxnorm;
-        MPI_Allreduce(&diff_maxnorm_loc, &diff_maxnorm, 1, MPI_DOUBLE, MPI_MAX, comm);
-
-        if (diff_maxnorm > 1e-8)
-        {
-            if (myid == 0)
-            {
-                std::cout << "Level " << level << ": || D_smoothG - D_RAP ||_inf = "
-                          << diff_maxnorm << "\n";
-            }
-
-            return EXIT_FAILURE;
-        }
-    }
-
-    return EXIT_SUCCESS;
+    return CoarseNotEqualRAP("M") + CoarseNotEqualRAP("D");
 }
