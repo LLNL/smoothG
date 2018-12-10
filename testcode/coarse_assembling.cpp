@@ -52,6 +52,9 @@ int main(int argc, char* argv[])
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
                    "Dimension of the physical space.");
+    int spe10_scale = 1;
+    args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
+                   "Scale of problem, 1=small, 5=full SPE10");
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
@@ -80,9 +83,8 @@ int main(int argc, char* argv[])
     mfem::Array<int> ess_attr(nbdr);
     ess_attr = 1;
 
-    const bool metis_agglomeration = false;
+    const bool metis_agglomeration = true;
     const double proc_part_ubal = 2.0;
-    const int spe10_scale = 5;
     mfem::Array<int> coarseningFactor(3);
 
     // Setting up finite volume discretization problem
@@ -90,13 +92,6 @@ int main(int argc, char* argv[])
                               metis_agglomeration, proc_part_ubal, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
-
-    if (myid == 0)
-    {
-        std::cout << pmesh->GetNEdges() << " fine edges, " <<
-                  pmesh->GetNFaces() << " fine faces, " <<
-                  pmesh->GetNE() << " fine elements\n";
-    }
 
     // Construct "finite volume mass" matrix using mfem instead of parelag
     mfem::Vector weight;
@@ -120,19 +115,13 @@ int main(int argc, char* argv[])
     auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
                               : pmesh->ElementToFaceTable();
     const mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
-
-    // Construct agglomerated topology based on METIS
-    mfem::Array<int> partitioning;
-    PartitionAAT(vertex_edge, partitioning, upscale_param.coarse_factor);
-
     const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
     Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
 
     // Create Upscaler
-    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
+    Upscale upscale(graph, upscale_param, nullptr, &ess_attr);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();

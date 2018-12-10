@@ -81,8 +81,8 @@ add_test(rescaling rescaling)
 add_test(parrescaling mpirun -np 2 ./rescaling)
 add_valgrind_test(vrescaling rescaling)
 
-add_test(coarse_assembling coarse_assembling -m 1 --perm ${SPE10_PERM})
-add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 1 --perm ${SPE10_PERM})
+add_test(coarse_assembling coarse_assembling -m 3 -t 1 --coarse-factor 10 --perm ${SPE10_PERM})
+add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 3 -t 1 --coarse-factor 10 --perm ${SPE10_PERM})
 
 add_test(lineargraphthree lineargraphthree --size 64 --partitions 32 --max-evects 1 --coarse-factor 2)
 
