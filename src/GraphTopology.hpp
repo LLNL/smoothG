@@ -67,17 +67,26 @@ public:
        @param coarsening_factor intended number of vertices in an aggregate
        @return coarse graph
     */
-    std::unique_ptr<Graph> Coarsen(int coarsening_factor);
+    std::shared_ptr<Graph> Coarsen(int coarsening_factor);
 
     /**
        @brief Coarsen fine graph
        @param partitioning partitioning vector for vertices
        @return coarse graph
     */
-    std::unique_ptr<Graph> Coarsen(const mfem::Array<int>& partitioning);
+    std::shared_ptr<Graph> Coarsen(const mfem::Array<int>& partitioning);
 
+    /// Getter for fine graph
     const Graph& FineGraph() const { return *fine_graph_; }
+
+    /// Getter for coarse graph
     const Graph& CoarseGraph() const { return *coarse_graph_; }
+
+    /// Setter for coarse graph
+    void SetCoarseGraph(std::shared_ptr<Graph> coarse_graph)
+    {
+        coarse_graph_ = coarse_graph;
+    }
 
     /// Return number of faces in aggregated graph
     unsigned int NumFaces() const { return face_edge_.NumRows(); }
@@ -109,11 +118,9 @@ public:
     mfem::SparseMatrix face_edge_;
     ///@}
 
-    /// pointer to coarse graph
-    const Graph* coarse_graph_;
-
 private:
     const Graph* fine_graph_;
+    std::shared_ptr<Graph> coarse_graph_;
     const mfem::HypreParMatrix* edge_trueedge_edge_;
 
     mfem::Array<HYPRE_Int> vertex_start_;
