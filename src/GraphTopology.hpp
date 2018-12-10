@@ -60,8 +60,6 @@ public:
     */
     GraphTopology(GraphTopology&& graph_topology) noexcept;
 
-    ~GraphTopology() {}
-
     /**
        @brief Coarsen fine graph
        @param coarsening_factor intended number of vertices in an aggregate
@@ -77,10 +75,18 @@ public:
     std::shared_ptr<Graph> Coarsen(const mfem::Array<int>& partitioning);
 
     /// Getter for fine graph
-    const Graph& FineGraph() const { return *fine_graph_; }
+    const Graph& FineGraph() const
+    {
+        assert(fine_graph_);
+        return *fine_graph_;
+    }
 
     /// Getter for coarse graph
-    const Graph& CoarseGraph() const { return *coarse_graph_; }
+    const Graph& CoarseGraph() const
+    {
+        assert(coarse_graph_);
+        return *coarse_graph_;
+    }
 
     /// Setter for coarse graph
     void SetCoarseGraph(std::shared_ptr<Graph> coarse_graph)
