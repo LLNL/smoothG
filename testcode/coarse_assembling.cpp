@@ -60,6 +60,7 @@ int main(int argc, char* argv[])
                    "Slice of SPE10 data to take for 2D run.");
 
     upscale_param.max_levels = 3;
+    upscale_param.coarse_factor = 10;
     upscale_param.hybridization = true;
 
     // Read upscaling options from command line into upscale_param object
@@ -83,7 +84,7 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     const bool metis_agglomeration = true;
-    const double proc_part_ubal = 2.0;
+    const double proc_part_ubal = 1.001;
     mfem::Array<int> junk(3);
 
     // Setting up finite volume discretization problem
