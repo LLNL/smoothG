@@ -52,7 +52,6 @@ public:
        All of this data is local to a single processor
 
        @param graph graph oject containing vertex edge relation
-       @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
     GraphTopology(const Graph& graph);
 
