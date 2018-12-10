@@ -451,8 +451,10 @@ void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
 {
     int i, j, gi, gj, s, t;
     double a;
+#ifdef MFEM_DEBUG
     const int height = mat.Height();
     const int width = mat.Width();
+#endif
 
     for (i = 0; i < rows.Size(); i++)
     {
