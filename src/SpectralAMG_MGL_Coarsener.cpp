@@ -40,7 +40,7 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
 {
     GraphTopology topology(mgL.GetGraph());
     std::shared_ptr<Graph> coarse_graph = partitioning ? topology.Coarsen(*partitioning)
-                                                       : topology.Coarsen(param_.coarse_factor);
+                                          : topology.Coarsen(param_.coarse_factor);
 
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;

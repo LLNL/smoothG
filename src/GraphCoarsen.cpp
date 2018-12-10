@@ -769,9 +769,9 @@ GraphSpace GraphCoarsen::BuildCoarseSpace(
     auto agg_coarse_vdof = BuildCoarseEntityToCoarseDof(vertex_targets);
     auto face_coarse_edof = BuildCoarseEntityToCoarseDof(edge_traces);
     auto agg_coarse_edof = BuildAggToCoarseEdgeDof(
-                coarse_graph, agg_coarse_vdof, face_coarse_edof);
+                               coarse_graph, agg_coarse_vdof, face_coarse_edof);
     auto coarse_edof_trueedof = BuildCoarseEdgeDofTruedof(
-                coarse_graph, face_coarse_edof, agg_coarse_edof.NumCols());
+                                    coarse_graph, face_coarse_edof, agg_coarse_edof.NumCols());
 
     return GraphSpace(std::move(coarse_graph), std::move(agg_coarse_vdof),
                       std::move(agg_coarse_edof), std::move(face_coarse_edof),
