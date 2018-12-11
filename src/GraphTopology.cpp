@@ -350,8 +350,8 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     // Construct "face to true face" table
     auto face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
-    coarse_graph_ = make_unique<Graph>(Agg_face, *face_trueface, mfem::Vector(),
-                                       face_bdratt.get());
+    coarse_graph_ = std::make_shared<Graph>(Agg_face, *face_trueface,
+                                            mfem::Vector(), face_bdratt.get());
     return coarse_graph_;
 }
 
