@@ -42,11 +42,11 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& w_block)
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
                          std::unique_ptr<mfem::SparseMatrix> D,
                          std::unique_ptr<mfem::SparseMatrix> W,
-                         mfem::Vector constant_rep)
+                         mfem::Vector constant_rep, mfem::SparseMatrix Ppw1)
     : graph_space_(std::move(graph_space)),
       D_(std::move(D)), W_(std::move(W)), edge_d_td_(&graph_space_.EDofToTrueEDof()),
       edge_td_d_(edge_d_td_->Transpose()), mbuilder_(std::move(mbuilder)),
-      constant_rep_(std::move(constant_rep))
+      constant_rep_(std::move(constant_rep)), Ppw1_(std::move(Ppw1))
 {
     GenerateRowStarts();
 }
@@ -105,6 +105,9 @@ void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
 
     constant_rep_.SetSize(D_->NumRows());
     constant_rep_ = 1.0;
+
+    mfem::SparseMatrix identity_v = SparseIdentity(GetGraph().NumVertices());
+    Ppw1_.Swap(identity_v);
 }
 
 void MixedMatrix::GenerateRowStarts()

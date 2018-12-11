@@ -105,6 +105,7 @@ public:
        @brief Build coarse mixed system
     */
     MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
+                                  const MixedMatrix& fine_mgL,
                                   const mfem::SparseMatrix& Pvertices);
 private:
     /**

@@ -60,7 +60,7 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
                                      coarse_space, param_.coarse_components,
                                      Pu_, Psigma_);
 
-    return graph_coarsen.BuildCoarseMatrix(std::move(coarse_space), Pu_);
+    return graph_coarsen.BuildCoarseMatrix(std::move(coarse_space), mgL, Pu_);
 }
 
 } // namespace smoothg
