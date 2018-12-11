@@ -97,11 +97,9 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
     W_block *= cell_volume_ * kappa * kappa;
 
-    graph_ = Graph(vertex_edge, edge_d_td, weight);
-    fvupscale_ = std::make_shared<Upscale>(
-                     graph_, param, &partitioning, &edge_boundary_att, &ess_attr,
-                     W_block);
-    fvupscale_->MakeFineSolver();
+    graph_ = Graph(vertex_edge, edge_d_td, weight, &edge_boundary_att);
+    fvupscale_ = std::make_shared<Upscale>(graph_, param, &partitioning,
+                                           &ess_attr, W_block);
 
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
     {

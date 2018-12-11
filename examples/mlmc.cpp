@@ -260,19 +260,18 @@ int main(int argc, char* argv[])
     unique_ptr<Graph> graph;
     if (elem_mass == false)
     {
-        graph = make_unique<Graph>(vertex_edge, *edge_d_td, weight);
+        graph = make_unique<Graph>(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
     }
     else
     {
-        graph = make_unique<Graph>(vertex_edge, *edge_d_td, local_weight);
+        graph = make_unique<Graph>(vertex_edge, *edge_d_td, local_weight, &edge_boundary_att);
     }
 
     // Create Upscaler and Solve
-    Upscale upscale(*graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr);
+    Upscale upscale(*graph, upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();
-    upscale.MakeFineSolver();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;

@@ -273,11 +273,10 @@ int main(int argc, char* argv[])
 
     // Create Upscaler
     upscale_param.coarse_factor = 4;
-    Graph graph(vertex_edge, *edge_d_td, weight);
+    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
     auto upscale = std::make_shared<Upscale>(
-                       graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr, W_block);
+                       graph, upscale_param, &partitioning, &ess_attr, W_block);
 
-    upscale->MakeFineSolver();
     upscale->PrintInfo();
     upscale->ShowSetupTime();
 

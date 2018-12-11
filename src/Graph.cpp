@@ -40,7 +40,8 @@ Graph::Graph(MPI_Comm comm,
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
-             const mfem::Vector& edge_weight_local)
+             const mfem::Vector& edge_weight_local,
+             const mfem::SparseMatrix* edge_bdratt)
     : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge))
 {
     if (edge_weight_local.Size() > 0)
@@ -54,19 +55,33 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
         FixSharedEdgeWeight(unit_edge_weight);
         SplitEdgeWeight(unit_edge_weight);
     }
+
+    if (edge_bdratt != nullptr)
+    {
+        mfem::SparseMatrix tmp(*edge_bdratt);
+        edge_bdratt_.Swap(tmp);
+    }
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
-             const std::vector<mfem::Vector>& split_edge_weight)
+             const std::vector<mfem::Vector>& split_edge_weight,
+             const mfem::SparseMatrix* edge_bdratt)
     : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge)),
       split_edge_weight_(split_edge_weight)
-{ }
+{
+    if (edge_bdratt != nullptr)
+    {
+        mfem::SparseMatrix tmp(*edge_bdratt);
+        edge_bdratt_.Swap(tmp);
+    }
+}
 
 Graph::Graph(const Graph& other) noexcept
     : vertex_edge_local_(other.vertex_edge_local_),
       edge_trueedge_(Copy(*other.edge_trueedge_)),
-      split_edge_weight_(other.split_edge_weight_)
+      split_edge_weight_(other.split_edge_weight_),
+      edge_bdratt_(other.edge_bdratt_)
 {
     other.vert_loc_to_glo_.Copy(vert_loc_to_glo_);
     other.edge_loc_to_glo_.Copy(edge_loc_to_glo_);
@@ -90,8 +105,9 @@ void swap(Graph& lhs, Graph& rhs) noexcept
     lhs.vertex_edge_local_.Swap(rhs.vertex_edge_local_);
     std::swap(lhs.split_edge_weight_, rhs.split_edge_weight_);
     std::swap(lhs.edge_trueedge_, rhs.edge_trueedge_);
-    std::swap(lhs.vertex_trueedge_, rhs.vertex_trueedge_);
+    lhs.edge_bdratt_.Swap(rhs.edge_bdratt_);
 
+    std::swap(lhs.vertex_trueedge_, rhs.vertex_trueedge_);
     mfem::Swap(lhs.vert_loc_to_glo_, rhs.vert_loc_to_glo_);
     mfem::Swap(lhs.edge_loc_to_glo_, rhs.edge_loc_to_glo_);
     mfem::Swap(lhs.vertex_starts_, rhs.vertex_starts_);

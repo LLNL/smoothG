@@ -52,38 +52,52 @@ public:
        All of this data is local to a single processor
 
        @param graph graph oject containing vertex edge relation
-       @param edge_boundaryattr boundary attributes for edges with boundary conditions
     */
-    GraphTopology(const Graph& graph,
-                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
+    GraphTopology(const Graph& graph);
 
     /**
        @brief Move constructor
     */
     GraphTopology(GraphTopology&& graph_topology) noexcept;
 
-    ~GraphTopology() {}
-
     /**
        @brief Coarsen fine graph
        @param coarsening_factor intended number of vertices in an aggregate
        @return coarse graph
     */
-    Graph Coarsen(int coarsening_factor);
+    std::shared_ptr<Graph> Coarsen(int coarsening_factor);
 
     /**
        @brief Coarsen fine graph
        @param partitioning partitioning vector for vertices
        @return coarse graph
     */
-    Graph Coarsen(const mfem::Array<int>& partitioning);
+    std::shared_ptr<Graph> Coarsen(const mfem::Array<int>& partitioning);
 
-    const Graph& FineGraph() const { return *fine_graph_; }
+    /// Getter for fine graph
+    const Graph& FineGraph() const
+    {
+        assert(fine_graph_);
+        return *fine_graph_;
+    }
+
+    /// Getter for coarse graph
+    const Graph& CoarseGraph() const
+    {
+        assert(coarse_graph_);
+        return *coarse_graph_;
+    }
+
+    /// Setter for coarse graph
+    void SetCoarseGraph(std::shared_ptr<Graph> coarse_graph)
+    {
+        coarse_graph_ = coarse_graph;
+    }
 
     /// Return number of faces in aggregated graph
-    unsigned int NumFaces() const { return Agg_face_.Width(); }
+    unsigned int NumFaces() const { return face_edge_.NumRows(); }
     /// Return number of aggregates in coarse graph
-    unsigned int NumAggs() const { return Agg_face_.Height(); }
+    unsigned int NumAggs() const { return Agg_vertex_.NumRows(); }
 
     ///@name Getters for row/column partitions of tables
     ///@{
@@ -97,11 +111,6 @@ public:
     const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
     ///@}
 
-    ///@name entity to true_entity tables for edge and face
-    ///@{
-    std::unique_ptr<mfem::HypreParMatrix> face_trueface_;
-    ///@}
-
     ///@name entity_trueentity_entity tables, which connect dofs across processors that share a true entity
     ///@{
     std::unique_ptr<mfem::HypreParMatrix> face_trueface_face_;
@@ -112,18 +121,12 @@ public:
     mfem::SparseMatrix Agg_edge_;
     mfem::SparseMatrix Agg_vertex_;
     mfem::SparseMatrix face_Agg_;
-    mfem::SparseMatrix Agg_face_;
     mfem::SparseMatrix face_edge_;
     ///@}
 
-    /// "face" to boundary attribute table
-    std::unique_ptr<mfem::SparseMatrix> face_bdratt_;
-
 private:
-
     const Graph* fine_graph_;
-
-    const mfem::SparseMatrix* edge_boundaryattr_;
+    std::shared_ptr<Graph> coarse_graph_;
     const mfem::HypreParMatrix* edge_trueedge_edge_;
 
     mfem::Array<HYPRE_Int> vertex_start_;
@@ -131,10 +134,6 @@ private:
     mfem::Array<HYPRE_Int> aggregate_start_;
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology
-
-std::vector<GraphTopology> MultilevelGraphTopology(
-    const Graph& graph, const mfem::SparseMatrix* edge_boundaryattr,
-    int num_levels, int coarsening_factor);
 
 } // namespace smoothg
 

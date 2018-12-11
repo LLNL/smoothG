@@ -1248,7 +1248,10 @@ unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat)
 {
     // temporary work-around suggested by Veselin
     // TODO: make a direct copy function for HypreParMatrix
-    return unique_ptr<mfem::HypreParMatrix>(mfem::Add(1.0, mat, 0.0, mat));
+    unique_ptr<mfem::HypreParMatrix> copy(mfem::Add(1.0, mat, 0.0, mat));
+    copy->CopyRowStarts();
+    copy->CopyColStarts();
+    return copy;
 }
 
 } // namespace smoothg

@@ -81,10 +81,13 @@ public:
        @param edge_weight_local edge weight of local graph. weights of shared
               edges are assumed to be split already. If not provided, the graph
               is assumed to have uniform unit weight.
+       @param edge_bdratt local edge to boundary attribute relation. If not
+              provided, the graph is assumed to have no boundary
     */
     Graph(const mfem::SparseMatrix& vertex_edge_local,
           const mfem::HypreParMatrix& edge_trueedge,
-          const mfem::Vector& edge_weight_local = mfem::Vector());
+          const mfem::Vector& edge_weight_local = mfem::Vector(),
+          const mfem::SparseMatrix* edge_bdratt = nullptr);
 
     /**
        @brief Construct a distributed graph by copying data from input
@@ -92,10 +95,13 @@ public:
        @param vertex_edge_local local vertex to edge relation
        @param edge_trueedge edge to true edge relation
        @param split_edge_weight_ array of split edge weights
+       @param edge_bdratt local edge to boundary attribute relation. If not
+              provided, the graph is assumed to have no boundary
     */
     Graph(const mfem::SparseMatrix& vertex_edge_local,
           const mfem::HypreParMatrix& edge_trueedge,
-          const std::vector<mfem::Vector>& split_edge_weight);
+          const std::vector<mfem::Vector>& split_edge_weight,
+          const mfem::SparseMatrix* edge_bdratt = nullptr);
 
     /// Default constructor
     Graph() = default;
@@ -120,24 +126,24 @@ public:
 
     ///@name Getters for tables/arrays that describe parallel graph
     ///@{
-    const mfem::SparseMatrix& GetVertexToEdge() const
+    const mfem::SparseMatrix& VertexToEdge() const
     {
         return vertex_edge_local_;
     }
 
-    const std::vector<mfem::Vector>& GetEdgeWeight() const
-    {
-        return split_edge_weight_;
-    }
-
-    const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
+    const mfem::HypreParMatrix& EdgeToTrueEdge() const
     {
         return *edge_trueedge_;
     }
 
-    const mfem::Array<int>& GetVertexStarts() const
+    const std::vector<mfem::Vector>& EdgeWeight() const
     {
-        return vertex_starts_;
+        return split_edge_weight_;
+    }
+
+    const mfem::SparseMatrix& EdgeToBdrAtt() const
+    {
+        return edge_bdratt_;
     }
 
     const int NumVertices() const
@@ -152,6 +158,9 @@ public:
 
     MPI_Comm GetComm() const { return edge_trueedge_->GetComm(); }
     ///@}
+
+    /// Indicate if the graph has "boundary"
+    bool HasBoundary() const { return edge_bdratt_.Width() > 0; }
 private:
     void Distribute(MPI_Comm comm,
                     const mfem::SparseMatrix& vertex_edge_global,
@@ -180,6 +189,7 @@ private:
     mfem::SparseMatrix vertex_edge_local_;
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_;
     std::vector<mfem::Vector> split_edge_weight_;
+    mfem::SparseMatrix edge_bdratt_; // edge to "boundary attribute"
 
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
     mfem::Array<int> vert_loc_to_glo_;

@@ -83,6 +83,8 @@ public:
 
     GraphTopology graph_topology_;
 
+    shared_ptr<Graph> coarse_graph_;
+
     mfem::SparseMatrix face_identity_;
 };
 
@@ -150,14 +152,15 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     auto face_trueface = make_unique<mfem::HypreParMatrix>(
                              MPI_COMM_WORLD, partitions - 1, graph_topology_.GetFaceStart(), &face_identity_);
 
+    coarse_graph_ = make_shared<Graph>(Agg_face, *face_trueface);
+    graph_topology_.SetCoarseGraph(coarse_graph_);
+
     graph_topology_.face_trueface_face_ = smoothg::AAt(*face_trueface);
 
-    graph_topology_.Agg_face_.Swap(Agg_face);
     graph_topology_.Agg_vertex_.Swap(Agg_vertex);
     graph_topology_.Agg_edge_.Swap(Agg_edge);
     graph_topology_.face_edge_.Swap(face_edge);
     graph_topology_.face_Agg_.Swap(face_Agg);
-    std::swap(graph_topology_.face_trueface_, face_trueface);
 }
 
 int main(int argc, char* argv[])
@@ -175,11 +178,9 @@ int main(int argc, char* argv[])
     int global_size = 4;
     args.AddOption(&global_size, "-s", "--size", "Size of fine linear graph.");
     const int num_partitions = 2;
-    const int max_evects = 1;
-    const double spect_tol = 0.0;
-    const bool dual_target = false;
-    const bool scaled_dual = false;
-    const bool energy_dual = false;
+    UpscaleParameters param;
+    param.max_evects = 1;
+    param.spect_tol = 0.0;
     const double test_tol = 1.e-8;
     args.Parse();
     if (myid == 0)
@@ -195,15 +196,8 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LocalMixedGraphSpectralTargets localtargets(
-        spect_tol, max_evects, dual_target, scaled_dual, energy_dual,
-        mgL.GetM(), mgL.GetD(), partition.graph_topology_);
-
-    mfem::Vector constant_rep(mgL.GetD().Height());
-    constant_rep = 1.0;
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets,
-                         constant_rep);
-
+    LocalMixedGraphSpectralTargets localtargets(mgL, partition.graph_topology_, param);
+    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
         throw std::logic_error(
@@ -238,12 +232,14 @@ int main(int argc, char* argv[])
 
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
-    mfem::SparseMatrix face_dof; // not used in this example
 
     GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
-    ElementMBuilder builder;
+    GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
+                                        local_edge_traces, local_spectral_vertex_targets,
+                                        std::move(*partition.coarse_graph_));
+    bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     Pp, Pu, face_dof, builder, constant_rep);
+                                     coarse_graph_space, build_coarse_components, Pp, Pu);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;

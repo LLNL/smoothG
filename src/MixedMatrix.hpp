@@ -24,7 +24,7 @@
 #include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
-#include "Graph.hpp"
+#include "GraphSpace.hpp"
 #include "GraphCoarsenBuilder.hpp"
 
 namespace smoothg
@@ -54,9 +54,8 @@ public:
        @param graph the graph on which the graph Laplacian is based
        @param w_block the matrix W. If not provided, it is assumed to be zero
     */
-    MixedMatrix(const Graph& graph,
-                const mfem::SparseMatrix& w_block = SparseIdentity(0),
-                const mfem::SparseMatrix* edge_bdratt = nullptr);
+    MixedMatrix(Graph graph,
+                const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
     /**
        @brief Construct a mixed system directly from building blocks.
@@ -66,16 +65,26 @@ public:
        @param W the matrix W. If it is nullptr, it is assumed to be zero
        @param edge_d_td edge dof to true edge dof table
     */
-    MixedMatrix(const Graph& graph,
+    MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
-                const mfem::HypreParMatrix& edge_d_td,
-                const mfem::SparseMatrix* edge_bdratt);
+                mfem::Vector constant_rep);
 
-    const Graph& GetGraph() const { return *graph_; }
+    /// Get the associated graph space
+    const GraphSpace& GetGraphSpace() const { return graph_space_; }
 
-    const mfem::SparseMatrix* GetEdgeBdrAtt() const { return edge_bdratt_; }
+    /// Get the associated graph
+    const Graph& GetGraph() const { return graph_space_.GetGraph(); }
+
+    /// Get edge-based dofs to boundary attribute
+    const mfem::SparseMatrix& EDofToBdrAtt() const
+    {
+        return GetGraphSpace().EDofToBdrAtt();
+    }
+
+    /// Get constant representation (null vector of D)
+    const mfem::Vector& GetConstantRep() const { return constant_rep_; }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -334,6 +343,8 @@ private:
 
     void GenerateRowStarts();
 
+    GraphSpace graph_space_;
+
     std::unique_ptr<mfem::SparseMatrix> M_;
     std::unique_ptr<mfem::SparseMatrix> D_;
     std::unique_ptr<mfem::SparseMatrix> W_;
@@ -353,8 +364,7 @@ private:
 
     std::unique_ptr<MBuilder> mbuilder_;
 
-    const Graph* graph_;
-    const mfem::SparseMatrix* edge_bdratt_;
+    mfem::Vector constant_rep_;
 }; // class MixedMatrix
 
 } // namespace smoothg

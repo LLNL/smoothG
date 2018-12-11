@@ -39,12 +39,8 @@ namespace smoothg
 class Mixed_GL_Coarsener
 {
 public:
-    /**
-       @brief Build a coarsener from the graph Laplacian and the
-       agglomerated topology.
-    */
-    Mixed_GL_Coarsener(const MixedMatrix& mgL)
-        : mgL_(mgL), graph_topology_(mgL.GetGraph(), mgL.GetEdgeBdrAtt()) {}
+    /// Default constructor
+    Mixed_GL_Coarsener() = default;
 
     virtual ~Mixed_GL_Coarsener() {}
 
@@ -56,18 +52,22 @@ public:
        \f$ P_u \f$ and \f$ P_\sigma \f$ whose columns represent the coarse
        degrees of freedom on the fine spaces.
 
-       This routine also uses matrix triple products to produce coarse
-       versions of the derivative matrix \f$ D \f$ and the weighting
-       matrix \f$ M \f$.
+       This routine also produces coarse versions of the derivative matrix
+       \f$ D \f$ and the weighting matrix \f$ M \f$.
+
+       @return coarse mixed system
     */
-    void construct_coarse_subspace(const mfem::Vector& constant_rep)
+    MixedMatrix Coarsen(
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
     {
-        graph_coarsen_ = make_unique<GraphCoarsen>(mgL_, graph_topology_);
-        do_construct_coarse_subspace(constant_rep);
         is_coarse_subspace_constructed_ = true;
+        return do_construct_coarse_subspace(mgL, partitioning);
     }
 
+    /// Get the interpolation matrix for edge space
     const mfem::SparseMatrix& GetPsigma() const;
+
+    /// Get the interpolation matrix for vertex space
     const mfem::SparseMatrix& GetPu() const;
 
     // Mixed form
@@ -78,42 +78,9 @@ public:
     void Restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
     void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
-    const mfem::SparseMatrix& construct_Agg_cvertexdof_table() const;
-    const mfem::SparseMatrix& construct_face_facedof_table() const;
-
-    const mfem::HypreParMatrix& get_face_dof_truedof_table() const;
-
-    /**
-       @brief Get the coarse M matrix
-    */
-    std::unique_ptr<CoarseMBuilder> GetCoarseMBuilder()
-    {
-        return std::move(coarse_m_builder_);
-    }
-
-    /**
-       @brief Get the coarse D matrix
-    */
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseD()
-    {
-        return std::move(coarse_D_);
-    }
-
-    /**
-       @brief Get the coarse D matrix
-    */
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseW()
-    {
-        return std::move(coarse_W_);
-    }
-
-    /**
-       @brief Creates the matrix from coarse M, D, W
-    */
-    MixedMatrix GetCoarse();
-
 private:
-    virtual void do_construct_coarse_subspace(const mfem::Vector& constant_rep) = 0;
+    virtual MixedMatrix do_construct_coarse_subspace(
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr) = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;
@@ -126,26 +93,8 @@ private:
     }
 
 protected:
-    const MixedMatrix& mgL_;
-    GraphTopology graph_topology_;
-    std::unique_ptr<GraphCoarsen> graph_coarsen_;
-
-    mfem::SparseMatrix face_facedof_table_;
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;
-
-    mutable std::unique_ptr<mfem::HypreParMatrix> face_dof_truedof_table_;
-
-    /// Builder for coarse M operator
-    std::unique_ptr<CoarseMBuilder> coarse_m_builder_;
-
-    /// Coarse D operator
-    std::unique_ptr<mfem::SparseMatrix> coarse_D_;
-
-    /// Coarse W operator
-    std::unique_ptr<mfem::SparseMatrix> coarse_W_;
-
-    Graph coarse_graph_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

@@ -39,25 +39,23 @@ public:
     /**
        @brief Build a coarsener based on spectral AMG.
 
-       @param mgL the actual mixed graph Laplacian
-       @param gt the topology describing how vertices and edges are agglomerated
        @param param upscaling parameters
     */
-    SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                              const UpscaleParameters& param = UpscaleParameters(),
-                              const mfem::Array<int>* partitioning = nullptr);
+    SpectralAMG_MGL_Coarsener(const UpscaleParameters& param = UpscaleParameters());
 
 private:
     /**
        @brief Coarsen the graph, constructing projectors, coarse operators, etc.
 
-       @param constant_rep representation of constant on finer level
+       @param mgL building blocks of the mixed system
+       @param partitioning partitioning vector of vertices. If not provided,
+              it will be generated based on param_.coarse_factor
     */
-    void do_construct_coarse_subspace(const mfem::Vector& constant_rep);
+    MixedMatrix do_construct_coarse_subspace(
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr);
 
 private:
     const UpscaleParameters& param_;
-    const mfem::Array<int>* partitioning_;
 }; // SpectralAMG_MGL_Coarsener
 
 } // namespace smoothg

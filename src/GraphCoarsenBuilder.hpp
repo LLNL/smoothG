@@ -232,6 +232,8 @@ private:
                            const mfem::DenseMatrix& P);
 
     const GraphTopology& topology_;
+    mfem::SparseMatrix Agg_face_ref_;
+    mfem::SparseMatrix face_Agg_;
 
     int total_num_traces_;
     int ncoarse_vertexdofs_;
@@ -249,32 +251,6 @@ private:
     std::vector<mfem::DenseMatrix> comp_E_E_;
 
     bool components_built_;
-};
-
-/**
-   @brief Used to help build the coarse dof-edge relation table.
-*/
-class Agg_cdof_edge_Builder
-{
-public:
-    Agg_cdof_edge_Builder(std::vector<mfem::DenseMatrix>& edge_traces,
-                          std::vector<mfem::DenseMatrix>& vertex_target,
-                          const mfem::SparseMatrix& Agg_face,
-                          bool build_coarse_relation);
-    ~Agg_cdof_edge_Builder() {}
-
-    /// Register the bubble size
-    void Register(int k);
-
-    /// Get the resulting coarse relation table
-    std::unique_ptr<mfem::SparseMatrix> GetAgg_cdof_edge(int rows, int cols);
-
-private:
-    int* Agg_dof_i_;
-    int* Agg_dof_j_;
-    double* Agg_dof_d_;
-    int Agg_dof_nnz_;
-    bool build_coarse_relation_;
 };
 
 }

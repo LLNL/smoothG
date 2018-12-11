@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> partitioning;
     if (metis_agglomeration || generate_graph || num_procs > 1)
     {
-        MetisGraphPart(graph.GetVertexToEdge(), partitioning,
+        MetisGraphPart(graph.VertexToEdge(), partitioning,
                        num_partitions / num_procs, isolate);
     }
     else

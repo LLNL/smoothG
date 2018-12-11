@@ -55,7 +55,6 @@ public:
     Upscale(const Graph& graph,
             const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
-            const mfem::SparseMatrix* edge_boundary_att = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
@@ -136,7 +135,10 @@ public:
     /// Get a vector of coefficients that represents a constant vector on
     /// the graph; that is, return a vector v such that P_{vertices} v = 1
     /// GetConstantRep(0) will normally return a vector of all 1s
-    const mfem::Vector& GetConstantRep(unsigned int level) const;
+    const mfem::Vector& GetConstantRep(unsigned int level) const
+    {
+        return GetMatrix(level).GetConstantRep();
+    }
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
@@ -194,9 +196,7 @@ public:
         return coarsener_[level]->GetPu();
     }
 
-    /// Create Fine Level Solver
-    void MakeFineSolver();
-
+    /// Create solver on level
     void MakeSolver(int level);
 
     /// coeff should have the size of the number of *aggregates*
@@ -236,10 +236,6 @@ protected:
     std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
-    /// why exactly is this mutable?
-    mutable std::vector<mfem::Vector> constant_rep_;
-
-    const mfem::SparseMatrix* edge_boundary_att_;
     const mfem::Array<int>* ess_attr_;
 
     const UpscaleParameters& param_;

@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
     const Graph graph(comm, ReadVertexEdge(ve_filename));
     {
         mfem::Array<int> partitioning(graph.NumVertices());
-        PartitionAAT(graph.GetVertexToEdge(), partitioning, param.coarse_factor);
+        PartitionAAT(graph.VertexToEdge(), partitioning, param.coarse_factor);
 
         const auto upscale = Upscale(graph, param, &partitioning);
 
