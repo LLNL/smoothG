@@ -93,7 +93,6 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     edge_trueedge_edge_ = graph_topology.edge_trueedge_edge_;
 }
 
-
 std::shared_ptr<Graph> GraphTopology::Coarsen(int coarsening_factor)
 {
     mfem::Array<int> partitioning;

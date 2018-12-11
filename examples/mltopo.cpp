@@ -115,8 +115,6 @@ std::vector<GraphTopology> MultilevelGraphTopology(
 
     std::vector<std::shared_ptr<Graph>> graphs;
     graphs.reserve(num_levels);
-
-    // Construct finest level graph topology
     graphs.push_back(std::make_shared<Graph>(graph));
 
     // Construct coarser levels graph topology by recursion
