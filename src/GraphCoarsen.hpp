@@ -99,7 +99,7 @@ public:
     GraphSpace BuildCoarseSpace(
         const std::vector<mfem::DenseMatrix>& edge_traces,
         const std::vector<mfem::DenseMatrix>& vertex_targets,
-        std::unique_ptr<Graph> coarse_graph);
+        Graph coarse_graph);
 
     /**
        @brief Build coarse mixed system
@@ -117,12 +117,15 @@ private:
 
     /// Construct aggregate to coarse edge dofs relation table
     mfem::SparseMatrix BuildAggToCoarseEdgeDof(
+        const Graph& coarse_graph,
         const mfem::SparseMatrix& agg_coarse_vdof,
         const mfem::SparseMatrix& face_coarse_edof);
 
     /// Construct edge coarse dof to true dof relation table
     std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
-        const mfem::SparseMatrix& face_cdof, int num_coarse_edofs);
+        const Graph& coarse_graph,
+        const mfem::SparseMatrix& face_cdof,
+        int num_coarse_edofs);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices(

@@ -606,15 +606,14 @@ void GraphCoarsen::BuildInterpolation(
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
-    const mfem::SparseMatrix& face_cdof, int num_coarse_edofs)
+    const Graph& coarse_graph, const mfem::SparseMatrix& face_cdof, int num_coarse_edofs)
 {
     const int ncdofs = num_coarse_edofs;
     const int nfaces = face_cdof.Height();
 
     // count edge coarse true dofs (if the dof is a bubble or on a true face)
     mfem::SparseMatrix face_d_td_diag;
-    const mfem::HypreParMatrix& face_trueface_ =
-        topology_.CoarseGraph().EdgeToTrueEdge();
+    const mfem::HypreParMatrix& face_trueface_ = coarse_graph.EdgeToTrueEdge();
     mfem::HypreParMatrix& face_trueface_face_ =
         const_cast<mfem::HypreParMatrix&>(*topology_.face_trueface_face_);
     face_trueface_.GetDiag(face_d_td_diag);
@@ -694,11 +693,12 @@ unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
+    const Graph& coarse_graph,
     const mfem::SparseMatrix& agg_coarse_vdof,
     const mfem::SparseMatrix& face_coarse_edof)
 {
     const unsigned int num_aggs = agg_coarse_vdof.NumRows();
-    const mfem::SparseMatrix& agg_face = topology_.CoarseGraph().VertexToEdge();
+    const mfem::SparseMatrix& agg_face = coarse_graph.VertexToEdge();
 
     int* I = new int[num_aggs + 1];
     I[0] = 0;
@@ -758,15 +758,16 @@ mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
 GraphSpace GraphCoarsen::BuildCoarseSpace(
     const std::vector<mfem::DenseMatrix>& edge_traces,
     const std::vector<mfem::DenseMatrix>& vertex_targets,
-    unique_ptr<Graph> coarse_graph)
+    Graph coarse_graph)
 {
     auto agg_coarse_vdof = BuildCoarseEntityToCoarseDof(vertex_targets);
     auto face_coarse_edof = BuildCoarseEntityToCoarseDof(edge_traces);
-    auto agg_coarse_edof = BuildAggToCoarseEdgeDof(agg_coarse_vdof, face_coarse_edof);
-    auto coarse_edof_trueedof =
-        BuildCoarseEdgeDofTruedof(face_coarse_edof, agg_coarse_edof.NumCols());
+    auto agg_coarse_edof = BuildAggToCoarseEdgeDof(
+                               coarse_graph, agg_coarse_vdof, face_coarse_edof);
+    auto coarse_edof_trueedof = BuildCoarseEdgeDofTruedof(
+                                    coarse_graph, face_coarse_edof, agg_coarse_edof.NumCols());
 
-    return GraphSpace(std::move(*coarse_graph), std::move(agg_coarse_vdof),
+    return GraphSpace(std::move(coarse_graph), std::move(agg_coarse_vdof),
                       std::move(agg_coarse_edof), std::move(face_coarse_edof),
                       std::move(coarse_edof_trueedof));
 }

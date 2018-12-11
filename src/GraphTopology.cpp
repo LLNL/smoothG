@@ -90,15 +90,14 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
     edge_trueedge_edge_ = graph_topology.edge_trueedge_edge_;
 }
 
-
-std::unique_ptr<Graph> GraphTopology::Coarsen(int coarsening_factor)
+std::shared_ptr<Graph> GraphTopology::Coarsen(int coarsening_factor)
 {
     mfem::Array<int> partitioning;
     PartitionAAT(fine_graph_->VertexToEdge(), partitioning, coarsening_factor);
     return Coarsen(partitioning);
 }
 
-std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
+std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioning)
 {
     MPI_Comm comm = fine_graph_->GetComm();
 
@@ -333,10 +332,9 @@ std::unique_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     // Construct "face to true face" table
     auto face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
-    auto coarse_graph = make_unique<Graph>(
-                            Agg_face, *face_trueface, mfem::Vector(), face_bdratt.get());
-    coarse_graph_ = coarse_graph.get();
-    return coarse_graph;
+    coarse_graph_ = std::make_shared<Graph>(Agg_face, *face_trueface,
+                                            mfem::Vector(), face_bdratt.get());
+    return coarse_graph_;
 }
 
 } // namespace smoothg

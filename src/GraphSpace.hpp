@@ -38,14 +38,14 @@ public:
     /**
        @brief Construct GraphSpace from Graph
 
-       Entity and dof are one-to-one.
+       Each entity has exactly one dof (as on the finest level).
 
        @param graph the graph on which the GraphSpace is based.
     */
     GraphSpace(Graph graph);
 
     /**
-       @brief Constructor that essentially collect all members from input
+       @brief Constructor that essentially collects all members from input
     */
     GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
                mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,

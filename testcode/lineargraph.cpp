@@ -83,7 +83,7 @@ public:
 
     GraphTopology graph_topology_;
 
-    unique_ptr<Graph> coarse_graph_;
+    shared_ptr<Graph> coarse_graph_;
 
     mfem::SparseMatrix face_identity_;
 };
@@ -141,7 +141,7 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
                                        graph_topology_.GetFaceStarts(), &face_identity_);
 
     coarse_graph_ = make_unique<Graph>(Agg_face, face_trueface);
-    graph_topology_.coarse_graph_ = coarse_graph_.get();
+    graph_topology_.SetCoarseGraph(coarse_graph_);
 
     graph_topology_.face_trueface_face_ = smoothg::AAt(face_trueface);
 
@@ -224,7 +224,7 @@ int main(int argc, char* argv[])
     GraphCoarsen graph_coarsen(mgL, dof_agg);
     GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
                                         local_edge_traces, local_spectral_vertex_targets,
-                                        std::move(partition.coarse_graph_));
+                                        std::move(*partition.coarse_graph_));
     bool build_coarse_components = false;
     graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
                                      coarse_graph_space, build_coarse_components, Pp, Pu);
