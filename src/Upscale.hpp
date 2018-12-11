@@ -140,6 +140,8 @@ public:
         return GetMatrix(level).GetConstantRep();
     }
 
+    mfem::Vector PWConstProject(int level, const mfem::Vector& x) const;
+
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
 

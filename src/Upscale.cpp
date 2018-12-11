@@ -355,6 +355,13 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
     return mixed_laplacians_[level];
 }
 
+mfem::Vector Upscale::PWConstProject(int level, const mfem::Vector& x) const
+{
+    mfem::Vector out(GetMatrix(level).GetGraph().NumVertices());
+    GetMatrix(level).GetPWConstProj().Mult(x, out);
+    return out;
+}
+
 void Upscale::PrintInfo(std::ostream& out) const
 {
     int num_procs;
