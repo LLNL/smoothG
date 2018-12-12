@@ -649,9 +649,20 @@ def make_tests():
     tests["ml-sampler"] = \
         [["./sampler",
           "--num-samples", "1",
-          "--max-levels", "3"],
+          "--max-levels", "3",
+          "--spect-tol", "1.0",
+          "--max-evects", "1"],
          {"p-error-level-1": 0.20833920382939719,
           "p-error-level-2": 0.40118441747952621}]
+
+    tests["ml-sampler4"] = \
+        [["./sampler",
+          "--num-samples", "1",
+          "--max-levels", "3",
+          "--spect-tol", "1.0",
+          "--max-evects", "4"],
+         {"p-error-level-1": 0.15983187318775974,
+          "p-error-level-2": 0.34182546133693903}]
 
     if "tux" in platform.node():
         tests["veigenvector"] = \
