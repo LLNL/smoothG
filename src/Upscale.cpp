@@ -362,6 +362,13 @@ mfem::Vector Upscale::PWConstProject(int level, const mfem::Vector& x) const
     return out;
 }
 
+mfem::Vector Upscale::PWConstInterpolate(int level, const mfem::Vector& x) const
+{
+    mfem::Vector out(GetMatrix(level).GetD().NumRows());
+    GetMatrix(level).GetPWConstInterp().Mult(x, out);
+    return out;
+}
+
 void Upscale::PrintInfo(std::ostream& out) const
 {
     int num_procs;

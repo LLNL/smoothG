@@ -789,9 +789,14 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(GraphSpace coarse_graph_space,
     auto Ppw1 = smoothg::Mult(tmp, Pvertices);
     Ppw1.ScaleRows(agg_size_inv);
 
+    auto vert_agg = smoothg::Transpose(topology_.Agg_vertex_);
+    auto PvT = smoothg::Transpose(Pvertices);
+    auto tmp2 = smoothg::Mult(fine_mgL.GetPWConstInterp(), vert_agg);
+    auto Qpw1 = smoothg::Mult(PvT, tmp2);
+
     return MixedMatrix(std::move(coarse_graph_space), std::move(coarse_m_builder_),
                        std::move(coarse_D_), std::move(coarse_W_),
-                       std::move(coarse_const_rep), std::move(Ppw1));
+                       std::move(coarse_const_rep), std::move(Ppw1), std::move(Qpw1));
 }
 
 } // namespace smoothg

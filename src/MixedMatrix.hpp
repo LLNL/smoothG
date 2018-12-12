@@ -70,7 +70,8 @@ public:
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
                 mfem::Vector constant_rep,
-                mfem::SparseMatrix Ppw1);
+                mfem::SparseMatrix Ppw1,
+                mfem::SparseMatrix Qpw1);
 
     /// Get the associated graph space
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
@@ -89,6 +90,9 @@ public:
 
     /// Get piecewise constant projector
     const mfem::SparseMatrix& GetPWConstProj() const { return Ppw1_; }
+
+    /// Get piecewise constant projector
+    const mfem::SparseMatrix& GetPWConstInterp() const { return Qpw1_; }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -367,6 +371,8 @@ private:
     mfem::Vector constant_rep_;
 
     mfem::SparseMatrix Ppw1_; // project vertex-based vector to piecewise-constant
+    mfem::SparseMatrix Qpw1_; // project piecewise-constant to vertex-based vector
+
 }; // class MixedMatrix
 
 } // namespace smoothg

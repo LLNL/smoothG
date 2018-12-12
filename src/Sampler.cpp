@@ -217,21 +217,17 @@ mfem::Vector& PDESampler::GetCoefficientForVisualization(int level)
     coefficient_[level].SetSize(rhs_[level].Size());
     fvupscale_->SolveAtLevel(level, rhs_[level], coefficient_[level]);
 
-    const mfem::Vector& coarse_constant_rep = fvupscale_->GetConstantRep(level);
-    MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_[level].Size(),
-                "PDESampler::GetCoarseCoefficient : Sizes do not match!");
-    for (int i = 0; i < coefficient_[level].Size(); ++i)
+    // coarse solution projected to piece-wise constant on aggregates
+    mfem::Vector pw1_coarse_sol = fvupscale_->PWConstProject(level, coefficient_[level]);
+
+    // Compute exponential of solution in each aggregate
+    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
     {
-        if (std::fabs(coarse_constant_rep(i)) > 1.e-8)
-        {
-            coefficient_[level](i) =
-                std::exp(coefficient_[level](i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
-        }
-        else
-        {
-            coefficient_[level](i) = 0.0;
-        }
+        pw1_coarse_sol(i) = std::exp(pw1_coarse_sol(i));
     }
+
+    // interpolate piece-wise constant function to vertex space
+    coefficient_[level] = fvupscale_->PWConstInterpolate(level, pw1_coarse_sol);
 
     return coefficient_[level];
 }

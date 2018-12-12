@@ -142,6 +142,8 @@ public:
 
     mfem::Vector PWConstProject(int level, const mfem::Vector& x) const;
 
+    mfem::Vector PWConstInterpolate(int level, const mfem::Vector& x) const;
+
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
 
