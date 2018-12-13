@@ -36,23 +36,13 @@ double NormalDistribution::Sample()
     return out;
 }
 
-SimpleSampler::SimpleSampler(int fine_size, int coarse_size, int sample)
-    :
-    size_(2), sample_(sample), helper_(2)
-{
-    size_[0] = fine_size;
-    size_[1] = coarse_size;
-    helper_[0].SetSize(size_[0]);
-    helper_[1].SetSize(size_[1]);
-}
-
 SimpleSampler::SimpleSampler(std::vector<int>& size)
     :
-    size_(size), sample_(-1)
+    sample_(-1), helper_(size.size())
 {
     for (unsigned int level = 0; level < size.size(); ++level)
     {
-        helper_[level].SetSize(size_[level]);
+        helper_[level].SetSize(size[level]);
     }
 }
 
@@ -107,11 +97,9 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
     W_block *= cell_volume_ * kappa * kappa;
 
-    graph_ = Graph(vertex_edge, edge_d_td, weight);
-    fvupscale_ = std::make_shared<Upscale>(
-                     graph_, param, &partitioning, &edge_boundary_att, &ess_attr,
-                     W_block);
-    fvupscale_->MakeFineSolver();
+    graph_ = Graph(vertex_edge, edge_d_td, weight, &edge_boundary_att);
+    fvupscale_ = std::make_shared<Upscale>(graph_, param, &partitioning,
+                                           &ess_attr, W_block);
 
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
     {

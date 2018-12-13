@@ -55,7 +55,6 @@ public:
     Upscale(const Graph& graph,
             const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
-            const mfem::SparseMatrix* edge_boundary_att = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const mfem::SparseMatrix& w_block = SparseIdentity(0));
 
@@ -136,7 +135,10 @@ public:
     /// Get a vector of coefficients that represents a constant vector on
     /// the graph; that is, return a vector v such that P_{vertices} v = 1
     /// GetConstantRep(0) will normally return a vector of all 1s
-    const mfem::Vector& GetConstantRep(unsigned int level) const;
+    const mfem::Vector& GetConstantRep(unsigned int level) const
+    {
+        return GetMatrix(level).GetConstantRep();
+    }
 
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
@@ -186,17 +188,15 @@ public:
 
     const mfem::SparseMatrix& GetPsigma(int level) const
     {
-        return coarsener_[level]->get_Psigma();
+        return coarsener_[level]->GetPsigma();
     }
 
     const mfem::SparseMatrix& GetPu(int level) const
     {
-        return coarsener_[level]->get_Pu();
+        return coarsener_[level]->GetPu();
     }
 
-    /// Create Fine Level Solver
-    void MakeFineSolver();
-
+    /// Create solver on level
     void MakeSolver(int level);
 
     /// coeff should have the size of the number of *aggregates*
@@ -204,22 +204,16 @@ public:
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
     int GetNumLevels() const { return rhs_.size(); }
-    int GetNumVertices(int level) const
-    {
-        // return rhs_[level]->GetBlock(1).Size();
-        if (level == 0)
-        {
-            return rhs_[level]->GetBlock(1).Size();
-        }
-        else
-        {
-            return coarsener_[level - 1]->get_num_aggregates();
-        }
-    }
+
+    /// returns the number of vertices at a given level
+    int GetNumVertices(int level) const;
+
+    /// return vector with number of vertices on each level
+    std::vector<int> GetVertexSizes() const;
 
 protected:
 
-    void Init(const Graph& graph, const mfem::Array<int>& partitioning);
+    void Init(const mfem::Array<int>* partitioning);
 
     void MakeVectors(int level)
     {
@@ -242,10 +236,6 @@ protected:
     std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
-    /// why exactly is this mutable?
-    mutable std::vector<mfem::Vector> constant_rep_;
-
-    const mfem::SparseMatrix* edge_boundary_att_;
     const mfem::Array<int>* ess_attr_;
 
     const UpscaleParameters& param_;

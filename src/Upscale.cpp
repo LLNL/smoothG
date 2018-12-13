@@ -28,137 +28,69 @@ namespace smoothg
 Upscale::Upscale(const Graph& graph,
                  const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning,
-                 const mfem::SparseMatrix* edge_boundary_att,
                  const mfem::Array<int>* ess_attr,
                  const mfem::SparseMatrix& w_block)
     : Operator(graph.NumVertices()), comm_(graph.GetComm()), setup_time_(0.0),
-      edge_boundary_att_(edge_boundary_att), ess_attr_(ess_attr), param_(param)
+      ess_attr_(ess_attr), param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
 
+    mixed_laplacians_.reserve(param_.max_levels);
     mixed_laplacians_.emplace_back(graph, w_block);
-
-    if (partitioning)
-    {
-        Init(graph, *partitioning);
-    }
-    else
-    {
-        mfem::Array<int> partition;
-        PartitionAAT(graph.GetVertexToEdge(), partition, param_.coarse_factor);
-        Init(graph, partition);
-    }
+    Init(partitioning);
 
     chrono.Stop();
     setup_time_ += chrono.RealTime();
 }
 
-void Upscale::Init(const Graph& graph, const mfem::Array<int>& partitioning)
+void Upscale::Init(const mfem::Array<int>* partitioning)
 {
     MPI_Comm_rank(comm_, &myid_);
 
     solver_.resize(param_.max_levels);
     rhs_.resize(param_.max_levels);
     sol_.resize(param_.max_levels);
-    std::vector<GraphTopology> gts;
-    gts.emplace_back(graph, partitioning, edge_boundary_att_);
-
-    // coarser levels: topology
-    for (int level = 2; level < param_.max_levels; ++level)
-    {
-        gts.emplace_back(gts.back(), param_.coarse_factor);
-    }
 
     // coarser levels: matrices
-    for (int level = 1; level < param_.max_levels; ++level)
+    for (int level = 0; level < param_.max_levels - 1; ++level)
     {
-        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(
-                                    mixed_laplacians_[level - 1],
-                                    std::move(gts[level - 1]), param_));
-        coarsener_[level - 1]->construct_coarse_subspace(GetConstantRep(level - 1));
-
-        mixed_laplacians_.push_back(coarsener_[level - 1]->GetCoarse());
-        if (level < param_.max_levels - 1 || !param_.hybridization)
+        mixed_laplacians_.back().BuildM();
+        coarsener_.emplace_back(make_unique<SpectralAMG_MGL_Coarsener>(param_));
+        if (level == 0)
         {
-            mixed_laplacians_.back().BuildM();
+            mixed_laplacians_.push_back(
+                coarsener_[level]->Coarsen(GetMatrix(level), partitioning));
+        }
+        else
+        {
+            mixed_laplacians_.push_back(coarsener_[level]->Coarsen(GetMatrix(level)));
         }
     }
 
-    // fine level: solver
-    MakeFineSolver();
-    MakeVectors(0);
-
-    // coarser levels: solver
-    for (int level = 1; level < param_.max_levels; ++level)
+    // make solver on each level
+    for (int level = 0; level < param_.max_levels; ++level)
     {
         MakeSolver(level);
     }
 }
 
-void Upscale::MakeFineSolver()
-{
-    mfem::Array<int> marker;
-    if (edge_boundary_att_)
-    {
-        BooleanMult(*edge_boundary_att_, *ess_attr_, marker);
-    }
-
-    if (param_.hybridization) // Hybridization solver
-    {
-        solver_[0] = make_unique<HybridSolver>(comm_, GetMatrix(0),
-                                               edge_boundary_att_, &marker);
-    }
-    else // L2-H1 block diagonal preconditioner
-    {
-        mfem::SparseMatrix& Mref = GetMatrix(0).GetM();
-        mfem::SparseMatrix& Dref = GetMatrix(0).GetD();
-
-        for (int mm = 0; mm < marker.Size(); ++mm)
-        {
-            if (marker[mm])
-            {
-                //Mref.EliminateRowCol(mm, ess_data[k][mm], *(rhs[k]));
-
-                const bool set_diag = true;
-                Mref.EliminateRow(mm, set_diag);
-            }
-        }
-        if (marker.Size())
-        {
-            Dref.EliminateCols(marker);
-        }
-
-        solver_[0] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(0));
-    }
-}
-
 void Upscale::MakeSolver(int level)
 {
-    if (level == 0)
-    {
-        /// todo: better unification of multilevel MakeSolver()
-        MakeFineSolver();
-        return;
-    }
-
     mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
-    mfem::Array<int> marker;
-
-    if (edge_boundary_att_)
+    mfem::Array<int> marker(Dref.Width());
+    marker = 0;
+    if (GetMatrix(level).GetGraph().HasBoundary())
     {
+        BooleanMult(GetMatrix(level).EDofToBdrAtt(), *ess_attr_, marker);
         marker.SetSize(Dref.Width());
-        MarkDofsOnBoundary(coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_,
-                           coarsener_[level - 1]->construct_face_facedof_table(),
-                           *ess_attr_, marker);
     }
 
     if (param_.hybridization) // Hybridization solver
     {
-        auto face_bdratt = coarsener_[level - 1]->get_GraphTopology_ref().face_bdratt_;
+        SAAMGeParam* saamge_param = level > 0 ? param_.saamge_param : nullptr;
         solver_[level] = make_unique<HybridSolver>(
-                             comm_, GetMatrix(level), *coarsener_[level - 1],
-                             &face_bdratt, &marker, 0, param_.saamge_param);
+                             comm_, GetMatrix(level), &marker, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -168,7 +100,7 @@ void Upscale::MakeSolver(int level)
         {
             // Assume M diagonal, no ess data
             if (marker[mm])
-                Mref.EliminateRow(mm, true);
+                Mref.EliminateRowCol(mm, true);
         }
         if (marker.Size())
         {
@@ -185,7 +117,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     rhs_[0]->GetBlock(1) = x;
     for (int i = 0; i < level; ++i)
     {
-        coarsener_[i]->restrict(rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
+        coarsener_[i]->Restrict(rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
     }
 
     // solve
@@ -203,7 +135,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
     {
-        coarsener_[i]->interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
+        coarsener_[i]->Interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
     y = sol_[0]->GetBlock(1);
     Orthogonalize(0, y);
@@ -237,7 +169,7 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     *rhs_[0] = x;
     for (int i = 0; i < level; ++i)
     {
-        coarsener_[i]->restrict(*rhs_[i], * rhs_[i + 1]);
+        coarsener_[i]->Restrict(*rhs_[i], * rhs_[i + 1]);
     }
 
     // solve
@@ -251,7 +183,7 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
     {
-        coarsener_[i]->interpolate(*sol_[i + 1], *sol_[i]);
+        coarsener_[i]->Interpolate(*sol_[i + 1], *sol_[i]);
     }
     y = *sol_[0];
 }
@@ -302,7 +234,7 @@ mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) c
 void Upscale::Interpolate(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(coarsener_[level - 1]);
-    coarsener_[level - 1]->interpolate(x, y);
+    coarsener_[level - 1]->Interpolate(x, y);
 }
 
 mfem::Vector Upscale::Interpolate(int level, const mfem::Vector& x) const
@@ -318,7 +250,7 @@ void Upscale::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVect
 {
     assert(coarsener_[level - 1]);
 
-    coarsener_[level - 1]->interpolate(x, y);
+    coarsener_[level - 1]->Interpolate(x, y);
 }
 
 mfem::BlockVector Upscale::Interpolate(int level, const mfem::BlockVector& x) const
@@ -334,7 +266,7 @@ void Upscale::Restrict(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(coarsener_[level - 1]);
 
-    coarsener_[level - 1]->restrict(x, y);
+    coarsener_[level - 1]->Restrict(x, y);
 }
 
 mfem::Vector Upscale::Restrict(int level, const mfem::Vector& x) const
@@ -349,7 +281,7 @@ void Upscale::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector&
 {
     assert(coarsener_[level - 1]);
 
-    coarsener_[level - 1]->restrict(x, y);
+    coarsener_[level - 1]->Restrict(x, y);
 }
 
 mfem::BlockVector Upscale::Restrict(int level, const mfem::BlockVector& x) const
@@ -421,23 +353,6 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
 {
     assert(level >= 0 && level < static_cast<int>(mixed_laplacians_.size()));
     return mixed_laplacians_[level];
-}
-
-const mfem::Vector& Upscale::GetConstantRep(unsigned int level) const
-{
-    for (unsigned int i = constant_rep_.size(); i < level + 1; ++i)
-    {
-        constant_rep_.emplace_back(GetVector(i));
-        if (i == 0)
-        {
-            constant_rep_.back() = 1.0;
-        }
-        else
-        {
-            Restrict(i, constant_rep_[i - 1], constant_rep_.back());
-        }
-    }
-    return constant_rep_[level];
 }
 
 void Upscale::PrintInfo(std::ostream& out) const
@@ -638,12 +553,12 @@ void Upscale::DumpDebug(const std::string& prefix) const
         s << prefix << "Psigma" << counter << ".sparsematrix";
         std::ofstream outPsigma(s.str().c_str());
         outPsigma << std::scientific << std::setprecision(15);
-        c->get_Psigma().Print(outPsigma, 1);
+        c->GetPsigma().Print(outPsigma, 1);
         s.str("");
         s << prefix << "Pu" << counter++ << ".sparsematrix";
         std::ofstream outPu(s.str().c_str());
         outPu << std::scientific << std::setprecision(15);
-        c->get_Pu().Print(outPu, 1);
+        c->GetPu().Print(outPu, 1);
     }
 }
 
@@ -660,6 +575,21 @@ void Upscale::RescaleCoefficient(int level, const mfem::Vector& coeff)
         assert(hybrid_solver);
         hybrid_solver->UpdateAggScaling(coeff);
     }
+}
+
+int Upscale::GetNumVertices(int level) const
+{
+    return GetMatrix(level).GetGraph().NumVertices();
+}
+
+std::vector<int> Upscale::GetVertexSizes() const
+{
+    std::vector<int> out(GetNumLevels());
+    for (int level = 0; level < GetNumLevels(); ++level)
+    {
+        out[level] = GetNumVertices(level);
+    }
+    return out;
 }
 
 } // namespace smoothg

@@ -33,3 +33,4 @@
 #include "UpscaleOperators.hpp"
 #include "Graph.hpp"
 #include "Sampler.hpp"
+#include "GraphSpace.hpp"

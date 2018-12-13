@@ -273,11 +273,10 @@ int main(int argc, char* argv[])
 
     // Create Upscaler
     upscale_param.coarse_factor = 4;
-    Graph graph(vertex_edge, *edge_d_td, weight);
+    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
     auto upscale = std::make_shared<Upscale>(
-                       graph, upscale_param, &partitioning, &edge_boundary_att, &ess_attr, W_block);
+                       graph, upscale_param, &partitioning, &ess_attr, W_block);
 
-    upscale->MakeFineSolver();
     upscale->PrintInfo();
     upscale->ShowSetupTime();
 
@@ -338,22 +337,19 @@ int main(int argc, char* argv[])
             if (level == 1)
             {
                 max_p_error = (max_p_error > p_error[level]) ? max_p_error : p_error[level];
+            }
 
-                if (save_samples)
+            if (save_samples)
+            {
+                std::stringstream name;
+                name << "sample_l" << level << "_s" << sample;
+                if (level == 0)
                 {
-                    std::stringstream coarsename;
-                    coarsename << "coarse_" << sample;
-                    SaveFigure(sol_upscaled, ufespace, coarsename.str());
-                    std::stringstream finename;
-                    finename << "fine_" << sample;
-                    SaveFigure(sol_fine, ufespace, finename.str());
+                    SaveFigure(sol_fine, ufespace, name.str());
                 }
-
+                else
                 {
-                    //std::cout << "    fine: iterations: " << fine_iterations
-                    // << ", time: " << fine_time << std::endl;
-                    // std::cout << "    coarse: iterations: " << coarse_iterations
-                    // << ", time: " << coarse_time << std::endl;
+                    SaveFigure(sol_upscaled, ufespace, name.str());
                 }
             }
         }
@@ -401,10 +397,15 @@ int main(int argc, char* argv[])
     }
     if (save_statistics)
     {
-        SaveFigure(mean[1], ufespace, "coarse_mean");
-        SaveFigure(mean[0], ufespace, "fine_mean");
-        SaveFigure(m2[1], ufespace, "coarse_variance");
-        SaveFigure(m2[0], ufespace, "fine_variance");
+        for (int level = 0; level < num_levels; ++level)
+        {
+            std::stringstream filename;
+            filename << "level_" << level << "_mean";
+            SaveFigure(mean[level], ufespace, filename.str());
+            filename.str("");
+            filename << "level_" << level << "_variance";
+            SaveFigure(m2[level], ufespace, filename.str());
+        }
     }
 
     if (myid == 0)
