@@ -72,11 +72,6 @@ public:
         const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true, bool use_W = false,
         const mfem::Array<int>* ess_attr = nullptr);
 
-    MinresBlockSolver(
-        MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true,
-        const mfem::Array<int>* ess_attr = nullptr);
-
     /**
        @brief Constructor from a single MixedMatrix
     */

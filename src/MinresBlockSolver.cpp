@@ -26,7 +26,7 @@
 namespace smoothg
 {
 
-/// implementation largely lifted from ex5p.cpp
+///// implementation largely lifted from ex5p.cpp
 MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
     const mfem::Array<int>& block_true_offsets,
     bool remove_one_dof, bool use_W, const mfem::Array<int>* ess_attr)
@@ -115,12 +115,6 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     minres_.SetPreconditioner(prec_);
     minres_.SetOperator(operator_);
     minres_.iterative_mode = false;
-}
-
-MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-    const mfem::Array<int>& block_true_offsets, bool remove_one_dof, const mfem::Array<int>* ess_attr)
-    : MinresBlockSolver(comm, M, D, nullptr, block_true_offsets, remove_one_dof, ess_attr)
-{
 }
 
 MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof,
