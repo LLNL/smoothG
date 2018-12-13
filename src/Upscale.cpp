@@ -69,7 +69,11 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
     }
 
     remove_one_dof_ = true;
-    if (ess_attr_)
+    if (mixed_laplacians_.back().CheckW())
+    {
+        remove_one_dof_ = false;
+    }
+    else if (ess_attr_)
     {
         for (int i = 0; i < ess_attr_->Size(); ++i)
         {
@@ -151,7 +155,11 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
         coarsener_[i]->Interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
     y = sol_[0]->GetBlock(1);
-    Orthogonalize(0, y);
+
+    if (remove_one_dof_)
+    {
+        Orthogonalize(0, y);
+    }
 }
 
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
@@ -219,6 +227,7 @@ void Upscale::SolveAtLevel(int level, const mfem::Vector& x, mfem::Vector& y) co
 
     solver_[level]->Solve(x, y);
     y *= -1.0; // ????
+
     if (remove_one_dof_)
     {
         Orthogonalize(level, y);
@@ -239,7 +248,11 @@ void Upscale::SolveAtLevel(int level, const mfem::BlockVector& x, mfem::BlockVec
 
     solver_[level]->Solve(x, y);
     y *= -1.0;
-    Orthogonalize(level, y); // TODO: temporary literal 1!
+
+    if (remove_one_dof_)
+    {
+        Orthogonalize(level, y); // TODO: temporary literal 1!
+    }
 }
 
 mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) const
