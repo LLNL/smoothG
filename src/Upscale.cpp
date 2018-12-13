@@ -68,6 +68,19 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
         }
     }
 
+    remove_one_dof_ = true;
+    if (ess_attr_)
+    {
+        for (int i = 0; i < ess_attr_->Size(); ++i)
+        {
+            if ((*ess_attr_)[i] == 0)
+            {
+                remove_one_dof_ = false;
+                break;
+            }
+        }
+    }
+
     // make solver on each level
     for (int level = 0; level < param_.max_levels; ++level)
     {
@@ -106,7 +119,7 @@ void Upscale::MakeSolver(int level)
         {
             Dref.EliminateCols(marker);
         }
-        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level));
+        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level), remove_one_dof_);
     }
     MakeVectors(level);
 }

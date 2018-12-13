@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
         {
             upscale.Solve(level, fine_rhs, sol[level]);
             upscale.ShowSolveInfo(level);
-
+//sol[level].Print();
             auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
 
             if (level > 0 && myid == 0)

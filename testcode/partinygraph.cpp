@@ -321,7 +321,7 @@ int main(int argc, char* argv[])
     // solve
     if (myid == 0)
         std::cout << "Solving graph problem..." << std::endl;
-    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, w_block);
+    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, !w_block, w_block);
     mgp.Mult(rhs, sol);
     int iter = mgp.GetNumIterations();
     // int nnz = mgp.GetNNZ();

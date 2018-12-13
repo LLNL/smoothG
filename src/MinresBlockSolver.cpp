@@ -93,8 +93,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
         }
         W_.Finalize();
 
-        hW_ = make_unique<mfem::HypreParMatrix>(comm_, D->GetGlobalNumRows(),
-                                                D->RowPart(), &W_);
+        hW_ = make_unique<mfem::HypreParMatrix>(comm_, D->M(), D->RowPart(), &W_);
 
         operator_.SetBlock(1, 1, hW_.get());
 
