@@ -29,7 +29,7 @@ namespace smoothg
 /// implementation largely lifted from ex5p.cpp
 MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
     const mfem::Array<int>& block_true_offsets,
-    bool remove_one_dof, bool use_W)
+    bool remove_one_dof, bool use_W, const mfem::Array<int>* ess_attr)
     :
     MixedLaplacianSolver(block_true_offsets),
     minres_(comm),
@@ -118,12 +118,13 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 }
 
 MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-    const mfem::Array<int>& block_true_offsets, bool remove_one_dof)
-    : MinresBlockSolver(comm, M, D, nullptr, block_true_offsets, remove_one_dof)
+    const mfem::Array<int>& block_true_offsets, bool remove_one_dof, const mfem::Array<int>* ess_attr)
+    : MinresBlockSolver(comm, M, D, nullptr, block_true_offsets, remove_one_dof, ess_attr)
 {
 }
 
-MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof)
+MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof,
+                                     const mfem::Array<int>* ess_attr)
     :
     MixedLaplacianSolver(mgL.GetBlockOffsets()),
     minres_(comm),
@@ -131,18 +132,37 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool
     remove_one_dof_(remove_one_dof),
     use_W_(mgL.CheckW()),
     operator_(mgL.GetBlockTrueOffsets()),
-    prec_(mgL.GetBlockTrueOffsets()),
-    M_(mgL.GetM()),
-    D_(mgL.GetD())
+    prec_(mgL.GetBlockTrueOffsets())
 {
     MPI_Comm_rank(comm_, &myid_);
+
+    mfem::SparseMatrix D_proc(mgL.GetD());
+    mfem::Array<int> marker(D_proc.Width());
+    marker = 0;
+    if (mgL.GetGraph().HasBoundary())
+    {
+        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, marker);
+        marker.SetSize(D_proc.Width());
+    }
+
+    mfem::SparseMatrix M_proc(mgL.GetM());
+    for (int mm = 0; mm < marker.Size(); ++mm)
+    {
+        // Assume M diagonal, no ess data
+        if (marker[mm])
+            M_proc.EliminateRowCol(mm, true);
+    }
+    if (marker.Size())
+    {
+        D_proc.EliminateCols(marker);
+    }
 
     mfem::Array<int>& D_row_start(mgL.GetDrowStarts());
 
     const mfem::HypreParMatrix& edge_d_td(mgL.GetEdgeDofToTrueDof());
     const mfem::HypreParMatrix& edge_td_d(mgL.GetEdgeTrueDofToDof());
 
-    mfem::HypreParMatrix M(comm, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_);
+    mfem::HypreParMatrix M(comm, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_proc);
     std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M, &edge_d_td));
     hM_.reset(ParMult(&edge_td_d, M_tmp.get()));
 
@@ -151,10 +171,10 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool
 
     if (remove_one_dof_ && myid_ == 0)
     {
-        D_.EliminateRow(0);
+        D_proc.EliminateRow(0);
     }
 
-    hD_ = ParMult(D_, edge_d_td, D_row_start);
+    hD_ = ParMult(D_proc, edge_d_td, D_row_start);
     hDt_.reset(hD_->Transpose());
 
     hD_->CopyRowStarts();
@@ -227,9 +247,10 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 /**
    MinresBlockSolver acts on "true" dofs, this one does not.
 */
-MinresBlockSolverFalse::MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof)
+MinresBlockSolverFalse::MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof,
+                                               const mfem::Array<int>* ess_attr)
     :
-    MinresBlockSolver(comm, mgL, remove_one_dof),
+    MinresBlockSolver(comm, mgL, remove_one_dof, ess_attr),
     mixed_matrix_(mgL),
     true_rhs_(mgL.GetBlockTrueOffsets()),
     true_sol_(mgL.GetBlockTrueOffsets())

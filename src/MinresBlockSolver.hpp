@@ -69,16 +69,19 @@ public:
        @param use_W use the W block
     */
     MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
-        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true, bool use_W = false);
+        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true, bool use_W = false,
+        const mfem::Array<int>* ess_attr = nullptr);
 
     MinresBlockSolver(
         MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true);
+        const mfem::Array<int>& block_true_offsets, bool remove_one_dof = true,
+        const mfem::Array<int>* ess_attr = nullptr);
 
     /**
        @brief Constructor from a single MixedMatrix
     */
-    MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof = true);
+    MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof = true,
+                      const mfem::Array<int>* ess_attr = nullptr);
 
     ~MinresBlockSolver();
 
@@ -119,8 +122,6 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> schur_block_;
 
     // Solvers' copy of potentially modified data
-    mfem::SparseMatrix M_;
-    mfem::SparseMatrix D_;
     mfem::SparseMatrix W_;
 
     std::unique_ptr<mfem::HypreParMatrix> hM_;
@@ -135,7 +136,8 @@ private:
 class MinresBlockSolverFalse : public MinresBlockSolver
 {
 public:
-    MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof = true);
+    MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof = true,
+                           const mfem::Array<int>* ess_attr = nullptr);
     ~MinresBlockSolverFalse();
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;

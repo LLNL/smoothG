@@ -112,18 +112,8 @@ void Upscale::MakeSolver(int level)
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        mfem::SparseMatrix& Mref = GetMatrix(level).GetM();
-        for (int mm = 0; mm < marker.Size(); ++mm)
-        {
-            // Assume M diagonal, no ess data
-            if (marker[mm])
-                Mref.EliminateRowCol(mm, true);
-        }
-        if (marker.Size())
-        {
-            Dref.EliminateCols(marker);
-        }
-        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level), remove_one_dof_);
+        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level),
+                                                             remove_one_dof_, ess_attr_);
     }
     MakeVectors(level);
 }
