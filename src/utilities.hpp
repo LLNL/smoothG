@@ -140,12 +140,6 @@ void VisualizeSolution(int k,
                        const mfem::BlockVector& sol);
 
 class GraphTopology;
-void PostProcess(mfem::SparseMatrix& M_global,
-                 mfem::SparseMatrix& D_global,
-                 GraphTopology& graph_topology_,
-                 mfem::Vector& sol,
-                 mfem::Vector& solp,
-                 const mfem::Vector& rhs);
 
 /**
    @brief Build boundary attribute table from mesh.
@@ -175,72 +169,6 @@ int MarkDofsOnBoundary(
     const mfem::Array<int>& bndrAttributesMarker, mfem::Array<int>& dofMarker);
 
 /**
-    @brief Manage topological information for the coarsening
-
-    Extract the local submatrix of the global vertex to edge relation table
-    Each vertex belongs to one and only one processor, while some edges are
-    shared by two processors, indicated by the edge to true edge
-    HypreParMatrix edge_e_te
-*/
-class ParGraph
-{
-public:
-    /**
-       @brief Distribute a graph to the communicator.
-
-       Generally we read a global graph on one processor, and then distribute
-       it. This constructor handles that process.
-
-       @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
-    */
-    ParGraph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Array<int>& partition_global);
-
-    ///@name Getters for tables that describe parallel graph
-    ///@{
-    mfem::SparseMatrix& GetLocalVertexToEdge()
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::SparseMatrix& GetLocalVertexToEdge() const
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::Array<int>& GetLocalPartition() const
-    {
-        return partition_local_;
-    }
-
-    const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
-    {
-        return *edge_e_te_;
-    }
-
-    const mfem::Array<int>& GetVertexLocalToGlobalMap() const
-    {
-        return vert_local2global_;
-    }
-
-    const mfem::Array<int>& GetEdgeLocalToGlobalMap() const
-    {
-        return edge_local2global_;
-    }
-    ///@}
-private:
-    mfem::SparseMatrix vertex_edge_local_;
-    mfem::Array<int> partition_local_;
-    std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
-    mfem::Array<int> vert_local2global_;
-    mfem::Array<int> edge_local2global_;
-};
-
-/**
    @brief Treat a SparseMatrix as a (boolean) table, and return the column
    indices of a given row in the Array J
 
@@ -248,6 +176,10 @@ private:
    related table.
 */
 void GetTableRow(
+    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
+
+/// if you call GetTableRow repeatedly, bad things might happen
+void GetTableRowCopy(
     const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
 
 /**
@@ -358,6 +290,7 @@ public:
     static void SetMeshSizes(double hx, double hy, double hz);
     static void Set2DSlice(SliceOrientation o, int npos );
 
+    static void BlankPermeability();
     static void ReadPermeabilityFile(const std::string& fileName);
     static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
 
@@ -403,6 +336,25 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::
 /// Use power iterations to find the maximum eigenpair
 double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
+
+// Rescale vec by scaling: vec = diag(scaling) * vec
+void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
+
+/**
+   @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
+
+   This function is copied from mfem::Mesh::GetElementColoring.
+
+   @param colors at return containing colors of all elements
+   @param el_el element connectivity matrix (assuming nonzero diagonal)
+*/
+void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
+
+std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
+
+void FVMeshCartesianPartition(
+    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
+    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor);
 
 } // namespace smoothg
 

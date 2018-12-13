@@ -126,62 +126,37 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfe
 
 MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool remove_one_dof)
     :
-    MixedLaplacianSolver(mgL.get_blockoffsets()),
+    MixedLaplacianSolver(mgL.GetBlockOffsets()),
     minres_(comm),
     comm_(comm),
     remove_one_dof_(remove_one_dof),
     use_W_(mgL.CheckW()),
-    operator_(mgL.get_blockTrueOffsets()),
-    prec_(mgL.get_blockTrueOffsets()),
-    M_(mgL.getWeight()),
-    D_(mgL.getD())
+    operator_(mgL.GetBlockTrueOffsets()),
+    prec_(mgL.GetBlockTrueOffsets()),
+    M_(mgL.GetM()),
+    D_(mgL.GetD())
 {
     MPI_Comm_rank(comm_, &myid_);
 
-    mfem::Array<int>& D_row_start(mgL.get_Drow_start());
+    mfem::Array<int>& D_row_start(mgL.GetDrowStarts());
 
-    const mfem::HypreParMatrix& edge_d_td(mgL.get_edge_d_td());
-    const mfem::HypreParMatrix& edge_td_d(mgL.get_edge_td_d());
+    const mfem::HypreParMatrix& edge_d_td(mgL.GetEdgeDofToTrueDof());
+    const mfem::HypreParMatrix& edge_td_d(mgL.GetEdgeTrueDofToDof());
 
-    mfem::HypreParMatrix M(comm, edge_d_td.M(),
-                           edge_d_td.GetRowStarts(), &M_);
-
-    std::unique_ptr<mfem::HypreParMatrix> M_tmp(
-        ParMult(&M, const_cast<mfem::HypreParMatrix*>(&edge_d_td)));
-    hM_.reset(ParMult(const_cast<mfem::HypreParMatrix*>(&edge_td_d), M_tmp.get()));
-    hypre_ParCSRMatrixSetNumNonzeros(*hM_);
+    mfem::HypreParMatrix M(comm, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_);
+    std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M, &edge_d_td));
+    hM_.reset(ParMult(&edge_td_d, M_tmp.get()));
 
     hM_->CopyRowStarts();
     hM_->CopyColStarts();
 
-    if (use_W_)
+    if (remove_one_dof_ && myid_ == 0)
     {
-        hD_.reset(edge_d_td.LeftDiagMult(D_, D_row_start));
-        hDt_.reset(hD_->Transpose());
-
-        mfem::SparseMatrix* W = mgL.getW();
-        assert(W);
-        mfem::SparseMatrix W_copy(*W);
-
-        W_.Swap(W_copy);
-        W_.Finalize();
-
-        hW_ = make_unique<mfem::HypreParMatrix>(comm_, hD_->GetGlobalNumRows(),
-                                                D_row_start, &W_);
-
-        hW_->CopyRowStarts();
-        hW_->CopyColStarts();
+        D_.EliminateRow(0);
     }
-    else
-    {
-        if (remove_one_dof_ && myid_ == 0)
-        {
-            D_.EliminateRow(0);
-        }
 
-        hD_.reset(edge_d_td.LeftDiagMult(D_, D_row_start));
-        hDt_.reset(hD_->Transpose());
-    }
+    hD_ = ParMult(D_, edge_d_td, D_row_start);
+    hDt_.reset(hD_->Transpose());
 
     hD_->CopyRowStarts();
     hDt_->CopyRowStarts();
@@ -189,6 +164,20 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL, bool
     hD_->CopyColStarts();
     hDt_->CopyColStarts();
 
+    if (use_W_)
+    {
+        const mfem::SparseMatrix* W = mgL.GetW();
+        assert(W);
+        mfem::SparseMatrix W_copy(*W);
+
+        W_.Swap(W_copy);
+        W_.Finalize();
+
+        hW_ = make_unique<mfem::HypreParMatrix>(comm_, hD_->M(), D_row_start, &W_);
+
+        hW_->CopyRowStarts();
+        hW_->CopyColStarts();
+    }
 
     Init(hM_.get(), hD_.get(), hW_.get());
 }
@@ -215,7 +204,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     minres_.Mult(*rhs_, sol);
 
     chrono.Stop();
-    timing_ += chrono.RealTime();
+    timing_ = chrono.RealTime();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -233,7 +222,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
                       << minres_.GetFinalNorm() << "\n";
     }
 
-    num_iterations_ += minres_.GetNumIterations();
+    num_iterations_ = minres_.GetNumIterations();
 }
 
 /**
@@ -243,8 +232,8 @@ MinresBlockSolverFalse::MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix&
     :
     MinresBlockSolver(comm, mgL, remove_one_dof),
     mixed_matrix_(mgL),
-    true_rhs_(mgL.get_blockTrueOffsets()),
-    true_sol_(mgL.get_blockTrueOffsets())
+    true_rhs_(mgL.GetBlockTrueOffsets()),
+    true_sol_(mgL.GetBlockTrueOffsets())
 {
 }
 
@@ -259,7 +248,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     chrono.Clear();
     chrono.Start();
 
-    const mfem::HypreParMatrix& edgedof_d_td = mixed_matrix_.get_edge_d_td();
+    const mfem::HypreParMatrix& edgedof_d_td = mixed_matrix_.GetEdgeDofToTrueDof();
 
     edgedof_d_td.MultTranspose(rhs.GetBlock(0), true_rhs_.GetBlock(0));
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
@@ -276,7 +265,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
 
     chrono.Stop();
 
-    timing_ += chrono.RealTime();
+    timing_ = chrono.RealTime();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -294,7 +283,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
                       << minres_.GetFinalNorm() << "\n";
     }
 
-    num_iterations_ += minres_.GetNumIterations();
+    num_iterations_ = minres_.GetNumIterations();
 }
 
 void MinresBlockSolver::SetPrintLevel(int print_level)

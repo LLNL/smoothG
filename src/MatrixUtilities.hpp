@@ -41,18 +41,21 @@ void Print(const mfem::SparseMatrix& mat, const std::string& label = "",
 */
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol = 1e-8);
 
-
 /**
     @brief Creates a sparse matrix from a table
 */
-mfem::SparseMatrix TableToSparse(const mfem::Table& table);
+mfem::SparseMatrix TableToMatrix(const mfem::Table& table);
+
+/**
+    @brief Creates a table from a sparse matrix's graph
+*/
+mfem::Table MatrixToTable(const mfem::SparseMatrix& mat);
 
 // Rap by hand that seems to be faster than the mfem rap but uses more memory
 // Use mfem::RAP if memory is more important than cycles
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
                           const mfem::HypreParMatrix& P);
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& P);
-
 
 /**
     @brief Broadcast a SparseMatrix on processor 0 to all other processors
@@ -70,17 +73,35 @@ mfem::SparseMatrix Transpose(const mfem::SparseMatrix& A);
 mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B);
 
 /**
+    @brief Compute the product A * A^T
+*/
+mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
+
+std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A);
+
+/**
+    @brief Compute the product A * B between SparseMatrix and HypreParMatrix
+*/
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
+                                              const mfem::SparseMatrix& B,
+                                              const mfem::Array<int>& B_colpart);
+
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
+                                              const mfem::HypreParMatrix& B,
+                                              const mfem::Array<int>& A_rowpart);
+
+/**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense.
 */
-void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDense(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C);
 
 /**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense, but C is kept transposed.
 */
-void MultSparseDenseTranspose(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                               mfem::DenseMatrix& C);
 
 /**
@@ -144,6 +165,16 @@ mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D)
 mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect);
 
 /**
+   Add scaling*subm into the matrix mat at locations given by rows and cols.
+
+   The implementation is simply copied from mfem::SparseMatrix::AddSubMatrix,
+   with the scaling added.
+*/
+void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
+                        const mfem::Array<int>& cols, const mfem::DenseMatrix& subm,
+                        double scaling = 1.0, int skip_zeros = 1);
+
+/**
    @brief Add two parallel matrices C = A + B
    @param A left hand side matrix
    @param B right hand side matrix
@@ -156,6 +187,19 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A, const mfem::HyprePar
    @param A Parallel Matrix
 */
 double MaxNorm(const mfem::HypreParMatrix& A);
+
+/**
+   @brief Extract a submatrix from a matrix
+
+   @param A the matrix to extract from
+   @param rows the rows to extract
+   @param cols the columns to extract
+
+   @returns the extracted submatrix
+*/
+mfem::SparseMatrix ExtractRowAndColumns(
+    const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
+    const mfem::Array<int>& cols);
 
 /**
    @brief Extract a submatrix from a matrix
@@ -190,15 +234,16 @@ void ExtractSubMatrix(
    @brief Extract columns from a dense matrix (A) to another dense matrix (A_sub)
 
    @param A the matrix to extract from
-   @param ref_to_col mapping from reference index to column index of A
+   @param col_to_ref mapping from column index of A to reference index
    @param subcol_to_ref mapping from column index of A_sub to reference index
+   @param ref_workspace array of "-1" of size at least dimension of reference space
    @param A_sub the returned matrix where the extracted columns are collected
    @param row_offset which row of A_sub to start putting the extracted columns
 */
 void ExtractColumns(
-    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
-    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
-    const int row_offset = 0);
+    const mfem::DenseMatrix& A, const mfem::Array<int>& col_to_ref,
+    const mfem::Array<int>& subcol_to_ref, mfem::Array<int>& ref_workspace,
+    mfem::DenseMatrix& A_sub, int row_offset = 0);
 
 /**
    @brief Fill a DenseMatrix with the entries of a SparseMatrix
@@ -228,18 +273,16 @@ void Concatenate(const mfem::Vector& a, const mfem::DenseMatrix& b,
 void Deflate(mfem::DenseMatrix& a, const mfem::Vector& v);
 
 /**
-   @brief Orthogonalize this vector from the constant vector.
+   @brief Orthogonalize this vector against wrt
 
-   This is equivalent to shifting the vector so it has zero mean.
+   In most cases, wrt is some (possibly non-nodal) representation of
+   the constant vector, in which case this funtion shifts the vector
+   so that it has zero mean.
 
-   The correct way to do this is with respect to a finite element space,
-   take an FiniteElementSpace argument or a list of volumes or something.
-   For now we assume equal size volumes, or a graph, and just take
-   vec.Sum() / vec.Size()
-
-   @todo improve this for the finite volume case
+   @param vec the vector to be modified
+   @param wrt the vector with respect to which to orthogonalize vec
 */
-void orthogonalize_from_constant(mfem::Vector& vec);
+void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt);
 
 /**
    @brief Orthogonalize this vector from the constant vector.
@@ -296,6 +339,8 @@ void GenerateOffsets(MPI_Comm comm, int N, HYPRE_Int loc_sizes[],
 */
 void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offsets);
 
+bool IsDiag(const mfem::SparseMatrix& A);
+
 /**
    @brief Solver for local saddle point problems, see the formula below.
 
@@ -310,7 +355,7 @@ void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offs
      \end{array} \right)
      =
      \left( \begin{array}{c}
-       0 \\ -g
+       -g \\ -f
      \end{array} \right)
    \f]
 
@@ -325,41 +370,65 @@ public:
 
        @param M matrix \f$ M \f$ in the formula in the class description
        @param D matrix \f$ D \f$ in the formula in the class description
+       @param const_rep a vector which solution u is set to be orthogonal to.
+       If not provided, there will be NO orthogonalization step in solving stage
 
-       M is assumed to be diagonal (TODO: should assert?)
        We construct the matrix \f$ A = D M^{-1} D^T \f$, eliminate the zeroth
        degree of freedom to ensure it is solvable. LU factorization of \f$ A \f$
        is computed and stored (until the object is deleted) for potential
        multiple solves.
     */
     LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
-                         const mfem::SparseMatrix& D);
-
-    /// M is the diagonal of the matrix \f$ M \f$ in the formula above
-    LocalGraphEdgeSolver(const mfem::Vector& M, const mfem::SparseMatrix& D);
+                         const mfem::SparseMatrix& D,
+                         const mfem::Vector& const_rep = mfem::Vector());
 
     /**
-       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+       @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
 
-       @param rhs \f$ g \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma);
+    void Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sigma) const;
 
     /**
-       @brief Solves \f$ (D M^{-1} D^T) u = g\f$, \f$ \sigma = M^{-1} D^T u \f$.
+       @brief Solves \f$ (D M^{-1} D^T) u = f - D M^{-1} g \f$,
+                     \f$ \sigma = M^{-1} (D^T u + g) \f$.
 
-       @param rhs \f$ g \f$ in the formula above
+       @param rhs_sigma \f$ g \f$ in the formula above
+       @param rhs_u \f$ f \f$ in the formula above
        @param sol_sigma \f$ \sigma \f$ in the formula above
        @param sol_u \f$ u \f$ in the formula above
     */
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol_sigma, mfem::Vector& sol_u);
-private:
-    void Init(double* M_data, const mfem::SparseMatrix& D);
+    void Mult(const mfem::Vector& rhs_sigma, const mfem::Vector& rhs_u,
+              mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
 
-    std::unique_ptr<mfem::UMFPackSolver> solver_;
+    /**
+       @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
+
+       @param rhs_u \f$ f \f$ in the formula above
+       @param sol_sigma \f$ \sigma \f$ in the formula above
+       @param sol_u \f$ u \f$ in the formula above
+    */
+    void Mult(const mfem::Vector& rhs_u,
+              mfem::Vector& sol_sigma, mfem::Vector& sol_u) const;
+
+
+private:
+    /// Setup matrix and solver when M is diagonal
+    void Init(const mfem::Vector& M_diag, const mfem::SparseMatrix& D);
+
+    /// Setup matrix and solver when M is not diagonal
+    void Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
+
+    mfem::UMFPackSolver solver_;
     mfem::SparseMatrix A_;
     mfem::SparseMatrix MinvDT_;
+    bool M_is_diag_;
+    mfem::Vector Minv_;
+    mfem::Array<int> offsets_;
+    mutable std::unique_ptr<mfem::BlockVector> rhs_;
+    mutable std::unique_ptr<mfem::BlockVector> sol_;
+    mfem::Vector const_rep_;
 };
 
 /**
@@ -383,6 +452,19 @@ double InnerProduct(const mfem::Vector& u, const mfem::Vector& v);
 */
 std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
     const mfem::HypreParMatrix& entity_trueentity_entity);
+
+/**
+   @brief out = bool(mat) * bool(vec)
+   Compute mat * vec, with entries of mat and vec treated as boolean.
+   For mat, entries in the matrix graph are treated as 1, otherwise 0.
+*/
+void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
+                 mfem::Array<int>& out);
+
+/**
+   @brief Make a copy of mfem::HypreParMatrix
+*/
+std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
 
 } // namespace smoothg
 

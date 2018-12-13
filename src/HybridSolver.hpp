@@ -39,6 +39,10 @@
 #include "Mixed_GL_Coarsener.hpp"
 #include "MixedMatrix.hpp"
 
+#if SMOOTHG_USE_SAAMGE
+#include "saamge.hpp"
+#endif
+
 namespace smoothg
 {
 
@@ -80,13 +84,6 @@ namespace smoothg
 class HybridSolver : public MixedLaplacianSolver
 {
 public:
-    /// Construct local mass matrix for the fine level edge space
-    static void BuildFineLevelLocalMassMatrix(
-        const mfem::SparseMatrix& vertex_edge,
-        const mfem::SparseMatrix& M,
-        std::vector<mfem::Vector>& M_el);
-
-public:
     /**
        @brief Constructor for fine-level hybridiziation solver.
 
@@ -94,34 +91,19 @@ public:
        @param mgL Mixed matrices for the graph Laplacian in the fine level
        @param face_bdrattr Boundary edge to boundary attribute table
        @param ess_edge_dofs An array indicating essential edge dofs
-       @param spectralAMGe Whether to use spectral AMGe as the preconditioner
-              for the CG iteration (not implemented yet).
+       @param rescale_iter number of iterations to compute diagonal scaling
+              vector for hybridized system. No rescaling if set to 0.
+       @param saamge_param SAAMGe parameters. Use SAAMGe as preconditioner for
+              hybridized system if saamge_param is not nullptr, otherwise
+              BoomerAMG is used instead.
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
-                 const mfem::SparseMatrix* face_bdrattr = nullptr,
                  const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 bool spectralAMGe = false);
+                 const int rescale_iter = 0,
+                 const SAAMGeParam* saamge_param = nullptr);
 
-    /**
-       @brief Constructor for coarse-level hybridiziation solver.
-
-       @param comm MPI communicator
-       @param mgL Mixed matrices for the graph Laplacian in the coarse level
-       @param mgLc Mixed graph Laplacian Coarsener from fine to coarse level
-       @param face_bdrattr Boundary edge to boundary attribute table
-       @param ess_edge_dofs An array indicating essential edge dofs
-       @param spectralAMGe Whether to use spectral AMGe as the preconditioner
-              for the CG iteration (not implemented yet).
-    */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgL,
-                 const Mixed_GL_Coarsener& mgLc,
-                 const mfem::SparseMatrix* face_bdrattr = nullptr,
-                 const mfem::Array<int>* ess_edge_dofs = nullptr,
-                 bool spectralAMGe = false);
-
-    virtual ~HybridSolver() {}
+    virtual ~HybridSolver();
 
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
@@ -155,6 +137,18 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
+    /**
+       @brief Update weights of local M matrices on aggregates
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+
+       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
+    */
+    void UpdateAggScaling(const mfem::Vector& agg_weights_inverse);
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;
@@ -164,19 +158,22 @@ public:
     ///@}
 
 protected:
-    template<typename T>
     void Init(const mfem::SparseMatrix& face_edgedof,
-              const std::vector<T>& M_el,
+              const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
-              const mfem::SparseMatrix* face_bdrattr,
+              const mfem::SparseMatrix& face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
-    /**
-       @todo this method and its cousin share a lot of duplicated code
-    */
     void AssembleHybridSystem(const std::vector<mfem::DenseMatrix>& M_el);
 
-    void AssembleHybridSystem(const std::vector<mfem::Vector>& M_el);
+    // Compute scaling vector and the scaled hybridized system
+    void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
+
+    // Construct spectral AMGe preconditioner
+    void BuildSpectralAMGePreconditioner();
+
+    // Assemble parallel hybridized system and build a solver for it
+    void BuildParallelSystemAndSolver();
 
 private:
     MPI_Comm comm_;
@@ -192,7 +189,7 @@ private:
 
     std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
     std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_;
-    std::unique_ptr<mfem::HypreBoomerAMG> prec_;
+    std::unique_ptr<mfem::Solver> prec_;
     std::unique_ptr<mfem::CGSolver> cg_;
 
     // eliminated part of HybridSystem_ (for applying elimination in repeated solves)
@@ -223,10 +220,21 @@ private:
     int num_edge_dofs_;
     int num_multiplier_dofs_;
 
-    bool spectralAMGe_;
     bool use_w_;
+
+    int rescale_iter_;
+    mfem::Vector diagonal_scaling_;
+
+    mfem::Vector agg_weights_;
+
+    const SAAMGeParam* saamge_param_;
+#if SMOOTHG_USE_SAAMGE
+    std::vector<int> sa_nparts_;
+    saamge::agg_partitioning_relations_t* sa_apr_;
+    saamge::ml_data_t* sa_ml_data_;
+#endif
 };
 
 } // namespace smoothg
 
-#endif /* HYBRIDIZATION_HPP_ */
+#endif /* __HYBRIDIZATION_HPP */

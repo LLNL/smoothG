@@ -21,7 +21,6 @@
 #include <mpi.h>
 
 #include "mfem.hpp"
-#include "../src/GraphUpscale.hpp"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
@@ -38,13 +37,14 @@ int main(int argc, char* argv[])
     picojson::object serialize;
 
     // Setup Parameters
-    constexpr auto coarse_factor = 80;
-    constexpr auto max_evects = 4;
-    constexpr auto spect_tol = 1.0;
-    constexpr auto dual_target = false;
-    constexpr auto scaled_dual = false;
-    constexpr auto energy_dual = false;
-    constexpr auto hybridization = false;
+    UpscaleParameters param;
+    param.coarse_factor = 80;
+    param.max_evects = 4;
+    param.spect_tol = 1.0;
+    param.dual_target = false;
+    param.scaled_dual = false;
+    param.energy_dual = false;
+    param.hybridization = false;
 
     // Solve Parameters
     constexpr auto max_iter = 800;
@@ -55,14 +55,12 @@ int main(int argc, char* argv[])
     // Global Input Information
     constexpr auto ve_filename = "../../graphdata/vertex_edge_sample.txt";
     constexpr auto rhs_filename = "../../graphdata/fiedler_sample.txt";
-    const auto vertex_edge = ReadVertexEdge(ve_filename);
+    const Graph graph(comm, ReadVertexEdge(ve_filename));
 
     // Power Iteration With Upscale Operators
     {
         // Upscaler
-        const GraphUpscale upscale(comm, vertex_edge, coarse_factor, spect_tol,
-                                   max_evects, dual_target, scaled_dual,
-                                   energy_dual, hybridization);
+        const Upscale upscale(graph, param);
 
         // Wrapper for solving on the fine level, no upscaling
         const UpscaleFineSolve fine_solver(upscale);
@@ -70,7 +68,7 @@ int main(int argc, char* argv[])
         upscale.PrintInfo();
 
         // Read and normalize true Fiedler vector
-        Vector true_sol = upscale.ReadVertexVector(rhs_filename);
+        Vector true_sol = graph.ReadVertexVector(rhs_filename);
         true_sol /= ParNormlp(true_sol, 2, comm);
 
         // Power Iteration for each Operator
@@ -91,7 +89,7 @@ int main(int argc, char* argv[])
 
             // Normalize
             result /= ParNormlp(result, 2, comm);
-            upscale.Orthogonalize(result);
+            upscale.Orthogonalize(0, result);
 
             // Match Signs
             double true_sign = true_sol[0] / std::fabs(true_sol[0]);

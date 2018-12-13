@@ -24,6 +24,9 @@
 
 using std::unique_ptr;
 
+namespace smoothg
+{
+
 /**
    @brief A forcing function that is supposed to very roughly represent some wells
    that are resolved on the *coarse* level.
@@ -108,31 +111,44 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 class SPE10Problem
 {
 public:
+    /// constructor for the usual SPE10 dataset permeabilities
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
-                 int slice, bool metis_partition,
+                 int slice, bool metis_partition, double proc_part_ubal,
                  const mfem::Array<int>& coarsening_factor);
+
     ~SPE10Problem();
+
     mfem::ParMesh* GetParMesh()
     {
         return pmesh_;
     }
+
     mfem::VectorFunctionCoefficient* GetKInv()
     {
         return kinv_;
     }
+
     GCoefficient* GetForceCoeff()
     {
         return source_coeff_;
     }
+
     const std::vector<int>& GetNumProcsXYZ()
     {
         return num_procs_xyz_;
     }
+
     static double CellVolume(int nDimensions)
     {
         return (nDimensions == 2 ) ? (20.0 * 10.0) : (20.0 * 10.0 * 2.0);
     }
+
 private:
+    void Init(
+        const char* permFile, int nDimensions, int spe10_scale, int slice,
+        bool metis_partition, double proc_part_ubal,
+        const mfem::Array<int>& coarsening_factor);
+
     double Lx, Ly, Lz, Hx, Hy, Hz;
     mfem::ParMesh* pmesh_;
     mfem::VectorFunctionCoefficient* kinv_;
@@ -141,8 +157,16 @@ private:
 };
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
-                           int spe10_scale, int slice,  bool metis_partition,
+                           int spe10_scale, int slice, bool metis_partition, double proc_part_ubal,
                            const mfem::Array<int>& coarsening_factor)
+{
+    Init(permFile, nDimensions, spe10_scale, slice, metis_partition, proc_part_ubal,
+         coarsening_factor);
+}
+
+void SPE10Problem::Init(
+    const char* permFile, int nDimensions, int spe10_scale, int slice,
+    bool metis_partition, double proc_part_ubal, const mfem::Array<int>& coarsening_factor)
 {
     int num_procs, myid;
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -165,7 +189,14 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     IPF::SetNumberCells(N[0], N[1], N[2]);
     IPF::SetMeshSizes(h(0), h(1), h(2));
-    IPF::ReadPermeabilityFile(permFile, MPI_COMM_WORLD);
+    if (permFile != NULL && (std::strcmp(permFile, "") == 0))
+    {
+        IPF::BlankPermeability();
+    }
+    else
+    {
+        IPF::ReadPermeabilityFile(permFile, MPI_COMM_WORLD);
+    }
 
     if (nDimensions == 2)
         IPF::Set2DSlice(IPF::XY, slice);
@@ -173,22 +204,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
     kinv_ = new mfem::VectorFunctionCoefficient(
         nDimensions, IPF::InversePermeability);
 
-    const bool use_egg_model = false;
-    if (use_egg_model)
-    {
-        std::string meshfile = "Egg_model.mesh";
-        std::ifstream imesh(meshfile.c_str());
-        if (!imesh)
-        {
-            if (myid == 0)
-                std::cerr << "\nCan not open mesh file: " << meshfile
-                          << std::endl;
-            throw 2;
-        }
-        mesh = make_unique<mfem::Mesh>(imesh, 1, 1);
-        imesh.close();
-    }
-    else if (nDimensions == 3)
+    if (nDimensions == 3)
     {
         mesh = make_unique<mfem::Mesh>(
                    N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1,
@@ -203,7 +219,16 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions,
 
     if (metis_partition)
     {
-        pmesh_  = new mfem::ParMesh(comm, *mesh);
+        auto elem_elem = TableToMatrix(mesh->ElementToElementTable());
+
+        mfem::Array<int> partition;
+        MetisGraphPartitioner partitioner;
+        partitioner.setUnbalanceTol(proc_part_ubal);
+        partitioner.doPartition(elem_elem, num_procs, partition);
+
+        pmesh_  = new mfem::ParMesh(comm, *mesh, partition);
+
+        assert(partition.Max() + 1 == num_procs);
     }
     else
     {
@@ -252,4 +277,6 @@ SPE10Problem::~SPE10Problem()
     delete kinv_;
     delete pmesh_;
 }
+
+} // namespace smoothg
 

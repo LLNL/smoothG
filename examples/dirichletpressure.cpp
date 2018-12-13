@@ -56,6 +56,7 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
+    UpscaleParameters upscale_param;
     const char* permFile = "spe_perm.dat";
     args.AddOption(&permFile, "-p", "--perm",
                    "SPE10 permeability file data.");
@@ -65,12 +66,6 @@ int main(int argc, char* argv[])
     int slice = 1;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.0;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -78,21 +73,10 @@ int main(int argc, char* argv[])
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
@@ -132,7 +116,7 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, coarseningFactor);
+                              metis_agglomeration, 1.0, coarseningFactor);
 
     mfem::ParMesh* pmesh = spe10problem.GetParMesh();
 
@@ -179,17 +163,9 @@ int main(int argc, char* argv[])
     rhs_u_fine = 0.0;
 
     // Construct vertex_edge table in mfem::SparseMatrix format
-    mfem::SparseMatrix vertex_edge;
-    if (nDimensions == 2)
-    {
-        mfem::SparseMatrix tmp = TableToSparse(pmesh->ElementToEdgeTable());
-        vertex_edge.Swap(tmp);
-    }
-    else
-    {
-        mfem::SparseMatrix tmp = TableToSparse(pmesh->ElementToFaceTable());
-        vertex_edge.Swap(tmp);
-    }
+    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
+                              : pmesh->ElementToFaceTable();
+    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration
     mfem::Array<int> partitioning;
@@ -207,27 +183,26 @@ int main(int argc, char* argv[])
 
     auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
 
-    FiniteVolumeUpscale fvupscale(comm, vertex_edge, weight, partitioning, *edge_d_td,
-                                  edge_boundary_att, ess_attr, spect_tol, max_evects,
-                                  dual_target, scaled_dual, energy_dual, hybridization);
+    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
 
-    mfem::Array<int> marker(fvupscale.GetFineMatrix().getD().Width());
-    marker = 0;
-    sigmafespace.GetEssentialVDofs(ess_attr, marker);
-    fvupscale.MakeFineSolver(marker);
+    // Create Upscaler and Solve
+    Upscale fvupscale(graph, upscale_param, &partitioning, &ess_attr);
+    fvupscale.MakeSolver(0);
 
     fvupscale.PrintInfo();
     fvupscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
+    mfem::BlockVector rhs_fine(fvupscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = rhs_sigma_fine;
     rhs_fine.GetBlock(1) = rhs_u_fine;
 
-    auto sol_upscaled = fvupscale.Solve(rhs_fine);
-    fvupscale.ShowCoarseSolveInfo();
+    mfem::BlockVector sol_upscaled(rhs_fine);
+    fvupscale.Solve(1, rhs_fine, sol_upscaled);
+    fvupscale.ShowSolveInfo(1);
 
-    auto sol_fine = fvupscale.SolveFine(rhs_fine);
-    fvupscale.ShowFineSolveInfo();
+    mfem::BlockVector sol_fine(rhs_fine);
+    fvupscale.Solve(0, rhs_fine, sol_fine);
+    fvupscale.ShowSolveInfo(0);
 
     auto error_info = fvupscale.ComputeErrors(sol_upscaled, sol_fine);
     if (myid == 0)

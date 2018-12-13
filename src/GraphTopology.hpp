@@ -25,6 +25,7 @@
 #include <assert.h>
 
 #include "mfem.hpp"
+#include "Graph.hpp"
 
 namespace smoothg
 {
@@ -46,92 +47,84 @@ public: // static functions
         mfem::SparseMatrix& aggregate_edge_int);
 public:
     /**
-       @brief Build agglomerated topology relation tables.
+       @brief Build agglomerated topology relation tables of a given graph
 
        All of this data is local to a single processor
 
-       @param vertex_edge (unsigned) table describing graph
-       @param edge_d_td "dof_truedof" relation describing parallel data
-       @param partition partition vector for vertices
-       @param edge_boundaryattr boundary attributes for edges with boundary conditions
+       @param graph graph oject containing vertex edge relation
     */
-    GraphTopology(mfem::SparseMatrix& vertex_edge,
-                  const mfem::HypreParMatrix& edge_d_td,
-                  const mfem::Array<int>& partition,
-                  const mfem::SparseMatrix* edge_boundaryattr = nullptr);
+    GraphTopology(const Graph& graph);
 
     /**
-       @brief Partial graph-based constructor for graph topology.
-
-       Uses given topology relations to construct the aggregated topology.
-
-       @todo the arguments to this constructor should be carefully documented
+       @brief Move constructor
     */
-    GraphTopology(const mfem::SparseMatrix& face_edge,
-                  const mfem::SparseMatrix& Agg_vertex,
-                  const mfem::SparseMatrix& Agg_edge,
-                  const mfem::HypreParMatrix& pAggExt_vertex,
-                  const mfem::HypreParMatrix& pAggExt_edge,
-                  const mfem::SparseMatrix& Agg_face,
-                  const mfem::HypreParMatrix& edge_d_td,
-                  const mfem::HypreParMatrix& face_d_td,
-                  const mfem::HypreParMatrix& face_d_td_d);
+    GraphTopology(GraphTopology&& graph_topology) noexcept;
 
-    ~GraphTopology() {}
+    /**
+       @brief Coarsen fine graph
+       @param coarsening_factor intended number of vertices in an aggregate
+       @return coarse graph
+    */
+    std::shared_ptr<Graph> Coarsen(int coarsening_factor);
+
+    /**
+       @brief Coarsen fine graph
+       @param partitioning partitioning vector for vertices
+       @return coarse graph
+    */
+    std::shared_ptr<Graph> Coarsen(const mfem::Array<int>& partitioning);
+
+    /// Getter for fine graph
+    const Graph& FineGraph() const
+    {
+        assert(fine_graph_);
+        return *fine_graph_;
+    }
+
+    /// Getter for coarse graph
+    const Graph& CoarseGraph() const
+    {
+        assert(coarse_graph_);
+        return *coarse_graph_;
+    }
+
+    /// Setter for coarse graph
+    void SetCoarseGraph(std::shared_ptr<Graph> coarse_graph)
+    {
+        coarse_graph_ = coarse_graph;
+    }
 
     /// Return number of faces in aggregated graph
-    unsigned int get_num_faces() const { return Agg_face_.Width(); }
+    unsigned int NumFaces() const { return face_edge_.NumRows(); }
     /// Return number of aggregates in coarse graph
-    unsigned int get_num_aggregates() const { return Agg_face_.Height(); }
+    unsigned int NumAggs() const { return Agg_vertex_.NumRows(); }
 
     ///@name Getters for row/column partitions of tables
     ///@{
-    mfem::Array<HYPRE_Int>& GetVertexStart() { return vertex_start_; }
-    mfem::Array<HYPRE_Int>& GetEdgeStart() { return edge_start_; }
-    mfem::Array<HYPRE_Int>& GetFaceStart() { return face_start_; }
-    const mfem::Array<HYPRE_Int>& GetVertexStart() const { return vertex_start_; }
-    const mfem::Array<HYPRE_Int>& GetEdgeStart() const { return edge_start_; }
-    const mfem::Array<HYPRE_Int>& GetFaceStart() const { return face_start_; }
+    mfem::Array<HYPRE_Int>& GetAggregateStarts() { return agg_start_; }
+    mfem::Array<HYPRE_Int>& GetFaceStarts() { return face_start_; }
+    const mfem::Array<HYPRE_Int>& GetAggregateStarts() const { return agg_start_; }
+    const mfem::Array<HYPRE_Int>& GetFaceStarts() const { return face_start_; }
     ///@}
 
-    ///@name dof to true_dof tables for edge and face
+    ///@name entity_trueentity_entity tables, which connect dofs across processors that share a true entity
     ///@{
-    const mfem::HypreParMatrix& edge_d_td_;
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_;
-    ///@}
-
-    ///@name dof_truedof_dof tables, which connect dofs across processors that share a true dof
-    ///@{
-    std::unique_ptr<mfem::HypreParMatrix> edge_d_td_d_;
-    std::unique_ptr<mfem::HypreParMatrix> face_d_td_d_;
+    std::unique_ptr<mfem::HypreParMatrix> face_trueface_face_;
     ///@}
 
     ///@name topology relation tables, connecting aggregates, edges, faces, and vertices
     ///@{
-    mfem::SparseMatrix Agg_edge_;
     mfem::SparseMatrix Agg_vertex_;
     mfem::SparseMatrix face_Agg_;
-    mfem::SparseMatrix Agg_face_;
     mfem::SparseMatrix face_edge_;
     ///@}
 
-    ///@name extended aggregate relation tables, using "true dofs"
-    ///@{
-    std::unique_ptr<mfem::HypreParMatrix> pAggExt_vertex_;
-    std::unique_ptr<mfem::HypreParMatrix> pAggExt_edge_;
-    ///@}
-
-    /// "face" to boundary attribute table
-    mfem::SparseMatrix face_bdratt_;
-
 private:
-    MPI_Comm comm_;
-    int num_procs_;
-    int myid_;
+    const Graph* fine_graph_;
+    std::shared_ptr<Graph> coarse_graph_;
+    const mfem::HypreParMatrix* edge_trueedge_edge_;
 
-    mfem::Array<HYPRE_Int> vertex_start_;
-    mfem::Array<HYPRE_Int> edge_start_;
-    mfem::Array<HYPRE_Int> aggregate_start_;
+    mfem::Array<HYPRE_Int> agg_start_;
     mfem::Array<HYPRE_Int> face_start_;
 }; // class GraphTopology
 

@@ -31,5 +31,6 @@
 #include "GraphGenerator.hpp"
 #include "Upscale.hpp"
 #include "UpscaleOperators.hpp"
-#include "GraphUpscale.hpp"
-#include "FiniteVolumeUpscale.hpp"
+#include "Graph.hpp"
+#include "Sampler.hpp"
+#include "GraphSpace.hpp"

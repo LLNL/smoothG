@@ -39,13 +39,8 @@ namespace smoothg
 class Mixed_GL_Coarsener
 {
 public:
-    /**
-       @brief Build a coarsener from the graph Laplacian and the
-       agglomerated topology.
-    */
-    Mixed_GL_Coarsener(const MixedMatrix& mgL,
-                       std::unique_ptr<GraphTopology> gt)
-        : mgL_(mgL), graph_topology_(std::move(gt)) {}
+    /// Default constructor
+    Mixed_GL_Coarsener() = default;
 
     virtual ~Mixed_GL_Coarsener() {}
 
@@ -57,99 +52,35 @@ public:
        \f$ P_u \f$ and \f$ P_\sigma \f$ whose columns represent the coarse
        degrees of freedom on the fine spaces.
 
-       This routine also uses matrix triple products to produce coarse
-       versions of the derivative matrix \f$ D \f$ and the weighting
-       matrix \f$ M \f$.
+       This routine also produces coarse versions of the derivative matrix
+       \f$ D \f$ and the weighting matrix \f$ M \f$.
+
+       @return coarse mixed system
     */
-    void construct_coarse_subspace()
+    MixedMatrix Coarsen(
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr)
     {
-        graph_coarsen_ = make_unique<GraphCoarsen>(mgL_, *graph_topology_);
-        do_construct_coarse_subspace();
         is_coarse_subspace_constructed_ = true;
+        return do_construct_coarse_subspace(mgL, partitioning);
     }
 
-    const mfem::SparseMatrix& get_Psigma() const;
-    const mfem::SparseMatrix& get_Pu() const;
-    const std::vector<mfem::DenseMatrix>& get_CM_el() const;
-    //const std::vector<std::unique_ptr<mfem::DenseMatrix>>& get_CM_el() const;
+    /// Get the interpolation matrix for edge space
+    const mfem::SparseMatrix& GetPsigma() const;
 
-    /// Coarsen the (block) right-hand side by multiplying by \f$ P_\sigma, P_u \f$
-    std::unique_ptr<mfem::BlockVector> coarsen_rhs(
-        const mfem::BlockVector& rhs) const;
+    /// Get the interpolation matrix for vertex space
+    const mfem::SparseMatrix& GetPu() const;
 
     // Mixed form
-    void coarsen(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
-    void interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
+    void Restrict(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
+    void Interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
 
     // Primal form
-    void coarsen(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
-    void interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
-
-    const mfem::SparseMatrix& construct_Agg_cvertexdof_table() const;
-    const mfem::SparseMatrix& construct_Agg_cedgedof_table() const;
-    const mfem::SparseMatrix& construct_face_facedof_table() const;
-
-    const mfem::HypreParMatrix& get_face_dof_truedof_table() const;
-
-    /**
-        @brief Get the Array of offsets representing the block structure of
-        the coarse matrix.
-
-        The Array is of length 3. The first element is the starting
-        index of the first block (always 0), the second element is the
-        starting index of the second block, and the third element is
-        the total number of rows in the matrix.
-    */
-    mfem::Array<int>& get_blockoffsets() const;
-
-    unsigned int get_num_faces()
-    {
-        return graph_topology_->get_num_faces();
-    }
-    unsigned int get_num_aggregates()
-    {
-        return graph_topology_->get_num_aggregates();
-    }
-    const GraphTopology& get_GraphTopology_ref() const
-    {
-        return *graph_topology_;
-    }
-    const GraphCoarsen& get_GraphCoarsen_ref() const
-    {
-        return *graph_coarsen_;
-    }
-
-    /**
-       @brief Get the coarse M matrix
-    */
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseM()
-    {
-        return std::move(CoarseM_);
-    }
-
-    /**
-       @brief Get the coarse D matrix
-    */
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseD()
-    {
-        return std::move(CoarseD_);
-    }
-
-    /**
-       @brief Get the coarse D matrix
-    */
-    std::unique_ptr<mfem::SparseMatrix> GetCoarseW()
-    {
-        return std::move(CoarseW_);
-    }
-
-    /**
-       @brief Creates the matrix from coarse M, D, W
-    */
-    MixedMatrix GetCoarse();
+    void Restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
+    void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
 
 private:
-    virtual void do_construct_coarse_subspace() = 0;
+    virtual MixedMatrix do_construct_coarse_subspace(
+        const MixedMatrix& mgL, const mfem::Array<int>* partitioning = nullptr) = 0;
 
 private:
     bool is_coarse_subspace_constructed_ = false;
@@ -162,28 +93,8 @@ private:
     }
 
 protected:
-    const MixedMatrix& mgL_;
-    std::unique_ptr<GraphTopology> graph_topology_;
-    std::unique_ptr<GraphCoarsen> graph_coarsen_;
-
-    mfem::SparseMatrix face_facedof_table_;
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;
-
-    /// Some kind of element matrices for hybridization
-    //std::vector<std::unique_ptr<mfem::DenseMatrix>> CM_el_;
-    std::vector<mfem::DenseMatrix> CM_el_;
-    mutable std::unique_ptr<mfem::Array<int>> coarseBlockOffsets_;
-    mutable std::unique_ptr<mfem::HypreParMatrix> face_dof_truedof_table_;
-
-    /// Coarse D operator
-    std::unique_ptr<mfem::SparseMatrix> CoarseD_;
-
-    /// Coarse M operator
-    std::unique_ptr<mfem::SparseMatrix> CoarseM_;
-
-    /// Coarse W operator
-    std::unique_ptr<mfem::SparseMatrix> CoarseW_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

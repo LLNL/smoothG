@@ -34,6 +34,10 @@ spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@smoothG_GRAPHDATA@"
 memorycheck_command = "@MEMORYCHECK_COMMAND@"
 
+# Test paramaters
+num_procs = "@SMOOTHG_TEST_PROCS@"
+test_tol = float("@SMOOTHG_TEST_TOL@")
+
 def run_test(command, expected={}, verbose=False):
     """ Executes test
 
@@ -65,7 +69,7 @@ def run_test(command, expected={}, verbose=False):
     for key, expected_val in expected.items():
         test_val = output[key]
 
-        if abs(float(expected_val) - float(test_val)) > 1.e-4:
+        if abs(float(expected_val) - float(test_val)) > test_tol:
             return False
 
     return True
@@ -216,6 +220,69 @@ def make_tests():
           "finest-u-error": 0.38079825403520218,
           "operator-complexity": 1.016509834901651}]
 
+    tests["samplegraph1-coeff"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components"],
+         {"finest-div-error": 0.37918423747873353,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["samplegraph1-coeff-hb"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components",
+          "--hybridization"],
+         {"finest-div-error": 0.37918423747873353,
+          "finest-p-error": 0.38013398274257243,
+          "finest-u-error": 0.38079825403520218,
+          "operator-complexity": 1.000874038778061}]
+
+    tests["parsamplegraph1-coeff"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components"],
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
+          "operator-complexity": 1.016509834901651}]
+
+    tests["parsamplegraph1-coeff-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components"],
+         {"finest-div-error": 0.63689693723000362,
+          "finest-p-error": 0.64187135487003488,
+          "finest-u-error": 0.59087512350996252,
+          "operator-complexity": 1.008739912600874}]
+
+    tests["parsamplegraph1-coeff-hb"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components",
+          "--hybridization"],
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
+          "operator-complexity": 1.000874038778061}]
+
+    tests["parsamplegraph1-coeff-hb-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--coarse-components",
+          "--hybridization"],
+         {"finest-div-error": 0.63689693723000362,
+          "finest-p-error": 0.64187135487003488,
+          "finest-u-error": 0.59087512350996252,
+          "operator-complexity": 1.0004420643459024}]
+
     tests["graph-metis"] = \
         [["./generalgraph",
           "--spect-tol", "1.0",
@@ -244,6 +311,27 @@ def make_tests():
           "finest-p-error": 0.13514675917148347,
           "finest-u-error": 0.19926779054787247,
           "operator-complexity": 1.2578874211257887}]
+
+    tests["samplegraph4-coeff"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4",
+          "--coarse-components"],
+         {"finest-div-error": 0.12043046187567592,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.2578874211257887}]
+
+    tests["samplegraph4-coeff-hb"] = \
+        [["./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4",
+          "--coarse-components",
+          "--hybridization"],
+         {"finest-div-error": 0.12043046187567592,
+          "finest-p-error": 0.13514675917148347,
+          "finest-u-error": 0.19926779054787247,
+          "operator-complexity": 1.013984620448976}]
 
     tests["graph-hybridization"] = \
         [["./generalgraph",
@@ -282,6 +370,13 @@ def make_tests():
           "fine-error": 2.9382710663490486e-05,
           "fine-eval": 0.17545528997990226}]
 
+    tests["poweriter-mac"] = \
+        [["./poweriter"],
+         {"coarse-error": 0.26120392031493855,
+          "coarse-eval": 0.17978705998830949,
+          "fine-error": 2.7998030058085634e-05,
+          "fine-eval": 0.17545528997985335}]
+
     tests["graph-weight"] = \
         [["./generalgraph",
           "--graph", graph_data + "/vertex_edge_tiny.txt",
@@ -294,13 +389,38 @@ def make_tests():
           "finest-u-error": 0.14767829457535478,
           "operator-complexity": 1.1666666666666667}]
 
+    tests["mlmc-sanity"] = \
+        [["./mlmc",
+          "--perm", spe10_perm_file],
+         {"finest-p-error": 0.10754186878360708}]
+
+    tests["mlmc-pde-sampler"] = \
+        [["./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01"],
+         {"finest-p-error": 0.1487505869352104}]
+
+    tests["mlmc-pde-sampler-hb"] = \
+        [["./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01",
+          "--hybridization",
+          "--no-coarse-components"],
+         {"finest-p-error": 0.14875751525009742}]
+
+    tests["par-mlmc"] = \
+        [["mpirun", "-n", "2", "./mlmc",
+          "--sampler-type", "pde",
+          "--kappa", "0.01"],
+         {"finest-p-error": 0.38805214759478951}]
+
     tests["timestep"] = \
         [["./timestep",
           "--total-time", "100.0",
           "--perm", spe10_perm_file]]
 
     tests["pareigenvector1"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "1",
@@ -311,7 +431,7 @@ def make_tests():
           "operator-complexity": 1.0221724964280585}]
 
     tests["pareigenvector4"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -322,7 +442,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parfv-hybridization"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -334,7 +454,7 @@ def make_tests():
           "operator-complexity": 1.1362437864707153}]
 
     tests["parslice19"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "19",
           "--max-evects", "1",
@@ -345,7 +465,7 @@ def make_tests():
           "operator-complexity": 1.0221724964280585}]
 
     tests["pardual-trace"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -357,7 +477,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parscaled-dual-trace"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -370,7 +490,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parenergy-dual-trace"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -383,7 +503,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parscaled-energy-dual-trace"] = \
-        [["mpirun", "-n", "4", "./finitevolume",
+        [["mpirun", "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -397,82 +517,117 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parsamplegraph1"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1"],
-         {"finest-div-error": 0.37918423727222522,
-          "finest-p-error": 0.38013398274257243,
-          "finest-u-error": 0.38079825403520218,
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
+    tests["parsamplegraph1-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "1"],
+         {"finest-div-error": 0.63689693723000385,
+          "finest-p-error": 0.64187135487003799,
+          "finest-u-error": 0.59087512350995663,
+          "operator-complexity": 1.008739912600874}]
+
     tests["pargraph-metis"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--metis-agglomeration"],
-         {"finest-div-error": 0.44710819906667049,
-          "finest-p-error": 0.44939226988126274,
-          "finest-u-error": 0.42773807524771068,
+         {"finest-div-error": 0.79929158208615803,
+          "finest-p-error": 0.80196594708999625,
+          "finest-u-error": 0.78297677149740286,
           "operator-complexity": 1.016509834901651}]
 
     tests["pargraph-metis-mac"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--metis-agglomeration"],
-         {"finest-div-error": 0.22228470008233389,
-          "finest-p-error": 0.22265174467689006,
-          "finest-u-error": 0.22168973853676807,
-          "operator-complexity": 1.016509834901651}]
+         {"finest-div-error": 0.63689693723000385,
+          "finest-p-error": 0.64187135487003799,
+          "finest-u-error": 0.59087512350995663,
+          "operator-complexity": 1.008739912600874}]
 
     tests["parsamplegraph4"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
-         {"finest-div-error": 0.12043046187567592,
-          "finest-p-error": 0.13514675917148347,
-          "finest-u-error": 0.19926779054787247,
-          "operator-complexity": 1.2578874211257887}]
+         {"finest-div-error": 0.1438138616203242,
+          "finest-p-error": 0.1874559440644907,
+          "finest-u-error": 0.25470044682041143,
+          "operator-complexity": 1.2292477075229247}]
+
+    tests["parsamplegraph4-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4"],
+         {"finest-div-error": 0.094122554052011503,
+          "finest-p-error": 0.11511310888163191,
+          "finest-u-error": 0.18119613898323036,
+          "operator-complexity": 1.1303686963130368}]
 
     tests["pargraph-hybridization"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--hybridization"],
-         {"finest-div-error": 0.12051328492652449,
-          "finest-p-error": 0.13514675917148347,
-          "finest-u-error": 0.19926779054787247,
-          "operator-complexity": 1.013984620448976}]
+         {"finest-div-error": 0.1438138616203242,
+          "finest-p-error": 0.1874559440644907,
+          "finest-u-error": 0.25470044682041143,
+          "operator-complexity": 1.0124793314423153}]
+
+    tests["pargraph-hybridization-mac"] = \
+        [["mpirun", "-n", num_procs, "./generalgraph",
+          "--spect-tol", "1.0",
+          "--max-evects", "4",
+          "--hybridization"],
+         {"finest-div-error": 0.094122554052011503,
+          "finest-p-error": 0.11511310888163191,
+          "finest-u-error": 0.18119613898323036,
+          "operator-complexity": 1.0067715933613413}]
 
     tests["pargraph-usegenerator"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--generate-graph"],
-         {"finest-div-error": 0.11283262603381641,
-          "finest-p-error": 0.1203852548326301,
-          "finest-u-error": 0.16674213482507089,
-          "operator-complexity": 1.2578874211257887}]
+         {"finest-div-error": 0.19793206480307649,
+          "finest-p-error": 0.28945297307624301,
+          "finest-u-error": 0.29617987947507896,
+          "operator-complexity": 1.1895581044189558}]
 
     tests["pargraph-usegenerator-mac"] = \
-        [["mpirun", "-n", "4", "./generalgraph",
+        [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--generate-graph"],
-         {"finest-div-error": 0.1070681247529167,
-          "finest-p-error": 0.10863131137013603,
-          "finest-u-error": 0.12848813745253315,
-          "operator-complexity": 1.2578874211257887}]
+         {"finest-div-error": 0.10696386867442335,
+          "finest-p-error": 0.19594367090858048,
+          "finest-u-error": 0.2468153494604973,
+          "operator-complexity": 1.1347886521134789}]
 
     tests["parpoweriter"] = \
-        [["mpirun", "-n", "4", "./poweriter"],
-         {"coarse-error": 0.20499789652195419,
-          "coarse-eval": 0.17663653207421526,
-          "fine-error": 2.9887390635842169e-05,
-          "fine-eval": 0.17545528997977797}]
+        [["mpirun", "-n", num_procs, "./poweriter"],
+         {"coarse-error": 1.4795742061962853,
+          "coarse-eval": 0.33533401525270057,
+          "fine-error": 2.950192232309819e-05,
+          "fine-eval": 0.17545528997987314}]
+
+    tests["parpoweriter-mac"] = \
+        [["mpirun", "-n", num_procs, "./poweriter"],
+         {"coarse-error": 1.3769646029608467,
+          "coarse-eval": 0.24465778499404064,
+          "fine-error": 2.9877711869866266e-05,
+          "fine-eval": 0.1754552899797806}]
 
     tests["partimestep"] = \
-        [["mpirun", "-n", "4", "./timestep",
+        [["mpirun", "-n", num_procs, "./timestep",
           "--total-time", "100.0",
           "--perm", spe10_perm_file]]
 
@@ -484,10 +639,35 @@ def make_tests():
           "--isolate", "0"],
          {"operator-complexity": 1.2736672633273667}]
 
+    tests["sampler"] = \
+        [["./sampler",
+          "--kappa", "0.01",
+          "--num-samples", "2"],
+         {"fine-mean-l1": 0.54961180496539375,
+          "p-error-level-1": 0.39869063097389679}]
+
+    tests["ml-sampler"] = \
+        [["./sampler",
+          "--num-samples", "1",
+          "--max-levels", "3",
+          "--spect-tol", "1.0",
+          "--max-evects", "1"],
+         {"p-error-level-1": 0.20833920382939719,
+          "p-error-level-2": 0.40118441747952621}]
+
+    tests["ml-sampler4"] = \
+        [["./sampler",
+          "--num-samples", "1",
+          "--max-levels", "3",
+          "--spect-tol", "1.0",
+          "--max-evects", "4"],
+         {"p-error-level-1": 0.15983187318775974,
+          "p-error-level-2": 0.34182546133693903}]
+
     if "tux" in platform.node():
         tests["veigenvector"] = \
             [[memorycheck_command, "--leak-check=full",
-              "mpirun", "-n", "4", "./finitevolume",
+              "mpirun", "-n", num_procs, "./finitevolume",
               "--max-evects", "1",
               "--spe10-scale", "1",
               "--perm", spe10_perm_file]]

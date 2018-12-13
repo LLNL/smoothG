@@ -30,45 +30,37 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const MixedMatrix& mgL,
-                                                     std::unique_ptr<GraphTopology> gt,
-                                                     double spectral_tol,
-                                                     unsigned int max_evecs_per_agg,
-                                                     bool dual_target,
-                                                     bool scaled_dual,
-                                                     bool energy_dual,
-                                                     bool is_hybridization_used)
-    : Mixed_GL_Coarsener(mgL, std::move(gt)),
-      is_hybridization_used_(is_hybridization_used),
-      spectral_tol_(spectral_tol),
-      max_evecs_per_agg_(max_evecs_per_agg),
-      dual_target_(dual_target),
-      scaled_dual_(scaled_dual),
-      energy_dual_(energy_dual)
+SpectralAMG_MGL_Coarsener::SpectralAMG_MGL_Coarsener(const UpscaleParameters& param)
+    : Mixed_GL_Coarsener(), param_(param)
 {
 }
 
-void SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace()
+MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
+    const MixedMatrix& mgL, const mfem::Array<int>* partitioning)
 {
-    using LMGST = LocalMixedGraphSpectralTargets;
+    GraphTopology topology(mgL.GetGraph());
+    std::shared_ptr<Graph> coarse_graph = partitioning ? topology.Coarsen(*partitioning)
+                                          : topology.Coarsen(param_.coarse_factor);
+
+    DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LMGST localtargets(spectral_tol_, max_evecs_per_agg_, dual_target_,
-                       scaled_dual_, energy_dual_, mgL_.getWeight(),
-                       mgL_.getD(), mgL_.getW(), *graph_topology_);
+    LocalMixedGraphSpectralTargets localtargets(mgL, dof_agg, param_);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
-    graph_coarsen_->BuildInterpolation(local_edge_traces,
-                                       local_spectral_vertex_targets,
-                                       Pu_, Psigma_, face_facedof_table_,
-                                       CM_el_, is_hybridization_used_);
+    GraphCoarsen graph_coarsen(mgL, dof_agg);
+    GraphSpace coarse_space = graph_coarsen.BuildCoarseSpace(local_edge_traces,
+                                                             local_spectral_vertex_targets,
+                                                             std::move(*coarse_graph));
 
-    CoarseD_ = graph_coarsen_->GetCoarseD();
-    CoarseM_ = graph_coarsen_->GetCoarseM();
+    graph_coarsen.BuildInterpolation(local_edge_traces,
+                                     local_spectral_vertex_targets,
+                                     coarse_space, param_.coarse_components,
+                                     Pu_, Psigma_);
 
-    CoarseW_ = graph_coarsen_->GetCoarseW();
+    return graph_coarsen.BuildCoarseMatrix(std::move(coarse_space), mgL, Pu_);
 }
 
 } // namespace smoothg
