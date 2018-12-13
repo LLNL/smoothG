@@ -96,7 +96,6 @@ int main(int argc, char* argv[])
 
         // Interpolate back to Fine Level
         auto sol_u_fine = upscale.Interpolate(1, sol_u_coarse);
-        upscale.Orthogonalize(0, sol_u_fine);
 
         graph.WriteVertexVector(sol_u_fine, "sol3.out");
     }

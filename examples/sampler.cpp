@@ -316,7 +316,6 @@ int main(int argc, char* argv[])
             auto sol_upscaled = InterpolateToFine(*upscale, level, sol_coarse);
             for (int i = 0; i < sol_upscaled.Size(); ++i)
                 sol_upscaled(i) = std::log(sol_upscaled(i));
-            upscale->Orthogonalize(0, sol_upscaled);
             iterations = upscale->GetSolveIters(level);
             total_iterations[level] += iterations;
             time = upscale->GetSolveTime(level);

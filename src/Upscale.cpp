@@ -276,25 +276,6 @@ void Upscale::TrueBlockOffsets(int level, mfem::Array<int>& offsets) const
     GetMatrix(level).GetBlockTrueOffsets().Copy(offsets);
 }
 
-void Upscale::Orthogonalize(int level, mfem::BlockVector& vect) const
-{
-    Orthogonalize(level, vect.GetBlock(1));
-}
-
-void Upscale::Orthogonalize(int level, mfem::Vector& vect) const
-{
-    const mfem::Vector& coarse_constant_rep = GetConstantRep(level);
-    double local_dot = (vect * coarse_constant_rep);
-    double global_dot;
-    MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
-
-    double local_scale = (coarse_constant_rep * coarse_constant_rep);
-    double global_scale;
-    MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
-
-    vect.Add(-global_dot / global_scale, coarse_constant_rep);
-}
-
 mfem::Vector Upscale::GetVector(int level) const
 {
     const auto& offsets = GetMatrix(level).GetBlockOffsets();

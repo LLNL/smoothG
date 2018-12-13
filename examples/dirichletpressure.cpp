@@ -213,13 +213,13 @@ int main(int argc, char* argv[])
     double QoI = mfem::InnerProduct(comm, sol_fine.GetBlock(0), rhs_sigma_fine);
     if (myid == 0)
     {
-        std::cout<< "Fine level QoI = " << QoI << "\n";
+        std::cout << "Fine level QoI = " << QoI << "\n";
     }
 
     QoI = mfem::InnerProduct(comm, sol_upscaled.GetBlock(0), rhs_sigma_fine);
     if (myid == 0)
     {
-        std::cout<< "Coarse level QoI = " << QoI << "\n";
+        std::cout << "Coarse level QoI = " << QoI << "\n";
     }
 
     // Visualize the solution

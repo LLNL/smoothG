@@ -315,14 +315,14 @@ int main(int argc, char* argv[])
     sol = 0.0;
     if (myid == 0)
         std::cout << "Solving graph problem..." << std::endl;
-//    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, w_block);
-//    mgp.Mult(rhs, sol);
-//    int iter = mgp.GetNumIterations();
-//    // int nnz = mgp.GetNNZ();
-//    // std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
-//    if (myid == 0)
-//        std::cout << "Minres converged in " << iter << " iterations."
-//                  << std::endl;
+    //    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, w_block);
+    //    mgp.Mult(rhs, sol);
+    //    int iter = mgp.GetNumIterations();
+    //    // int nnz = mgp.GetNNZ();
+    //    // std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
+    //    if (myid == 0)
+    //        std::cout << "Minres converged in " << iter << " iterations."
+    //                  << std::endl;
 
     if (!w_block)
     {
