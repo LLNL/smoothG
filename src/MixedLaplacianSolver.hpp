@@ -65,8 +65,8 @@ public:
     ///@}
 
 protected:
-    std::unique_ptr<mfem::BlockVector> rhs_;
-    std::unique_ptr<mfem::BlockVector> sol_;
+    mutable mfem::BlockVector rhs_;
+    mutable mfem::BlockVector sol_;
 
     // default linear solver options
     int print_level_ = 0;

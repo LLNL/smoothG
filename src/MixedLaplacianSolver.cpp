@@ -24,8 +24,8 @@ namespace smoothg
 {
 
 MixedLaplacianSolver::MixedLaplacianSolver(const mfem::Array<int>& block_offsets)
-    : rhs_(make_unique<mfem::BlockVector>(block_offsets)),
-      sol_(make_unique<mfem::BlockVector>(block_offsets)),
+    : rhs_(block_offsets),
+      sol_(block_offsets),
       nnz_(0), num_iterations_(0), timing_(0)
 {
 
@@ -36,12 +36,12 @@ void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) con
     assert(rhs_);
     assert(sol_);
 
-    rhs_->GetBlock(0) = 0.0;
-    rhs_->GetBlock(1) = rhs;
+    rhs_.GetBlock(0) = 0.0;
+    rhs_.GetBlock(1) = rhs;
 
-    Solve(*rhs_, *sol_);
+    Solve(rhs_, sol_);
 
-    sol = sol_->GetBlock(1);
+    sol = sol_.GetBlock(1);
 }
 
 void MixedLaplacianSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const

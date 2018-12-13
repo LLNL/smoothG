@@ -193,14 +193,14 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Clear();
     chrono.Start();
 
-    *rhs_ = rhs;
+    rhs_ = rhs;
 
     if (!use_W_ && remove_one_dof_ && myid_ == 0)
     {
-        rhs_->GetBlock(1)(0) = 0.0;
+        rhs_.GetBlock(1)(0) = 0.0;
     }
 
-    minres_.Mult(*rhs_, sol);
+    minres_.Mult(rhs_, sol);
 
     chrono.Stop();
     timing_ = chrono.RealTime();
