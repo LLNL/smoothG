@@ -75,7 +75,7 @@ public:
     /**
        @brief Constructor from a single MixedMatrix
     */
-    MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL,
+    MinresBlockSolver(const MixedMatrix& mgL,
                       const mfem::Array<int>* ess_attr = nullptr);
 
     ~MinresBlockSolver();
@@ -121,7 +121,7 @@ private:
 class MinresBlockSolverFalse : public MinresBlockSolver
 {
 public:
-    MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL,
+    MinresBlockSolverFalse(const MixedMatrix& mgL,
                            const mfem::Array<int>* ess_attr = nullptr);
     ~MinresBlockSolverFalse();
 

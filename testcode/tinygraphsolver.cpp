@@ -142,10 +142,10 @@ int main(int argc, char* argv[])
     // setup solvers
     std::map<MixedLaplacianSolver*, std::string> solver_to_name;
 
-    MinresBlockSolver minres(comm, mixed_graph_laplacian);
+    MinresBlockSolver minres(mixed_graph_laplacian);
     solver_to_name[&minres] = "Minres + block preconditioner";
 
-    HybridSolver hb_bamg(comm, mixed_graph_laplacian);
+    HybridSolver hb_bamg(mixed_graph_laplacian);
     solver_to_name[&hb_bamg] = "Hybridization + BoomerAMG";
 
 #if SMOOTHG_USE_SAAMGE

@@ -81,12 +81,12 @@ void Upscale::MakeSolver(int level)
     {
         SAAMGeParam* saamge_param = level > 0 ? param_.saamge_param : nullptr;
         solver_[level] = make_unique<HybridSolver>(
-                             comm_, GetMatrix(level), ess_attr_, 0, saamge_param);
+                             GetMatrix(level), ess_attr_, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level),
+        solver_[level] = make_unique<MinresBlockSolverFalse>(GetMatrix(level),
                                                              ess_attr_);
     }
     MakeVectors(level);
@@ -111,7 +111,6 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     {
         sol_[level]->GetBlock(1) *= -1.0;
     }
-    // orthogonalize at coarse level, every level, or fine level?
 
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
@@ -119,11 +118,6 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
         coarsener_[i]->Interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
     y = sol_[0]->GetBlock(1);
-
-    if (remove_one_dof_)
-    {
-        Orthogonalize(0, y);
-    }
 }
 
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
@@ -162,12 +156,6 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
 
     solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
-    // orthogonalize at coarse level, every level, or fine level?
-    if (remove_one_dof_)
-    {
-        Orthogonalize(level, sol_[level]->GetBlock(1));
-    }
-
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
     {
@@ -191,11 +179,6 @@ void Upscale::SolveAtLevel(int level, const mfem::Vector& x, mfem::Vector& y) co
 
     solver_[level]->Solve(x, y);
     y *= -1.0; // ????
-
-    if (remove_one_dof_)
-    {
-        Orthogonalize(level, y);
-    }
 }
 
 mfem::Vector Upscale::SolveAtLevel(int level, const mfem::Vector& x) const
@@ -212,11 +195,6 @@ void Upscale::SolveAtLevel(int level, const mfem::BlockVector& x, mfem::BlockVec
 
     solver_[level]->Solve(x, y);
     y *= -1.0;
-
-    if (remove_one_dof_)
-    {
-        Orthogonalize(level, y); // TODO: temporary literal 1!
-    }
 }
 
 mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) const

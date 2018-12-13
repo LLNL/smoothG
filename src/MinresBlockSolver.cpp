@@ -116,7 +116,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     minres_.iterative_mode = false;
 }
 
-MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL,
+MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
                                      const mfem::Array<int>* ess_attr)
     :
     MixedLaplacianSolver(mgL, ess_attr),
@@ -145,7 +145,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL,
     const mfem::HypreParMatrix& edge_d_td(mgL.GetEdgeDofToTrueDof());
     const mfem::HypreParMatrix& edge_td_d(mgL.GetEdgeTrueDofToDof());
 
-    mfem::HypreParMatrix M(comm, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_proc);
+    mfem::HypreParMatrix M(comm_, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_proc);
     std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M, &edge_d_td));
     hM_.reset(ParMult(&edge_td_d, M_tmp.get()));
 
@@ -235,10 +235,10 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 /**
    MinresBlockSolver acts on "true" dofs, this one does not.
 */
-MinresBlockSolverFalse::MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL,
+MinresBlockSolverFalse::MinresBlockSolverFalse(const MixedMatrix& mgL,
                                                const mfem::Array<int>* ess_attr)
     :
-    MinresBlockSolver(comm, mgL, ess_attr),
+    MinresBlockSolver(mgL, ess_attr),
     mixed_matrix_(mgL),
     true_rhs_(mgL.GetBlockTrueOffsets()),
     true_sol_(mgL.GetBlockTrueOffsets())

@@ -97,8 +97,7 @@ public:
               hybridized system if saamge_param is not nullptr, otherwise
               BoomerAMG is used instead.
     */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgL,
+    HybridSolver(const MixedMatrix& mgL,
                  const mfem::Array<int>* ess_attr = nullptr,
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);

@@ -29,8 +29,7 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-HybridSolver::HybridSolver(MPI_Comm comm,
-                           const MixedMatrix& mgL,
+HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const mfem::Array<int>* ess_attr,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
@@ -41,7 +40,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
-    MPI_Comm_rank(comm, &myid_);
+    MPI_Comm_rank(comm_, &myid_);
 
     auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
