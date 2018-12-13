@@ -68,23 +68,6 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
         }
     }
 
-    remove_one_dof_ = true;
-    if (mixed_laplacians_.back().CheckW())
-    {
-        remove_one_dof_ = false;
-    }
-    else if (ess_attr_)
-    {
-        for (int i = 0; i < ess_attr_->Size(); ++i)
-        {
-            if ((*ess_attr_)[i] == 0)
-            {
-                remove_one_dof_ = false;
-                break;
-            }
-        }
-    }
-
     // make solver on each level
     for (int level = 0; level < param_.max_levels; ++level)
     {
@@ -94,26 +77,17 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
 
 void Upscale::MakeSolver(int level)
 {
-    mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
-    mfem::Array<int> marker(Dref.Width());
-    marker = 0;
-    if (GetMatrix(level).GetGraph().HasBoundary())
-    {
-        BooleanMult(GetMatrix(level).EDofToBdrAtt(), *ess_attr_, marker);
-        marker.SetSize(Dref.Width());
-    }
-
     if (param_.hybridization) // Hybridization solver
     {
         SAAMGeParam* saamge_param = level > 0 ? param_.saamge_param : nullptr;
         solver_[level] = make_unique<HybridSolver>(
-                             comm_, GetMatrix(level), &marker, 0, saamge_param);
+                             comm_, GetMatrix(level), ess_attr_, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
         solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level),
-                                                             remove_one_dof_, ess_attr_);
+                                                             ess_attr_);
     }
     MakeVectors(level);
 }

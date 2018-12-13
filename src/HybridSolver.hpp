@@ -99,7 +99,7 @@ public:
     */
     HybridSolver(MPI_Comm comm,
                  const MixedMatrix& mgL,
-                 const mfem::Array<int>* ess_edge_dofs = nullptr,
+                 const mfem::Array<int>* ess_attr = nullptr,
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);
 
@@ -107,12 +107,6 @@ public:
 
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
-
-    /// Same as Mult()
-    void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
-    {
-        Mult(rhs, sol);
-    }
 
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const mfem::BlockVector& OriginalRHS,
@@ -176,7 +170,6 @@ protected:
     void BuildParallelSystemAndSolver();
 
 private:
-    MPI_Comm comm_;
     int myid_;
 
     mfem::SparseMatrix Agg_multiplier_;
@@ -219,8 +212,6 @@ private:
     int nAggs_;
     int num_edge_dofs_;
     int num_multiplier_dofs_;
-
-    bool use_w_;
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;

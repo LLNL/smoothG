@@ -31,15 +31,13 @@ namespace smoothg
 
 HybridSolver::HybridSolver(MPI_Comm comm,
                            const MixedMatrix& mgL,
-                           const mfem::Array<int>* ess_edge_dofs,
+                           const mfem::Array<int>* ess_attr,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.GetBlockOffsets()),
-    comm_(comm),
+    MixedLaplacianSolver(mgL, ess_attr),
     D_(mgL.GetD()),
     W_(mgL.GetW()),
-    use_w_(mgL.CheckW()),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
@@ -56,7 +54,7 @@ HybridSolver::HybridSolver(MPI_Comm comm,
     Agg_edgedof_.MakeRef(mgL.GetGraphSpace().VertexToEDof());
 
     Init(mgL.GetGraphSpace().EdgeToEDof(), mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), mgL.EDofToBdrAtt(), ess_edge_dofs);
+         mgL.GetEdgeDofToTrueDof(), mgL.EDofToBdrAtt(), &ess_edofs_);
 }
 
 HybridSolver::~HybridSolver()
@@ -146,20 +144,17 @@ void HybridSolver::Init(
     // Mark the multiplier dof with essential BC
     // Note again there is a 1-1 map from multipliers to edge dofs on faces
     ess_multiplier_bc_ = false;
-    if (edgedof_bdrattr.Width() && ess_edge_dofs)
+    if (edgedof_bdrattr.Width())
     {
-        ess_multiplier_dofs_.SetSize(num_multiplier_dofs_);
+        ess_multiplier_dofs_.SetSize(num_multiplier_dofs_, 0);
         for (int i = 0; i < num_multiplier_dofs_; i++)
         {
             // natural BC for H(div) dof <=> essential BC for multiplier dof
-            //if (edgedof_bdrattr.RowSize(i) > 0 && ess_edge_dofs->operator[](i) != 0)
-            if (edgedof_bdrattr.RowSize(i) && !ess_edge_dofs->operator[](i))
+            if (edgedof_bdrattr.RowSize(i) && !(*ess_edge_dofs)[i])
             {
                 ess_multiplier_dofs_[i] = 1;
                 ess_multiplier_bc_ = true;
             }
-            else
-                ess_multiplier_dofs_[i] = 0;
         }
     }
 
@@ -334,7 +329,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     // assemble true right hand side
     multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
 
-    if (!ess_multiplier_bc_ && !use_w_ && myid_ == 0)
+    if (!ess_multiplier_bc_ && !W_is_nonzero_ && myid_ == 0)
     {
         trueHrhs_[0] = 0.0;
     }
@@ -384,6 +379,11 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 
     multiplier_d_td_->Mult(trueMu_, Mu_);
     RecoverOriginalSolution(Mu_, Sol);
+
+    if (!W_is_nonzero_ && remove_one_dof_ )
+    {
+        Orthogonalize(Sol.GetBlock(1));
+    }
 
     chrono.Stop();
 
@@ -608,7 +608,7 @@ void HybridSolver::BuildParallelSystemAndSolver()
     nnz_ = pHybridSystem_->NNZ();
 
     mfem::Array<int> ess_dof;
-    if (!ess_multiplier_bc_ && !use_w_ && myid_ == 0)
+    if (!ess_multiplier_bc_ && !W_is_nonzero_ && myid_ == 0)
     {
         ess_dof.Append(0);
     }
@@ -664,7 +664,7 @@ void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weights_inverse)
     }
 
     // TODO: this is not valid when W is nonzero
-    assert(use_w_ == false);
+    assert(W_is_nonzero_ == false);
 
     HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
     mfem::Array<int> local_multiplier;

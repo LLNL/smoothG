@@ -33,7 +33,7 @@ namespace smoothg
 class MixedLaplacianSolver : public mfem::Operator
 {
 public:
-    MixedLaplacianSolver(const mfem::Array<int>& block_offsets);
+    MixedLaplacianSolver(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
     MixedLaplacianSolver() = delete;
 
     virtual ~MixedLaplacianSolver() = default;
@@ -45,9 +45,12 @@ public:
        That is, dofs on processor boundaries are *repeated* in the vectors that
        come into and go out of this method.
     */
-    virtual void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
-    virtual void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
-    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
+    void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+
+    void Orthogonalize(mfem::Vector& vec) const;
 
     ///@name Set solver parameters
     ///@{
@@ -65,6 +68,8 @@ public:
     ///@}
 
 protected:
+    MPI_Comm comm_;
+
     mutable mfem::BlockVector rhs_;
     mutable mfem::BlockVector sol_;
 
@@ -77,6 +82,12 @@ protected:
     int nnz_;
     mutable int num_iterations_;
     mutable double timing_;
+
+    bool remove_one_dof_;
+    bool W_is_nonzero_;
+
+    mfem::Array<int> ess_edofs_;
+    const mfem::Vector& const_rep_;
 };
 
 } // namespace smoothg

@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
     // setup solvers
     std::map<MixedLaplacianSolver*, std::string> solver_to_name;
 
-    MinresBlockSolver minres(comm, mixed_graph_laplacian, !w_block);
+    MinresBlockSolver minres(comm, mixed_graph_laplacian);
     solver_to_name[&minres] = "Minres + block preconditioner";
 
     HybridSolver hb_bamg(comm, mixed_graph_laplacian);

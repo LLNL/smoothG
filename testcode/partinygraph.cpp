@@ -293,42 +293,36 @@ int main(int argc, char* argv[])
     mfem::HypreParMatrix* M = build_tiny_graph_weights(weighted);
     mfem::HypreParMatrix* W = build_tiny_w_block();
 
-    // set the appropriate right hand side
-    mfem::HypreParVector rhs_u_fine(comm, M->GetGlobalNumRows(),
-                                    M->GetRowStarts());
-    mfem::HypreParVector rhs_p_fine(comm, D->GetGlobalNumRows(),
-                                    D->GetRowStarts());
-    rhs_u_fine = 0.0;
-    rhs_p_fine = 1.0;
-
     // setup mixed problem
     if (myid == 0)
         std::cout << "Setting up mixed problem..." << std::endl;
     const int num_blocks = 2;
     mfem::Array<int> block_true_offsets(num_blocks + 1);
     block_true_offsets[0] = 0;
-    // block_true_offsets[1] = M->GetGlobalNumRows();
     block_true_offsets[1] = M->Height();
-    // block_true_offsets[2] = D->GetGlobalNumRows();
     block_true_offsets[2] = D->Height();
     block_true_offsets.PartialSum();
+
+    // set the appropriate right hand side
+    mfem::HypreParVector rhs_p_fine(comm, D->M(), D->GetRowStarts());
+    rhs_p_fine = 1.0;
     mfem::BlockVector rhs(block_true_offsets);
-    rhs.GetBlock(0) = rhs_u_fine;
-    rhs.GetBlock(1) = rhs_p_fine;
-    mfem::BlockVector sol(block_true_offsets);
-    sol = 0.0;
+    rhs.GetBlock(0) = 0.0;
+    rhs.GetBlock(1) = 1.0;
 
     // solve
+    mfem::BlockVector sol(block_true_offsets);
+    sol = 0.0;
     if (myid == 0)
         std::cout << "Solving graph problem..." << std::endl;
-    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, !w_block, w_block);
-    mgp.Mult(rhs, sol);
-    int iter = mgp.GetNumIterations();
-    // int nnz = mgp.GetNNZ();
-    // std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
-    if (myid == 0)
-        std::cout << "Minres converged in " << iter << " iterations."
-                  << std::endl;
+//    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, w_block);
+//    mgp.Mult(rhs, sol);
+//    int iter = mgp.GetNumIterations();
+//    // int nnz = mgp.GetNNZ();
+//    // std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
+//    if (myid == 0)
+//        std::cout << "Minres converged in " << iter << " iterations."
+//                  << std::endl;
 
     if (!w_block)
     {
