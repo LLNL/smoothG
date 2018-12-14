@@ -163,7 +163,6 @@ private:
     std::vector<mfem::Vector> coefficient_;
 
     void Initialize(int dimension, double kappa);
-    mfem::Vector& GetFineCoefficient();
 };
 
 }

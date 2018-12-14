@@ -297,6 +297,7 @@ int main(int argc, char* argv[])
         auto sol_fine = pdesampler.GetCoefficient(0);
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
+        par_orthogonalize_from_constant(sol_fine, graph.VertexStarts().Last());
         int iterations = upscale->GetSolveIters(0);
         total_iterations[0] += iterations;
         double time = upscale->GetSolveTime(0);
@@ -316,6 +317,7 @@ int main(int argc, char* argv[])
             auto sol_upscaled = InterpolateToFine(*upscale, level, sol_coarse);
             for (int i = 0; i < sol_upscaled.Size(); ++i)
                 sol_upscaled(i) = std::log(sol_upscaled(i));
+            par_orthogonalize_from_constant(sol_upscaled, graph.VertexStarts().Last());
             iterations = upscale->GetSolveIters(level);
             total_iterations[level] += iterations;
             time = upscale->GetSolveTime(level);
