@@ -34,13 +34,20 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL, ess_attr),
+    MixedLaplacianSolver(mgL.GetComm(), mgL.GetBlockOffsets(), ess_attr, mgL.CheckW()),
     D_(mgL.GetD()),
     W_(mgL.GetW()),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
-    MPI_Comm_rank(comm_, &myid_);
+    const_rep_ = &(mgL.GetConstantRep());
+    if (ess_attr)
+    {
+        assert(mgL.GetGraph().HasBoundary());
+        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
+        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
+        ess_edofs_.SetSize(sol_.BlockSize(0));
+    }
 
     auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)

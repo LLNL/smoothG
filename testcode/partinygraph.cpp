@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
         std::cout << "Building parallel graph..." << std::endl;
     mfem::HypreParMatrix* D = build_tiny_graph();
     mfem::HypreParMatrix* M = build_tiny_graph_weights(weighted);
-    mfem::HypreParMatrix* W = build_tiny_w_block();
+    mfem::HypreParMatrix* W = w_block ? build_tiny_w_block() : nullptr;
 
     // setup mixed problem
     if (myid == 0)
@@ -304,29 +304,31 @@ int main(int argc, char* argv[])
     block_true_offsets.PartialSum();
 
     // set the appropriate right hand side
-    mfem::HypreParVector rhs_p_fine(comm, D->M(), D->GetRowStarts());
-    rhs_p_fine = 1.0;
     mfem::BlockVector rhs(block_true_offsets);
     rhs.GetBlock(0) = 0.0;
     rhs.GetBlock(1) = 1.0;
+
+    // make rhs average zero so the problem is well defined when W block is zero
+    if (!w_block && myid == 0)
+        rhs.GetBlock(1)[0] = -5.0;
 
     // solve
     mfem::BlockVector sol(block_true_offsets);
     sol = 0.0;
     if (myid == 0)
         std::cout << "Solving graph problem..." << std::endl;
-    //    MinresBlockSolver mgp(comm, M, D, W, block_true_offsets, w_block);
-    //    mgp.Mult(rhs, sol);
-    //    int iter = mgp.GetNumIterations();
-    //    // int nnz = mgp.GetNNZ();
-    //    // std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
-    //    if (myid == 0)
-    //        std::cout << "Minres converged in " << iter << " iterations."
-    //                  << std::endl;
+    MinresBlockSolver mgp(M, D, W, block_true_offsets);
+    mgp.Mult(rhs, sol);
+    int iter = mgp.GetNumIterations();
+    // int nnz = mgp.GetNNZ();
+    // std::cout << "Global system has " << nnz << " nonzeros." << std::endl;
+    if (myid == 0)
+        std::cout << "Minres converged in " << iter << " iterations."
+                  << std::endl;
 
     if (!w_block)
     {
-        par_orthogonalize_from_constant(sol.GetBlock(1), rhs_p_fine.GlobalSize());
+        par_orthogonalize_from_constant(sol.GetBlock(1), D->M());
     }
 
     // truesol was found "independently" with python: testcode/tinygraph.py

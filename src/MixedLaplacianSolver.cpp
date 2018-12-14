@@ -24,16 +24,18 @@
 namespace smoothg
 {
 
-MixedLaplacianSolver::MixedLaplacianSolver(const MixedMatrix& mgL,
-                                           const mfem::Array<int>* ess_attr)
-    : comm_(mgL.GetGraph().GetComm()),
-      rhs_(mgL.GetBlockOffsets()), sol_(mgL.GetBlockOffsets()),
+MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
+                                           const mfem::Array<int>& block_offsets,
+                                           const mfem::Array<int>* ess_attr,
+                                           bool W_is_nonzero)
+    : comm_(comm), rhs_(block_offsets), sol_(block_offsets),
       nnz_(0), num_iterations_(0), timing_(0), remove_one_dof_(true),
-      W_is_nonzero_(mgL.CheckW()), const_rep_(mgL.GetConstantRep())
+      W_is_nonzero_(W_is_nonzero)
 {
+    MPI_Comm_rank(comm_, &myid_);
+
     if (ess_attr)
     {
-        assert(mgL.GetGraph().HasBoundary());
         for (int i = 0; i < ess_attr->Size(); ++i)
         {
             if ((*ess_attr)[i] == 0) // if Dirichlet pressure boundary is not empty
@@ -42,10 +44,6 @@ MixedLaplacianSolver::MixedLaplacianSolver(const MixedMatrix& mgL,
                 break;
             }
         }
-
-        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
-        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
-        ess_edofs_.SetSize(sol_.BlockSize(0));
     }
 }
 
@@ -74,15 +72,17 @@ void MixedLaplacianSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol) cons
 
 void MixedLaplacianSolver::Orthogonalize(mfem::Vector& vec) const
 {
-    double local_dot = (vec * const_rep_);
+    assert(const_rep_);
+
+    double local_dot = (vec * (*const_rep_));
     double global_dot;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
 
-    double local_scale = (const_rep_ * const_rep_);
+    double local_scale = ((*const_rep_) * (*const_rep_));
     double global_scale;
     MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
 
-    vec.Add(-global_dot / global_scale, const_rep_);
+    vec.Add(-global_dot / global_scale, *const_rep_);
 }
 
 } // namespace smoothg

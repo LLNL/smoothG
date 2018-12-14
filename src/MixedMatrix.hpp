@@ -73,6 +73,8 @@ public:
                 mfem::SparseMatrix Ppw1,
                 mfem::SparseMatrix Qpw1);
 
+    MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
+
     /// Get the associated graph space
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
 

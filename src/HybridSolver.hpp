@@ -169,8 +169,6 @@ protected:
     void BuildParallelSystemAndSolver();
 
 private:
-    int myid_;
-
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;

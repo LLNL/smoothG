@@ -26,20 +26,20 @@
 namespace smoothg
 {
 
-///// implementation largely lifted from ex5p.cpp
-//MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
-//    const mfem::Array<int>& block_true_offsets,
-//    bool use_W, const mfem::Array<int>* ess_attr)
-//    :
-//    MixedLaplacianSolver(block_true_offsets, ess_attr, use_W),
-//    minres_(comm),
-//    comm_(comm),
-//    use_W_(use_W),
-//    operator_(block_true_offsets),
-//    prec_(block_true_offsets)
-//{
-//    Init(M, D, W);
-//}
+/// implementation largely lifted from ex5p.cpp
+MinresBlockSolver::MinresBlockSolver(mfem::HypreParMatrix* M,
+                                     mfem::HypreParMatrix* D,
+                                     mfem::HypreParMatrix* W,
+                                     const mfem::Array<int>& block_true_offsets)
+    :
+    MixedLaplacianSolver(M->GetComm(), block_true_offsets, nullptr, W),
+    minres_(comm_),
+    operator_(block_true_offsets),
+    prec_(block_true_offsets)
+{
+    remove_one_dof_ = false;
+    Init(M, D, W);
+}
 
 void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
                              mfem::HypreParMatrix* W)
@@ -119,12 +119,19 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
                                      const mfem::Array<int>* ess_attr)
     :
-    MixedLaplacianSolver(mgL, ess_attr),
+    MixedLaplacianSolver(mgL.GetComm(), mgL.GetBlockOffsets(), ess_attr, mgL.CheckW()),
     minres_(comm_),
     operator_(mgL.GetBlockTrueOffsets()),
     prec_(mgL.GetBlockTrueOffsets())
 {
-    MPI_Comm_rank(comm_, &myid_);
+    const_rep_ = &(mgL.GetConstantRep());
+    if (ess_attr)
+    {
+        assert(mgL.GetGraph().HasBoundary());
+        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
+        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
+        ess_edofs_.SetSize(sol_.BlockSize(0));
+    }
 
     mfem::SparseMatrix M_proc(mgL.GetM());
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
@@ -266,6 +273,7 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
         true_rhs_.GetBlock(1)(0) = 0.0;
     }
 
+    true_sol_ = 0.0;
     minres_.Mult(true_rhs_, true_sol_);
 
     edgedof_d_td.Mult(true_sol_.GetBlock(0), sol.GetBlock(0));

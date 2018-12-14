@@ -33,7 +33,8 @@ namespace smoothg
 class MixedLaplacianSolver : public mfem::Operator
 {
 public:
-    MixedLaplacianSolver(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
+    MixedLaplacianSolver(MPI_Comm comm, const mfem::Array<int>& block_offsets,
+                         const mfem::Array<int>* ess_attr, bool W_is_nonzero);
     MixedLaplacianSolver() = delete;
 
     virtual ~MixedLaplacianSolver() = default;
@@ -49,8 +50,6 @@ public:
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
     void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
-
-    void Orthogonalize(mfem::Vector& vec) const;
 
     ///@name Set solver parameters
     ///@{
@@ -68,7 +67,10 @@ public:
     ///@}
 
 protected:
+    void Orthogonalize(mfem::Vector& vec) const;
+
     MPI_Comm comm_;
+    int myid_;
 
     mutable mfem::BlockVector rhs_;
     mutable mfem::BlockVector sol_;
@@ -87,7 +89,7 @@ protected:
     bool W_is_nonzero_;
 
     mfem::Array<int> ess_edofs_;
-    const mfem::Vector& const_rep_;
+    const mfem::Vector* const_rep_;
 };
 
 } // namespace smoothg
