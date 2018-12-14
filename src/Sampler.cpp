@@ -146,17 +146,6 @@ void PDESampler::NewSample()
     }
 }
 
-mfem::Vector& PDESampler::GetFineCoefficient()
-{
-    const int level = 0;
-    fvupscale_->Solve(level, rhs_[level], coefficient_[level]);
-    for (int i = 0; i < coefficient_[level].Size(); ++i)
-    {
-        coefficient_[level](i) = std::exp(coefficient_[level](i));
-    }
-    return coefficient_[level];
-}
-
 /**
    Implementation notes:
 
@@ -178,11 +167,6 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
     MFEM_ASSERT(sampled_,
                 "PDESampler object in wrong state (call NewSample() first)!");
 
-    if (level == 0)
-    {
-        return GetFineCoefficient();
-    }
-
     for (int k = 0; k < level; ++k)
     {
         fvupscale_->Restrict(k + 1, rhs_[k], rhs_[k + 1]);
@@ -203,28 +187,8 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
 
 mfem::Vector& PDESampler::GetCoefficientForVisualization(int level)
 {
-    MFEM_ASSERT(sampled_,
-                "PDESampler object in wrong state (call NewSample() first)!");
-    if (level == 0)
-    {
-        return GetFineCoefficient();
-    }
-
-    for (int i = 0; i < level; ++i)
-    {
-        fvupscale_->Restrict(i + 1, rhs_[i], rhs_[i + 1]);
-    }
-    coefficient_[level].SetSize(rhs_[level].Size());
-    fvupscale_->SolveAtLevel(level, rhs_[level], coefficient_[level]);
-
     // coarse solution projected to piece-wise constant on aggregates
-    mfem::Vector pw1_coarse_sol = fvupscale_->PWConstProject(level, coefficient_[level]);
-
-    // Compute exponential of solution in each aggregate
-    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
-    {
-        pw1_coarse_sol(i) = std::exp(pw1_coarse_sol(i));
-    }
+    mfem::Vector pw1_coarse_sol = GetCoefficient(level);
 
     // interpolate piece-wise constant function to vertex space
     coefficient_[level] = fvupscale_->PWConstInterpolate(level, pw1_coarse_sol);
