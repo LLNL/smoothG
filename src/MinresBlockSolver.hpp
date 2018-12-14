@@ -94,7 +94,6 @@ public:
 
 protected:
     mfem::MINRESSolver minres_;
-    int myid_;
 
 private:
     void Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
