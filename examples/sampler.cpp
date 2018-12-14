@@ -40,8 +40,7 @@
 #include <cmath>
 #include <mpi.h>
 
-#include "mfem.hpp"
-#include "spe10.hpp"
+#include "pde.hpp"
 
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"

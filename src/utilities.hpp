@@ -142,21 +142,6 @@ void VisualizeSolution(int k,
 class GraphTopology;
 
 /**
-   @brief Build boundary attribute table from mesh.
-
-   Copied from parelag::AgglomeratedTopology::generateFacetBdrAttributeTable
-
-   Given a mesh and a boundary operator B[0], with height number of elements,
-   width number of faces, this computes a table with a row for every face and a
-   column for every boundary attribute, with a 1 if the face has that boundary
-   attribute.
-
-   This only works for the fine level, because of the mfem::Mesh. To get
-   this table on a coarser mesh, premultiply by AEntity_entity.
-*/
-mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh);
-
-/**
    Given a face_boundaryatrribute matrix, bndrAttributesMarker, and face_dof,
    fill dofMarker so that it can be used for MFEM elimination routines to enforce
    boundary conditions.
@@ -274,45 +259,6 @@ void ReadVertexEdge(std::ifstream& graphFile, mfem::SparseMatrix& out);
 void ReadCoordinate(std::ifstream& graphFile, mfem::SparseMatrix& out);
 
 mfem::SparseMatrix ReadVertexEdge(const std::string& filename);
-
-/**
-   @brief A utility class for working with the SPE10 data set.
-
-   The SPE10 data set can be found at: http://www.spe.org/web/csp/datasets/set02.htm
-*/
-class InversePermeabilityFunction
-{
-public:
-
-    enum SliceOrientation {NONE, XY, XZ, YZ};
-
-    static void SetNumberCells(int Nx_, int Ny_, int Nz_);
-    static void SetMeshSizes(double hx, double hy, double hz);
-    static void Set2DSlice(SliceOrientation o, int npos );
-
-    static void BlankPermeability();
-    static void ReadPermeabilityFile(const std::string& fileName);
-    static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
-
-    static void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
-
-    static double InvNorm2(const mfem::Vector& x);
-
-    static void ClearMemory();
-
-private:
-    static int Nx;
-    static int Ny;
-    static int Nz;
-    static double hx;
-    static double hy;
-    static double hz;
-    static double* inversePermeability;
-
-    static SliceOrientation orientation;
-    static int npos;
-};
-
 
 // Compute D(sigma_h - sigma_H) / D(sigma_h)
 double DivError(MPI_Comm comm, const mfem::SparseMatrix& D, const mfem::Vector& numer,

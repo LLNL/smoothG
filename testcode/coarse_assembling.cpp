@@ -24,8 +24,7 @@
 #include <sstream>
 #include <mpi.h>
 
-#include "mfem.hpp"
-#include "../examples/spe10.hpp"
+#include "../examples/pde.hpp"
 
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"

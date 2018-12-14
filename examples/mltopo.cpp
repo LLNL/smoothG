@@ -25,7 +25,7 @@
 
 #include <mpi.h>
 
-#include "mfem.hpp"
+#include "pde.hpp"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
