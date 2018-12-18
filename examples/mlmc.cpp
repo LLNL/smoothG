@@ -117,14 +117,7 @@ int main(int argc, char* argv[])
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration
     mfem::Array<int> partitioning;
-    if (metis_agglomeration)
-    {
-        spe10problem.MetisPart(coarsening_factors, partitioning);
-    }
-    else
-    {
-        spe10problem.CartPart(coarsening_factors, partitioning);
-    }
+    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
     Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);

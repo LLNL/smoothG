@@ -140,17 +140,9 @@ int main(int argc, char* argv[])
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
-    if (metis_agglomeration)
-    {
-        spe10problem.MetisPart(coarsening_factors, partitioning);
-    }
-    else
-    {
-        spe10problem.CartPart(coarsening_factors, partitioning);
-    }
+    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
-
     const double cell_volume = spe10problem.CellVolume();
     W_block *= cell_volume * kappa * kappa;
 

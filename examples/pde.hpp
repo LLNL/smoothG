@@ -391,12 +391,14 @@ public:
                   double range_max = 0.0, const std::string& caption = "", int coef = 0) const;
     void VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const;
     void SaveFigure(const mfem::Vector& sol, const std::string& name) const;
-    void CartPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
-    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
+    void Partition(bool metis_parition, const mfem::Array<int>& coarsening_factors,
+                   mfem::Array<int>& partitioning) const;
 protected:
     void BuildReservoirGraph();
     void InitGraph();
     void ComputeGraphWeight(bool unit_weight = false);
+    void CartPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
+    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 
     unique_ptr<mfem::ParMesh> pmesh_;
 
@@ -666,6 +668,20 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
     PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
 }
 
+void DarcyProblem::Partition(bool metis_parition,
+                             const mfem::Array<int>& coarsening_factors,
+                             mfem::Array<int>& partitioning) const
+{
+    if (metis_parition)
+    {
+        MetisPart(coarsening_factors, partitioning);
+    }
+    else
+    {
+        CartPart(coarsening_factors, partitioning);
+    }
+}
+
 class SPE10Problem : public DarcyProblem
 {
 public:
@@ -771,7 +787,7 @@ mfem::ParMesh* SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
     if (metis_partition)
     {
         auto elem_elem = TableToMatrix(mesh.ElementToElementTable());
-        Partition(elem_elem, partition, num_procs_);
+        smoothg::Partition(elem_elem, partition, num_procs_);
         assert(partition.Max() + 1 == num_procs_);
     }
     else
