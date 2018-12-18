@@ -396,7 +396,7 @@ public:
 protected:
     void BuildReservoirGraph();
     void InitGraph();
-    void ComputeGraphWeight();
+    void ComputeGraphWeight(bool unit_weight = false);
 
     unique_ptr<mfem::ParMesh> pmesh_;
 
@@ -450,7 +450,7 @@ DarcyProblem::DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& e
 Graph DarcyProblem::GetFVGraph(bool use_local_weight)
 {
     const mfem::HypreParMatrix& edge_trueedge = *sigma_fes_->Dof_TrueDof_Matrix();
-    if (use_local_weight)
+    if (use_local_weight && local_weight_.size() > 0)
     {
         return Graph(vertex_edge_, edge_trueedge, local_weight_, &edge_bdratt_);
     }
@@ -485,8 +485,15 @@ void DarcyProblem::InitGraph()
     rhs_u_ = 0.0;
 }
 
-void DarcyProblem::ComputeGraphWeight()
+void DarcyProblem::ComputeGraphWeight(bool unit_weight)
 {
+    if (unit_weight)
+    {
+        weight_.SetSize(vertex_edge_.NumCols());
+        weight_ = 1.0;
+        return;
+    }
+
     // Construct "finite volume mass" matrix
     mfem::ParBilinearForm a(sigma_fes_.get());
     if (kinv_vector_)
@@ -663,7 +670,8 @@ class SPE10Problem : public DarcyProblem
 {
 public:
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
-                 int slice, bool metis_parition, const mfem::Array<int>& ess_attr);
+                 int slice, bool metis_parition,
+                 const mfem::Array<int>& ess_attr, bool unit_weight = false);
 
     ~SPE10Problem()
     {
@@ -682,12 +690,13 @@ private:
 };
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
-                           int slice, bool metis_parition, const mfem::Array<int>& ess_attr)
+                           int slice, bool metis_parition,
+                           const mfem::Array<int>& ess_attr, bool unit_weight)
     : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
 {
     SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice);
     InitGraph();
-    ComputeGraphWeight();
+    ComputeGraphWeight(unit_weight);
     MakeRHS();
 }
 

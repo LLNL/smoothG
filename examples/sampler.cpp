@@ -133,8 +133,9 @@ int main(int argc, char* argv[])
     ess_attr = 0;
 
     // Setting up finite volume discretization problem
+    bool unit_edge_weight = true;
     SPE10Problem spe10problem("", nDimensions, spe10_scale, slice,
-                              metis_agglomeration, ess_attr);
+                              metis_agglomeration, ess_attr, unit_edge_weight);
     Graph graph = spe10problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration

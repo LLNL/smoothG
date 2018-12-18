@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
     ess_attr = 1;
 
-    const bool metis_agglomeration = true;
+    const bool metis_agglomeration = false;
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
