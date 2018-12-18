@@ -298,10 +298,6 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
 
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 
-void FVMeshCartesianPartition(
-    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
-    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor);
-
 } // namespace smoothg
 
 #endif /* __UTILITIES_HPP */

@@ -391,7 +391,7 @@ public:
                   double range_max = 0, const std::string& caption = "", int coef = 0) const;
     void VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const;
     void CartPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
-    void MetisPart(mfem::Array<int> &coarsening_factor, mfem::Array<int>& partitioning);
+    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 protected:
     void BuildReservoirGraph();
     void InitGraph();
@@ -626,10 +626,19 @@ void DarcyProblem::CartPart(const mfem::Array<int>& coarsening_factor,
     partitioning.Append(cart_part);
 }
 
-void DarcyProblem::MetisPart(mfem::Array<int>& coarsening_factor,
-                             mfem::Array<int>& partitioning)
+void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
+                             mfem::Array<int>& partitioning) const
 {
-    FESpaceMetisPartition(partitioning, *sigma_fes_, *u_fes_, coarsening_factor);
+    mfem::DiscreteLinearOperator DivOp(sigma_fes_.get(), u_fes_.get());
+    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
+    DivOp.Assemble();
+    DivOp.Finalize();
+
+    int metis_coarsening_factor = 1;
+    for (const auto factor : coarsening_factor)
+        metis_coarsening_factor *= factor;
+
+    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
 }
 
 class SPE10Problem : public DarcyProblem

@@ -344,21 +344,4 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
     Partition(vert_vert, partitioning, num_partitions);
 }
 
-void FESpaceMetisPartition(mfem::Array<int>& partitioning,
-                           mfem::ParFiniteElementSpace& sigmafespace,
-                           mfem::ParFiniteElementSpace& ufespace,
-                           mfem::Array<int>& coarsening_factor)
-{
-    mfem::DiscreteLinearOperator DivOp(&sigmafespace, &ufespace);
-    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
-    DivOp.Assemble();
-    DivOp.Finalize();
-
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
-
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
-}
-
 } // namespace smoothg

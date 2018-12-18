@@ -741,31 +741,4 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat)
     return cols;
 }
 
-void FVMeshCartesianPartition(
-    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
-    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor)
-{
-    const int SPE10_num_x_volumes = 60;
-    const int SPE10_num_y_volumes = 220;
-    const int SPE10_num_z_volumes = 85;
-
-    const int nDimensions = num_procs_xyz.size();
-
-    mfem::Array<int> nxyz(nDimensions);
-    nxyz[0] = SPE10_num_x_volumes / num_procs_xyz[0] / coarsening_factor[0];
-    nxyz[1] = SPE10_num_y_volumes / num_procs_xyz[1] / coarsening_factor[1];
-    if (nDimensions == 3)
-        nxyz[2] = SPE10_num_z_volumes / num_procs_xyz[2] / coarsening_factor[2];
-
-    for (int& i : nxyz)
-    {
-        i = std::max(1, i);
-    }
-
-    mfem::Array<int> cart_part(pmesh.CartesianPartitioning(nxyz.GetData()), pmesh.GetNE());
-    partitioning.Append(cart_part);
-
-    cart_part.MakeDataOwner();
-}
-
 } // namespace smoothg
