@@ -118,102 +118,37 @@ int main(int argc, char* argv[])
 
     assert(k == 0 || k == 1);
 
-    mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 10;
-    coarseningFactor[1] = 10;
-    if (nDimensions == 3)
-        coarseningFactor[2] = 5;
+    mfem::Array<int> coarsening_factors(nDimensions);
+    coarsening_factors = 10;
+    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
 
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    mfem::Array<int> ess_zeros(nbdr);
-    mfem::Array<int> nat_one(nbdr);
-    mfem::Array<int> nat_zeros(nbdr);
-    ess_zeros = 1;
-    nat_one = 0;
-    nat_zeros = 0;
-
-    mfem::Array<int> ess_attr;
-    mfem::Vector weight;
-    mfem::Vector rhs_sigma_fine;
-    mfem::Vector rhs_u_fine;
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
+    ess_attr = 1;
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, proc_part_ubal, coarseningFactor);
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
-
-    for (int i = 0; i < num_refine; ++i)
-    {
-        pmesh->UniformRefinement();
-    }
-
-    ess_attr.SetSize(nbdr);
-    for (int i(0); i < nbdr; ++i)
-        ess_attr[i] = ess_zeros[i];
-
-    // Construct "finite volume mass" matrix using mfem instead of parelag
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-
-    mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight);
-
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        weight[i] = 1.0 / weight[i];
-    }
-
-    mfem::L2_FECollection ufec(0, nDimensions);
-    mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
-
-    mfem::ConstantCoefficient pinflow_coeff(0.);
-    mfem::LinearForm b(&sigmafespace);
-    b.AddBoundaryIntegrator(
-        new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
-    b.Assemble();
-    rhs_sigma_fine = b;
-
-    rhs_u_fine = 0.0;
-
-    // Construct vertex_edge table in mfem::SparseMatrix format
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
+                              metis_agglomeration, ess_attr);
+    Graph graph = spe10problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration
     mfem::Array<int> partitioning;
     if (metis_agglomeration)
     {
-        FESpaceMetisPartition(partitioning, sigmafespace, ufespace, coarseningFactor);
+        spe10problem.MetisPart(coarsening_factors, partitioning);
     }
     else
     {
-        auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
+        spe10problem.CartPart(coarsening_factors, partitioning);
     }
 
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-
-    auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
-
-    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
-
-    const double cell_volume = spe10problem.CellVolume(nDimensions);
+    mfem::SparseMatrix W_block = SparseIdentity(graph.VertexToEdge().Height());
+    const double cell_volume = spe10problem.CellVolume();
     W_block *= cell_volume / delta_t;     // W_block = Mass matrix / delta_t
 
     //W_block *= 1.0 / delta_t;
 
     // Time Stepping
     {
-        Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
         Upscale fvupscale(graph, upscale_param, &partitioning,
                           &ess_attr, W_block);
 
@@ -225,12 +160,11 @@ int main(int argc, char* argv[])
         fvupscale.BlockOffsets(1, offsets[1]);
 
         mfem::BlockVector fine_rhs(offsets[0]);
-        fine_rhs.GetBlock(0) = 0.0;
-        fine_rhs.GetBlock(1) = rhs_u_fine;
+        fine_rhs = 0.0;
 
         // Set some pressure initial condition
         mfem::BlockVector fine_u(offsets[0]);
-        InitialCondition(ufespace, fine_u, initial_val);
+        fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace
         mfem::BlockVector tmp(offsets[k]);
@@ -254,13 +188,12 @@ int main(int argc, char* argv[])
         assert(W);
 
         // Setup visualization
-        mfem::socketstream vis_v, vis_w;
-        mfem::ParGridFunction field(&ufespace);
+        mfem::socketstream vis_v;
 
         if (vis_step > 0)
         {
-            field = fine_u.GetBlock(1);
-            VisSetup(comm, vis_v, field, *pmesh, initial_val, caption);
+            spe10problem.VisSetup(vis_v, fine_u.GetBlock(1), -std::fabs(initial_val),
+                                  std::fabs(initial_val), caption);
         }
 
         fvupscale.ShowSetupTime();
@@ -306,8 +239,7 @@ int main(int argc, char* argv[])
                     fvupscale.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
                 }
 
-                field = fine_u.GetBlock(1);
-                VisUpdate(comm, vis_v, field, *pmesh);
+                spe10problem.VisUpdate(vis_v, fine_u.GetBlock(1));
             }
         }
 
@@ -324,16 +256,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-void InitialCondition(mfem::ParFiniteElementSpace& ufespace, mfem::BlockVector& fine_u,
-                      double initial_val)
-{
-    HalfCoeffecient half(initial_val);
 
-    mfem::GridFunction init(&ufespace);
-    init.ProjectCoefficient(half);
-
-    fine_u.GetBlock(1) = init;
-}
 
 void VisSetup(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
               mfem::ParMesh& pmesh,

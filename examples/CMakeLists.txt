@@ -34,9 +34,6 @@ target_link_libraries(graphupscale smoothg ${TPL_LIBRARIES})
 add_executable(poweriter poweriter.cpp)
 target_link_libraries(poweriter smoothg ${TPL_LIBRARIES})
 
-add_executable(dirichletpressure dirichletpressure.cpp)
-target_link_libraries(dirichletpressure smoothg ${TPL_LIBRARIES})
-
 add_executable(mltopo mltopo.cpp)
 target_link_libraries(mltopo smoothg ${TPL_LIBRARIES})
 

@@ -68,6 +68,10 @@ int main(int argc, char* argv[])
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    bool lateral_pressure = false;
+    args.AddOption(&lateral_pressure, "-lat-pres", "--lateral-pressure",
+                   "-no-lat-pres", "--no-lateral-pressure",
+                   "Impose Dirichlet pressure condition on lateral sides.");
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
@@ -85,31 +89,32 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
+    mfem::Array<int> coarsening_factors(nDimensions);
+    coarsening_factors = 10;
+    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
+
     mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
     ess_attr = 1;
+    if (lateral_pressure)
+    {
+        ess_attr[0] = ess_attr[2] = 0;
+    }
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
                               metis_agglomeration, ess_attr);
+    Graph graph = spe10problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration
-    mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 10;
-    coarseningFactor[1] = 10;
-    if (nDimensions == 3)
-        coarseningFactor[2] = 5;
-
     mfem::Array<int> partitioning;
     if (metis_agglomeration)
     {
-        spe10problem.MetisPart(partitioning, coarseningFactor);
+        spe10problem.MetisPart(coarsening_factors, partitioning);
     }
     else
     {
-        spe10problem.CartPart(partitioning, coarseningFactor);
+        spe10problem.CartPart(coarsening_factors, partitioning);
     }
-
-    Graph graph = spe10problem.GetFVGraph();
 
     // Create Upscaler and Solve
     Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
@@ -118,7 +123,7 @@ int main(int argc, char* argv[])
     upscale.ShowSetupTime();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
-    rhs_fine.GetBlock(0) = 0.0;
+    rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
     rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
     /// [Solve]
@@ -128,24 +133,31 @@ int main(int argc, char* argv[])
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);
 
+        if (lateral_pressure)
+        {
+            double QoI = mfem::InnerProduct(comm, sol[level], rhs_fine);
+            if (myid == 0)
+            {
+                std::cout << "Quantity of interest on level " << level
+                          << " = " << QoI << "\n";
+            }
+        }
+
         auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
 
         if (level > 0 && myid == 0)
         {
             ShowErrors(error_info);
         }
-    }
-    /// [Solve]
 
-    // Visualize the solution
-    if (visualization)
-    {
-        mfem::socketstream vis_v;
-        for (int level = 0; level < upscale_param.max_levels; ++level)
+        // Visualize the solution
+        if (visualization)
         {
+            mfem::socketstream vis_v;
             spe10problem.VisSetup(vis_v, sol[level].GetBlock(1));
         }
     }
+    /// [Solve]
 
     return EXIT_SUCCESS;
 }

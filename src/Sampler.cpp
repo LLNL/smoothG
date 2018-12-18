@@ -77,13 +77,9 @@ PDESampler::PDESampler(std::shared_ptr<Upscale> fvupscale,
     Initialize(dimension, kappa);
 }
 
-PDESampler::PDESampler(MPI_Comm comm, int dimension,
-                       double cell_volume, double kappa, int seed,
-                       const mfem::SparseMatrix& vertex_edge,
-                       const mfem::Vector& weight,
+PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+                       const Graph& graph,
                        const mfem::Array<int>& partitioning,
-                       const mfem::HypreParMatrix& edge_d_td,
-                       const mfem::SparseMatrix& edge_boundary_att,
                        const mfem::Array<int>& ess_attr,
                        const UpscaleParameters& param)
     :
@@ -94,11 +90,10 @@ PDESampler::PDESampler(MPI_Comm comm, int dimension,
     rhs_(param.max_levels),
     coefficient_(param.max_levels)
 {
-    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
+    mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
     W_block *= cell_volume_ * kappa * kappa;
 
-    graph_ = Graph(vertex_edge, edge_d_td, weight, &edge_boundary_att);
-    fvupscale_ = std::make_shared<Upscale>(graph_, param, &partitioning,
+    fvupscale_ = std::make_shared<Upscale>(graph, param, &partitioning,
                                            &ess_attr, W_block);
 
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)

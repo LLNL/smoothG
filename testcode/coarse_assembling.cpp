@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
                    "Slice of SPE10 data to take for 2D run.");
 
     upscale_param.max_levels = 3;
-    upscale_param.coarse_factor = 10;
+    upscale_param.coarse_factor = 8;
     upscale_param.hybridization = true;
 
     // Read upscaling options from command line into upscale_param object
@@ -83,40 +83,11 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     const bool metis_agglomeration = true;
-    const double proc_part_ubal = 1.001;
-    mfem::Array<int> junk(3);
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, proc_part_ubal, junk);
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
-
-    // Construct "finite volume mass" matrix using mfem instead of parelag
-    mfem::Vector weight;
-
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-
-    mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight);
-
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        weight[i] = 1.0 / weight[i];
-    }
-
-    // Construct vertex_edge table in mfem::SparseMatrix format
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    const mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-    auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
-
-    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
+                              metis_agglomeration, ess_attr);
+    Graph graph = spe10problem.GetFVGraph();
 
     // Create Upscaler
     Upscale upscale(graph, upscale_param, nullptr, &ess_attr);
