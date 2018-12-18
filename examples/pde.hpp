@@ -395,7 +395,7 @@ protected:
 
     unique_ptr<mfem::ParMesh> pmesh_;
 
-    std::vector<int> num_procs_xyz_;
+    mfem::Array<int> num_procs_xyz_;
     mfem::RT_FECollection sigma_fec_;
     mfem::L2_FECollection u_fec_;
     unique_ptr<mfem::ParFiniteElementSpace> sigma_fes_;
@@ -599,7 +599,7 @@ void DarcyProblem::CartPart(const mfem::Array<int>& coarsening_factor,
     const int SPE10_num_y_volumes = 220;
     const int SPE10_num_z_volumes = 85;
 
-    const int nDimensions = num_procs_xyz_.size();
+    const int nDimensions = num_procs_xyz_.Size();
 
     mfem::Array<int> nxyz(nDimensions);
     nxyz[0] = SPE10_num_x_volumes / num_procs_xyz_[0] / coarsening_factor[0];
@@ -646,6 +646,7 @@ public:
 private:
     void SetupMeshAndCoeff(const char* permFile, int nDimensions,
                            int spe10_scale, bool metis_partition, int slice);
+    mfem::ParMesh* MakeParMesh(mfem::Mesh& mesh, bool metis_partition);
     void MakeRHS();
 
     unique_ptr<GCoefficient> source_coeff_;
@@ -675,44 +676,20 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     h(1) = 10.0;
     h(2) = 2.0;
 
-    unique_ptr<mfem::Mesh> mesh;
+    const int Lx = N[0] * h(0);
+    const int Ly = N[1] * h(1);
+    const int Lz = N[2] * h(2);
+
     if (nDimensions == 2)
     {
-        mesh = make_unique<mfem::Mesh>(N[0], N[1], mfem::Element::QUADRILATERAL,
-                                       1, h(0) * N[0], h(1) * N[1]);
+        mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
+        pmesh_.reset(MakeParMesh(mesh, metis_partition));
     }
     else
     {
-        mesh = make_unique<mfem::Mesh>(N[0], N[1], N[2], mfem::Element::HEXAHEDRON,
-                                       1, h(0) * N[0], h(1) * N[1], h(2) * N[2]);
+        mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
+        pmesh_.reset(MakeParMesh(mesh, metis_partition));
     }
-
-    mfem::Array<int> partition;
-    if (metis_partition)
-    {
-        auto elem_elem = TableToMatrix(mesh->ElementToElementTable());
-        Partition(elem_elem, partition, num_procs_);
-        assert(partition.Max() + 1 == num_procs_);
-    }
-    else
-    {
-        int num_procs_x = static_cast<int>(std::sqrt(num_procs_) + 0.5);
-        while (num_procs_ % num_procs_x)
-            num_procs_x -= 1;
-
-        num_procs_xyz_.resize(nDimensions, 1);
-        num_procs_xyz_[0] = num_procs_x;
-        num_procs_xyz_[1] = num_procs_ / num_procs_x;
-
-        int nparts = 1;
-        for (int d = 0; d < nDimensions; d++)
-            nparts *= num_procs_xyz_[d];
-        assert(nparts == num_procs_);
-
-        partition.MakeRef(mesh->CartesianPartitioning(num_procs_xyz_.data()), mesh->GetNE());
-        partition.MakeDataOwner();
-    }
-    pmesh_ = make_unique<mfem::ParMesh>(comm_, partition);
 
     if (myid_ == 0)
     {
@@ -735,15 +712,38 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     coarsening_factor = 10;
     coarsening_factor.Last() = nDimensions == 3 ? 5 : 10;
 
-    int Lx = N[0] * h(0);
-    int Ly = N[1] * h(1);
-    int Lz = N[2] * h(2);
     int Hx = coarsening_factor[0] * h(0);
     int Hy = coarsening_factor[1] * h(1);
     int Hz = 1.0;
     if (nDimensions == 3)
         Hz = coarsening_factor[2] * h(2);
     source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Lz, Hx, Hy, Hz);
+}
+
+mfem::ParMesh* SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
+{
+    mfem::Array<int> partition;
+    if (metis_partition)
+    {
+        auto elem_elem = TableToMatrix(mesh.ElementToElementTable());
+        Partition(elem_elem, partition, num_procs_);
+        assert(partition.Max() + 1 == num_procs_);
+    }
+    else
+    {
+        int num_procs_x = static_cast<int>(std::sqrt(num_procs_) + 0.5);
+        while (num_procs_ % num_procs_x)
+            num_procs_x -= 1;
+
+        num_procs_xyz_.SetSize(mesh.SpaceDimension(), 1);
+        num_procs_xyz_[0] = num_procs_x;
+        num_procs_xyz_[1] = num_procs_ / num_procs_x;
+        assert(num_procs_xyz_[0] * num_procs_xyz_[1] == num_procs_);
+
+        partition.MakeRef(mesh.CartesianPartitioning(num_procs_xyz_), mesh.GetNE());
+        partition.MakeDataOwner();
+    }
+    return new mfem::ParMesh(comm_, mesh, partition);
 }
 
 void SPE10Problem::MakeRHS()
