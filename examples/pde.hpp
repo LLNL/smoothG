@@ -364,8 +364,8 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 class DarcyProblem
 {
 public:
-    DarcyProblem(MPI_Comm comm, const mfem::Array<int>& ess_v_attr);
-    DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int> &ess_v_attr);
+    DarcyProblem(MPI_Comm comm, int num_dims, const mfem::Array<int>& ess_attr);
+    DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int> &ess_attr);
 
     Graph GetFVGraph(bool use_local_weight = false);
 
@@ -380,11 +380,7 @@ public:
     double CellVolume() const
     {
         assert(pmesh_);
-        return pmesh_->GetElementVolume(0);
-    }
-    const mfem::Array<int>& GetEssentialVertDofs() const
-    {
-        return ess_vdofs_;
+        return pmesh_->GetElementVolume(0); // assumed uniform mesh
     }
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
     void VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min = 0,
@@ -400,8 +396,8 @@ protected:
     unique_ptr<mfem::ParMesh> pmesh_;
 
     std::vector<int> num_procs_xyz_;
-    unique_ptr<mfem::RT_FECollection> sigma_fec_;
-    unique_ptr<mfem::L2_FECollection> u_fec_;
+    mfem::RT_FECollection sigma_fec_;
+    mfem::L2_FECollection u_fec_;
     unique_ptr<mfem::ParFiniteElementSpace> sigma_fes_;
     unique_ptr<mfem::ParFiniteElementSpace> u_fes_;
 
@@ -419,9 +415,7 @@ protected:
     mfem::Vector rhs_sigma_;
     mfem::Vector rhs_u_;
 
-    mfem::Array<int> ess_v_attr_;
-    mfem::Array<int> ess_vdofs_;
-    int num_ess_vdof_;
+    mfem::Array<int> ess_attr_;
 
     mutable mfem::ParGridFunction u_fes_gf_;
 
@@ -430,17 +424,17 @@ protected:
     int num_procs_;
 };
 
-DarcyProblem::DarcyProblem(MPI_Comm comm, const mfem::Array<int> &ess_v_attr)
-    : num_ess_vdof_(0), comm_(comm)
+DarcyProblem::DarcyProblem(MPI_Comm comm, int num_dims, const mfem::Array<int> &ess_attr)
+    : sigma_fec_(0, num_dims), u_fec_(0, num_dims), comm_(comm)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
 
-    ess_v_attr.Copy(ess_v_attr_);
+    ess_attr.Copy(ess_attr_);
 }
 
-DarcyProblem::DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int> &ess_v_attr)
-    : DarcyProblem(pmesh.GetComm(), ess_v_attr)
+DarcyProblem::DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int> &ess_attr)
+    : DarcyProblem(pmesh.GetComm(), pmesh.Dimension(), ess_attr)
 {
     pmesh_ = make_unique<mfem::ParMesh>(pmesh, false);
     InitGraph();
@@ -463,7 +457,7 @@ void DarcyProblem::BuildReservoirGraph()
 {
     mfem::SparseMatrix edge_bdratt = GenerateBoundaryAttributeTable(pmesh_.get());
     edge_bdratt_.Swap(edge_bdratt);
-    assert(edge_bdratt_.NumCols() == ess_v_attr_.Size());
+    assert(edge_bdratt_.NumCols() == ess_attr_.Size());
 
     const mfem::Table& v_e_table = pmesh_->Dimension() == 2 ?
                 pmesh_->ElementToEdgeTable() : pmesh_->ElementToFaceTable();
@@ -473,12 +467,9 @@ void DarcyProblem::BuildReservoirGraph()
 
 void DarcyProblem::InitGraph()
 {
-    sigma_fec_ = make_unique<mfem::RT_FECollection>(0, pmesh_->SpaceDimension());
-    sigma_fes_ = make_unique<mfem::ParFiniteElementSpace>(pmesh_.get(), sigma_fec_.get());
-
-    u_fec_ = make_unique<mfem::L2_FECollection>(0, pmesh_->SpaceDimension());
-    u_fes_ = make_unique<mfem::ParFiniteElementSpace>(pmesh_.get(), u_fec_.get());
-    coeff_gf_ = make_unique<mfem::GridFunction>(u_fes_.get());
+    sigma_fes_ = make_unique<mfem::ParFiniteElementSpace>(pmesh_.get(), &sigma_fec_);
+    u_fes_ = make_unique<mfem::ParFiniteElementSpace>(pmesh_.get(), &u_fec_);
+    coeff_gf_ = make_unique<mfem::GridFunction>(&u_fes_);
 
     BuildReservoirGraph();
 
@@ -591,14 +582,14 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const
 {
     u_fes_gf_.MakeRef(u_fes_.get(), vec.GetData());
 
-    vis_v << "parallel " << pmesh_->GetNRanks() << " " << myid_ << "\n";
+    vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
 
-    MPI_Barrier(pmesh_->GetComm());
+    MPI_Barrier(comm_);
 
     vis_v << "keys S\n";         //Screenshot
 
-    MPI_Barrier(pmesh_->GetComm());
+    MPI_Barrier(comm_);
 }
 
 void DarcyProblem::CartPart(const mfem::Array<int>& coarsening_factor,
@@ -662,7 +653,7 @@ private:
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
                            int slice, bool metis_parition, const mfem::Array<int>& ess_attr)
-    : DarcyProblem(MPI_COMM_WORLD, ess_attr)
+    : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
 {
     SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice);
     InitGraph();
