@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
     SPE10Problem spe10problem("", nDimensions, spe10_scale, 0,
                               metis_agglomeration, 2.0, coarseningFactor);
 
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
+    mfem::ParMesh* pmesh = spe10problem.GetMesh();
 
     if (myid == 0)
     {
