@@ -422,8 +422,6 @@ Graph DarcyProblem::GetFVGraph(bool use_local_weight)
     return Graph(vertex_edge_, edge_trueedge, weight_, &edge_bdratt_);
 }
 
-// Keep only boundary faces associated with essential pressure condition
-// For these faces, add the associated attribute as a (ghost) element
 void DarcyProblem::BuildReservoirGraph()
 {
     mfem::SparseMatrix edge_bdratt = GenerateBoundaryAttributeTable(pmesh_.get());
