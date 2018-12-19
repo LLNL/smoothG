@@ -34,46 +34,31 @@ namespace smoothg
 
    Given a mesh this computes a table with a row for every face and a column for
    every boundary attribute, with a 1 if the face has that boundary attribute.
-
-   This only works for the fine level, because of the mfem::Mesh. To get
-   this table on a coarser mesh, premultiply by AEntity_entity.
 */
 mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh)
 {
     int nedges = mesh->Dimension() == 2 ? mesh->GetNEdges() : mesh->GetNFaces();
-    int nbdr = mesh->bdr_attributes.Max();
     int nbdr_edges = mesh->GetNBE();
 
-    int* edge_bdrattr_i = new int[nedges + 1]();
-    int* edge_bdrattr_j = new int[nbdr_edges];
+    int* I = new int[nedges + 1]();
+    int* J = new int[nbdr_edges];
 
-    // in the loop below, edge_bdrattr_i is used as a temporary array
-    for (int j = 0; j < nbdr_edges; j++)
+    for (int j = 0; j < nbdr_edges; ++j)
     {
-        int edge = mesh->GetBdrElementEdgeIndex(j);
-        edge_bdrattr_i[edge + 1] = mesh->GetBdrAttribute(j);
-    }
-    edge_bdrattr_i[0] = 0;
-
-    int count = 0;
-    for (int j = 1; j <= nedges; j++)
-    {
-        if (edge_bdrattr_i[j])
-        {
-            edge_bdrattr_j[count++] = edge_bdrattr_i[j] - 1;
-            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1] + 1; // single nonzero in this row
-        }
-        else
-        {
-            edge_bdrattr_i[j] = edge_bdrattr_i[j - 1]; // no nonzeros in this row
-        }
+        I[mesh->GetBdrElementEdgeIndex(j) + 1]++ ;
     }
 
-    double* edge_bdrattr_data = new double[nbdr_edges];
-    std::fill_n(edge_bdrattr_data, nbdr_edges, 1.0);
+    std::partial_sum(I, I + nedges + 1, I);
 
-    return mfem::SparseMatrix(edge_bdrattr_i, edge_bdrattr_j, edge_bdrattr_data,
-                              nedges, nbdr);
+    for (int j = 0; j < nbdr_edges; ++j)
+    {
+        J[I[mesh->GetBdrElementEdgeIndex(j)]] = mesh->GetBdrAttribute(j) - 1;
+    }
+
+    double* Data = new double[nbdr_edges];
+    std::fill_n(Data, nbdr_edges, 1.0);
+
+    return mfem::SparseMatrix(I, J, Data, nedges, mesh->bdr_attributes.Max());
 }
 
 /**
@@ -81,63 +66,65 @@ mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh)
 
    The SPE10 data set can be found at: http://www.spe.org/web/csp/datasets/set02.htm
 */
-class InversePermeabilityFunction
+class InversePermeabilityCoefficient : public mfem::VectorCoefficient
 {
 public:
     enum SliceOrientation {NONE, XY, XZ, YZ};
-    static void SetNumberCells(int Nx_, int Ny_, int Nz_);
-    static void SetReadRange(int max_Nx_, int max_Ny_, int max_Nz_);
-    static void SetMeshSizes(double hx, double hy, double hz);
-    static void Set2DSlice(SliceOrientation o, int npos );
-    static void ReadPermeabilityFile(const std::string& fileName);
-    static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
-    static void BlankPermeability();
-    static void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
-    static double InvNorm2(const mfem::Vector& x);
-    static void ClearMemory();
+    InversePermeabilityCoefficient(MPI_Comm comm,
+                                   const std::string& fileName,
+                                   const mfem::Array<int>& N,
+                                   const mfem::Array<int>& max_N,
+                                   const mfem::Vector& h,
+                                   SliceOrientation orientation = NONE,
+                                   int slice = -1);
+
+    virtual void Eval(mfem::Vector& V, mfem::ElementTransformation& T,
+                      const mfem::IntegrationPoint& ip)
+    {
+        mfem::Vector transip(vdim);
+        T.Transform(ip, transip);
+        InversePermeability(transip, V);
+    }
+
+    double InvNorm2(const mfem::Vector& x);
 private:
-    static int Nx;
-    static int Ny;
-    static int Nz;
-    static int max_Nx;
-    static int max_Ny;
-    static int max_Nz;
-    static double hx;
-    static double hy;
-    static double hz;
-    static double* inversePermeability;
-    static SliceOrientation orientation;
-    static int npos;
+    void ReadPermeabilityFile(const std::string& fileName,
+                              const mfem::Array<int>& max_N);
+    void ReadPermeabilityFile(MPI_Comm comm, const std::string& fileName,
+                              const mfem::Array<int>& max_N);
+    void BlankPermeability();
+    void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
+
+    mfem::Array<int> N_;
+    mfem::Vector h_;
+    int slice_;
+    SliceOrientation orientation_;
+
+    int N_slice_;
+    int N_all_;
+    std::vector<double> inverse_permeability_;
 };
 
-void InversePermeabilityFunction::SetNumberCells(int Nx_, int Ny_, int Nz_)
+InversePermeabilityCoefficient::InversePermeabilityCoefficient(
+    MPI_Comm comm, const std::string& file_name, const mfem::Array<int>& N,
+    const mfem::Array<int>& max_N, const mfem::Vector& h,
+    SliceOrientation orientation, int slice)
+    : mfem::VectorCoefficient(orientation == NONE ? 3 : 2), h_(h), slice_(slice),
+      orientation_(orientation), N_slice_(N[0] * N[1]), N_all_(N_slice_ * N[2]),
+      inverse_permeability_(3 * N_all_)
 {
-    Nx = Nx_;
-    Ny = Ny_;
-    Nz = Nz_;
+    N.Copy(N_);
+
+    if (file_name == "")
+    {
+        BlankPermeability();
+        return;
+    }
+    ReadPermeabilityFile(comm, file_name, max_N);
 }
 
-void InversePermeabilityFunction::SetReadRange(int max_Nx_, int max_Ny_, int max_Nz_)
-{
-    max_Nx = max_Nx_;
-    max_Ny = max_Ny_;
-    max_Nz = max_Nz_;
-}
-
-void InversePermeabilityFunction::SetMeshSizes(double hx_, double hy_, double hz_)
-{
-    hx = hx_;
-    hy = hy_;
-    hz = hz_;
-}
-
-void InversePermeabilityFunction::Set2DSlice(SliceOrientation o, int npos_ )
-{
-    orientation = o;
-    npos = npos_;
-}
-
-void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName)
+void InversePermeabilityCoefficient::ReadPermeabilityFile(const std::string& fileName,
+                                                          const mfem::Array<int>& max_N)
 {
     std::ifstream permfile(fileName.c_str());
 
@@ -147,51 +134,48 @@ void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileNa
         mfem::mfem_error("File does not exist");
     }
 
-    inversePermeability = new double [3 * Nx * Ny * Nz];
-    double* ip = inversePermeability;
+    double* ip = inverse_permeability_.data();
     double tmp;
     for (int l = 0; l < 3; l++)
     {
-        for (int k = 0; k < Nz; k++)
+        for (int k = 0; k < N_[2]; k++)
         {
-            for (int j = 0; j < Ny; j++)
+            for (int j = 0; j < N_[1]; j++)
             {
-                for (int i = 0; i < Nx; i++)
+                for (int i = 0; i < N_[0]; i++)
                 {
                     permfile >> *ip;
                     *ip = 1. / (*ip);
                     ip++;
                 }
-                for (int i = 0; i < max_Nx - Nx; i++)
+                for (int i = 0; i < max_N[0] - N_[0]; i++)
                     permfile >> tmp; // skip unneeded part
             }
-            for (int j = 0; j < max_Ny - Ny; j++)
-                for (int i = 0; i < max_Nx; i++)
+            for (int j = 0; j < max_N[1] - N_[1]; j++)
+                for (int i = 0; i < max_N[0]; i++)
                     permfile >> tmp;  // skip unneeded part
         }
 
         if (l < 2) // if not processing Kz, skip unneeded part
-            for (int k = 0; k < max_Nz - Nz; k++)
-                for (int j = 0; j < max_Ny; j++)
-                    for (int i = 0; i < max_Nx; i++)
+            for (int k = 0; k < max_N[2] - N_[2]; k++)
+                for (int j = 0; j < max_N[1]; j++)
+                    for (int i = 0; i < max_N[0]; i++)
                         permfile >> tmp;
     }
 }
 
-void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileName,
-                                                       MPI_Comm comm)
+void InversePermeabilityCoefficient::ReadPermeabilityFile(MPI_Comm comm,
+                                                          const std::string& fileName,
+                                                          const mfem::Array<int>& max_N)
 {
-    int num_procs, myid;
-    MPI_Comm_size(comm, &num_procs);
+    int myid;
     MPI_Comm_rank(comm, &myid);
 
     mfem::StopWatch chrono;
 
     chrono.Start();
     if (myid == 0)
-        ReadPermeabilityFile(fileName);
-    else
-        inversePermeability = new double [3 * Nx * Ny * Nz];
+        ReadPermeabilityFile(fileName, max_N);
     chrono.Stop();
 
     if (myid == 0)
@@ -200,7 +184,7 @@ void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileNa
     chrono.Clear();
 
     chrono.Start();
-    MPI_Bcast(inversePermeability, 3 * Nx * Ny * Nz, MPI_DOUBLE, 0, comm);
+    MPI_Bcast(inverse_permeability_.data(), 3 * N_all_, MPI_DOUBLE, 0, comm);
     chrono.Stop();
 
     if (myid == 0)
@@ -208,78 +192,57 @@ void InversePermeabilityFunction::ReadPermeabilityFile(const std::string& fileNa
 
 }
 
-void InversePermeabilityFunction::BlankPermeability()
+void InversePermeabilityCoefficient::BlankPermeability()
 {
-    inversePermeability = new double[3 * Nx * Ny * Nz];
-    std::fill_n(inversePermeability, 3 * Nx * Ny * Nz, 1.0);
+    std::fill(inverse_permeability_.begin(), inverse_permeability_.end(), 1.0);
 }
 
-void InversePermeabilityFunction::InversePermeability(const mfem::Vector& x,
-                                                      mfem::Vector& val)
+void InversePermeabilityCoefficient::InversePermeability(const mfem::Vector& x,
+                                                         mfem::Vector& val)
 {
     val.SetSize(x.Size());
 
     unsigned int i = 0, j = 0, k = 0;
 
-    switch (orientation)
+    switch (orientation_)
     {
         case NONE:
-            i = Nx - 1 - (int)floor(x[0] / hx / (1. + 3e-16));
-            j = (int)floor(x[1] / hy / (1. + 3e-16));
-            k = Nz - 1 - (int)floor(x[2] / hz / (1. + 3e-16));
+            i = N_[0] - 1 - (int)floor(x[0] / h_[0] / (1. + 3e-16));
+            j = (int)floor(x[1] / h_[1] / (1. + 3e-16));
+            k = N_[2] - 1 - (int)floor(x[2] / h_[2] / (1. + 3e-16));
             break;
         case XY:
-            i = Nx - 1 - (int)floor(x[0] / hx / (1. + 3e-16));
-            j = (int)floor(x[1] / hy / (1. + 3e-16));
-            k = npos;
+            i = N_[0] - 1 - (int)floor(x[0] / h_[0] / (1. + 3e-16));
+            j = (int)floor(x[1] / h_[1] / (1. + 3e-16));
+            k = slice_;
             break;
         case XZ:
-            i = Nx - 1 - (int)floor(x[0] / hx / (1. + 3e-16));
-            j = npos;
-            k = Nz - 1 - (int)floor(x[2] / hz / (1. + 3e-16));
+            i = N_[0] - 1 - (int)floor(x[0] / h_[0] / (1. + 3e-16));
+            j = slice_;
+            k = N_[2] - 1 - (int)floor(x[2] / h_[2] / (1. + 3e-16));
             break;
         case YZ:
-            i = npos;
-            j = (int)floor(x[1] / hy / (1. + 3e-16));
-            k = Nz - 1 - (int)floor(x[2] / hz / (1. + 3e-16));
+            i = slice_;
+            j = (int)floor(x[1] / h_[1] / (1. + 3e-16));
+            k = N_[2] - 1 - (int)floor(x[2] / h_[2] / (1. + 3e-16));
             break;
         default:
-            mfem::mfem_error("InversePermeabilityFunction::InversePermeability");
+            mfem::mfem_error("InversePermeabilityCoefficient::InversePermeability");
     }
 
-    val[0] = inversePermeability[Ny * Nx * k + Nx * j + i];
-    val[1] = inversePermeability[Ny * Nx * k + Nx * j + i + Nx * Ny * Nz];
-
-    if (orientation == NONE)
-        val[2] = inversePermeability[Ny * Nx * k + Nx * j + i + 2 * Nx * Ny * Nz];
-
+    const int offset = N_slice_ * k + N_[0] * j + i;
+    for (int l = 0; l < vdim; ++l)
+    {
+        val[l] = inverse_permeability_[offset + N_all_ * l];
+    }
 }
 
-double InversePermeabilityFunction::InvNorm2(const mfem::Vector& x)
+double InversePermeabilityCoefficient::InvNorm2(const mfem::Vector& x)
 {
     mfem::Vector val(3);
     InversePermeability(x, val);
     return 1.0 / val.Norml2();
 }
-
-void InversePermeabilityFunction::ClearMemory()
-{
-    delete[] inversePermeability;
-}
-
-int InversePermeabilityFunction::Nx(60);
-int InversePermeabilityFunction::Ny(220);
-int InversePermeabilityFunction::Nz(85);
-int InversePermeabilityFunction::max_Nx(60);
-int InversePermeabilityFunction::max_Ny(220);
-int InversePermeabilityFunction::max_Nz(85);
-double InversePermeabilityFunction::hx(20);
-double InversePermeabilityFunction::hy(10);
-double InversePermeabilityFunction::hz(2);
-double* InversePermeabilityFunction::inversePermeability(NULL);
-InversePermeabilityFunction::SliceOrientation InversePermeabilityFunction::orientation(
-    InversePermeabilityFunction::NONE );
-int InversePermeabilityFunction::npos(-1);
 
 /**
    @brief A forcing function that is supposed to very roughly represent some wells
@@ -689,11 +652,6 @@ public:
                  int slice, bool metis_parition,
                  const mfem::Array<int>& ess_attr, bool unit_weight = false);
 
-    ~SPE10Problem()
-    {
-        InversePermeabilityFunction::ClearMemory();
-    }
-
     mfem::Vector InitialCondition(double initial_val) const;
 
 private:
@@ -719,6 +677,11 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
 void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
                                      int spe10_scale, bool metis_partition, int slice)
 {
+    mfem::Array<int> max_N(3);
+    max_N[0] = 60;
+    max_N[1] = 220;
+    max_N[2] = 85;
+
     mfem::Array<int> N(3);
     N[0] = 12 * spe10_scale; // 60
     N[1] = 44 * spe10_scale; // 220
@@ -752,22 +715,12 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
                   << pmesh_->GetNE() << " fine elements\n";
     }
 
-    using IPF = InversePermeabilityFunction;
-    IPF::SetNumberCells(N[0], N[1], N[2]);
-    IPF::SetMeshSizes(h(0), h(1), h(2));
-    if (nDimensions == 2)
-    {
-        IPF::Set2DSlice(IPF::XY, slice);
-    }
-    if (std::strcmp(permFile, ""))
-    {
-        IPF::ReadPermeabilityFile(permFile, comm_);
-    }
-    else
-    {
-        IPF::BlankPermeability();
-    }
-    kinv_vector_ = make_unique<mfem::VectorFunctionCoefficient>(nDimensions, IPF::InversePermeability);
+    using IPC = InversePermeabilityCoefficient;
+    IPC::SliceOrientation orient = nDimensions == 2 ? IPC::XY : IPC::NONE;
+    kinv_vector_ = make_unique<IPC>(comm_, permFile, N, max_N, h, orient, slice);
+
+    IPC test;
+    test = IPC(comm_, permFile, N, max_N, h, orient, slice);
 
     mfem::Array<int> coarsening_factor(nDimensions);
     coarsening_factor = 10;
