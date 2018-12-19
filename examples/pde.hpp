@@ -719,9 +719,6 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     IPC::SliceOrientation orient = nDimensions == 2 ? IPC::XY : IPC::NONE;
     kinv_vector_ = make_unique<IPC>(comm_, permFile, N, max_N, h, orient, slice);
 
-    IPC test;
-    test = IPC(comm_, permFile, N, max_N, h, orient, slice);
-
     mfem::Array<int> coarsening_factor(nDimensions);
     coarsening_factor = 10;
     coarsening_factor.Last() = nDimensions == 3 ? 5 : 10;
