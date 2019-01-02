@@ -498,13 +498,13 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
             B_potentials.GetColumnReference(l, ref_vec1);
             vertex_target_i.GetColumnReference(l + 1, ref_vec2);
             entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-            coarse_m_builder_->SetBubbleBubbleBlock(l, l, entry_value);
+            coarse_m_builder_->SetBubbleBubbleBlock(i, l, l, entry_value);
 
             for (int j = l + 1; j < num_bubbles_i; j++)
             {
                 vertex_target_i.GetColumnReference(j + 1, ref_vec2);
                 entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-                coarse_m_builder_->SetBubbleBubbleBlock(l, j, entry_value);
+                coarse_m_builder_->SetBubbleBubbleBlock(i, l, j, entry_value);
             }
         }
         bubble_counter += num_bubbles_i;
