@@ -342,9 +342,10 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         // next line does *not* assume M_proc_ is diagonal
         LocalGraphEdgeSolver solver(Mloc, Dloc, one);
 
-        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
         int num_local_vdofs = local_vdofs.Size();
         local_rhs_trace1.SetSize(num_local_vdofs);
+
+        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
 
         // ---
         // solving bubble functions (vertex_target -> bubbles)
@@ -779,24 +780,20 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(GraphSpace coarse_graph_space,
     mfem::Vector coarse_const_rep(Pvertices.NumCols());
     Pvertices.MultTranspose(constant_rep_, coarse_const_rep);
 
-    mfem::Vector agg_size_inv(topology_.NumAggs());
-    for (unsigned int i = 0; i < topology_.NumAggs(); ++i)
+    mfem::Vector agg_sizes(topology_.NumAggs());
+    topology_.Agg_vertex_.Mult(fine_mgL.GetVertexSizes(), agg_sizes);
+
+    auto tmp = smoothg::Mult(fine_mgL.GetPWConstProj(), Pvertices);
+    tmp.ScaleRows(fine_mgL.GetVertexSizes());
+    auto P_pwc = smoothg::Mult(topology_.Agg_vertex_, tmp);
+    for (int i = 0; i < P_pwc.NumRows(); ++i)
     {
-        agg_size_inv[i] = 1.0 / topology_.Agg_vertex_.RowSize(i);
+        P_pwc.ScaleRow(i, 1.0 / agg_sizes[i]);
     }
-
-    auto tmp = smoothg::Mult(topology_.Agg_vertex_, fine_mgL.GetPWConstProj());
-    auto Ppw1 = smoothg::Mult(tmp, Pvertices);
-    Ppw1.ScaleRows(agg_size_inv);
-
-    auto vert_agg = smoothg::Transpose(topology_.Agg_vertex_);
-    auto PvT = smoothg::Transpose(Pvertices);
-    auto tmp2 = smoothg::Mult(fine_mgL.GetPWConstInterp(), vert_agg);
-    auto Qpw1 = smoothg::Mult(PvT, tmp2);
 
     return MixedMatrix(std::move(coarse_graph_space), std::move(coarse_m_builder_),
                        std::move(coarse_D_), std::move(coarse_W_),
-                       std::move(coarse_const_rep), std::move(Ppw1), std::move(Qpw1));
+                       std::move(coarse_const_rep), std::move(agg_sizes), std::move(P_pwc));
 }
 
 } // namespace smoothg

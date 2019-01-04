@@ -80,12 +80,19 @@ mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
 std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A);
 
 /**
-    @brief Compute the product A * B between SparseMatrix and HypreParMatrix
+    @brief Compute the product A * B between HypreParMatrix and SparseMatrix
+
+    First interpret B as a block-diagonal HypreParMatrix, then call mfem::ParMult
 */
 std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
                                               const mfem::SparseMatrix& B,
                                               const mfem::Array<int>& B_colpart);
 
+/**
+    @brief Compute the product A * B between SparseMatrix and HypreParMatrix
+
+    First interpret A as a block-diagonal HypreParMatrix, then call mfem::ParMult
+*/
 std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
                                               const mfem::HypreParMatrix& B,
                                               const mfem::Array<int>& A_rowpart);
@@ -461,9 +468,7 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
 void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
                  mfem::Array<int>& out);
 
-/**
-   @brief Make a copy of mfem::HypreParMatrix
-*/
+/// Make a copy of mfem::HypreParMatrix
 std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
 
 } // namespace smoothg

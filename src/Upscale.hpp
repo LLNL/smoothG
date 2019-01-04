@@ -140,8 +140,10 @@ public:
         return GetMatrix(level).GetConstantRep();
     }
 
+    /// Project a vertex-based vector in level to piecewise constant on vertices
     mfem::Vector PWConstProject(int level, const mfem::Vector& x) const;
 
+    /// Opposite of PWConstProject
     mfem::Vector PWConstInterpolate(int level, const mfem::Vector& x) const;
 
     /// Show Solver Information

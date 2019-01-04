@@ -364,8 +364,10 @@ mfem::Vector Upscale::PWConstProject(int level, const mfem::Vector& x) const
 
 mfem::Vector Upscale::PWConstInterpolate(int level, const mfem::Vector& x) const
 {
+    mfem::Vector scaled_x(x);
+    RescaleVector(GetMatrix(level).GetVertexSizes(), scaled_x);
     mfem::Vector out(GetMatrix(level).GetD().NumRows());
-    GetMatrix(level).GetPWConstInterp().Mult(x, out);
+    GetMatrix(level).GetPWConstProj().MultTranspose(scaled_x, out);
     return out;
 }
 
