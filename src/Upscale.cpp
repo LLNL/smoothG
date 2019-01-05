@@ -402,14 +402,15 @@ void Upscale::PrintInfo(std::ostream& out) const
 
             if (i != 0)
             {
-                tout << "Op Comp (level " << i - 1 << " to " << i <<
-                        "):\t" << OperatorComplexityAtLevel(i) << "\n";
+                tout << "Op Comp (level " << i - 1 << " to " << i
+                     << "):\t" << OperatorComplexityAtLevel(i) << "\n";
                 tout << "\n";
             }
         }
 
         tout << "Total Op Comp:\t"
-             << OperatorComplexity(mixed_laplacians_.size() - 1) << "\n\n";
+             << OperatorComplexity(mixed_laplacians_.size() - 1) << "\n";
+        tout << "\n";
     }
     if (myid_ == 0)
     {
