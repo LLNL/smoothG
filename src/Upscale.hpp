@@ -149,8 +149,11 @@ public:
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
 
-    /// Compute Operator Complexity
-    double OperatorComplexity() const;
+    /// Compute total operator complexity up to a given level
+    double OperatorComplexity(unsigned int level) const;
+
+    /// Compute operator complexity from level-1 to level
+    double OperatorComplexityAtLevel(unsigned int level) const;
 
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
@@ -179,12 +182,14 @@ public:
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
     std::vector<double> ComputeErrors(const mfem::BlockVector& upscaled_sol,
-                                      const mfem::BlockVector& fine_sol) const;
+                                      const mfem::BlockVector& fine_sol,
+                                      int level) const;
 
     /// Compare errors between upscaled and fine solution.
     /// Displays error to stdout on processor 0
     void ShowErrors(const mfem::BlockVector& upscaled_sol,
-                    const mfem::BlockVector& fine_sol) const;
+                    const mfem::BlockVector& fine_sol,
+                    int level) const;
 
     /// Dump some debug data
     void DumpDebug(const std::string& prefix) const;

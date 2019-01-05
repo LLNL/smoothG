@@ -192,11 +192,9 @@ int main(int argc, char* argv[])
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);
 
-        auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
-
-        if (level > 0 && myid == 0)
+        if (level > 0)
         {
-            ShowErrors(error_info);
+            upscale.ShowErrors(sol[level], sol[0], level);
         }
     }
     /// [Solve]

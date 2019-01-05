@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
 
         upscale.PrintInfo();
 
-        auto error_info = upscale.ComputeErrors(upscaled_sol, fine_sol);
+        auto error_info = upscale.ComputeErrors(upscaled_sol, fine_sol, 1);
 
         if (myid == 0)
         {
