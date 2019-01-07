@@ -355,6 +355,22 @@ const MixedMatrix& Upscale::GetMatrix(int level) const
     return mixed_laplacians_[level];
 }
 
+mfem::Vector Upscale::PWConstProject(int level, const mfem::Vector& x) const
+{
+    mfem::Vector out(GetMatrix(level).GetGraph().NumVertices());
+    GetMatrix(level).GetPWConstProj().Mult(x, out);
+    return out;
+}
+
+mfem::Vector Upscale::PWConstInterpolate(int level, const mfem::Vector& x) const
+{
+    mfem::Vector scaled_x(x);
+    RescaleVector(GetMatrix(level).GetVertexSizes(), scaled_x);
+    mfem::Vector out(GetMatrix(level).GetD().NumRows());
+    GetMatrix(level).GetPWConstProj().MultTranspose(scaled_x, out);
+    return out;
+}
+
 void Upscale::PrintInfo(std::ostream& out) const
 {
     int num_procs;
@@ -384,14 +400,17 @@ void Upscale::PrintInfo(std::ostream& out) const
             tout << "NonZeros:\t" << GetMatrix(i).GlobalNNZ() << "\n";
             tout << "\n";
 
-            if (i != 0 && solver_[i] && solver_[0])
+            if (i != 0)
             {
-                double op_comp = 1.0 + (solver_[i]->GetNNZ() / (double) solver_[0]->GetNNZ());
-
-                tout << "Op Comp:\t" << op_comp << "\n";
+                tout << "Op Comp (level " << i - 1 << " to " << i
+                     << "):\t" << OperatorComplexityAtLevel(i) << "\n";
                 tout << "\n";
             }
         }
+
+        tout << "Total Op Comp:\t"
+             << OperatorComplexity(mixed_laplacians_.size() - 1) << "\n";
+        tout << "\n";
     }
     if (myid_ == 0)
     {
@@ -399,27 +418,34 @@ void Upscale::PrintInfo(std::ostream& out) const
     }
 }
 
-/// @todo multilevel this implementation (relatively easy)
-double Upscale::OperatorComplexity() const
+double Upscale::OperatorComplexity(unsigned int level) const
 {
-    assert(solver_[1]);
+    assert(level < mixed_laplacians_.size());
 
-    int nnz_coarse = solver_[1]->GetNNZ();
-    int nnz_fine;
-
-    if (solver_[0])
+    int nnz_all = 0;
+    for (unsigned int i = 0; i < level + 1; ++i)
     {
-        nnz_fine = solver_[0]->GetNNZ();
-    }
-    else
-    {
-        nnz_fine = GetMatrix(0).GlobalNNZ();
+        assert(solver_[i]);
+        nnz_all += solver_[i]->GetNNZ();
     }
 
+    int nnz_fine = solver_[0] ? solver_[0]->GetNNZ() : GetMatrix(0).GlobalNNZ();
 
-    double op_comp = 1.0 + (nnz_coarse / (double) nnz_fine);
+    return nnz_all / (double) nnz_fine;
+}
 
-    return op_comp;
+double Upscale::OperatorComplexityAtLevel(unsigned int level) const
+{
+    assert(level < mixed_laplacians_.size());
+
+    if (level == 0)
+        return 1.0;
+
+    assert(solver_[level - 1] && solver_[level]);
+    int nnz_coarse = solver_[level]->GetNNZ();
+    int nnz_fine = solver_[level - 1]->GetNNZ();
+
+    return 1.0 + nnz_coarse / (double) nnz_fine;
 }
 
 void Upscale::SetPrintLevel(int print_level)
@@ -459,21 +485,23 @@ void Upscale::SetAbsTol(double atol)
 }
 
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,
-                                           const mfem::BlockVector& fine_sol) const
+                                           const mfem::BlockVector& fine_sol,
+                                           int level) const
 {
     const mfem::SparseMatrix& M = GetMatrix(0).GetM();
     const mfem::SparseMatrix& D = GetMatrix(0).GetD();
 
     auto info = smoothg::ComputeErrors(comm_, M, D, upscaled_sol, fine_sol);
-    info.push_back(OperatorComplexity());
+    info.push_back(OperatorComplexity(level));
 
     return info;
 }
 
 void Upscale::ShowErrors(const mfem::BlockVector& upscaled_sol,
-                         const mfem::BlockVector& fine_sol) const
+                         const mfem::BlockVector& fine_sol,
+                         int level) const
 {
-    auto info = ComputeErrors(upscaled_sol, fine_sol);
+    auto info = ComputeErrors(upscaled_sol, fine_sol, level);
 
     if (myid_ == 0)
     {

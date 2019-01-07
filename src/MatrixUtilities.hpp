@@ -80,6 +80,24 @@ mfem::SparseMatrix AAt(const mfem::SparseMatrix& A);
 std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A);
 
 /**
+    @brief Compute the product A * B between HypreParMatrix and SparseMatrix
+
+    First interpret B as a block-diagonal HypreParMatrix, then call mfem::ParMult
+*/
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
+                                              const mfem::SparseMatrix& B,
+                                              const mfem::Array<int>& B_colpart);
+
+/**
+    @brief Compute the product A * B between SparseMatrix and HypreParMatrix
+
+    First interpret A as a block-diagonal HypreParMatrix, then call mfem::ParMult
+*/
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
+                                              const mfem::HypreParMatrix& B,
+                                              const mfem::Array<int>& A_rowpart);
+
+/**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense.
 */
@@ -359,6 +377,8 @@ public:
 
        @param M matrix \f$ M \f$ in the formula in the class description
        @param D matrix \f$ D \f$ in the formula in the class description
+       @param const_rep a vector which solution u is set to be orthogonal to.
+       If not provided, there will be NO orthogonalization step in solving stage
 
        We construct the matrix \f$ A = D M^{-1} D^T \f$, eliminate the zeroth
        degree of freedom to ensure it is solvable. LU factorization of \f$ A \f$
@@ -367,10 +387,7 @@ public:
     */
     LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                          const mfem::SparseMatrix& D,
-                         const mfem::Vector& const_rep);
-
-    /// solution u will not be orthogonalized to const_rep in solving stage
-    LocalGraphEdgeSolver(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
+                         const mfem::Vector& const_rep = mfem::Vector());
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
@@ -410,7 +427,7 @@ private:
     /// Setup matrix and solver when M is not diagonal
     void Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D);
 
-    std::unique_ptr<mfem::UMFPackSolver> solver_;
+    mfem::UMFPackSolver solver_;
     mfem::SparseMatrix A_;
     mfem::SparseMatrix MinvDT_;
     bool M_is_diag_;
@@ -451,9 +468,7 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
 void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
                  mfem::Array<int>& out);
 
-/**
-   @brief Make a copy of mfem::HypreParMatrix
-*/
+/// Make a copy of mfem::HypreParMatrix
 std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
 
 } // namespace smoothg

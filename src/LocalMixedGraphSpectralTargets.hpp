@@ -30,7 +30,9 @@
 
 #include "mfem.hpp"
 #include "GraphTopology.hpp"
+#include "GraphSpace.hpp"
 #include "LocalEigenSolver.hpp"
+#include "MatrixUtilities.hpp"
 
 namespace smoothg
 {
@@ -120,6 +122,35 @@ public:
 };
 
 /**
+   Collection of relation tables concerning degrees of freedom aggregations
+
+   @param agg_vdof_ aggregate to vertex-based dof relation table
+   @param agg_edof_ aggregate to edge-based dof relation table
+   @param face_edof_ face to edge-based dof relation table
+   @param topology_ associated topology
+*/
+struct DofAggregate
+{
+    mfem::SparseMatrix agg_vdof_;
+    mfem::SparseMatrix agg_edof_;  // the edofs here belong to one and only one agg
+    mfem::SparseMatrix face_edof_;
+    const GraphTopology* topology_;
+
+    DofAggregate(const GraphTopology& topology, const GraphSpace& space)
+        : topology_(&topology)
+    {
+        auto agg_vdof = smoothg::Mult(topology.Agg_vertex_, space.VertexToVDof());
+        agg_vdof_.Swap(agg_vdof);
+
+        auto face_edof = smoothg::Mult(topology.face_edge_, space.EdgeToEDof());
+        face_edof_.Swap(face_edof);
+
+        auto agg_edof = smoothg::Mult(topology.Agg_vertex_, space.VertexToEDof());
+        GraphTopology::AggregateEdge2AggregateEdgeInt(agg_edof, agg_edof_);
+    }
+};
+
+/**
    @brief Take a mixed form graph Laplacian, do local eigenvalue problems, and
    generate targets in parallel.
 */
@@ -130,7 +161,7 @@ public:
        @brief Construct based on mixed form graph Laplacian.
 
        @param mixed_graph_laplacian container for M, D, W
-       @param graph_topology the partitioning relations for coarsening
+       @param dof_agg container for various dofs aggregation
        @param param container for rel_tol, max_evects, various dual target flags
 
        And the graph Laplacian in mixed form is
@@ -143,7 +174,7 @@ public:
     */
     LocalMixedGraphSpectralTargets(
         const MixedMatrix& mixed_graph_laplacian,
-        const GraphTopology& graph_topology,
+        const DofAggregate& dof_agg,
         const UpscaleParameters& param);
 
     ~LocalMixedGraphSpectralTargets() {}
@@ -191,7 +222,8 @@ private:
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
                             std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
 
-    void BuildExtendedAggregates();
+    /// Build extended aggregates to vertex-based and edge-based dofs relation
+    void BuildExtendedAggregates(const GraphSpace& space);
 
     // TODO: better naming - this is not really a permutation because it is not one to one
     // the returned matrix makes a copy of extended part (offd) and add it to local
@@ -211,7 +243,8 @@ private:
     mfem::Vector MakeOneNegOne(const mfem::Vector& constant, int split);
 
     /// given an assembled vector on vertices, return extracted value on (possibly shared) faces
-    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect);
+    mfem::Vector** CollectConstant(const mfem::Vector& constant_vect,
+                                   const mfem::SparseMatrix& agg_vdof);
 
     /// shared_constant expected to be an array of legth 2, just returns them
     /// stacked on top of each other
@@ -225,16 +258,14 @@ private:
     const bool scaled_dual_;
     const bool energy_dual_;
 
+    const MixedMatrix& mgL_;
     const mfem::SparseMatrix& M_local_;
     const mfem::SparseMatrix& D_local_;
     const mfem::SparseMatrix* W_local_;
     const mfem::Vector& constant_rep_;
 
-    std::unique_ptr<mfem::HypreParMatrix> M_global_;
-    std::unique_ptr<mfem::HypreParMatrix> D_global_;
-    std::unique_ptr<mfem::HypreParMatrix> W_global_;
-
-    const GraphTopology& graph_topology_;
+    const GraphTopology& topology_;
+    const DofAggregate& dof_agg_;
     const double zero_eigenvalue_threshold_;
 
     /// Extended aggregate to vertex dof relation table
@@ -249,11 +280,6 @@ private:
 
     /// face to permuted edge dof relation table
     std::unique_ptr<mfem::HypreParMatrix> face_perm_edof_;
-
-    mfem::Array<HYPRE_Int> edgedof_starts;
-    mfem::Array<HYPRE_Int> vertdof_starts;
-    mfem::Array<HYPRE_Int> edgedof_ext_starts;
-    mfem::Array<int> Agg_start_;
 
     mfem::Array<int> col_map_;
 };

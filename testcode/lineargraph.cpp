@@ -100,7 +100,6 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
 {
     mfem::SparseMatrix face_edge(partitions - 1, n_ - 1);
     mfem::SparseMatrix Agg_vertex(partitions, n_);
-    mfem::SparseMatrix Agg_edge(partitions, n_ - 1);
     mfem::SparseMatrix Agg_face(partitions, partitions - 1);
 
     // dividing line between partitions
@@ -109,19 +108,11 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     for (int i = 0; i < line; ++i)
     {
         Agg_vertex.Add(p, i, 1.0);
-        if (i < line - 1)
-        {
-            Agg_edge.Add(p, i, 1.0);
-        }
     }
     face_edge.Add(0, line - 1, 1.0);
     p = 1;
     for (int i = line; i < graph.GetN(); ++i)
     {
-        if (i < graph.GetN() - 1)
-        {
-            Agg_edge.Add(p, i, 1.0);
-        }
         Agg_vertex.Add(p, i, 1.0);
     }
 
@@ -129,7 +120,6 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     Agg_face.Add(1, 0, 1.0);
 
     Agg_vertex.Finalize();
-    Agg_edge.Finalize();
     face_edge.Finalize();
     Agg_face.Finalize();
     mfem::SparseMatrix face_Agg = smoothg::Transpose(Agg_face);
@@ -144,21 +134,18 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     vertex_start[1] = vertex_start[2] = n_;
     edge_start[1] = n_ - 1; edge_start[2] = n_ - 1;
 
-    agg_start.Copy(graph_topology_.GetAggregateStart());
-    face_start.Copy(graph_topology_.GetFaceStart());
-    vertex_start.Copy(graph_topology_.GetVertexStart());
-    edge_start.Copy(graph_topology_.GetEdgeStart());
+    agg_start.Copy(graph_topology_.GetAggregateStarts());
+    face_start.Copy(graph_topology_.GetFaceStarts());
 
-    auto face_trueface = make_unique<mfem::HypreParMatrix>(
-                             MPI_COMM_WORLD, partitions - 1, graph_topology_.GetFaceStart(), &face_identity_);
+    mfem::HypreParMatrix face_trueface(graph.GetGraph().GetComm(), partitions - 1,
+                                       graph_topology_.GetFaceStarts(), &face_identity_);
 
-    coarse_graph_ = make_shared<Graph>(Agg_face, *face_trueface);
+    coarse_graph_ = make_unique<Graph>(Agg_face, face_trueface);
     graph_topology_.SetCoarseGraph(coarse_graph_);
 
-    graph_topology_.face_trueface_face_ = smoothg::AAt(*face_trueface);
+    graph_topology_.face_trueface_face_ = smoothg::AAt(face_trueface);
 
     graph_topology_.Agg_vertex_.Swap(Agg_vertex);
-    graph_topology_.Agg_edge_.Swap(Agg_edge);
     graph_topology_.face_edge_.Swap(face_edge);
     graph_topology_.face_Agg_.Swap(face_Agg);
 }
@@ -196,7 +183,8 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_edge_traces;
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
-    LocalMixedGraphSpectralTargets localtargets(mgL, partition.graph_topology_, param);
+    DofAggregate dof_agg(partition.graph_topology_, mgL.GetGraphSpace());
+    LocalMixedGraphSpectralTargets localtargets(mgL, dof_agg, param);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
@@ -233,7 +221,7 @@ int main(int argc, char* argv[])
     mfem::SparseMatrix Pu;
     mfem::SparseMatrix Pp;
 
-    GraphCoarsen graph_coarsen(mgL, partition.graph_topology_);
+    GraphCoarsen graph_coarsen(mgL, dof_agg);
     GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
                                         local_edge_traces, local_spectral_vertex_targets,
                                         std::move(*partition.coarse_graph_));

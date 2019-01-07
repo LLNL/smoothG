@@ -22,7 +22,6 @@
 #include "GraphCoarsen.hpp"
 #include "utilities.hpp"
 #include "sharedentitycommunication.hpp"
-#include "MatrixUtilities.hpp"
 
 using std::unique_ptr;
 
@@ -61,76 +60,46 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
 }
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
-    const MixedMatrix& mgL, const GraphTopology& graph_topology, const UpscaleParameters& param)
+    const MixedMatrix& mgL, const DofAggregate& dof_agg, const UpscaleParameters& param)
     :
-    comm_(graph_topology.FineGraph().GetComm()),
+    comm_(mgL.GetGraph().GetComm()),
     rel_tol_(param.spect_tol),
     max_evects_(param.max_evects),
     dual_target_(param.dual_target),
     scaled_dual_(param.scaled_dual),
     energy_dual_(param.energy_dual),
+    mgL_(mgL),
     M_local_(mgL.GetM()),
     D_local_(mgL.GetD()),
     W_local_(mgL.GetW()),
     constant_rep_(mgL.GetConstantRep()),
-    graph_topology_(graph_topology),
+    topology_(*dof_agg.topology_),
+    dof_agg_(dof_agg),
     zero_eigenvalue_threshold_(1.e-8), // note we also use this for singular values
     col_map_(0)
 {
-    // Assemble the parallel global M and D
-    // TODO: D and M starts should in terms of dofs
-    graph_topology.GetVertexStart().Copy(vertdof_starts);
-    graph_topology.GetEdgeStart().Copy(edgedof_starts);
-
-    auto M_local_ptr = const_cast<mfem::SparseMatrix*>(&M_local_);
-    auto D_local_ptr = const_cast<mfem::SparseMatrix*>(&D_local_);
-
-    mfem::HypreParMatrix M_d(comm_, edgedof_starts.Last(), edgedof_starts, M_local_ptr);
-
-    const mfem::HypreParMatrix& edge_trueedge(graph_topology.FineGraph().EdgeToTrueEdge());
-    M_global_.reset(smoothg::RAP(M_d, edge_trueedge));
-
-    mfem::HypreParMatrix D_d(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
-                             vertdof_starts, edgedof_starts, D_local_ptr);
-    D_global_.reset( ParMult(&D_d, &edge_trueedge) );
-
-    if (W_local_)
-    {
-        auto W_local_ptr = const_cast<mfem::SparseMatrix*>(W_local_);
-        W_global_ = make_unique<mfem::HypreParMatrix>(
-                        comm_, vertdof_starts.Last(),
-                        vertdof_starts, W_local_ptr);
-    }
 }
 
-void LocalMixedGraphSpectralTargets::BuildExtendedAggregates()
+void LocalMixedGraphSpectralTargets::BuildExtendedAggregates(const GraphSpace& space)
 {
-    mfem::HypreParMatrix edge_trueedge;
-    edge_trueedge.MakeRef(graph_topology_.FineGraph().EdgeToTrueEdge());
+    mfem::Array<int> Agg_start, vert_start;
+    Agg_start.MakeRef(topology_.GetAggregateStarts());
+    vert_start.MakeRef(space.GetGraph().VertexStarts());
 
-    // hypre may modify the matrix, so make a deep copy
-    mfem::SparseMatrix vertex_edge(graph_topology_.FineGraph().VertexToEdge());
+    // Construct extended aggregate to vertex relation table
+    auto vertex_vertex = AAt(space.GetGraph().VertexToTrueEdge());
+    auto ExtAgg_vert = ParMult(topology_.Agg_vertex_, *vertex_vertex, Agg_start);
+    SetConstantValue(*ExtAgg_vert, 1.);
 
-    // Construct extended aggregate to vertex dofs relation tables
-    mfem::HypreParMatrix vertex_edge_bd(comm_, vertdof_starts.Last(), edgedof_starts.Last(),
-                                        vertdof_starts, edgedof_starts, &vertex_edge);
-    unique_ptr<mfem::HypreParMatrix> pvertex_edge( ParMult(&vertex_edge_bd, &edge_trueedge) );
-    unique_ptr<mfem::HypreParMatrix> pvertex_vertex( AAt(*pvertex_edge) );
+    // Construct extended aggregate to "interior" dofs relation tables
+    ExtAgg_vdof_ = ParMult(*ExtAgg_vert, space.VertexToVDof(), mgL_.GetDrowStarts());
 
-    graph_topology_.GetAggregateStart().Copy(Agg_start_);
+    auto vert_trueedof = ParMult(space.VertexToEDof(), space.EDofToTrueEDof(), vert_start);
+    ExtAgg_edof_.reset(mfem::ParMult(ExtAgg_vert.get(), vert_trueedof.get()));
 
-    mfem::SparseMatrix Agg_vertex(graph_topology_.Agg_vertex_);
-    mfem::HypreParMatrix Agg_vertex_bd(comm_, Agg_start_.Last(), vertdof_starts.Last(),
-                                       Agg_start_, vertdof_starts, &Agg_vertex);
-    ExtAgg_vdof_.reset( ParMult(&Agg_vertex_bd, pvertex_vertex.get()) );
-    ExtAgg_vdof_->CopyColStarts();
-
-    // Construct extended aggregate to (interior) edge relation tables
-    SetConstantValue(*ExtAgg_vdof_, 1.);
-    ExtAgg_edof_.reset(ParMult(ExtAgg_vdof_.get(), pvertex_edge.get()));
-
-    // Note that boundary edges on an extended aggregate have value 1, while
-    // interior edges have value 2, and the goal is to keep only interior edges
+    // Note that edofs on an extended aggregate boundary have value 1, while
+    // interior edofs have value 2, and the goal is to keep only interior edofs
+    // See also documentation in GraphCoarsen::BuildAggToCoarseEdgeDof
     ExtAgg_edof_->Threshold(1.5);
 }
 
@@ -174,15 +143,12 @@ class MixedBlockEigensystem
 {
 public:
     MixedBlockEigensystem(
-        const mfem::Array<int>& vertex_local_dof_ext,
-        const mfem::Array<int>& edge_local_dof_ext,
-        LocalEigenSolver& eigs, mfem::Array<int>& colMapper,
-        mfem::SparseMatrix& D_ext,
-        mfem::SparseMatrix& M_ext, mfem::SparseMatrix& W_ext,
-        bool scaled_dual, bool energy_dual);
+        int max_evects, double spec_tol, bool scaled_dual, bool energy_dual);
 
-    /// returns minimum eigenvalue
-    double ComputeEigenvectors(mfem::DenseMatrix& evects);
+    /// compute eigenvectors of the matrix DM^{-1}D^T + W
+    void ComputeEigenvectors(
+        mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
+        mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects);
 
     /// @todo should scaled_dual and energy_dual be arguments here?
     void ComputeEdgeTraces(mfem::DenseMatrix& evects,
@@ -199,12 +165,14 @@ private:
         const mfem::SparseMatrix& D,
         const mfem::Vector& M_diag_inv);
 
-    LocalEigenSolver& eigs_;
+    LocalEigenSolver eigs_;
     bool use_w_;
-    mfem::SparseMatrix Dloc_;
+    bool M_is_diag_;
     mfem::SparseMatrix DlocT_;
+    mfem::SparseMatrix Dloc_ref_;
     mfem::SparseMatrix DMinvDt_;
     mfem::Vector Mloc_diag_inv_;
+    mfem::UMFPackSolver M_inv_;
     mfem::DenseMatrix evects_;
     double eval_min_;
     bool scaled_dual_;
@@ -225,98 +193,54 @@ void MixedBlockEigensystem::CheckMinimalEigenvalue(
 }
 
 MixedBlockEigensystem::MixedBlockEigensystem(
-    const mfem::Array<int>& vertex_local_dof_ext,
-    const mfem::Array<int>& edge_local_dof_ext,
-    LocalEigenSolver& eigs, mfem::Array<int>& colMapper,
-    mfem::SparseMatrix& D_ext,
-    mfem::SparseMatrix& M_ext, mfem::SparseMatrix& W_ext,
-    bool scaled_dual, bool energy_dual)
+    int max_evects, double spec_tol, bool scaled_dual, bool energy_dual)
     :
-    eigs_(eigs),
-    use_w_((W_ext.Height() > 0)),
+    eigs_(max_evects, spec_tol),
     scaled_dual_(scaled_dual),
     energy_dual_(energy_dual),
     zero_eigenvalue_threshold_(1.e-8)
 {
-    // extract local D corresponding to iAgg-th extended aggregate
-    mfem::SparseMatrix Dloc_tmp =
-        ExtractRowAndColumns(D_ext, vertex_local_dof_ext, edge_local_dof_ext, colMapper);
-    Dloc_.Swap(Dloc_tmp);
-    mfem::SparseMatrix Wloc;
+}
 
-    if (use_w_)
-    {
-        // Wloc assumed to be diagonal
-        auto Wloc_tmp = ExtractRowAndColumns(
-                            W_ext, vertex_local_dof_ext, vertex_local_dof_ext, colMapper) ;
-        Wloc.Swap(Wloc_tmp);
-        assert(Wloc.NumNonZeroElems() == Wloc.Height());
-        assert(Wloc.Height() == Wloc.Width());
-    }
+void MixedBlockEigensystem::ComputeEigenvectors(
+    mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
+    mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects)
+{
+    use_w_ = (Wloc.Height() > 0);
+    Dloc_ref_.MakeRef(Dloc);
 
     // build local (weighted) graph Laplacian
+    mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc);
+    DlocT_.Swap(DlocT_tmp);
 
-    if (M_ext.NumNonZeroElems() == M_ext.Height())
+    M_is_diag_ = IsDiag(Mloc);
+    if (M_is_diag_)  // M is diagonal
     {
-        // M is diagonal (we assume---the check in the if is not great
-        const double* M_diag_data = M_ext.GetData();
-
-        Mloc_diag_inv_.SetSize(edge_local_dof_ext.Size());
-        for (int i = 0; i < Dloc_.Width(); i++)
+        Mloc_diag_inv_.SetSize(Mloc.Height());
+        for (int i = 0; i < Mloc.Height(); i++)
         {
-            Mloc_diag_inv_(i) = 1.0 / M_diag_data[edge_local_dof_ext[i]];
+            Mloc_diag_inv_(i) = 1.0 / Mloc(i, i);
         }
-
-        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
-        DlocT_.Swap(DlocT_tmp);
         DlocT_.ScaleRows(Mloc_diag_inv_);
-        mfem::SparseMatrix DMinvDt_tmp = smoothg::Mult(Dloc_, DlocT_);
+        mfem::SparseMatrix DMinvDt_tmp = smoothg::Mult(Dloc, DlocT_);
         DMinvDt_.Swap(DMinvDt_tmp);
         if (use_w_)
         {
             DMinvDt_.Add(-1.0, Wloc);
         }
-        eval_min_ = eigs_.Compute(DMinvDt_, evects_);
+        eval_min_ = eigs_.Compute(DMinvDt_, evects);
     }
-    else
+    else // general M
     {
-        // general M (explicit dense inverse for now, which is a mistake) (@todo)
-        mfem::DenseMatrix denseD(Dloc_.Height(), Dloc_.Width());
-        Full(Dloc_, denseD);
-        mfem::DenseMatrix denseMinv(denseD.Width());
-        M_ext.GetSubMatrix(edge_local_dof_ext, edge_local_dof_ext, denseMinv);
-        denseMinv.Invert();
-
-        mfem::DenseMatrix DMinv(denseD.Height(), denseMinv.Width());
-        Mult(denseD, denseMinv, DMinv);
-        mfem::DenseMatrix DMinvDt_dense(denseD.Height());
-        MultABt(DMinv, denseD, DMinvDt_dense);
-        if (use_w_)
-        {
-            for (int i = 0; i < Wloc.Height(); ++i)
-            {
-                DMinvDt_dense(i, i) += Wloc.GetData()[i];
-            }
-        }
-        mfem::Vector evals;
-        eigs_.Compute(DMinvDt_dense, evals, evects_);
-        eval_min_ = evals.Min();
-
-        // temporarily added to match dimension
-        mfem::SparseMatrix DlocT_tmp = smoothg::Transpose(Dloc_);
-        DlocT_.Swap(DlocT_tmp);
+        assert(!use_w_); // TODO: consider W in eigensolver
+        M_inv_.SetOperator(Mloc);
+        eval_min_ = eigs_.BlockCompute(Mloc, Dloc, evects);
     }
 
     if (!use_w_)
     {
         CheckMinimalEigenvalue(eval_min_, "vertex");
     }
-}
-
-double MixedBlockEigensystem::ComputeEigenvectors(mfem::DenseMatrix& evects)
-{
-    evects = evects_;
-    return eval_min_;
 }
 
 std::vector<mfem::SparseMatrix>
@@ -386,27 +310,43 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
 
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later
-        AggExt_sigmaT.SetSize(evects_tmp.Width(), DlocT_.Height());
-        MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
+        if (M_is_diag_)
+        {
+            AggExt_sigmaT.SetSize(evects_tmp.Width(), DlocT_.Height());
+            MultSparseDenseTranspose(DlocT_, evects_tmp, AggExt_sigmaT);
+        }
+        else
+        {
+            mfem::DenseMatrix DT_evects;
+            MultSparseDense(DlocT_, evects_tmp, DT_evects);
+
+            AggExt_sigmaT.SetSize(DT_evects.Height(), DT_evects.Width());
+            mfem::Vector in_col, out_col;
+            for (int j = 0; j < DT_evects.Width(); ++j)
+            {
+                DT_evects.GetColumnReference(j, in_col);
+                AggExt_sigmaT.GetColumnReference(j, out_col);
+                M_inv_.Mult(in_col, out_col);
+            }
+            AggExt_sigmaT.Transpose();
+        }
     }
     else
     {
         /// @todo
-        MFEM_ASSERT(DMinvDt_.Height() > 0,
+        MFEM_ASSERT(M_is_diag_,
                     "Edge eigensystem only works with diagonal M! (ie, two-level)");
-        double eval_min = 0.0;
-        // Collect trace samples from eigenvectors of dual graph Laplacian
-        auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_, Mloc_diag_inv_);
-        eval_min = eigs_.Compute(EES, evects);
 
-        CheckMinimalEigenvalue(eval_min, "edge");
+        // Collect trace samples from eigenvectors of dual graph Laplacian
+        auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_ref_, Mloc_diag_inv_);
+        eval_min_ = eigs_.Compute(EES, evects);
+
+        CheckMinimalEigenvalue(eval_min_, "edge");
 
         // Transpose all edge eigenvectors for extraction later
         AggExt_sigmaT.Transpose(evects);
     }
 }
-
-
 
 void LocalMixedGraphSpectralTargets::GetExtAggDofs(
     DofType dof_type, int iAgg, mfem::Array<int>& dofs)
@@ -431,11 +371,12 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
     std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
-    const int nAggs = graph_topology_.Agg_vertex_.Height();
+    const int nAggs = topology_.Agg_vertex_.Height();
     ExtAgg_sigmaT.resize(nAggs);
     local_vertex_targets.resize(nAggs);
 
-    BuildExtendedAggregates();
+    const GraphSpace& space = mgL_.GetGraphSpace();
+    BuildExtendedAggregates(space);
 
     // Construct permutation matrices to obtain M, D on extended aggregates
     using ParMatrix = unique_ptr<mfem::HypreParMatrix>;
@@ -445,10 +386,10 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     ParMatrix permute_eT( permute_e->Transpose() );
 
-    ParMatrix tmpM(ParMult(permute_e.get(), M_global_.get()) );
+    ParMatrix tmpM(ParMult(permute_e.get(), &mgL_.GetParallelM()) );
     ParMatrix pM_ext(ParMult(tmpM.get(), permute_eT.get()) );
 
-    ParMatrix tmpD(ParMult(permute_v.get(), D_global_.get()) );
+    ParMatrix tmpD(ParMult(permute_v.get(), &mgL_.GetParallelD()) );
     ParMatrix pD_ext(ParMult(tmpD.get(), permute_eT.get()) );
 
     mfem::SparseMatrix M_ext, D_ext, W_ext;
@@ -456,26 +397,24 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     pD_ext->GetDiag(D_ext);
 
     ParMatrix pW_ext;
-    if (W_global_)
+    if (mgL_.CheckW())
     {
         ParMatrix permute_vT( permute_v->Transpose() );
-        ParMatrix tmpW(ParMult(permute_v.get(), W_global_.get()) );
+        ParMatrix tmpW(ParMult(permute_v.get(), mgL_.GetParallelW()) );
 
         pW_ext.reset(ParMult(tmpW.get(), permute_vT.get()));
         pW_ext->GetDiag(W_ext);
     }
 
-    // Compute face to permuted edge relation table
-    auto& face_start = const_cast<mfem::Array<HYPRE_Int>&>(graph_topology_.GetFaceStart());
-    auto& edge_trueedge = const_cast<mfem::HypreParMatrix&>(
-                              graph_topology_.FineGraph().EdgeToTrueEdge());
+    // Compute face to permuted edge dofs relation table
+    const mfem::SparseMatrix& f_e = dof_agg_.face_edof_;
+    mfem::SparseMatrix face_edof(f_e.GetI(), f_e.GetJ(), f_e.GetData(), f_e.Height(),
+                                 space.VertexToEDof().Width(), false, false, false);
+    ParMatrix face_trueedof = ParMult(face_edof, space.EDofToTrueEDof(),
+                                      topology_.GetFaceStarts());
+    face_perm_edof_.reset(ParMult(face_trueedof.get(), permute_eT.get()));
 
-    auto& face_edge = const_cast<mfem::SparseMatrix&>(graph_topology_.face_edge_);
-    mfem::HypreParMatrix face_edge_d(comm_, face_start.Last(), edge_trueedge.M(),
-                                     face_start, edge_trueedge.RowPart(), &face_edge);
-
-    ParMatrix face_trueedge(ParMult(&face_edge_d, &edge_trueedge));
-    face_perm_edof_.reset(ParMult(face_trueedge.get(), permute_eT.get()));
+    auto agg_vdof = smoothg::Mult(topology_.Agg_vertex_, space.VertexToVDof());
 
     // Column map for submatrix extraction
     col_map_.SetSize(std::max(permute_e->Height(), permute_v->Height()), -1);
@@ -486,12 +425,12 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     mfem::DenseMatrix evects_T, evects_restricted_T;
 
     // SET W in eigenvalues
-    const bool use_w = false && W_global_;
+    const bool use_w = false && mgL_.CheckW();
 
     // ---
     // solve eigenvalue problem on each extended aggregate, our (3.1)
     // ---
-    LocalEigenSolver eigs(max_evects_, rel_tol_);
+    MixedBlockEigensystem mbe(max_evects_, rel_tol_, scaled_dual_, energy_dual_);
     for (int iAgg = 0; iAgg < nAggs; ++iAgg)
     {
         // Extract local dofs for extended aggregates that is shared
@@ -506,10 +445,20 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
             continue;
         }
 
-        MixedBlockEigensystem mbe(ext_loc_vdofs, ext_loc_edofs,
-                                  eigs, col_map_, D_ext, M_ext, W_ext,
-                                  scaled_dual_, energy_dual_);
-        mbe.ComputeEigenvectors(evects);
+        // Extract local matrices
+        auto Mloc = ExtractRowAndColumns(M_ext, ext_loc_edofs,
+                                         ext_loc_edofs, col_map_);
+        auto Dloc = ExtractRowAndColumns(D_ext, ext_loc_vdofs,
+                                         ext_loc_edofs, col_map_);
+        mfem::SparseMatrix Wloc;
+        if (use_w)
+        {
+            auto Wloc_tmp = ExtractRowAndColumns(W_ext, ext_loc_vdofs,
+                                                 ext_loc_vdofs, col_map_) ;
+            Wloc.Swap(Wloc_tmp);
+        }
+
+        mbe.ComputeEigenvectors(Mloc, Dloc, Wloc, evects);
 
         if (use_w)
         {
@@ -526,7 +475,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         int nevects = evects.Width();
 
         // restricting vertex dofs on extended region to the original aggregate
-        GetTableRow(graph_topology_.Agg_vertex_, iAgg, loc_vdofs);
+        GetTableRow(agg_vdof, iAgg, loc_vdofs);
 
         evects_T.Transpose(evects);
         evects_restricted_T.SetSize(nevects, loc_vdofs.Size());
@@ -582,26 +531,26 @@ mfem::Vector LocalMixedGraphSpectralTargets::MakeOneNegOne(
 
 /// implementation copied from Stephan Gelever's GraphCoarsen::CollectConstant
 mfem::Vector** LocalMixedGraphSpectralTargets::CollectConstant(
-    const mfem::Vector& constant_vect)
+    const mfem::Vector& constant_vect, const mfem::SparseMatrix& agg_vdof)
 {
     SharedEntityCommunication<mfem::Vector> sec_constant(
-        comm_, graph_topology_.CoarseGraph().EdgeToTrueEdge());
+        comm_, topology_.CoarseGraph().EdgeToTrueEdge());
     sec_constant.ReducePrepare();
 
-    unsigned int num_faces = graph_topology_.NumFaces();
+    const unsigned int num_faces = topology_.NumFaces();
 
     for (unsigned int face = 0; face < num_faces; ++face)
     {
-        const int* neighbors = graph_topology_.face_Agg_.GetRowColumns(face);
+        const int* neighbors = topology_.face_Agg_.GetRowColumns(face);
         std::vector<double> constant_data;
 
-        for (int k = 0; k < graph_topology_.face_Agg_.RowSize(face); ++k) //  agg : neighbors)
+        for (int k = 0; k < topology_.face_Agg_.RowSize(face); ++k) //  agg : neighbors)
         {
             int agg = neighbors[k];
-            mfem::Array<int> agg_vertices;
-            GetTableRow(graph_topology_.Agg_vertex_, agg, agg_vertices);
+            mfem::Array<int> local_vdofs;
+            GetTableRow(agg_vdof, agg, local_vdofs);
             mfem::Vector sub_vect;
-            constant_vect.GetSubVector(agg_vertices, sub_vect);
+            constant_vect.GetSubVector(local_vdofs, sub_vect);
 
             for (int l = 0; l < sub_vect.Size(); ++l)
                 constant_data.push_back(sub_vect(l));
@@ -634,10 +583,10 @@ mfem::Vector LocalMixedGraphSpectralTargets::ConstantLocal(
 // are summed together, and the rest are simply copied
 mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
                             const mfem::SparseMatrix& M1,
-                            int num_face_edges)
+                            int num_face_edofs)
 {
-    int size = M0.Height() + M1.Height() - num_face_edges;
-    int offset = M0.Height() - num_face_edges;
+    int size = M0.Height() + M1.Height() - num_face_edofs;
+    int offset = M0.Height() - num_face_edofs;
 
     mfem::SparseMatrix M_combine(size, size);
 
@@ -662,8 +611,8 @@ mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
         for (int j = M1_i[i]; j < M1_i[i + 1]; ++j)
         {
             int col = M1_j[j];
-            int combine_row = i < num_face_edges ? i : i + offset;
-            int combine_col = col < num_face_edges ? col : col + offset;
+            int combine_row = i < num_face_edofs ? i : i + offset;
+            int combine_col = col < num_face_edofs ? col : col + offset;
             M_combine.Add(combine_row, combine_col, M1_data[j]);
         }
     }
@@ -676,10 +625,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets)
 {
-    const mfem::SparseMatrix& face_Agg(graph_topology_.face_Agg_);
-    const mfem::SparseMatrix& face_edge(graph_topology_.face_edge_);
-    const mfem::SparseMatrix& Agg_vertex(graph_topology_.Agg_vertex_);
-    const mfem::SparseMatrix& Agg_edge(graph_topology_.Agg_edge_);
+    const mfem::SparseMatrix& face_Agg(topology_.face_Agg_);
+    const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
+    const mfem::SparseMatrix& agg_edof = dof_agg_.agg_edof_;
+    const mfem::SparseMatrix& face_edof = dof_agg_.face_edof_;
 
     const int nfaces = face_Agg.Height(); // Number of coarse faces
     local_edge_trace_targets.resize(nfaces);
@@ -692,11 +641,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
     mfem::SparseMatrix face_IsShared;
     HYPRE_Int* junk_map;
-    graph_topology_.face_trueface_face_->GetOffd(face_IsShared, junk_map);
+    topology_.face_trueface_face_->GetOffd(face_IsShared, junk_map);
 
     // Send and receive traces
-    const mfem::HypreParMatrix& face_trueface =
-        graph_topology_.CoarseGraph().EdgeToTrueEdge();
+    const auto& face_trueface = topology_.CoarseGraph().EdgeToTrueEdge();
     SharedEntityCommunication<mfem::DenseMatrix> sec_trace(comm_, face_trueface);
     sec_trace.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
@@ -760,7 +708,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     for (int iface = 0; iface < nfaces; ++iface)
     {
         // extract the dofs i.d. for the face
-        GetTableRow(face_edge, iface, iface_edofs);
+        GetTableRow(face_edof, iface, iface_edofs);
         int num_iface_edofs = iface_edofs.Size();
 
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
@@ -770,7 +718,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         {
             dof_counter = num_iface_edofs;
             for (int i = 0; i < num_neighbor_aggs; ++i)
-                dof_counter += Agg_edge.RowSize(neighbor_aggs[i]);
+                dof_counter += agg_edof.RowSize(neighbor_aggs[i]);
 
             face_nbh_dofs.SetSize(dof_counter);
             std::copy_n(iface_edofs.GetData(), num_iface_edofs,
@@ -778,7 +726,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             dof_counter = num_iface_edofs;
             for (int i = 0; i < num_neighbor_aggs; ++i)
             {
-                GetTableRow(Agg_edge, neighbor_aggs[i], local_dof);
+                GetTableRow(agg_edof, neighbor_aggs[i], local_dof);
                 std::copy_n(local_dof.GetData(), local_dof.Size(),
                             face_nbh_dofs.GetData() + dof_counter);
                 dof_counter += local_dof.Size();
@@ -786,13 +734,13 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
             dof_counter = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
-                dof_counter += Agg_vertex.RowSize(neighbor_aggs[i]);
+                dof_counter += agg_vdof.RowSize(neighbor_aggs[i]);
 
             vertex_local_dof.SetSize(dof_counter);
             dof_counter = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
             {
-                GetTableRow(Agg_vertex, neighbor_aggs[i], local_dof);
+                GetTableRow(agg_vdof, neighbor_aggs[i], local_dof);
                 std::copy_n(local_dof.GetData(), local_dof.Size(),
                             vertex_local_dof.GetData() + dof_counter);
                 dof_counter += local_dof.Size();
@@ -816,7 +764,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     for (int iface = 0; iface < nfaces; ++iface)
     {
         // extract the dofs i.d. for the face
-        GetTableRow(face_edge, iface, iface_edofs);
+        GetTableRow(face_edof, iface, iface_edofs);
         int num_iface_edofs = iface_edofs.Size();
 
         const int num_neighbor_aggs = face_Agg.RowSize(iface);
@@ -826,7 +774,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         {
             dof_counter = num_iface_edofs;
             for (int i = 0; i < num_neighbor_aggs; ++i)
-                dof_counter += Agg_edge.RowSize(neighbor_aggs[i]);
+                dof_counter += agg_edof.RowSize(neighbor_aggs[i]);
 
             face_nbh_dofs.SetSize(dof_counter);
             std::copy_n(iface_edofs.GetData(), num_iface_edofs,
@@ -834,7 +782,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             dof_counter = num_iface_edofs;
             for (int i = 0; i < num_neighbor_aggs; ++i)
             {
-                GetTableRow(Agg_edge, neighbor_aggs[i], local_dof);
+                GetTableRow(agg_edof, neighbor_aggs[i], local_dof);
                 std::copy_n(local_dof.GetData(), local_dof.Size(),
                             face_nbh_dofs.GetData() + dof_counter);
                 dof_counter += local_dof.Size();
@@ -860,10 +808,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     int capacity;
     mfem::Vector PV_sigma;
     mfem::SparseMatrix Mloc_neighbor;
-    mfem::Vector** shared_constant = CollectConstant(constant_rep_);
+    mfem::Vector** shared_constant = CollectConstant(constant_rep_, agg_vdof);
     for (int iface = 0; iface < nfaces; ++iface)
     {
-        int num_iface_edge_dof = face_edge.RowSize(iface);
+        int num_iface_edofs = face_edof.RowSize(iface);
 
         // if this face is owned by this processor
         if (sec_trace.OwnedByMe(iface))
@@ -877,7 +825,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_proc; ++i)
                 total_vects += shared_sigma_f[i].Width();
-            collected_sigma.SetSize(num_iface_edge_dof, total_vects);
+            collected_sigma.SetSize(num_iface_edofs, total_vects);
 
             total_vects = 0;
             for (int i = 0; i < num_neighbor_proc; ++i)
@@ -892,10 +840,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             // compute the PV vector
             mfem::Vector PV_sigma_on_face;
 
-            if (num_iface_edge_dof == 1)
+            if (num_iface_edofs == 1)
             {
                 // only 1 dof on face
-                PV_sigma_on_face.SetSize(num_iface_edge_dof);
+                PV_sigma_on_face.SetSize(num_iface_edofs);
                 PV_sigma_on_face = 1.; // should inherit something from contant_rep?
             }
             else if (face_IsShared.RowSize(iface))
@@ -915,10 +863,10 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 // each shared_Mloc_f[i] contains edge dofs on the face
                 int nedge_local_dofs =
-                    Mloc_0.Size() + Mloc_1.Size() - num_iface_edge_dof;
+                    Mloc_0.Size() + Mloc_1.Size() - num_iface_edofs;
 
                 // assemble contributions from each processor for shared dofs
-                mfem::SparseMatrix combined_M = CombineM(Mloc_0, Mloc_1, num_iface_edge_dof);
+                mfem::SparseMatrix combined_M = CombineM(Mloc_0, Mloc_1, num_iface_edofs);
                 Mloc_neighbor.Swap(combined_M);
 
                 int Dloc_0_nnz = Dloc_0.NumNonZeroElems();
@@ -936,11 +884,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                     Dloc_nb_i[nvertex_neighbor0 + i] = Dloc_0_nnz + Dloc_1_i[i];
 
                 std::copy_n(Dloc_0.GetJ(), Dloc_0_nnz, Dloc_nb_j);
-                int offset = Dloc_0_ncols - num_iface_edge_dof;
+                int offset = Dloc_0_ncols - num_iface_edofs;
                 for (int j = 0; j < Dloc_1_nnz; j++)
                 {
                     int col = Dloc_1_j[j];
-                    if (col < num_iface_edge_dof)
+                    if (col < num_iface_edofs)
                         Dloc_nb_j[Dloc_0_nnz + j] = col;
                     else
                         Dloc_nb_j[Dloc_0_nnz + j] = col + offset;
@@ -958,7 +906,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 PV_sigma.SetSize(Mloc_neighbor.Height());
                 LocalGraphEdgeSolver solver(Mloc_neighbor, Dloc_neighbor);
                 solver.Mult(OneNegOne, PV_sigma);
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
             else
             {
@@ -968,7 +916,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 // set up an average zero vector (so no need to Normalize)
                 const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
-                int nvertex_neighbor0 = Agg_vertex.RowSize(neighbor_aggs[0]);
+                int nvertex_neighbor0 = agg_vdof.RowSize(neighbor_aggs[0]);
                 mfem::Vector OneNegOne = MakeOneNegOne(shared_constant[iface][0], nvertex_neighbor0);
 
                 // solve saddle point problem for PV and restrict to face
@@ -976,7 +924,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 LocalGraphEdgeSolver solver(Mloc_0, Dloc_0);
                 solver.Mult(OneNegOne, PV_sigma);
 
-                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edge_dof);
+                PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
 
             // add PV vector to other vectors and orthogonalize
@@ -987,7 +935,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         else
         {
             assert(shared_sigma[iface] == nullptr);
-            local_edge_trace_targets[iface].SetSize(num_iface_edge_dof, 0);
+            local_edge_trace_targets[iface].SetSize(num_iface_edofs, 0);
         }
     }
     delete [] shared_sigma;

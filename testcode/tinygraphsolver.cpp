@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
 
 #if SMOOTHG_USE_SAAMGE
     SAAMGeParam sa_param;
-    HybridSolver hb_saamge(comm, mixed_graph_laplacian, nullptr, nullptr, 0, &sa_param);
+    HybridSolver hb_saamge(comm, mixed_graph_laplacian, nullptr, 0, &sa_param);
     solver_to_name[&hb_saamge] = "Hybridization + SA-AMGe";
 #endif
 

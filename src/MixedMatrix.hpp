@@ -60,16 +60,22 @@ public:
     /**
        @brief Construct a mixed system directly from building blocks.
 
+       @param graph_space the associated graph space (entity-to-dof relations)
        @param mbuilder builder for M
        @param D the matrix D
        @param W the matrix W. If it is nullptr, it is assumed to be zero
-       @param edge_d_td edge dof to true edge dof table
+       @param constant_rep constant representation (null vector of D^T)
+       @param vertex_sizes number of finest level vertices in each aggregate
+       @param P_pwc projector from vertex space to piecewise constant on
+              vertices, see documentation on P_pwc_ below for more details.
     */
     MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
-                mfem::Vector constant_rep);
+                mfem::Vector constant_rep,
+                mfem::Vector vertex_sizes,
+                mfem::SparseMatrix P_pwc);
 
     /// Get the associated graph space
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
@@ -85,6 +91,15 @@ public:
 
     /// Get constant representation (null vector of D)
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
+
+    /// Get piecewise constant projector
+    const mfem::SparseMatrix& GetPWConstProj() const { return P_pwc_; }
+
+    /**
+       @brief Interpret vertex at this level as aggregate of fine level vertices,
+       this returns number of fine level vertices contained in each aggregate
+    */
+    const mfem::Vector& GetVertexSizes() const { return vertex_sizes_; }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -260,7 +275,7 @@ public:
     }
 
     /// return the row starts (parallel row partitioning) of \f$ D \f$
-    mfem::Array<HYPRE_Int>& GetDrowStart() const
+    mfem::Array<HYPRE_Int>& GetDrowStarts() const
     {
         if (!Drow_start_)
             Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
@@ -278,8 +293,7 @@ public:
                                         edge_d_td_->GetRowStarts(), M_.get());
 
             std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M_diag, edge_d_td_));
-            pM_.reset(ParMult(const_cast<mfem::HypreParMatrix*>(edge_td_d_.get()), M_tmp.get()));
-            hypre_ParCSRMatrixSetNumNonzeros(*pM_);
+            pM_.reset(ParMult(edge_td_d_.get(), M_tmp.get()));
         }
 
         assert(pM_);
@@ -292,7 +306,7 @@ public:
         if (!pD_ || recompute)
         {
             assert(D_);
-            pD_.reset(edge_d_td_->LeftDiagMult(*D_, *Drow_start_));
+            pD_ = ParMult(*D_, *edge_d_td_, *Drow_start_);
         }
 
         assert(pD_);
@@ -352,9 +366,6 @@ private:
     const mfem::HypreParMatrix* edge_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> edge_td_d_;
 
-    int nedges_;
-    int ntrue_edges_;
-
     mutable std::unique_ptr<mfem::HypreParMatrix> pM_;
     mutable std::unique_ptr<mfem::HypreParMatrix> pD_;
     mutable std::unique_ptr<mfem::HypreParMatrix> pW_;
@@ -365,6 +376,24 @@ private:
     std::unique_ptr<MBuilder> mbuilder_;
 
     mfem::Vector constant_rep_;
+
+    mfem::Vector vertex_sizes_; // number of finest level vertices in "aggregate"
+
+    /**
+       At a certain level, a vertex is an aggregate of "finest level" vertices.
+       Given a vector \f$ x \f$ in the vertex space, P_pwc_ does the following:
+           1. projects \f$ x \f$ to finest level \f$ x_{fine} \f$,
+           2. on each aggregate (vertex of the current level), computes the
+              average value of \f$ x_{fine} \f$ on the aggregate.
+
+       Note that the two steps are combined so P_pwc_ is a matrix of size
+       number of "coarse vertices" by dimension of coarse vertex space.
+
+       This projector is useful in computing coarse level "element" scaling in
+       MLMC simulations and nonlinear multigrids without visiting finest level.
+    */
+    mfem::SparseMatrix P_pwc_;
+
 }; // class MixedMatrix
 
 } // namespace smoothg

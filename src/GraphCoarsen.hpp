@@ -62,9 +62,9 @@ public:
        This doesn't do much, just sets up the object to be coarsened.
 
        @param mgL describes fine graph
-       @param graph_topology describes vertex partitioning, agglomeration, etc.
+       @param dof_agg describes various dofs aggregation
     */
-    GraphCoarsen(const MixedMatrix& mgL, const GraphTopology& graph_topology);
+    GraphCoarsen(const MixedMatrix& mgL, const DofAggregate& dof_agg);
 
     /**
        @brief Given edge_trace and vertex_targets functions, construct the
@@ -105,6 +105,7 @@ public:
        @brief Build coarse mixed system
     */
     MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
+                                  const MixedMatrix& fine_mgL,
                                   const mfem::SparseMatrix& Pvertices);
 private:
     /**
@@ -124,7 +125,7 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
         const Graph& coarse_graph,
         const mfem::SparseMatrix& face_cdof,
-        int total_num_coarse_edofs);
+        int num_coarse_edofs);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices(
@@ -136,8 +137,8 @@ private:
        Helper for BuildPEdges
     */
     void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
-                         const mfem::SparseMatrix& Agg_vertex,
-                         const mfem::SparseMatrix& face_edge,
+                         const mfem::SparseMatrix& agg_vdof,
+                         const mfem::SparseMatrix& face_edof,
                          const mfem::Vector& constant_rep);
 
     /**
@@ -146,11 +147,10 @@ private:
 
        @return the I array of PEdges for CSR format.
     */
-    int* InitializePEdgesNNZ(std::vector<mfem::DenseMatrix>& edge_traces,
-                             std::vector<mfem::DenseMatrix>& vertex_target,
-                             const mfem::SparseMatrix& Agg_edge,
-                             const mfem::SparseMatrix& face_edge,
-                             const mfem::SparseMatrix& Agg_face);
+    int* InitializePEdgesNNZ(const mfem::SparseMatrix& agg_coarse_edof,
+                             const mfem::SparseMatrix& agg_fine_edof,
+                             const mfem::SparseMatrix& face_coares_edof,
+                             const mfem::SparseMatrix& face_fine_edof);
 
     /**
        @brief takes the column 'j' from the matrix 'potentials',
@@ -203,9 +203,9 @@ private:
     /**
        @brief Build fine-level aggregate sub-M corresponding to dofs on a face
     */
-    void BuildAggregateFaceM(const mfem::Array<int>& edge_dofs_on_face,
-                             const mfem::SparseMatrix& vert_Agg,
-                             const mfem::SparseMatrix& edge_vert,
+    void BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
+                             const mfem::SparseMatrix& vert_agg,
+                             const mfem::SparseMatrix& edof_vert,
                              const int agg,
                              mfem::DenseMatrix& Mloc);
 
@@ -214,7 +214,9 @@ private:
     const mfem::SparseMatrix* W_proc_;
     const mfem::Vector& constant_rep_;
     const ElementMBuilder* fine_mbuilder_;
-    const GraphTopology& graph_topology_;
+    const GraphTopology& topology_;
+    const DofAggregate& dof_agg_;
+    const GraphSpace& space_;
 
     /// basically just some storage to allocate
     mfem::Array<int> col_map_;

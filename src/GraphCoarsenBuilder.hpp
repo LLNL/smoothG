@@ -23,6 +23,7 @@
 
 #include "smoothG_config.h"
 #include "utilities.hpp"
+#include "GraphSpace.hpp"
 #include "mfem.hpp"
 
 namespace smoothg
@@ -82,11 +83,7 @@ class CoarseMBuilder : public MBuilder
 public:
     /// this is arguably poor design, most implementations of this interface
     /// do not need all these arguments
-    virtual void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs) = 0;
+    virtual void Setup(const GraphSpace& coarse_space) = 0;
 
     virtual void RegisterRow(int agg_index, int row, int cdof_loc, int bubble_counter) {}
 
@@ -99,7 +96,8 @@ public:
     /// Deal with shared dofs for Trace-Trace block
     virtual void AddTraceAcross(int row, int col, int agg, double value) {}
 
-    virtual void SetBubbleBubbleBlock(int l, int j, double value) {}
+    virtual void SetBubbleBubbleBlock(int agg_index, int l, int j,
+                                      double value) {}
 
     virtual void ResetEdgeCdofMarkers(int size) {}
 
@@ -131,11 +129,7 @@ public:
                     const mfem::SparseMatrix& elem_edgedof);
 
     /// Setting up coarse level element M builder
-    void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs);
+    void Setup(const GraphSpace& coarse_space);
 
     void RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter);
 
@@ -148,17 +142,12 @@ public:
     /// Deal with shared dofs for Trace-Trace block
     void AddTraceAcross(int row, int col, int agg, double value);
 
-    void SetBubbleBubbleBlock(int l, int j, double value);
+    void SetBubbleBubbleBlock(int agg_index, int l, int j, double value);
 
     void ResetEdgeCdofMarkers(int size);
 
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
-
-    void SetAggToEdgeDofsTableReference(const mfem::SparseMatrix& elem_edgedof)
-    {
-        elem_edgedof_.MakeRef(elem_edgedof);
-    }
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
@@ -194,16 +183,11 @@ private:
 class CoefficientMBuilder : public CoarseMBuilder
 {
 public:
-    CoefficientMBuilder(const GraphTopology& topology) :
-        topology_(topology),
-        components_built_(false)
-    {}
+    CoefficientMBuilder()
+        : components_built_(false)
+    { }
 
-    void Setup(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const mfem::SparseMatrix& Agg_face,
-        int total_num_traces, int ncoarse_vertexdofs);
+    void Setup(const GraphSpace& coarse_space);
 
     /**
        @brief Assemble local components, independent of coefficient.
@@ -214,7 +198,9 @@ public:
     */
     void BuildComponents(const mfem::Vector& fineMdiag,
                          const mfem::SparseMatrix& Pedges,
-                         const mfem::SparseMatrix& face_cdof);
+                         const mfem::SparseMatrix& face_fine_edof_,
+                         const mfem::SparseMatrix& face_coarse_edof,
+                         const mfem::SparseMatrix& agg_edof);
 
     virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
@@ -231,7 +217,6 @@ private:
                            const mfem::Vector& D,
                            const mfem::DenseMatrix& P);
 
-    const GraphTopology& topology_;
     mfem::SparseMatrix Agg_face_ref_;
     mfem::SparseMatrix face_Agg_;
 

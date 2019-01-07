@@ -72,6 +72,23 @@ public:
     template<typename T>
     void Compute(T& A, T& B, mfem::Vector& evals, mfem::DenseMatrix& evects);
 
+
+    /**
+       Given matrices \f$ M, D \f$, find the eigenvectors corresponding to the
+       smallest few eigenvalues of the eigen problem
+       \f$ (DM^{-1}D^T)x = \lambda x \f$.
+
+       If size of A > size_offset_ and SMOOTHG_USE_ARPACK is on, ARPACK-based
+       solver will be used, otherwise LAPACK-based solver is used.
+
+       @param M (in) the matrix M
+       @param D (in) the matrix D
+       @param evals (out) eigenvalues
+       @param evects (out) eigenvectors
+    */
+    template<typename T>
+    void BlockCompute(T& M, T& D, mfem::Vector& evals, mfem::DenseMatrix& evects);
+
     /**
        Given a symmetric matrix \f$ A \f$, find the eigenvectors
        corresponding to the smallest few eigenvalues.
@@ -114,6 +131,22 @@ public:
     */
     double Compute(
         std::vector<mfem::SparseMatrix>& mat, mfem::DenseMatrix& evects);
+
+    /**
+       Given matrices \f$ M, D \f$, find the eigenvectors corresponding to the
+       smallest few eigenvalues of the eigen problem
+       \f$ (DM^{-1}D^T)x = \lambda x \f$.
+
+       If size of A > size_offset_ and SMOOTHG_USE_ARPACK is on, ARPACK-based
+       solver will be used, otherwise LAPACK-based solver is used.
+
+       @param M (in) the matrix M
+       @param D (in) the matrix D
+       @param evects (out) eigenvectors
+       @return smallest eigenvalue
+    */
+    double BlockCompute(
+        mfem::SparseMatrix& M, mfem::SparseMatrix& D, mfem::DenseMatrix& evects);
 
     ~LocalEigenSolver() = default;
 private:

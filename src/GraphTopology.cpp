@@ -79,14 +79,11 @@ GraphTopology::GraphTopology(GraphTopology&& graph_topology) noexcept
 {
     face_trueface_face_ = std::move(graph_topology.face_trueface_face_);
 
-    Agg_edge_.Swap(graph_topology.Agg_edge_);
     Agg_vertex_.Swap(graph_topology.Agg_vertex_);
     face_edge_.Swap(graph_topology.face_edge_);
 
-    Swap(vertex_start_, graph_topology.GetVertexStart());
-    Swap(edge_start_, graph_topology.GetEdgeStart());
-    Swap(aggregate_start_, graph_topology.GetAggregateStart());
-    Swap(face_start_, graph_topology.GetFaceStart());
+    Swap(agg_start_, graph_topology.GetAggregateStarts());
+    Swap(face_start_, graph_topology.GetFaceStarts());
 
     std::swap(fine_graph_, graph_topology.fine_graph_);
 
@@ -105,6 +102,7 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     MPI_Comm comm = fine_graph_->GetComm();
 
     const mfem::SparseMatrix& edge_bdratt = fine_graph_->EdgeToBdrAtt();
+    const mfem::HypreParMatrix& edge_trueedge = fine_graph_->EdgeToTrueEdge();
 
     unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge;
     if (edge_trueedge_edge_)
@@ -114,19 +112,14 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     }
     else
     {
-        edge_trueedge_edge = AAt(fine_graph_->EdgeToTrueEdge());
+        edge_trueedge_edge = AAt(edge_trueedge);
     }
 
-    int nvertices = fine_graph_->NumVertices();
-    int nedges = fine_graph_->NumEdges();
-    int nAggs = partitioning.Max() + 1;
+    HYPRE_Int* edge_start = const_cast<HYPRE_Int*>(edge_trueedge.RowPart());
 
-    // generate the 'start' array (not true dof)
-    mfem::Array<HYPRE_Int>* start[3] = {&vertex_start_, &edge_start_,
-                                        &aggregate_start_
-                                       };
-    HYPRE_Int nloc[3] = {nvertices, nedges, nAggs};
-    GenerateOffsets(comm, 3, nloc, start);
+    // generate the 'start' array
+    int nAggs = partitioning.Max() + 1;
+    GenerateOffsets(comm, nAggs, agg_start_);
 
     // Construct the relation table aggregate_vertex from partition
     mfem::SparseMatrix tmp = PartitionToMatrix(partitioning, nAggs);
@@ -137,21 +130,10 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     // Need to sort the edge indices to prevent index problem in face_edge
     aggregate_edge.SortColumnIndices();
 
-    AggregateEdge2AggregateEdgeInt(aggregate_edge, Agg_edge_);
-    mfem::SparseMatrix edge_aggregate(smoothg::Transpose(aggregate_edge));
+    mfem::SparseMatrix edge_agg(smoothg::Transpose(aggregate_edge));
 
-    // block diagonal edge_aggregate and aggregate_edge
-    auto edge_aggregate_d = make_unique<mfem::HypreParMatrix>(
-                                comm, edge_start_.Last(), aggregate_start_.Last(),
-                                edge_start_, aggregate_start_, &edge_aggregate);
-    auto aggregate_edge_d = make_unique<mfem::HypreParMatrix>(
-                                comm, aggregate_start_.Last(), edge_start_.Last(),
-                                aggregate_start_, edge_start_, &aggregate_edge);
-
-    unique_ptr<mfem::HypreParMatrix> edge_trueedge_Agg(
-        ParMult(edge_trueedge_edge.get(), edge_aggregate_d.get()) );
-    unique_ptr<mfem::HypreParMatrix> Agg_Agg(
-        ParMult(aggregate_edge_d.get(), edge_trueedge_Agg.get()) );
+    auto edge_trueedge_Agg = ParMult(*edge_trueedge_edge, edge_agg, agg_start_);
+    auto Agg_Agg = ParMult(aggregate_edge, *edge_trueedge_Agg, agg_start_);
 
     auto Agg_Agg_d = ((hypre_ParCSRMatrix*) *Agg_Agg)->diag;
     auto Agg_Agg_o = ((hypre_ParCSRMatrix*) *Agg_Agg)->offd;
@@ -317,7 +299,7 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     double* face_edge_data = new double [face_edge_nnz];
     std::fill_n(face_edge_data, face_edge_nnz, 1.0);
     mfem::SparseMatrix face_edge_tmp(face_edge_i, face_edge_j, face_edge_data,
-                                     nfaces, nedges);
+                                     nfaces, fine_graph_->NumEdges());
     face_edge_.Swap(face_edge_tmp);
 
     // TODO: face_bdratt can be built when counting boundary faces
@@ -339,8 +321,8 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     mfem::SparseMatrix edge_face(smoothg::Transpose(face_edge_));
 
     // block diagonal edge_face
-    mfem::HypreParMatrix edge_face_d(comm, edge_start_.Last(), face_start_.Last(),
-                                     edge_start_, face_start_, &edge_face);
+    mfem::HypreParMatrix edge_face_d(comm, edge_trueedge.M(), face_start_.Last(),
+                                     edge_start, face_start_, &edge_face);
 
     assert(edge_trueedge_edge && edge_face_d);
     face_trueface_face_.reset(smoothg::RAP(*edge_trueedge_edge, edge_face_d));

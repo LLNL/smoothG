@@ -140,14 +140,24 @@ public:
         return GetMatrix(level).GetConstantRep();
     }
 
+    /// Project a vector in vertex space of a given level to a vector of size
+    /// number of vertices of that level (representing average values of the
+    /// given vector on vertices).
+    mfem::Vector PWConstProject(int level, const mfem::Vector& x) const;
+
+    /// Interpolate a vector of size number of vertices of a given level
+    /// (representing a piecewise constant vector on aggregates of fine level)
+    /// to a vector in vertex space of that level. Mostly used for visualization
+    mfem::Vector PWConstInterpolate(int level, const mfem::Vector& x) const;
+
     /// Show Solver Information
     virtual void PrintInfo(std::ostream& out = std::cout) const;
 
-    /// Compute Operator Complexity
-    double OperatorComplexity() const;
+    /// Compute total operator complexity up to a given level
+    double OperatorComplexity(unsigned int level) const;
 
-    /// Get Row Starts
-    virtual mfem::Array<HYPRE_Int>& GetDrowStart() const { return GetMatrix(0).GetDrowStart();}
+    /// Compute operator complexity from level-1 to level
+    double OperatorComplexityAtLevel(unsigned int level) const;
 
     /// Get communicator
     virtual MPI_Comm GetComm() const { return comm_; }
@@ -176,12 +186,14 @@ public:
     /// Compare errors between upscaled and fine solution.
     /// Returns {vertex_error, edge_error, div_error} array.
     std::vector<double> ComputeErrors(const mfem::BlockVector& upscaled_sol,
-                                      const mfem::BlockVector& fine_sol) const;
+                                      const mfem::BlockVector& fine_sol,
+                                      int level) const;
 
     /// Compare errors between upscaled and fine solution.
     /// Displays error to stdout on processor 0
     void ShowErrors(const mfem::BlockVector& upscaled_sol,
-                    const mfem::BlockVector& fine_sol) const;
+                    const mfem::BlockVector& fine_sol,
+                    int level) const;
 
     /// Dump some debug data
     void DumpDebug(const std::string& prefix) const;

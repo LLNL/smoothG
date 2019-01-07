@@ -36,6 +36,8 @@ Graph::Graph(MPI_Comm comm,
              const mfem::Vector& edge_weight_global)
 {
     Distribute(comm, vertex_edge_global, edge_weight_global);
+    const mfem::SparseMatrix* edge_bdratt = nullptr;
+    Init(edge_bdratt);
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
@@ -56,11 +58,7 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
         SplitEdgeWeight(unit_edge_weight);
     }
 
-    if (edge_bdratt != nullptr)
-    {
-        mfem::SparseMatrix tmp(*edge_bdratt);
-        edge_bdratt_.Swap(tmp);
-    }
+    Init(edge_bdratt);
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
@@ -70,18 +68,15 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
     : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge)),
       split_edge_weight_(split_edge_weight)
 {
-    if (edge_bdratt != nullptr)
-    {
-        mfem::SparseMatrix tmp(*edge_bdratt);
-        edge_bdratt_.Swap(tmp);
-    }
+    Init(edge_bdratt);
 }
 
 Graph::Graph(const Graph& other) noexcept
     : vertex_edge_local_(other.vertex_edge_local_),
       edge_trueedge_(Copy(*other.edge_trueedge_)),
       split_edge_weight_(other.split_edge_weight_),
-      edge_bdratt_(other.edge_bdratt_)
+      edge_bdratt_(other.edge_bdratt_),
+      vertex_trueedge_(Copy(*other.vertex_trueedge_))
 {
     other.vert_loc_to_glo_.Copy(vert_loc_to_glo_);
     other.edge_loc_to_glo_.Copy(edge_loc_to_glo_);
@@ -111,6 +106,18 @@ void swap(Graph& lhs, Graph& rhs) noexcept
     mfem::Swap(lhs.vert_loc_to_glo_, rhs.vert_loc_to_glo_);
     mfem::Swap(lhs.edge_loc_to_glo_, rhs.edge_loc_to_glo_);
     mfem::Swap(lhs.vertex_starts_, rhs.vertex_starts_);
+}
+
+void Graph::Init(const mfem::SparseMatrix* edge_bdratt)
+{
+    if (edge_bdratt != nullptr)
+    {
+        mfem::SparseMatrix tmp(*edge_bdratt);
+        edge_bdratt_.Swap(tmp);
+    }
+
+    GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
+    vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
 }
 
 void Graph::Distribute(MPI_Comm comm,
@@ -151,11 +158,6 @@ void Graph::DistributeVertexEdge(MPI_Comm comm,
     vertex_edge_local_.Swap(tmp);
 
     MakeEdgeTrueEdge(comm, myid, proc_edge);
-
-    // Compute vertex_trueedge (needed for redistribution)
-    GenerateOffsets(comm, vertex_edge_local_.Height(), vertex_starts_);
-    //    vertex_trueedge_.reset(
-    //        edge_trueedge_->LeftDiagMult(vertex_edge_local_, vertex_starts_) );
 }
 
 void Graph::MakeEdgeTrueEdge(MPI_Comm comm, int myid, const mfem::SparseMatrix& proc_edge)

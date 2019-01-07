@@ -317,9 +317,7 @@ int main(int argc, char* argv[])
 
             if (level > 0)
             {
-                auto error_info = upscale.ComputeErrors(sol[level], sol[0]);
-                if (myid == 0)
-                    ShowErrors(error_info);
+                upscale.ShowErrors(sol[level], sol[0], level);
             }
 
             std::stringstream filename;

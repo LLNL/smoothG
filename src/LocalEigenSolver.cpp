@@ -82,7 +82,7 @@ LocalEigenSolver::LocalEigenSolver(
     num_arnoldi_vectors_(-1),
     tolerance_(1e-10),
     max_iterations_(1000),
-    shift_(-1e-6)  // shift_ may need to be adjusted
+    shift_(-1e-2)  // shift_ may need to be adjusted
 {
 }
 
@@ -249,6 +249,20 @@ void LocalEigenSolver::Compute(
     dtrtrs_(&uplo_, &trans_, &diag_, &n, &m, b, &n, evects.Data(), &n, &info_);
 }
 
+template<>
+void LocalEigenSolver::BlockCompute(
+    mfem::DenseMatrix& M, mfem::DenseMatrix& D,
+    mfem::Vector& evals, mfem::DenseMatrix& evects)
+{
+    M.Invert();
+    mfem::DenseMatrix DMinv(D.Height(), M.Width());
+    mfem::Mult(D, M, DMinv);
+    mfem::DenseMatrix DMinvDt(D.Height());
+    MultABt(DMinv, D, DMinvDt);
+
+    Compute(DMinvDt, evals, evects);
+}
+
 #if SMOOTHG_USE_ARPACK
 /// Adapter for applying the action of a certain operator in ARPACK
 class ARPACK_operator_adapter
@@ -310,6 +324,58 @@ public:
 private:
     std::unique_ptr<mfem::SparseMatrix> A_minus_sigma_B_;
     mfem::UMFPackSolver A_minus_sigma_B_inv_;
+};
+
+// Evaluate y = ((DM^{-1}D^T)-shift*B)^{-1} x
+// TODO: this may use some modified version of LocalEdgeSolver
+class DMD_shift_adapter : public ARPACK_operator_adapter
+{
+public:
+    DMD_shift_adapter(const mfem::SparseMatrix& M,
+                      const mfem::SparseMatrix& D,
+                      const double shift)
+        :
+        ARPACK_operator_adapter(D.Height())
+    {
+        offsets_.SetSize(3);
+        offsets_[0] = 0;
+        offsets_[1] = M.Height();
+        offsets_[2] = M.Height() + D.Height();
+
+        mfem::SparseMatrix DT = smoothg::Transpose(D);
+        mfem::SparseMatrix W = SparseIdentity(D.Height());
+        W *= shift;
+
+        mfem::BlockMatrix block_A(offsets_);
+        block_A.SetBlock(0, 0, const_cast<mfem::SparseMatrix*>(&M));
+        block_A.SetBlock(1, 0, const_cast<mfem::SparseMatrix*>(&D));
+        block_A.SetBlock(0, 1, &DT);
+        block_A.SetBlock(1, 1, &W);
+
+        block_system_.reset(block_A.CreateMonolithic());
+        block_system_inv_.SetOperator(*block_system_);
+
+        rhs_ = make_unique<mfem::BlockVector>(offsets_);
+        sol_ = make_unique<mfem::BlockVector>(offsets_);
+        rhs_->GetBlock(0) = 0.0;
+    }
+
+    void MultOP(double* in, double* out) override
+    {
+        std::copy_n(in, size_, rhs_->GetBlock(1).GetData());
+        rhs_->GetBlock(1) *= -1.0;
+
+        block_system_inv_.Mult(*rhs_, *sol_);
+
+        std::copy_n(sol_->GetBlock(1).GetData(), size_, out);
+    }
+
+private:
+    mfem::UMFPackSolver block_system_inv_;
+    std::unique_ptr<mfem::SparseMatrix> block_system_;
+    mfem::Array<int> offsets_;
+    mutable std::unique_ptr<mfem::BlockVector> rhs_;
+    mutable std::unique_ptr<mfem::BlockVector> sol_;
 };
 
 // Evaluate y = (B^{-1}A) x, x = A x
@@ -474,6 +540,40 @@ void LocalEigenSolver::Compute(
         EigenPairsSetSizeAndData(n, num_evects, evals, evects);
     }
 }
+
+template<>
+void LocalEigenSolver::BlockCompute(
+    mfem::SparseMatrix& M, mfem::SparseMatrix& D,
+    mfem::Vector& evals, mfem::DenseMatrix& evects)
+{
+    int n = D.Height();
+    int max_num_evects = max_num_evects_ == -1 ? n : std::min(n, max_num_evects_);
+    int ncv = ComputeNCV(n, max_num_evects, num_arnoldi_vectors_);
+
+    // Find the eigenvectors associated with num_evects smallest eigenvalues
+    DMD_shift_adapter DMD_I_shift(M, D, shift_);
+
+    ARSymStdEig<double, DMD_shift_adapter>
+    eigprob(n, max_num_evects, &DMD_I_shift, &DMD_shift_adapter::MultOP,
+            shift_, "LM", ncv, tolerance_, max_iterations_);
+    auto data_ptr = EigenPairsSetSizeAndData(n, max_num_evects, evals, evects);
+    int num_converged = eigprob.EigenValVectors(data_ptr[0], data_ptr[1]);
+    CheckNotConverged(max_num_evects, num_converged);
+
+    // TODO: a fast way of computing largest eigenvalue?
+    //    if (rel_tol_ < 1.0)
+    //    {
+    //        // Find the largest eigenvalue
+    //        A_adapter adapter_A(A);
+    //        ARSymStdEig_<double, A_adapter>
+    //        eigvalueprob(n, 1, &adapter_A, &A_adapter::MultOP,
+    //                     "LM", ncv, tolerance_, max_iterations_);
+    //        eigvalueprob.Eigenvalues(eig_max_ptr_);
+
+    //        int num_evects = FindNumberOfEigenPairs(evals, max_num_evects, eig_max_);
+    //        EigenPairsSetSizeAndData(n, num_evects, evals, evects);
+    //    }
+}
 #endif // SMOOTHG_USE_ARPACK
 
 double LocalEigenSolver::Compute(mfem::SparseMatrix& A, mfem::DenseMatrix& evects)
@@ -522,6 +622,24 @@ double LocalEigenSolver::Compute(
     {
         return Compute(mat[0], mat[1], evects);
     }
+}
+
+double LocalEigenSolver::BlockCompute(
+    mfem::SparseMatrix& M, mfem::SparseMatrix& D, mfem::DenseMatrix& evects)
+{
+#if SMOOTHG_USE_ARPACK
+    if (D.NumRows() > size_offset_)
+    {
+        BlockCompute(M, D, evals_, evects);
+    }
+    else
+#endif
+    {
+        Full(M, dense_A_);
+        Full(D, dense_B_);
+        BlockCompute(dense_A_, dense_B_, evals_, evects);
+    }
+    return evals_(0);
 }
 
 } // namespace smoothg

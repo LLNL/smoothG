@@ -103,6 +103,30 @@ std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A)
     return std::unique_ptr<mfem::HypreParMatrix>(AAt);
 }
 
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
+                                              const mfem::SparseMatrix& B,
+                                              const mfem::Array<int>& B_colpart)
+{
+    assert(A.NumCols() == B.NumRows());
+    int* B_rowpart = const_cast<int*>(A.ColPart());
+    mfem::SparseMatrix* B_ptr = const_cast<mfem::SparseMatrix*>(&B);
+    mfem::HypreParMatrix pB(A.GetComm(), A.N(), B_colpart.Last(), B_rowpart,
+                            const_cast<mfem::Array<int>&>(B_colpart), B_ptr);
+    return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&A, &pB));
+}
+
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
+                                              const mfem::HypreParMatrix& B,
+                                              const mfem::Array<int>& A_rowpart)
+{
+    assert(A.NumCols() == B.NumRows());
+    mfem::Array<int>& rowpart = const_cast<mfem::Array<int>&>(A_rowpart);
+    mfem::SparseMatrix* A_ptr = const_cast<mfem::SparseMatrix*>(&A);
+    mfem::HypreParMatrix pA(B.GetComm(), A_rowpart.Last(), B.M(), rowpart,
+                            const_cast<int*>(B.RowPart()), A_ptr);
+    return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&pA, &B));
+}
+
 mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
 {
     // TODO(gelever1): Perform this more better
@@ -427,8 +451,10 @@ void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
 {
     int i, j, gi, gj, s, t;
     double a;
+#ifdef MFEM_DEBUG
     const int height = mat.Height();
     const int width = mat.Width();
+#endif
 
     for (i = 0; i < rows.Size(); i++)
     {
@@ -1015,13 +1041,6 @@ bool IsDiag(const mfem::SparseMatrix& A)
 LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                                            const mfem::SparseMatrix& D,
                                            const mfem::Vector& const_rep)
-    : LocalGraphEdgeSolver(M, D)
-{
-    const_rep_.SetDataAndSize(const_rep.GetData(), const_rep.Size());
-}
-
-LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
-                                           const mfem::SparseMatrix& D)
 {
     M_is_diag_ = IsDiag(M);
     if (M_is_diag_)
@@ -1033,6 +1052,8 @@ LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
     {
         Init(M, D);
     }
+
+    const_rep_.SetDataAndSize(const_rep.GetData(), const_rep.Size());
 }
 
 void LocalGraphEdgeSolver::Init(const mfem::Vector& M_diag, const mfem::SparseMatrix& D)
@@ -1056,7 +1077,7 @@ void LocalGraphEdgeSolver::Init(const mfem::Vector& M_diag, const mfem::SparseMa
 
     // Eliminate the first unknown so that A_ is invertible
     A_.EliminateRowCol(0);
-    solver_ = make_unique<mfem::UMFPackSolver>(A_);
+    solver_.SetOperator(A_);
 }
 
 void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D)
@@ -1083,7 +1104,7 @@ void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseM
     unique_ptr<mfem::SparseMatrix> tmp_A(block_A.CreateMonolithic());
     A_.Swap(*tmp_A);
 
-    solver_ = make_unique<mfem::UMFPackSolver>(A_);
+    solver_.SetOperator(A_);
 
     rhs_ = make_unique<mfem::BlockVector>(offsets_);
     sol_ = make_unique<mfem::BlockVector>(offsets_);
@@ -1101,13 +1122,13 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sig
     if (M_is_diag_)
     {
         mfem::Vector sol_u(rhs_u.Size());
-        solver_->Mult(rhs_u_copy, sol_u);
+        solver_.Mult(rhs_u_copy, sol_u);
         MinvDT_.Mult(sol_u, sol_sigma);
     }
     else
     {
         rhs_->GetBlock(1) = rhs_u_copy;
-        solver_->Mult(*rhs_, *sol_);
+        solver_.Mult(*rhs_, *sol_);
         sol_sigma = sol_->GetBlock(0);
     }
 
@@ -1125,7 +1146,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
         add(-1.0, rhs, 1.0, rhs_u, rhs);
         rhs(0) = 0.0;
 
-        solver_->Mult(rhs, sol_u);
+        solver_.Mult(rhs, sol_u);
 
         MinvDT_.Mult(sol_u, sol_sigma);
         mfem::Vector Minv_rhs_sigma(rhs_sigma);
@@ -1138,7 +1159,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
         rhs_->GetBlock(1) = rhs_u;
         rhs_->GetBlock(1)[0] = 0.0;
 
-        solver_->Mult(*rhs_, *sol_);
+        solver_.Mult(*rhs_, *sol_);
 
         sol_sigma = sol_->GetBlock(0);
         sol_u = sol_->GetBlock(1);
