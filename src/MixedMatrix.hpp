@@ -386,6 +386,9 @@ private:
            2. on each aggregate (vertex of the current level), computes the
               average value of \f$ x_{fine} \f$ on the aggregate.
 
+       Note that the two steps are combined so P_pwc_ is a matrix of size
+       number of "coarse vertices" by dimension of coarse vertex space.
+
        This projector is useful in computing coarse level "element" scaling in
        MLMC simulations and nonlinear multigrids without visiting finest level.
     */

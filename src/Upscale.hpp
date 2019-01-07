@@ -140,10 +140,14 @@ public:
         return GetMatrix(level).GetConstantRep();
     }
 
-    /// Project a vertex-based vector in level to piecewise constant on vertices
+    /// Project a vector in vertex space of a given level to a vector of size
+    /// number of vertices of that level (representing average values of the
+    /// given vector on vertices).
     mfem::Vector PWConstProject(int level, const mfem::Vector& x) const;
 
-    /// Opposite of PWConstProject
+    /// Interpolate a vector of size number of vertices of a given level
+    /// (representing a piecewise constant vector on aggregates of fine level)
+    /// to a vector in vertex space of that level. Mostly used for visualization
     mfem::Vector PWConstInterpolate(int level, const mfem::Vector& x) const;
 
     /// Show Solver Information
