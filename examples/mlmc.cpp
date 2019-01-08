@@ -42,7 +42,6 @@ using namespace smoothg;
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
-    picojson::object serialize;
 
     // 1. Initialize MPI
     mpi_session session(argc, argv);

@@ -121,6 +121,7 @@ int main(int argc, char* argv[])
 
     /// [Solve]
     std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
+    std::vector<double> QoI(upscale_param.max_levels);
     for (int level = 0; level < upscale_param.max_levels; ++level)
     {
         upscale.Solve(level, rhs_fine, sol[level]);
@@ -128,17 +129,22 @@ int main(int argc, char* argv[])
 
         if (lateral_pressure)
         {
-            double QoI = mfem::InnerProduct(comm, sol[level], rhs_fine);
+            QoI[level] = mfem::InnerProduct(comm, sol[level], rhs_fine);
             if (myid == 0)
             {
                 std::cout << "Quantity of interest on level " << level
-                          << " = " << QoI << "\n";
+                          << " = " << QoI[level] << "\n";
             }
         }
 
         if (level > 0)
         {
             upscale.ShowErrors(sol[level], sol[0], level);
+            if (lateral_pressure)
+            {
+                serialize["quantity-error-level-"+std::to_string(level)] =
+                        picojson::value(fabs(QoI[level] - QoI[0]) / QoI[0]);
+            }
         }
 
         // Visualize the solution
@@ -149,6 +155,9 @@ int main(int argc, char* argv[])
         }
     }
     /// [Solve]
+
+    if (myid == 0)
+        std::cout << picojson::value(serialize).serialize(true) << std::endl;
 
     return EXIT_SUCCESS;
 }
