@@ -96,7 +96,8 @@ public:
     /// Deal with shared dofs for Trace-Trace block
     virtual void AddTraceAcross(int row, int col, int agg, double value) {}
 
-    virtual void SetBubbleBubbleBlock(int l, int j, double value) {}
+    virtual void SetBubbleBubbleBlock(int agg_index, int l, int j,
+                                      double value) {}
 
     virtual void ResetEdgeCdofMarkers(int size) {}
 
@@ -141,7 +142,7 @@ public:
     /// Deal with shared dofs for Trace-Trace block
     void AddTraceAcross(int row, int col, int agg, double value);
 
-    void SetBubbleBubbleBlock(int l, int j, double value);
+    void SetBubbleBubbleBlock(int agg_index, int l, int j, double value);
 
     void ResetEdgeCdofMarkers(int size);
 

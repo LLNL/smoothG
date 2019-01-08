@@ -60,18 +60,22 @@ public:
     /**
        @brief Construct a mixed system directly from building blocks.
 
+       @param graph_space the associated graph space (entity-to-dof relations)
        @param mbuilder builder for M
        @param D the matrix D
        @param W the matrix W. If it is nullptr, it is assumed to be zero
-       @param edge_d_td edge dof to true edge dof table
+       @param constant_rep constant representation (null vector of D^T)
+       @param vertex_sizes number of finest level vertices in each aggregate
+       @param P_pwc projector from vertex space to piecewise constant on
+              vertices, see documentation on P_pwc_ below for more details.
     */
     MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
                 std::unique_ptr<mfem::SparseMatrix> D,
                 std::unique_ptr<mfem::SparseMatrix> W,
                 mfem::Vector constant_rep,
-                mfem::SparseMatrix Ppw1,
-                mfem::SparseMatrix Qpw1);
+                mfem::Vector vertex_sizes,
+                mfem::SparseMatrix P_pwc);
 
     MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
 
@@ -91,10 +95,13 @@ public:
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
 
     /// Get piecewise constant projector
-    const mfem::SparseMatrix& GetPWConstProj() const { return Ppw1_; }
+    const mfem::SparseMatrix& GetPWConstProj() const { return P_pwc_; }
 
-    /// Get piecewise constant projector
-    const mfem::SparseMatrix& GetPWConstInterp() const { return Qpw1_; }
+    /**
+       @brief Interpret vertex at this level as aggregate of fine level vertices,
+       this returns number of fine level vertices contained in each aggregate
+    */
+    const mfem::Vector& GetVertexSizes() const { return vertex_sizes_; }
 
     /**
        @brief Get a const reference to the mass matrix M.
@@ -372,8 +379,22 @@ private:
 
     mfem::Vector constant_rep_;
 
-    mfem::SparseMatrix Ppw1_; // project vertex-based vector to piecewise-constant
-    mfem::SparseMatrix Qpw1_; // project piecewise-constant to vertex-based vector
+    mfem::Vector vertex_sizes_; // number of finest level vertices in "aggregate"
+
+    /**
+       At a certain level, a vertex is an aggregate of "finest level" vertices.
+       Given a vector \f$ x \f$ in the vertex space, P_pwc_ does the following:
+           1. projects \f$ x \f$ to finest level \f$ x_{fine} \f$,
+           2. on each aggregate (vertex of the current level), computes the
+              average value of \f$ x_{fine} \f$ on the aggregate.
+
+       Note that the two steps are combined so P_pwc_ is a matrix of size
+       number of "coarse vertices" by dimension of coarse vertex space.
+
+       This projector is useful in computing coarse level "element" scaling in
+       MLMC simulations and nonlinear multigrids without visiting finest level.
+    */
+    mfem::SparseMatrix P_pwc_;
 
 }; // class MixedMatrix
 

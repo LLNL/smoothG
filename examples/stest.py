@@ -211,6 +211,19 @@ def make_tests():
           "finest-u-error": 0.035336370431801843,
           "operator-complexity": 1.3017591339648173}]
 
+    tests["fv-ml-4"] = \
+        [["./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--max-levels", "3",
+          "--coarse-factor", "8",
+          "--perm", spe10_perm_file],
+         {"finest-div-error": 0.8662426768490944,
+          "finest-p-error": 0.091264632420050174,
+          "finest-u-error": 0.22738497061055957,
+          "operator-complexity": 1.3402831850379118}]
+
     tests["samplegraph1"] = \
         [["./generalgraph",
           "--spect-tol", "1.0",
