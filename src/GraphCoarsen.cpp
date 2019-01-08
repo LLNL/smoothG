@@ -327,7 +327,7 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
     mfem::Vector local_rhs_trace0, local_rhs_trace1, local_rhs_bubble, local_sol, trace;
     mfem::Array<int> local_vdofs, local_edofs, faces;
     mfem::Array<int> facecdofs, local_facecdofs;
-    mfem::Vector one;
+    mfem::Vector one, first_vert_target;
     mfem::SparseMatrix Mbb;
     for (unsigned int i = 0; i < num_aggs; i++)
     {
@@ -337,16 +337,15 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
         GetTableRow(Agg_face, i, faces);
         auto Mloc = ExtractRowAndColumns(M_proc_, local_edofs, local_edofs, col_map_);
         auto Dloc = ExtractRowAndColumns(D_proc_, local_vdofs, local_edofs, col_map_);
-        // constant_rep_.GetSubVector(local_vdofs, one);
-        // TODO: make constant_rep_ up to precision
-        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
-        vertex_target_i.GetColumnReference(0, one);
+        constant_rep_.GetSubVector(local_vdofs, one);
 
         // next line does *not* assume M_proc_ is diagonal
         LocalGraphEdgeSolver solver(Mloc, Dloc, one);
 
         int num_local_vdofs = local_vdofs.Size();
         local_rhs_trace1.SetSize(num_local_vdofs);
+
+        mfem::DenseMatrix& vertex_target_i(vertex_target[i]);
 
         // ---
         // solving bubble functions (vertex_target -> bubbles)
@@ -411,7 +410,9 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
                 // compute and store local coarse D
                 if (k == 0)
                 {
-                    coarse_D_->Set(bubble_counter + i, row, -(local_rhs_trace1 * one));
+                    vertex_target_i.GetColumnReference(0, first_vert_target);
+                    coarse_D_->Set(bubble_counter + i, row,
+                                   -(local_rhs_trace1 * first_vert_target));
                 }
 
                 // instead of doing local_rhs *= -1, we store -trace later
@@ -498,13 +499,13 @@ void GraphCoarsen::BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
             B_potentials.GetColumnReference(l, ref_vec1);
             vertex_target_i.GetColumnReference(l + 1, ref_vec2);
             entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-            coarse_m_builder_->SetBubbleBubbleBlock(l, l, entry_value);
+            coarse_m_builder_->SetBubbleBubbleBlock(i, l, l, entry_value);
 
             for (int j = l + 1; j < num_bubbles_i; j++)
             {
                 vertex_target_i.GetColumnReference(j + 1, ref_vec2);
                 entry_value = smoothg::InnerProduct(ref_vec1, ref_vec2);
-                coarse_m_builder_->SetBubbleBubbleBlock(l, j, entry_value);
+                coarse_m_builder_->SetBubbleBubbleBlock(i, l, j, entry_value);
             }
         }
         bubble_counter += num_bubbles_i;
@@ -779,24 +780,20 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(GraphSpace coarse_graph_space,
     mfem::Vector coarse_const_rep(Pvertices.NumCols());
     Pvertices.MultTranspose(constant_rep_, coarse_const_rep);
 
-    mfem::Vector agg_size_inv(topology_.NumAggs());
-    for (unsigned int i = 0; i < topology_.NumAggs(); ++i)
+    mfem::Vector agg_sizes(topology_.NumAggs());
+    topology_.Agg_vertex_.Mult(fine_mgL.GetVertexSizes(), agg_sizes);
+
+    auto tmp = smoothg::Mult(fine_mgL.GetPWConstProj(), Pvertices);
+    tmp.ScaleRows(fine_mgL.GetVertexSizes());
+    auto P_pwc = smoothg::Mult(topology_.Agg_vertex_, tmp);
+    for (int i = 0; i < P_pwc.NumRows(); ++i)
     {
-        agg_size_inv[i] = 1.0 / topology_.Agg_vertex_.RowSize(i);
+        P_pwc.ScaleRow(i, 1.0 / agg_sizes[i]);
     }
-
-    auto tmp = smoothg::Mult(topology_.Agg_vertex_, fine_mgL.GetPWConstProj());
-    auto Ppw1 = smoothg::Mult(tmp, Pvertices);
-    Ppw1.ScaleRows(agg_size_inv);
-
-    auto vert_agg = smoothg::Transpose(topology_.Agg_vertex_);
-    auto PvT = smoothg::Transpose(Pvertices);
-    auto tmp2 = smoothg::Mult(fine_mgL.GetPWConstInterp(), vert_agg);
-    auto Qpw1 = smoothg::Mult(PvT, tmp2);
 
     return MixedMatrix(std::move(coarse_graph_space), std::move(coarse_m_builder_),
                        std::move(coarse_D_), std::move(coarse_W_),
-                       std::move(coarse_const_rep), std::move(Ppw1), std::move(Qpw1));
+                       std::move(coarse_const_rep), std::move(agg_sizes), std::move(P_pwc));
 }
 
 } // namespace smoothg

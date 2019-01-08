@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol1(fine_rhs);
     upscale.Solve(1, fine_rhs, sol1);
     upscale.ShowSolveInfo(1);
-    auto error_info_1 = upscale.ComputeErrors(sol1, sol0);
+    auto error_info_1 = upscale.ComputeErrors(sol1, sol0, 1);
     std::cout << "Level 1 errors:" << std::endl;
     std::cout << "  vertex error: " << error_info_1[0] << std::endl;
     std::cout << "  edge error: " << error_info_1[1] << std::endl;
@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol2(fine_rhs);
     upscale.Solve(2, fine_rhs, sol2);
     upscale.ShowSolveInfo(2);
-    auto error_info_2 = upscale.ComputeErrors(sol2, sol0);
+    auto error_info_2 = upscale.ComputeErrors(sol2, sol0, 2);
     std::cout << "Level 2 errors:" << std::endl;
     std::cout << "  vertex error: " << error_info_2[0] << std::endl;
     std::cout << "  edge error: " << error_info_2[1] << std::endl;
