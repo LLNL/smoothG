@@ -601,7 +601,7 @@ void HybridSolver::BuildParallelSystemAndSolver()
 
     auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
                               comm_, multiplier_start_.Last(), multiplier_start_,
-                              HybridSystemElim_.get());
+                              HybridSystem_.get());
 
     if (rescale_iter_ == 0 || saamge_param_)
     {

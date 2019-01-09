@@ -44,7 +44,6 @@ void VisUpdate(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& 
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
-    picojson::object serialize;
 
     // 1. Initialize MPI
     mpi_session session(argc, argv);
