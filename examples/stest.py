@@ -529,6 +529,27 @@ def make_tests():
           "finest-u-error": 0.035336370431801843,
           "operator-complexity": 1.3017591339648173}]
 
+    tests["pardirichlet"] = \
+        [["mpirun", "-n", num_procs, "./finitevolume",
+          "--lateral-pressure",
+          "--spect-tol", "1.0",
+          "--max-levels", "3",
+          "--coarse-factor", "8",
+          "--perm", spe10_perm_file],
+         {"quantity-error-level-1": 0.0024896122289841368,
+          "quantity-error-level-2": 0.0059890529148580261}]
+
+    tests["pardirichlet-hb"] = \
+        [["mpirun", "-n", num_procs, "./finitevolume",
+          "--lateral-pressure",
+          "--spect-tol", "1.0",
+          "--max-levels", "3",
+          "--coarse-factor", "8",
+          "--hybridization",
+          "--perm", spe10_perm_file],
+         {"quantity-error-level-1": 0.0024896122289841368,
+          "quantity-error-level-2": 0.0059890529148580261}]
+
     tests["parsamplegraph1"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
