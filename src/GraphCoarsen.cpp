@@ -285,9 +285,9 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildPEdges(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_target,
-        const GraphSpace& coarse_space)
+    std::vector<mfem::DenseMatrix>& edge_traces,
+    std::vector<mfem::DenseMatrix>& vertex_target,
+    const GraphSpace& coarse_space)
 {
     // put trace_extensions and bubble_functions in Pedges
     // the coarse dof numbering is as follows: first loop over each face, count
@@ -799,9 +799,9 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(GraphSpace coarse_graph_space,
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection(
-        const std::vector<mfem::DenseMatrix>& edge_traces,
-        const std::vector<mfem::DenseMatrix>& vertex_targets,
-        const GraphSpace& coarse_space)
+    const std::vector<mfem::DenseMatrix>& edge_traces,
+    const std::vector<mfem::DenseMatrix>& vertex_targets,
+    const GraphSpace& coarse_space)
 {
     const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
     const mfem::SparseMatrix& agg_edof = dof_agg_.agg_edof_;
@@ -815,7 +815,6 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection(
     mfem::SparseMatrix Q_edge(agg_edof.NumCols(), coarse_D_->NumCols());
     mfem::DenseMatrix Q_i;
 
-    mfem::DenseMatrix sigma_f, sigma_f_T;;
     mfem::DenseMatrix DT_one_pi_f_PV;
 
     mfem::Vector PV_trace;
@@ -874,36 +873,34 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection(
         mfem::Vector one_D(Q_i.Data(), Dloc.NumCols());
         Dloc.MultTranspose(one_rep, one_D);
 
-        if (traces.NumCols() > 1)
-        {
-            sigma_f.UseExternalData(traces.Data() + traces.NumRows(),
-                                    traces.NumRows(),  traces.NumCols() - 1);
-
-            sigma_f_T.Transpose(sigma_f);
-            mfem::DenseMatrix sigma_f_prod(sigma_f.Width());
-            mfem::Mult(sigma_f_T, sigma_f, sigma_f_prod);
-            sigma_f_prod.Invert();
-
-            mfem::DenseMatrix pi_f(Q_i.Data()+Q_i.NumRows(),
-                                   Q_i.NumRows(), Q_i.NumCols() - 1);
-            mfem::Mult(sigma_f, sigma_f_prod, pi_f);
-
-            mfem::Vector pi_f_PV(pi_f.Width());
-            pi_f.MultTranspose(PV_trace, pi_f_PV);
-            DT_one_pi_f_PV.SetSize(one_D.Size(), pi_f_PV.Size());
-            mfem::MultVWt(one_D, pi_f_PV, DT_one_pi_f_PV);
-
-            pi_f -= DT_one_pi_f_PV;
-        }
-
         double one_D_PV = smoothg::InnerProduct(one_D, PV_trace);
         if (one_D_PV < 0)
         {
             one_D /= one_D_PV;
         }
-        Q_i.SetCol(0, one_D);
 
-        Q_i *= -1.0;
+        if (traces.NumCols() > 1)
+        {
+            mfem::DenseMatrix sigma_f(traces.Data() + traces.NumRows(),
+                                      traces.NumRows(),  traces.NumCols() - 1);
+
+            mfem::DenseMatrix sigma_f_prod(sigma_f.Width());
+            mfem::MultAtB(sigma_f, sigma_f, sigma_f_prod);
+            sigma_f_prod.Invert();
+
+            mfem::DenseMatrix pi_f(sigma_f.Height(), sigma_f.Width());
+            mfem::Mult(sigma_f, sigma_f_prod, pi_f);
+
+            mfem::Vector pi_f_PV(pi_f.Width());
+            pi_f.MultTranspose(PV_trace, pi_f_PV);
+            DT_one_pi_f_PV.UseExternalData(Q_i.Data() + Q_i.NumRows(),
+                                           Q_i.NumRows(), Q_i.NumCols() - 1);
+            mfem::MultVWt(one_D, pi_f_PV, DT_one_pi_f_PV);
+
+            DT_one_pi_f_PV -= pi_f;
+        }
+
+        one_D *= -1.0;
         Q_edge.AddSubMatrix(face_edofs, face_coarse_edofs, Q_i);
     }
 

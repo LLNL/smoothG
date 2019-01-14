@@ -112,9 +112,9 @@ public:
        @brief Build the projection operator from fine to coarse edge space
     */
     mfem::SparseMatrix BuildEdgeProjection(
-            const std::vector<mfem::DenseMatrix>& edge_traces,
-            const std::vector<mfem::DenseMatrix>& vertex_targets,
-            const GraphSpace& coarse_space);
+        const std::vector<mfem::DenseMatrix>& edge_traces,
+        const std::vector<mfem::DenseMatrix>& vertex_targets,
+        const GraphSpace& coarse_space);
 private:
     /**
        Construct coarse entities to coarse dofs table in the case when each dof
