@@ -73,10 +73,12 @@ public:
     // Mixed form
     void Restrict(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
     void Interpolate(const mfem::BlockVector& rhs, mfem::BlockVector& fine_rhs) const;
+    void Project(const mfem::BlockVector& rhs, mfem::BlockVector& coarse_rhs) const;
 
     // Primal form
     void Restrict(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
     void Interpolate(const mfem::Vector& rhs, mfem::Vector& fine_rhs) const;
+    void Project(const mfem::Vector& rhs, mfem::Vector& coarse_rhs) const;
 
 private:
     virtual MixedMatrix do_construct_coarse_subspace(
@@ -93,8 +95,13 @@ private:
     }
 
 protected:
+
+    /// Test if Proj_sigma_ * Psigma_ = identity
+    void Debug_tests(const mfem::SparseMatrix& D) const;
+
     mfem::SparseMatrix Psigma_;
     mfem::SparseMatrix Pu_;
+    mfem::SparseMatrix Proj_sigma_;
 }; // class Mixed_GL_Coarsener
 
 } // namespace smoothg

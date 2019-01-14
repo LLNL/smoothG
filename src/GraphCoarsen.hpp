@@ -107,6 +107,14 @@ public:
     MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
                                   const MixedMatrix& fine_mgL,
                                   const mfem::SparseMatrix& Pvertices);
+
+    /**
+       @brief Build the projection operator from fine to coarse edge space
+    */
+    mfem::SparseMatrix BuildEdgeProjection(
+            const std::vector<mfem::DenseMatrix>& edge_traces,
+            const std::vector<mfem::DenseMatrix>& vertex_targets,
+            const GraphSpace& coarse_space);
 private:
     /**
        Construct coarse entities to coarse dofs table in the case when each dof
@@ -185,18 +193,14 @@ private:
        interiors and contains the "bubbles". (The columns are in fact ordered as
        written above, but the rows are not.)
 
-       @param[in] edge_trace lives on faces, not aggregates
-       @param[in] vertex_target usually eigenvectors, lives on aggregate
-       @param[out] face_cdof is out, the face_cdof relation on coarse mesh
-                   (coarse faces, coarse dofs)
-       @param[out] Pedges the interpolation
-       @param[out] CM_el the coarse element mass matrices in case build_coarse_relation is true
-       @param[in] constant_rep representation of vertex constants on finer level
+       @param edge_trace lives on faces, not aggregates
+       @param vertex_target usually eigenvectors, lives on aggregate
+       @param coarse_space the coarse graph space
+       @return the interpolation matrix Pedges for edge space
     */
-    void BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
-                     std::vector<mfem::DenseMatrix>& vertex_target,
-                     const GraphSpace& coarse_space,
-                     mfem::SparseMatrix& Pedges);
+    mfem::SparseMatrix BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
+                                   std::vector<mfem::DenseMatrix>& vertex_target,
+                                   const GraphSpace& coarse_space);
 
     void BuildCoarseW(const mfem::SparseMatrix& Pvertices);
 
