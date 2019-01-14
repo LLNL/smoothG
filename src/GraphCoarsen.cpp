@@ -812,7 +812,7 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection(
     const int num_aggs = topology_.NumAggs();
     const int num_faces = topology_.NumFaces();
 
-    mfem::SparseMatrix Q_edge(face_edof.NumCols(), coarse_D_->NumCols());
+    mfem::SparseMatrix Q_edge(agg_edof.NumCols(), coarse_D_->NumCols());
     mfem::DenseMatrix Q_i;
 
     mfem::DenseMatrix sigma_f, sigma_f_T;;
