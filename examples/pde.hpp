@@ -70,6 +70,20 @@ class InversePermeabilityCoefficient : public mfem::VectorCoefficient
 {
 public:
     enum SliceOrientation {NONE, XY, XZ, YZ};
+
+    /**
+       @brief MFEM Coefficient constructed from permeability data set
+       @param comm MPI communicator
+       @param fileName file name of permeability data set
+       @param N number of data in each direction intended to store from data set
+       @param max_N data set size in each direction.
+              For SPE10, it should be {60, 220, 85}
+              For egg model, it should be {60, 60, 7}
+       @param h element size in each direction
+       @param orientation if NONE (default), full data set will be read (3D);
+              otherwise, it tells which 2D plane {XY, XZ, or YZ} to read
+       @param slice which slice of the selected 2D plane to read
+    */
     InversePermeabilityCoefficient(MPI_Comm comm,
                                    const std::string& fileName,
                                    const mfem::Array<int>& N,
@@ -86,6 +100,7 @@ public:
         InversePermeability(transip, V);
     }
 
+    /// Inverse of Frobenius norm of the inverse permeability
     double InvNorm2(const mfem::Vector& x);
 private:
     void ReadPermeabilityFile(const std::string& fileName,
@@ -113,6 +128,12 @@ InversePermeabilityCoefficient::InversePermeabilityCoefficient(
       orientation_(orientation), N_slice_(N[0] * N[1]), N_all_(N_slice_ * N[2]),
       inverse_permeability_(3 * N_all_)
 {
+    assert(N.Size() == max_N.Size());
+    for (int i = 0; i < N.Size(); ++i)
+    {
+        assert(N[i] <= max_N[i]);
+    }
+
     N.Copy(N_);
 
     if (file_name == "")
@@ -323,37 +344,70 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 
 /**
    @brief Darcy's flow problem discretized in finite volume (TPFA)
+
+   Abstract class serves as interface between graph and finite volume problem.
+   It produces the weighted graph, partition, right hand side of an FV problem,
+   and it can visualize coefficient vectors in vertex space.
 */
 class DarcyProblem
 {
 public:
+    /**
+       @brief Abstract constructor, actual construction is done in derived class
+       @param comm MPI communicator
+       @param num_dims number of dimensions of underlying physical space
+       @param ess_attr marker for boundary attributes where essential edge
+              condition is imposed
+    */
     DarcyProblem(MPI_Comm comm, int num_dims, const mfem::Array<int>& ess_attr);
+
+    /**
+       @brief Construct an FV problem assuming constant 1 permeability
+       @param pmesh mesh where the finite volume problem is defined on
+       @param ess_attr marker for boundary attributes where essential edge
+              condition is imposed
+    */
     DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& ess_attr);
 
+    /**
+       @param use_local_weight whether to store "element" weight
+       @return weighted graph associated with the finite volume problem
+    */
     Graph GetFVGraph(bool use_local_weight = false);
 
+    /// Getter for vertex-block right hand side
     const mfem::Vector& GetVertexRHS() const
     {
         return rhs_u_;
     }
+
+    /// Getter for edge-block right hand side
     const mfem::Vector& GetEdgeRHS() const
     {
         return rhs_sigma_;
     }
-    const std::vector<mfem::Vector>& GetLocalWeight() const
-    {
-        return local_weight_;
-    }
+
+    /// Volume of a cell in the mesh (assuming all cells have the same volume)
     double CellVolume() const
     {
         assert(pmesh_);
         return pmesh_->GetElementVolume(0); // assumed uniform mesh
     }
+
+    /// Save mesh with partitioning information (GLVis can separate partitions)
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
+
+    /// Setup visualization of vertex space vector
     void VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min = 0.0,
                   double range_max = 0.0, const std::string& caption = "", int coef = 0) const;
+
+    /// Update visualization of vertex space vector, VisSetup needs to be called first
     void VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const;
+
+    /// Save plot of sol (in vertex space)
     void SaveFigure(const mfem::Vector& sol, const std::string& name) const;
+
+    /// Construct partitioning array for vertices
     void Partition(bool metis_parition, const mfem::Array<int>& coarsening_factors,
                    mfem::Array<int>& partitioning) const;
 protected:
@@ -643,19 +697,35 @@ void DarcyProblem::Partition(bool metis_parition,
     }
 }
 
+/**
+   @brief Construct finite volume problem on the SPE10 data set
+*/
 class SPE10Problem : public DarcyProblem
 {
 public:
+    /**
+       @brief Constructor
+       @param permFile file name
+       @param nDimensions
+       @param spe10_scale scale of problem size (1-5)
+       @param slice
+       @param metis_parition whether to call METIS/Cartesian partitioner
+       @param ess_attr marker for boundary attributes where essential edge
+              condition is imposed
+       @param unit_weight whether set edge weight as unit weight (1.0)
+    */
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
                  int slice, bool metis_parition,
                  const mfem::Array<int>& ess_attr, bool unit_weight = false);
 
+    /// Setup a vector that equals initial_val in half of the domain (in y-direction)
+    /// and -initial_val in the other half
     mfem::Vector InitialCondition(double initial_val) const;
 
 private:
     void SetupMeshAndCoeff(const char* permFile, int nDimensions,
                            int spe10_scale, bool metis_partition, int slice);
-    mfem::ParMesh* MakeParMesh(mfem::Mesh& mesh, bool metis_partition);
+    unique_ptr<mfem::ParMesh> MakeParMesh(mfem::Mesh& mesh, bool metis_partition);
     void MakeRHS();
 
     unique_ptr<GCoefficient> source_coeff_;
@@ -667,6 +737,14 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
     : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
 {
     SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice);
+
+    if (myid_ == 0)
+    {
+        std::cout << pmesh_->GetNEdges() << " fine edges, "
+                  << pmesh_->GetNFaces() << " fine faces, "
+                  << pmesh_->GetNE() << " fine elements\n";
+    }
+
     InitGraph();
     ComputeGraphWeight(unit_weight);
     MakeRHS();
@@ -685,7 +763,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     N[1] = 44 * spe10_scale; // 220
     N[2] = 17 * spe10_scale; // 85
 
-    // SPE10 grid cell dimensions
+    // SPE10 grid cell sizes
     mfem::Vector h(3);
     h(0) = 20.0;
     h(1) = 10.0;
@@ -694,24 +772,6 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     const int Lx = N[0] * h(0);
     const int Ly = N[1] * h(1);
     const int Lz = N[2] * h(2);
-
-    if (nDimensions == 2)
-    {
-        mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
-        pmesh_.reset(MakeParMesh(mesh, metis_partition));
-    }
-    else
-    {
-        mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
-        pmesh_.reset(MakeParMesh(mesh, metis_partition));
-    }
-
-    if (myid_ == 0)
-    {
-        std::cout << pmesh_->GetNEdges() << " fine edges, "
-                  << pmesh_->GetNFaces() << " fine faces, "
-                  << pmesh_->GetNE() << " fine elements\n";
-    }
 
     using IPC = InversePermeabilityCoefficient;
     IPC::SliceOrientation orient = nDimensions == 2 ? IPC::XY : IPC::NONE;
@@ -727,9 +787,18 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     if (nDimensions == 3)
         Hz = coarsening_factor[2] * h(2);
     source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Lz, Hx, Hy, Hz);
+
+    if (nDimensions == 2)
+    {
+        mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
+        pmesh_ = MakeParMesh(mesh, metis_partition);
+        return;
+    }
+    mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
+    pmesh_ = MakeParMesh(mesh, metis_partition);
 }
 
-mfem::ParMesh* SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
+unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
 {
     mfem::Array<int> partition;
     if (metis_partition)
@@ -752,7 +821,7 @@ mfem::ParMesh* SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
         partition.MakeRef(mesh.CartesianPartitioning(num_procs_xyz_), mesh.GetNE());
         partition.MakeDataOwner();
     }
-    return new mfem::ParMesh(comm_, mesh, partition);
+    return make_unique<mfem::ParMesh>(comm_, mesh, partition);
 }
 
 void SPE10Problem::MakeRHS()

@@ -150,14 +150,15 @@ public:
     virtual void SetAbsTol(double atol) override;
     ///@}
 
-protected:
+private:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
               const mfem::SparseMatrix& face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
-    void AssembleHybridSystem(const std::vector<mfem::DenseMatrix>& M_el);
+    mfem::SparseMatrix AssembleHybridSystem(
+        const std::vector<mfem::DenseMatrix>& M_el);
 
     // Compute scaling vector and the scaled hybridized system
     void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
@@ -166,24 +167,24 @@ protected:
     void BuildSpectralAMGePreconditioner();
 
     // Assemble parallel hybridized system and build a solver for it
-    void BuildParallelSystemAndSolver();
+    void BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc);
 
-private:
+    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
+                              const mfem::Array<int>* ess_edofs);
+
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
-    mfem::SparseMatrix edgedof_IsOwned_;
 
     const mfem::SparseMatrix& D_;
     const mfem::SparseMatrix* W_;
 
-    std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
-    std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_;
+    std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
     std::unique_ptr<mfem::CGSolver> cg_;
 
-    // eliminated part of HybridSystem_ (for applying elimination in repeated solves)
-    std::unique_ptr<mfem::SparseMatrix> HybridSystemElim_;
+    // eliminated part of H_ (for applying elimination in repeated solves)
+    std::unique_ptr<mfem::HypreParMatrix> H_elim_;
 
     std::vector<mfem::DenseMatrix> Hybrid_el_;
 
@@ -194,12 +195,13 @@ private:
 
     mutable std::vector<mfem::Vector> Ainv_f_;
 
-    bool ess_multiplier_bc_;
-    mfem::Array<int> ess_multiplier_dofs_;
-    mfem::Array<int> multiplier_to_edgedof_;
+    mfem::Array<int> ess_true_multipliers_;
+    mfem::Array<int> multiplier_to_edof_;
+    mfem::Array<int> ess_true_mult_to_edof_;
     mfem::Array<HYPRE_Int> multiplier_start_;
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
+    std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;
 
     mutable mfem::Vector trueHrhs_;
     mutable mfem::Vector trueMu_;

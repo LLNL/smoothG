@@ -18,6 +18,12 @@
    @brief This is an example for upscaling a graph Laplacian coming from a finite
    volume discretization of a simple reservior model in parallel.
 
+   If lateral_pressure == true, Dirichlet pressure boundary condition will be
+   imposed on left (p = -1) and right (p = 0) side of the domain boundary.
+   No flow boundary condition (v.n = 0) is imposed on the rest of the boundary.
+   In this case, the quantity of interest (QoI) is the total out flux
+   \f$ \int v \cdot n dS \f$ on the left boundary.
+
    A simple way to run the example:
 
    mpirun -n 4 ./finitevolume
@@ -142,8 +148,8 @@ int main(int argc, char* argv[])
             upscale.ShowErrors(sol[level], sol[0], level);
             if (lateral_pressure)
             {
-                serialize["quantity-error-level-"+std::to_string(level)] =
-                        picojson::value(fabs(QoI[level] - QoI[0]) / QoI[0]);
+                serialize["quantity-error-level-" + std::to_string(level)] =
+                    picojson::value(fabs(QoI[level] - QoI[0]) / QoI[0]);
             }
         }
 
@@ -156,7 +162,7 @@ int main(int argc, char* argv[])
     }
     /// [Solve]
 
-    if (myid == 0)
+    if (lateral_pressure && myid == 0)
         std::cout << picojson::value(serialize).serialize(true) << std::endl;
 
     return EXIT_SUCCESS;
