@@ -60,6 +60,15 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
                                      coarse_space, param_.coarse_components,
                                      Pu_, Psigma_);
 
+    auto tmp = graph_coarsen.BuildEdgeProjection(local_edge_traces,
+                                                 local_spectral_vertex_targets,
+                                                 coarse_space);
+    Proj_sigma_.Swap(tmp);
+
+#ifdef SMOOTHG_DEBUG
+    Debug_tests(mgL.GetD());
+#endif
+
     return graph_coarsen.BuildCoarseMatrix(std::move(coarse_space), mgL, Pu_);
 }
 
