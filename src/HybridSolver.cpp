@@ -120,34 +120,33 @@ void HybridSolver::Init(
     mfem::SparseMatrix edgedof_multiplier(
         i_edgedof_multiplier, j_edgedof_multiplier,
         data_edgedof_multiplier, num_edge_dofs_, num_multiplier_dofs_);
-    mfem::SparseMatrix multiplier_edgedof(smoothg::Transpose(edgedof_multiplier) );
+    mfem::SparseMatrix mult_edof(smoothg::Transpose(edgedof_multiplier) );
 
-    mfem::Array<int> j_array(multiplier_edgedof.GetJ(), multiplier_edgedof.NumNonZeroElems());
+    mfem::Array<int> j_array(mult_edof.GetJ(), mult_edof.NumNonZeroElems());
     j_array.Copy(multiplier_to_edof_);
 
-    Agg_multiplier_.Clear();
+    Agg_multiplier_.Clear(); // FIXME(CSL 1/14/2019): this line is not needed?
     mfem::SparseMatrix Agg_m_tmp(smoothg::Mult(Agg_edgedof_, edgedof_multiplier));
     Agg_multiplier_.Swap(Agg_m_tmp);
 
     GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
 
-    unique_ptr<mfem::HypreParMatrix> multiplier_trueedgedof(
-        edgedof_d_td.LeftDiagMult(multiplier_edgedof, multiplier_start_) );
-    unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(AAt(*multiplier_trueedgedof));
+    auto mult_trueedof = ParMult(mult_edof, edgedof_d_td, multiplier_start_);
+    unique_ptr<mfem::HypreParMatrix> multiplier_d_td_d(AAt(*mult_trueedof));
 
     // Construct multiplier "dof to true dof" table
     multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
+    multiplier_td_d_.reset(multiplier_d_td_->Transpose());
 
-    // Assemble the hybridized system
-    HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
-    AssembleHybridSystem(M_el);
+    // Assemble the hybridized system on each processor
+    mfem::SparseMatrix H_proc = AssembleHybridSystem(M_el);
     if (myid_ == 0 && print_level_ > 0)
         std::cout << "  Timing: Hybridized system built in "
                   << chrono.RealTime() << "s. \n";
 
     CollectEssentialDofs(edgedof_bdrattr, ess_edge_dofs);
 
-    BuildParallelSystemAndSolver();
+    BuildParallelSystemAndSolver(H_proc);
 
     trueHrhs_.SetSize(multiplier_d_td_->GetNumCols());
     trueMu_.SetSize(trueHrhs_.Size());
@@ -155,8 +154,11 @@ void HybridSolver::Init(
     Mu_.SetSize(num_multiplier_dofs_);
 }
 
-void HybridSolver::AssembleHybridSystem(const std::vector<mfem::DenseMatrix>& M_el)
+mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
+    const std::vector<mfem::DenseMatrix>& M_el)
 {
+    mfem::SparseMatrix H_proc(num_multiplier_dofs_);
+
     const int map_size = std::max(num_edge_dofs_, Agg_vertexdof_.Width());
     mfem::Array<int> edof_global_to_local_map(map_size);
     edof_global_to_local_map = -1;
@@ -167,7 +169,7 @@ void HybridSolver::AssembleHybridSystem(const std::vector<mfem::DenseMatrix>& M_
     multiplier_d_td_->GetDiag(edof_IsOwned);
 
     mfem::DenseMatrix DlocT, ClocT, Aloc, CMinvDT, DMinvCT, CMDADMC;
-    mfem::DenseMatrix tmpHybrid_el;
+    mfem::DenseMatrix Hybrid_el;
 
     mfem::DenseMatrixInverse Mloc_solver;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
@@ -242,7 +244,7 @@ void HybridSolver::AssembleHybridSystem(const std::vector<mfem::DenseMatrix>& M_
         Mloc_solver.Mult(ClocT, MinvCT_i);
 
         // Compute CMinvCT = Cloc * MinvCT
-        MultSparseDense(Cloc, MinvCT_i, tmpHybrid_el);
+        MultSparseDense(Cloc, MinvCT_i, Hybrid_el_[iAgg]);
 
         // Compute Aloc = DMinvDT = Dloc * MinvDT
         MultSparseDense(Dloc, MinvDT_i, Aloc);
@@ -281,15 +283,13 @@ void HybridSolver::AssembleHybridSystem(const std::vector<mfem::DenseMatrix>& M_
         }
 
         // Hybrid_el_ = CMinvCT - CMinvDTAinvDMinvCT
-        tmpHybrid_el -= CMDADMC;
+        Hybrid_el_[iAgg] -= CMDADMC;
 
         // Add contribution of the element matrix to the global system
-        HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier,
-                                    tmpHybrid_el);
-
-        // Save element matrix [C 0][M B^T;B 0]^-1[C 0]^T
-        Hybrid_el_[iAgg] = tmpHybrid_el;
+        H_proc.AddSubMatrix(local_multiplier, local_multiplier, Hybrid_el_[iAgg]);
     }
+
+    return H_proc;
 }
 
 
@@ -308,7 +308,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     {
         trueMu_(ess_true_multipliers_[m]) = -Rhs(ess_true_mult_to_edof_[m]);
     }
-    HybridSystemElim_->Mult(-1.0, trueMu_, 1.0, trueHrhs_);
+    H_elim_->Mult(-1.0, trueMu_, 1.0, trueHrhs_);
     for (int ess_true_mult : ess_true_multipliers_)
     {
         trueHrhs_(ess_true_mult) = trueMu_(ess_true_mult);
@@ -482,7 +482,7 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
 
     auto Scale = VectorToMatrix(diagonal_scaling_);
     mfem::HypreParMatrix pScale(comm_, H.N(), H.GetColStarts(), &Scale);
-    pHybridSystem_.reset(smoothg::RAP(H, pScale));
+    H_.reset(smoothg::RAP(H, pScale));
 }
 
 void HybridSolver::BuildSpectralAMGePreconditioner()
@@ -515,7 +515,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     bool first_do_aggregates = (saamge_param_->num_levels <= 2 && saamge_param_->do_aggregates);
     sa_apr_ = saamge::agg_create_partitioning_fine(
-                  *pHybridSystem_, num_elems, elem_dof, elem_elem, nullptr, bdr_dofs.data(),
+                  *H_, num_elems, elem_dof, elem_elem, nullptr, bdr_dofs.data(),
                   sa_nparts_.data(), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
@@ -534,11 +534,11 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
         saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
         saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
         saamge_param_->use_arpack, saamge_param_->do_aggregates);
-    sa_ml_data_ = saamge::ml_produce_data(*pHybridSystem_, sa_apr_, emp, mlp);
+    sa_ml_data_ = saamge::ml_produce_data(*H_, sa_apr_, emp, mlp);
     auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
 
     prec_ = make_unique<saamge::VCycleSolver>(level->tg_data, false);
-    prec_->SetOperator(*pHybridSystem_);
+    prec_->SetOperator(*H_);
 #else
     if (myid_ == 0)
         std::cout << "SAAMGE needs to be enabled! \n";
@@ -546,23 +546,21 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 #endif
 }
 
-void HybridSolver::BuildParallelSystemAndSolver()
+void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
 {
-    HybridSystem_->Finalize();
+    H_proc.Finalize();
+    {
+        auto tmp = ParMult(*multiplier_td_d_, H_proc, multiplier_start_);
+        H_.reset(mfem::ParMult(tmp.get(), multiplier_d_td_.get()));
+    }
 
-    auto HybridSystem_d = make_unique<mfem::HypreParMatrix>(
-                              comm_, multiplier_start_.Last(), multiplier_start_,
-                              HybridSystem_.get());
-
-    pHybridSystem_.reset(smoothg::RAP(*HybridSystem_d, *multiplier_d_td_));
-
-    HybridSystemElim_.reset(pHybridSystem_->EliminateRowsCols(ess_true_multipliers_));
+    H_elim_.reset(H_->EliminateRowsCols(ess_true_multipliers_));
 
     if (rescale_iter_ > 0 && !saamge_param_)
     {
-        ComputeScaledHybridSystem(*pHybridSystem_);
+        ComputeScaledHybridSystem(*H_);
     }
-    nnz_ = pHybridSystem_->NNZ();
+    nnz_ = H_->NNZ();
 
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -573,11 +571,11 @@ void HybridSolver::BuildParallelSystemAndSolver()
     cg_->SetMaxIter(max_num_iter_);
     cg_->SetRelTol(rtol_);
     cg_->SetAbsTol(atol_);
-    cg_->SetOperator(*pHybridSystem_);
+    cg_->SetOperator(*H_);
     cg_->iterative_mode = false;
 
     // HypreBoomerAMG is broken if local size is zero
-    int local_size = pHybridSystem_->Height();
+    int local_size = H_->Height();
     int min_size;
     MPI_Allreduce(&local_size, &min_size, 1, MPI_INT, MPI_MIN, comm_);
 
@@ -590,7 +588,7 @@ void HybridSolver::BuildParallelSystemAndSolver()
         }
         else
         {
-            auto temp_prec = make_unique<mfem::HypreBoomerAMG>(*pHybridSystem_);
+            auto temp_prec = make_unique<mfem::HypreBoomerAMG>(*H_);
             temp_prec->SetPrintLevel(0);
             prec_ = std::move(temp_prec);
         }
@@ -647,16 +645,16 @@ void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weights_inverse)
     // TODO: this is not valid when W is nonzero
     assert(W_is_nonzero_ == false);
 
-    HybridSystem_ = make_unique<mfem::SparseMatrix>(num_multiplier_dofs_);
+    mfem::SparseMatrix H_proc(num_multiplier_dofs_);
     mfem::Array<int> local_multiplier;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
         mfem::DenseMatrix H_el = Hybrid_el_[iAgg]; // deep copy
         H_el *= (1.0 / agg_weights_(iAgg));
-        HybridSystem_->AddSubMatrix(local_multiplier, local_multiplier, H_el);
+        H_proc.AddSubMatrix(local_multiplier, local_multiplier, H_el);
     }
-    BuildParallelSystemAndSolver();
+    BuildParallelSystemAndSolver(H_proc);
 }
 
 void HybridSolver::SetPrintLevel(int print_level)
