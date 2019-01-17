@@ -109,6 +109,14 @@ public:
     virtual void Restrict(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     virtual mfem::BlockVector Restrict(int level, const mfem::BlockVector& x) const;
 
+    /// Project vector at level-1 to level
+    virtual void Project(int level, const mfem::Vector& x, mfem::Vector& y) const;
+    virtual mfem::Vector Project(int level, const mfem::Vector& x) const;
+
+    /// Project vector at level-1 to level, in mixed form
+    virtual void Project(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
+    virtual mfem::BlockVector Project(int level, const mfem::BlockVector& x) const;
+
     /// Get block offsets for sigma, u blocks of mixed form dofs
     virtual void BlockOffsets(int level, mfem::Array<int>& offsets) const;
 
