@@ -292,6 +292,36 @@ mfem::BlockVector Upscale::Restrict(int level, const mfem::BlockVector& x) const
     return coarse_vect;
 }
 
+void Upscale::Project(int level, const mfem::Vector& x, mfem::Vector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->Project(x, y);
+}
+
+mfem::Vector Upscale::Project(int level, const mfem::Vector& x) const
+{
+    mfem::Vector coarse_vect = GetVector(level);
+    Project(level, x, coarse_vect);
+
+    return coarse_vect;
+}
+
+void Upscale::Project(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
+{
+    assert(coarsener_[level - 1]);
+
+    coarsener_[level - 1]->Project(x, y);
+}
+
+mfem::BlockVector Upscale::Project(int level, const mfem::BlockVector& x) const
+{
+    mfem::BlockVector coarse_vect(GetBlockVector(level));
+    Project(level, x, coarse_vect);
+
+    return coarse_vect;
+}
+
 void Upscale::BlockOffsets(int level, mfem::Array<int>& offsets) const
 {
     GetMatrix(level).GetBlockOffsets().Copy(offsets);
