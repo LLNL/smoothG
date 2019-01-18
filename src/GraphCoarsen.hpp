@@ -69,14 +69,15 @@ public:
     /**
        @brief Build coarse graph space (coarse entities to coarse dofs tables)
     */
-    void BuildCoarseSpace(const std::vector<mfem::DenseMatrix>& edge_traces,
-                          const std::vector<mfem::DenseMatrix>& vertex_targets,
-                          Graph coarse_graph);
+    void BuildCoarseSpace(Graph coarse_graph,
+                          const std::vector<mfem::DenseMatrix>& edge_traces,
+                          const std::vector<mfem::DenseMatrix>& vertex_targets);
 
     /**
        @brief Build coarse mixed system
     */
-    MixedMatrix BuildCoarseMatrix(const MixedMatrix& fine_mgL,
+    MixedMatrix BuildCoarseMatrix(GraphSpace coarse_space,
+                                  const MixedMatrix& fine_mgL,
                                   const mfem::SparseMatrix& Pvertices);
 
     /// take vertex-based target functions and assemble them in matrix
@@ -107,15 +108,19 @@ public:
        @param coarse_space the coarse graph space
        @return the interpolation matrix Pedges for edge space
     */
-    mfem::SparseMatrix BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
-                                   std::vector<mfem::DenseMatrix>& vertex_target,
-                                   bool build_coarse_components);
+    mfem::SparseMatrix BuildPEdges(
+            const GraphSpace& coarse_space,
+            std::vector<mfem::DenseMatrix>& edge_traces,
+            std::vector<mfem::DenseMatrix>& vertex_target,
+            bool build_coarse_components);
 
     /**
        @brief Build the projection operator from fine to coarse edge space
     */
-    mfem::SparseMatrix BuildEdgeProjection(const std::vector<mfem::DenseMatrix>& edge_traces,
-        const std::vector<mfem::DenseMatrix>& vertex_targets);
+    mfem::SparseMatrix BuildEdgeProjection(
+            const GraphSpace& coarse_space,
+            const std::vector<mfem::DenseMatrix>& edge_traces,
+            const std::vector<mfem::DenseMatrix>& vertex_targets);
 private:
     /**
        Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
@@ -184,8 +189,6 @@ private:
 
     /// Builder for coarse M operator
     std::unique_ptr<CoarseMBuilder> coarse_m_builder_;
-
-    GraphSpace coarse_space_;
 };
 
 } // namespace smoothg

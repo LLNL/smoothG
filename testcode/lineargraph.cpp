@@ -218,16 +218,14 @@ int main(int argc, char* argv[])
         std::cout << "Constant function in range of interpolation." << std::endl;
     result += thisresult;
 
-    mfem::SparseMatrix Pu;
-    mfem::SparseMatrix Pp;
-
     GraphCoarsen graph_coarsen(mgL, dof_agg);
-    GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
-                                        local_edge_traces, local_spectral_vertex_targets,
-                                        std::move(*partition.coarse_graph_));
+    GraphSpace coarse_graph_space(std::move(*partition.coarse_graph_),
+                                  local_edge_traces, local_spectral_vertex_targets);
     bool build_coarse_components = false;
-    graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     coarse_graph_space, build_coarse_components, Pp, Pu);
+    auto Pp = graph_coarsen.BuildPVertices(local_spectral_vertex_targets);
+    auto Pu = graph_coarsen.BuildPEdges(coarse_graph_space, local_edge_traces,
+                                        local_spectral_vertex_targets,
+                                        build_coarse_components);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;

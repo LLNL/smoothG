@@ -47,9 +47,9 @@ public:
     /**
        @brief Constructor that essentially collects all members from input
     */
-    GraphSpace(Graph graph, mfem::SparseMatrix vertex_vdof,
-               mfem::SparseMatrix vertex_edof, mfem::SparseMatrix edge_edof,
-               std::unique_ptr<mfem::HypreParMatrix> edof_trueedof);
+    GraphSpace(Graph graph,
+               const std::vector<mfem::DenseMatrix> edge_traces,
+               const std::vector<mfem::DenseMatrix> vertex_targets);
 
     /// Default constructor
     GraphSpace() = default;
@@ -73,18 +73,14 @@ public:
     const Graph& GetGraph() const { return graph_; }
     ///@}
 private:
-    /// Construct vertex to edofs relation table
     mfem::SparseMatrix BuildVertexToEDof();
-
-    /// Construct edge coarse dof to true dof relation table
-    std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof();
-
+    std::unique_ptr<mfem::HypreParMatrix> BuildEdofToTrueEdof();
 
     Graph graph_;
 
     mfem::SparseMatrix vertex_vdof_;
-    mfem::SparseMatrix vertex_edof_;
     mfem::SparseMatrix edge_edof_;
+    mfem::SparseMatrix vertex_edof_;
     std::unique_ptr<mfem::HypreParMatrix> edof_trueedof_;
     mfem::SparseMatrix edof_bdratt_;
 }; // class GraphSpace

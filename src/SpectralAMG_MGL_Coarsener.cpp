@@ -44,26 +44,24 @@ MixedMatrix SpectralAMG_MGL_Coarsener::do_construct_coarse_subspace(
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
-    std::vector<mfem::DenseMatrix> local_edge_traces;
-    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
+    std::vector<mfem::DenseMatrix> edge_traces;
+    std::vector<mfem::DenseMatrix> vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(mgL, dof_agg, param_);
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
+    localtargets.Compute(edge_traces, vertex_targets);
+
+    GraphSpace coarse_space(std::move(*coarse_graph), edge_traces, vertex_targets);
 
     GraphCoarsen graph_coarsen(mgL, dof_agg);
-    GraphSpace coarse_space = graph_coarsen.BuildCoarseSpace(local_edge_traces,
-                                                             local_spectral_vertex_targets,
-                                                             std::move(*coarse_graph));
 
-    graph_coarsen.BuildInterpolation(local_edge_traces,
-                                     local_spectral_vertex_targets,
-                                     coarse_space, param_.coarse_components,
-                                     Pu_, Psigma_);
-
-    auto tmp = graph_coarsen.BuildEdgeProjection(local_edge_traces,
-                                                 local_spectral_vertex_targets,
-                                                 coarse_space);
-    Proj_sigma_.Swap(tmp);
+    auto Pu_tmp = graph_coarsen.BuildPVertices(vertex_targets);
+    auto Psigma_tmp = graph_coarsen.BuildPEdges(
+                coarse_space, edge_traces, vertex_targets, param_.coarse_components);
+    auto Proj_sigma_tmp = graph_coarsen.BuildEdgeProjection(
+                coarse_space, edge_traces, vertex_targets);
+    Pu_.Swap(Pu_tmp);
+    Psigma_.Swap(Psigma_tmp);
+    Proj_sigma_.Swap(Proj_sigma_tmp);
 
 #ifdef SMOOTHG_DEBUG
     Debug_tests(mgL.GetD());

@@ -50,10 +50,10 @@ mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_
 GraphSpace::GraphSpace(Graph graph)
     : graph_(std::move(graph)),
       vertex_vdof_(SparseIdentity(graph_.NumVertices())),
-      edge_edof_(SparseIdentity(graph_.NumEdges()))
+      edge_edof_(SparseIdentity(graph_.NumEdges())),
+      edof_trueedof_(new mfem::HypreParMatrix)
 {
     vertex_edof_.MakeRef(graph_.VertexToEdge());
-    edof_trueedof_ = make_unique<mfem::HypreParMatrix>();
     edof_trueedof_->MakeRef(graph_.EdgeToTrueEdge());
     if (graph_.HasBoundary())
     {
@@ -61,11 +61,14 @@ GraphSpace::GraphSpace(Graph graph)
     }
 }
 
-GraphSpace::GraphSpace(Graph graph, const std::vector<int> num_local_vdofs,
-                       const std::vector<int> num_local_edofs)
-    : graph_(std::move(graph)), vertex_vdof_(BuildEntityToDof(num_local_vdofs)),
-      edge_edof_(BuildEntityToDof(num_local_edofs)),
-      vertex_edof_(BuildVertexToEDof()), edof_trueedof_(std::move(edof_trueedof))
+GraphSpace::GraphSpace(Graph graph,
+                       const std::vector<mfem::DenseMatrix> edge_traces,
+                       const std::vector<mfem::DenseMatrix> vertex_targets)
+    : graph_(std::move(graph)),
+      vertex_vdof_(BuildEntityToDof(vertex_targets)),
+      edge_edof_(BuildEntityToDof(edge_traces)),
+      vertex_edof_(BuildVertexToEDof()),
+      edof_trueedof_(BuildEdofToTrueEdof())
 {
     if (graph_.HasBoundary())
     {
@@ -103,8 +106,7 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
     const unsigned int num_vertices = vertex_vdof_.NumRows();
     const mfem::SparseMatrix& vertex_edge = graph_.VertexToEdge();
 
-    int* I = new int[num_vertices + 1];
-    I[0] = 0;
+    int* I = new int[num_vertices + 1]();
 
     mfem::Array<int> edges;
     for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
@@ -143,13 +145,13 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
         edof_counter += num_local_bubbles;
 
         GetTableRow(vertex_edge, vertex, edges);
-        for (int& face : edges)
+        for (int& edge : edges)
         {
-            J_end += edge_edof_.RowSize(face);
-            std::iota(J_begin, J_end, *edge_edof_.GetRowColumns(face));
+            J_end += edge_edof_.RowSize(edge);
+            std::iota(J_begin, J_end, *edge_edof_.GetRowColumns(edge));
             J_begin = J_end;
 
-            data_end += edge_edof_.RowSize(face);
+            data_end += edge_edof_.RowSize(edge);
         }
         std::fill(data_begin, data_end, 1.0);
         data_begin = data_end;
@@ -158,7 +160,7 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
     return mfem::SparseMatrix(I, J, data, num_vertices, edof_counter);
 }
 
-unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildCoarseEdgeDofTruedof()
+unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
 {
     const int num_edofs = vertex_edof_.NumCols();
     const int num_edges = edge_edof_.Height();
@@ -169,27 +171,27 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildCoarseEdgeDofTruedof()
     mfem::Array<HYPRE_Int> edof_starts;
     GenerateOffsets(comm, num_edofs, edof_starts);
 
-    HYPRE_Int* edge_starts = edge_trueedge_edge->GetRowStarts();
-
-    mfem::SparseMatrix edge_edof_diag(edge_edof_.GetI(), edge_edof_.GetJ(),
-                                      edge_edof_.GetData(), num_edges,
-                                      num_edofs, false, false, false);
-
-    mfem::HypreParMatrix edge_edof(comm, edge_trueedge_edge->M(),
-                                   edof_starts.Last(), edge_starts,
-                                   edof_starts, &edge_edof_diag);
-
     mfem::SparseMatrix diag = SparseIdentity(num_edofs);
-    HYPRE_Int* col_map;
 
-    mfem::SparseMatrix d_td_d_tmp_offd;
-    auto d_td_d_tmp = smoothg::RAP(*edge_trueedge_edge, edge_edof);
-    d_td_d_tmp->GetOffd(d_td_d_tmp_offd, col_map);
+    unique_ptr<mfem::HypreParMatrix> d_te_d; // dofs sharing the same true edge
+    {
+        mfem::SparseMatrix edge_edof;
+        edge_edof.MakeRef(edge_edof_);
+        edge_edof.SetWidth(num_edofs);
+        mfem::SparseMatrix edof_edge = smoothg::Transpose(edge_edof);
+
+        auto tmp = ParMult(*edge_trueedge_edge, edge_edof, edof_starts);
+        d_te_d = ParMult(edof_edge, *tmp, edof_starts);
+    }
+
+    HYPRE_Int* col_map;
+    mfem::SparseMatrix d_te_d_offd;
+    d_te_d->GetOffd(d_te_d_offd, col_map);
 
     int* offd_i = new int[num_edofs + 1]();
     for (int i = 0; i < num_edofs; i++)
     {
-        offd_i[i + 1] = offd_i[i] + (d_td_d_tmp_offd.RowSize(i) > 0);
+        offd_i[i + 1] = offd_i[i] + (d_te_d_offd.RowSize(i) > 0);
     }
 
     int* offd_j = new int[offd_i[num_edofs]];
@@ -199,24 +201,23 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildCoarseEdgeDofTruedof()
     HYPRE_Int* junk_map;
     edge_trueedge_edge->GetOffd(edge_is_shared, junk_map);
 
-    mfem::Array<int> local_edofs;
+    mfem::Array<int> offd_edofs;
     for (int i = 0; i < num_edges; i++)
     {
         if (edge_is_shared.RowSize(i))
         {
             const int num_local_edofs = edge_edof_.RowSize(i);
             const int edge_1st_edof = edge_edof_.GetRowColumns(i)[0];
-            GetTableRow(d_td_d_tmp_offd, edge_1st_edof, local_edofs);
-            assert(local_edofs.Size() == num_local_edofs);
-            std::copy_n(local_edofs.GetData(), num_local_edofs, offd_j + offd_nnz);
-            offd_nnz += num_local_edofs;
+            GetTableRow(d_te_d_offd, edge_1st_edof, offd_edofs);
+            assert(offd_edofs.Size() == num_local_edofs);
+            std::copy_n(offd_edofs.GetData(), num_local_edofs, offd_j += offd_nnz);
         }
     }
     assert(offd_i[num_edofs] == offd_nnz);
     mfem::SparseMatrix offd(offd_i, offd_j, diag.GetData(), num_edofs, offd_nnz,
                             true, false, false);
 
-    mfem::HypreParMatrix d_td_d(comm, edge_edof.N(), edge_edof.N(), edof_starts,
+    mfem::HypreParMatrix d_td_d(comm, d_te_d->N(), d_te_d->N(), edof_starts,
                                 edof_starts, &diag, &offd, col_map);
 
     return BuildEntityToTrueEntity(d_td_d);
