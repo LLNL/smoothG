@@ -26,6 +26,27 @@ using std::unique_ptr;
 namespace smoothg
 {
 
+// Construct entities to dofs table in the case when each dof belongs to one
+// and only one entity and the enumeration of dofs solely depends on entity
+mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_targets)
+{
+    const unsigned int num_entities = local_targets.size();
+    int* I = new int[num_entities + 1]();
+    for (unsigned int entity = 0; entity < num_entities; ++entity)
+    {
+        I[entity + 1] = I[entity] + local_targets[entity].NumCols();
+    }
+
+    int nnz = I[num_entities];
+    int* J = new int[nnz];
+    std::iota(J, J + nnz, 0);
+
+    double* Data = new double[nnz];
+    std::fill_n(Data, nnz, 1.);
+
+    return mfem::SparseMatrix(I, J, Data, num_entities, nnz);
+}
+
 GraphSpace::GraphSpace(Graph graph)
     : graph_(std::move(graph)),
       vertex_vdof_(SparseIdentity(graph_.NumVertices())),
@@ -77,25 +98,64 @@ void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept
     swap(lhs.graph_, rhs.graph_);
 }
 
-// Construct entities to dofs table in the case when each dof belongs to one
-// and only one entity and the enumeration of dofs solely depends on entity
-mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_targets)
+mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
 {
-    const unsigned int num_entities = local_targets.size();
-    int* I = new int[num_entities + 1]();
-    for (unsigned int entity = 0; entity < num_entities; ++entity)
+    const unsigned int num_vertices = vertex_vdof_.NumRows();
+    const mfem::SparseMatrix& vertex_edge = graph_.VertexToEdge();
+
+    int* I = new int[num_vertices + 1];
+    I[0] = 0;
+
+    mfem::Array<int> edges;
+    for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
     {
-        I[entity + 1] = I[entity] + local_targets[entity].NumCols();
+        int num_local_edofs = vertex_vdof_.RowSize(vertex) - 1;
+        GetTableRow(vertex_edge, vertex, edges);
+        for (int& edge : edges)
+        {
+            num_local_edofs += edge_edof_.RowSize(edge);
+        }
+        I[vertex + 1] = I[vertex] + num_local_edofs;
     }
 
-    int nnz = I[num_entities];
+    const int nnz = I[num_vertices];
     int* J = new int[nnz];
-    std::iota(J, J + nnz, 0);
+    double* data = new double[nnz];
 
-    double* Data = new double[nnz];
-    std::fill_n(Data, nnz, 1.);
+    int edof_counter = edge_edof_.NumCols();
 
-    return mfem::SparseMatrix(I, J, Data, num_entities, nnz);
+    int* J_begin = J;
+    double* data_begin = data;
+
+    // data values are chosen for the ease of extended aggregate construction
+    for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
+    {
+        const int num_local_bubbles = vertex_vdof_.RowSize(vertex) - 1;
+
+        int* J_end = J_begin + num_local_bubbles;
+        std::iota(J_begin, J_end, edof_counter);
+        J_begin = J_end;
+
+        double* data_end = data_begin + num_local_bubbles;
+        std::fill(data_begin, data_end, 2.0);
+        data_begin = data_end;
+
+        edof_counter += num_local_bubbles;
+
+        GetTableRow(vertex_edge, vertex, edges);
+        for (int& face : edges)
+        {
+            J_end += edge_edof_.RowSize(face);
+            std::iota(J_begin, J_end, *edge_edof_.GetRowColumns(face));
+            J_begin = J_end;
+
+            data_end += edge_edof_.RowSize(face);
+        }
+        std::fill(data_begin, data_end, 1.0);
+        data_begin = data_end;
+    }
+
+    return mfem::SparseMatrix(I, J, data, num_vertices, edof_counter);
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildCoarseEdgeDofTruedof()
@@ -160,66 +220,6 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildCoarseEdgeDofTruedof()
                                 edof_starts, &diag, &offd, col_map);
 
     return BuildEntityToTrueEntity(d_td_d);
-}
-
-mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
-{
-    const unsigned int num_vertices = vertex_vdof_.NumRows();
-    const mfem::SparseMatrix& vertex_edge = graph_.VertexToEdge();
-
-    int* I = new int[num_vertices + 1];
-    I[0] = 0;
-
-    mfem::Array<int> edges;
-    for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
-    {
-        int num_local_edofs = vertex_vdof_.RowSize(vertex) - 1;
-        GetTableRow(vertex_edge, vertex, edges);
-        for (int& edge : edges)
-        {
-            num_local_edofs += edge_edof_.RowSize(edge);
-        }
-        I[vertex + 1] = I[vertex] + num_local_edofs;
-    }
-
-    const int nnz = I[num_vertices];
-    int* J = new int[nnz];
-    double* data = new double[nnz];
-
-    int edof_counter = edge_edof_.NumCols();
-
-    int* J_begin = J;
-    double* data_begin = data;
-
-    // data values are chosen for the ease of extended aggregate construction
-    for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
-    {
-        const int num_local_bubbles = vertex_vdof_.RowSize(vertex) - 1;
-
-        int* J_end = J_begin + num_local_bubbles;
-        std::iota(J_begin, J_end, edof_counter);
-        J_begin = J_end;
-
-        double* data_end = data_begin + num_local_bubbles;
-        std::fill(data_begin, data_end, 2.0);
-        data_begin = data_end;
-
-        edof_counter += num_local_bubbles;
-
-        GetTableRow(vertex_edge, vertex, edges);
-        for (int& face : edges)
-        {
-            J_end += edge_edof_.RowSize(face);
-            std::iota(J_begin, J_end, *edge_edof_.GetRowColumns(face));
-            J_begin = J_end;
-
-            data_end += edge_edof_.RowSize(face);
-        }
-        std::fill(data_begin, data_end, 1.0);
-        data_begin = data_end;
-    }
-
-    return mfem::SparseMatrix(I, J, data, num_vertices, edof_counter);
 }
 
 } // namespace smoothg
