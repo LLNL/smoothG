@@ -67,78 +67,56 @@ public:
     GraphCoarsen(const MixedMatrix& mgL, const DofAggregate& dof_agg);
 
     /**
-       @brief Given edge_trace and vertex_targets functions, construct the
-       interpolation matrices Pvertices and Pedges.
-
-       The key method of the GraphCoarsen class.
-
-       @param[in] edge_traces edge-based traces on interfaces between aggregates.
-
-       @param[in]  vertex_targets vertex-based traces on aggregates.
-
-       @param[in] graph_space coarse graph space
-
-       @param[in] build_coarse_components whether to build coarse M components
-
-       @param[out] Pvertices the returned interpolator on vertex space.
-
-       @param[out] Pedges the returned interpolator on edge space.
-
-    */
-    void BuildInterpolation(
-        std::vector<mfem::DenseMatrix>& edge_traces,
-        std::vector<mfem::DenseMatrix>& vertex_targets,
-        const GraphSpace& coarse_space,
-        bool build_coarse_components,
-        mfem::SparseMatrix& Pvertices,
-        mfem::SparseMatrix& Pedges);
-
-    /**
        @brief Build coarse graph space (coarse entities to coarse dofs tables)
     */
-    GraphSpace BuildCoarseSpace(
-        const std::vector<mfem::DenseMatrix>& edge_traces,
-        const std::vector<mfem::DenseMatrix>& vertex_targets,
-        Graph coarse_graph);
+    void BuildCoarseSpace(const std::vector<mfem::DenseMatrix>& edge_traces,
+                          const std::vector<mfem::DenseMatrix>& vertex_targets,
+                          Graph coarse_graph);
 
     /**
        @brief Build coarse mixed system
     */
-    MixedMatrix BuildCoarseMatrix(GraphSpace coarse_graph_space,
-                                  const MixedMatrix& fine_mgL,
+    MixedMatrix BuildCoarseMatrix(const MixedMatrix& fine_mgL,
                                   const mfem::SparseMatrix& Pvertices);
-
-    /**
-       @brief Build the projection operator from fine to coarse edge space
-    */
-    mfem::SparseMatrix BuildEdgeProjection(
-        const std::vector<mfem::DenseMatrix>& edge_traces,
-        const std::vector<mfem::DenseMatrix>& vertex_targets,
-        const GraphSpace& coarse_space);
-private:
-    /**
-       Construct coarse entities to coarse dofs table in the case when each dof
-       belongs to one and only one entity (coarse vertex_vdof, edge_edof)
-    */
-    mfem::SparseMatrix BuildCoarseEntityToCoarseDof(
-        const std::vector<mfem::DenseMatrix>& local_targets);
-
-    /// Construct aggregate to coarse edge dofs relation table
-    mfem::SparseMatrix BuildAggToCoarseEdgeDof(
-        const Graph& coarse_graph,
-        const mfem::SparseMatrix& agg_coarse_vdof,
-        const mfem::SparseMatrix& face_coarse_edof);
-
-    /// Construct edge coarse dof to true dof relation table
-    std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof(
-        const Graph& coarse_graph,
-        const mfem::SparseMatrix& face_cdof,
-        int num_coarse_edofs);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices(
         const std::vector<mfem::DenseMatrix>& vertex_targets);
 
+    /**
+       @brief Construct Pedges, the projector from coarse edge degrees of freedom
+       to fine edge dofs.
+
+       This takes edge-based traces functions, extends them, finds bubbles,
+       and assembles into interpolation matrix.
+
+       Pedges can be written in the form
+       \f[
+          P_\sigma = \left( \begin{array}{cc}
+              P_F&  0 \\
+              P_{E(A),F}&  P_{E(A)}
+          \end{array} \right)
+       \f]
+       where \f$ P_F \f$ is block diagonal on the faces, \f$ P_{E(A),F} \f$ contains
+       only two nonzeros in each column, and \f$ P_{E(A)} \f$ is block diagonal on
+       interiors and contains the "bubbles". (The columns are in fact ordered as
+       written above, but the rows are not.)
+
+       @param edge_trace lives on faces, not aggregates
+       @param vertex_target usually eigenvectors, lives on aggregate
+       @param coarse_space the coarse graph space
+       @return the interpolation matrix Pedges for edge space
+    */
+    mfem::SparseMatrix BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
+                                   std::vector<mfem::DenseMatrix>& vertex_target,
+                                   bool build_coarse_components);
+
+    /**
+       @brief Build the projection operator from fine to coarse edge space
+    */
+    mfem::SparseMatrix BuildEdgeProjection(const std::vector<mfem::DenseMatrix>& edge_traces,
+        const std::vector<mfem::DenseMatrix>& vertex_targets);
+private:
     /**
        Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
 
@@ -174,33 +152,6 @@ private:
                           int j,
                           const mfem::Vector& trace);
 
-    /**
-       @brief Construct Pedges, the projector from coarse edge degrees of freedom
-       to fine edge dofs.
-
-       This takes edge-based traces functions, extends them, finds bubbles,
-       and assembles into interpolation matrix.
-
-       Pedges can be written in the form
-       \f[
-          P_\sigma = \left( \begin{array}{cc}
-              P_F&  0 \\
-              P_{E(A),F}&  P_{E(A)}
-          \end{array} \right)
-       \f]
-       where \f$ P_F \f$ is block diagonal on the faces, \f$ P_{E(A),F} \f$ contains
-       only two nonzeros in each column, and \f$ P_{E(A)} \f$ is block diagonal on
-       interiors and contains the "bubbles". (The columns are in fact ordered as
-       written above, but the rows are not.)
-
-       @param edge_trace lives on faces, not aggregates
-       @param vertex_target usually eigenvectors, lives on aggregate
-       @param coarse_space the coarse graph space
-       @return the interpolation matrix Pedges for edge space
-    */
-    mfem::SparseMatrix BuildPEdges(std::vector<mfem::DenseMatrix>& edge_traces,
-                                   std::vector<mfem::DenseMatrix>& vertex_target,
-                                   const GraphSpace& coarse_space);
 
     void BuildCoarseW(const mfem::SparseMatrix& Pvertices);
 
@@ -220,7 +171,7 @@ private:
     const ElementMBuilder* fine_mbuilder_;
     const GraphTopology& topology_;
     const DofAggregate& dof_agg_;
-    const GraphSpace& space_;
+    const GraphSpace& fine_space_;
 
     /// basically just some storage to allocate
     mfem::Array<int> col_map_;
@@ -233,6 +184,8 @@ private:
 
     /// Builder for coarse M operator
     std::unique_ptr<CoarseMBuilder> coarse_m_builder_;
+
+    GraphSpace coarse_space_;
 };
 
 } // namespace smoothg

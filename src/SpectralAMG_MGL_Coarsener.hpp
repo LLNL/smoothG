@@ -41,7 +41,7 @@ public:
 
        @param param upscaling parameters
     */
-    SpectralAMG_MGL_Coarsener(const UpscaleParameters& param = UpscaleParameters());
+    SpectralAMG_MGL_Coarsener(const UpscaleParameters& param);
 
 private:
     /**

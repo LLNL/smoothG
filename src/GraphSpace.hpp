@@ -73,13 +73,20 @@ public:
     const Graph& GetGraph() const { return graph_; }
     ///@}
 private:
+    /// Construct vertex to edofs relation table
+    mfem::SparseMatrix BuildVertexToEDof();
+
+    /// Construct edge coarse dof to true dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> BuildCoarseEdgeDofTruedof();
+
+
+    Graph graph_;
+
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix vertex_edof_;
     mfem::SparseMatrix edge_edof_;
     std::unique_ptr<mfem::HypreParMatrix> edof_trueedof_;
     mfem::SparseMatrix edof_bdratt_;
-
-    Graph graph_;
 }; // class GraphSpace
 
 } // namespace smoothg

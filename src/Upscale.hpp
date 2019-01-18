@@ -242,8 +242,6 @@ protected:
     std::vector<std::unique_ptr<Mixed_GL_Coarsener> > coarsener_;
     std::vector<std::unique_ptr<MixedLaplacianSolver> > solver_;
 
-    const mfem::HypreParMatrix* edge_e_te_;
-
     MPI_Comm comm_;
     int myid_;
 
@@ -253,8 +251,6 @@ protected:
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
     const mfem::Array<int>* ess_attr_;
-
-    bool remove_one_dof_; // whether the 1st dof of 2nd block should be eliminated
 
     const UpscaleParameters& param_;
 private:
