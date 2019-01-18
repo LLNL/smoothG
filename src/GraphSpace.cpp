@@ -42,10 +42,9 @@ GraphSpace::GraphSpace(Graph graph)
 
 GraphSpace::GraphSpace(Graph graph, const std::vector<int> num_local_vdofs,
                        const std::vector<int> num_local_edofs)
-    : graph_(std::move(graph)), vertex_vdof_(std::move(vertex_vdof)),
-      vertex_edof_(std::move(vertex_edof)),
-      edge_edof_(std::move(edge_edof)), edof_trueedof_(std::move(edof_trueedof)),
-
+    : graph_(std::move(graph)), vertex_vdof_(BuildEntityToDof(num_local_vdofs)),
+      edge_edof_(BuildEntityToDof(num_local_edofs)),
+      vertex_edof_(BuildVertexToEDof()), edof_trueedof_(std::move(edof_trueedof))
 {
     if (graph_.HasBoundary())
     {
@@ -78,15 +77,15 @@ void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept
     swap(lhs.graph_, rhs.graph_);
 }
 
-
-mfem::SparseMatrix GraphCoarsen::BuildCoarseEntityToCoarseDof(
-    const std::vector<mfem::DenseMatrix>& local_targets)
+// Construct entities to dofs table in the case when each dof belongs to one
+// and only one entity and the enumeration of dofs solely depends on entity
+mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_targets)
 {
     const unsigned int num_entities = local_targets.size();
     int* I = new int[num_entities + 1]();
     for (unsigned int entity = 0; entity < num_entities; ++entity)
     {
-        I[entity + 1] = I[entity] + local_targets[entity].Width();
+        I[entity + 1] = I[entity] + local_targets[entity].NumCols();
     }
 
     int nnz = I[num_entities];
@@ -99,154 +98,128 @@ mfem::SparseMatrix GraphCoarsen::BuildCoarseEntityToCoarseDof(
     return mfem::SparseMatrix(I, J, Data, num_entities, nnz);
 }
 
-unique_ptr<mfem::HypreParMatrix> GraphCoarsen::BuildCoarseEdgeDofTruedof(
-    const Graph& coarse_graph, const mfem::SparseMatrix& face_cdof, int num_coarse_edofs)
+unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildCoarseEdgeDofTruedof()
 {
-    const int ncdofs = num_coarse_edofs;
-    const int nfaces = face_cdof.Height();
+    const int num_edofs = vertex_edof_.NumCols();
+    const int num_edges = edge_edof_.Height();
 
-    // count edge coarse true dofs (if the dof is a bubble or on a true face)
-    mfem::SparseMatrix face_d_td_diag;
-    const mfem::HypreParMatrix& face_trueface_ = coarse_graph.EdgeToTrueEdge();
-    mfem::HypreParMatrix& face_trueface_face_ =
-        const_cast<mfem::HypreParMatrix&>(*topology_.face_trueface_face_);
-    face_trueface_.GetDiag(face_d_td_diag);
+    auto edge_trueedge_edge = AAt(graph_.EdgeToTrueEdge());
 
-    MPI_Comm comm = face_trueface_.GetComm();
-    mfem::Array<HYPRE_Int> edge_cd_start;
-    GenerateOffsets(comm, ncdofs, edge_cd_start);
+    MPI_Comm comm = graph_.GetComm();
+    mfem::Array<HYPRE_Int> edof_starts;
+    GenerateOffsets(comm, num_edofs, edof_starts);
 
-    mfem::Array<HYPRE_Int>& face_start =
-        const_cast<mfem::Array<HYPRE_Int>&>(topology_.GetFaceStarts());
+    HYPRE_Int* edge_starts = edge_trueedge_edge->GetRowStarts();
 
-    mfem::SparseMatrix face_cdof_tmp(face_cdof.GetI(), face_cdof.GetJ(),
-                                     face_cdof.GetData(), nfaces, ncdofs,
-                                     false, false, false);
+    mfem::SparseMatrix edge_edof_diag(edge_edof_.GetI(), edge_edof_.GetJ(),
+                                      edge_edof_.GetData(), num_edges,
+                                      num_edofs, false, false, false);
 
-    mfem::HypreParMatrix face_cdof_d(comm, face_start.Last(),
-                                     edge_cd_start.Last(), face_start,
-                                     edge_cd_start, &face_cdof_tmp);
+    mfem::HypreParMatrix edge_edof(comm, edge_trueedge_edge->M(),
+                                   edof_starts.Last(), edge_starts,
+                                   edof_starts, &edge_edof_diag);
 
-    unique_ptr<mfem::HypreParMatrix> d_td_d_tmp(smoothg::RAP(face_trueface_face_, face_cdof_d));
+    mfem::SparseMatrix diag = SparseIdentity(num_edofs);
+    HYPRE_Int* col_map;
 
     mfem::SparseMatrix d_td_d_tmp_offd;
-    HYPRE_Int* d_td_d_map;
-    d_td_d_tmp->GetOffd(d_td_d_tmp_offd, d_td_d_map);
+    auto d_td_d_tmp = smoothg::RAP(*edge_trueedge_edge, edge_edof);
+    d_td_d_tmp->GetOffd(d_td_d_tmp_offd, col_map);
 
-    mfem::Array<int> d_td_d_diag_i(ncdofs + 1);
-    std::iota(d_td_d_diag_i.begin(), d_td_d_diag_i.begin() + ncdofs + 1, 0);
-
-    mfem::Array<double> d_td_d_diag_data(ncdofs);
-    std::fill_n(d_td_d_diag_data.begin(), ncdofs, 1.0);
-    mfem::SparseMatrix d_td_d_diag(d_td_d_diag_i.GetData(), d_td_d_diag_i.GetData(),
-                                   d_td_d_diag_data.GetData(), ncdofs, ncdofs,
-                                   false, false, false);
-
-    int* d_td_d_offd_i = new int[ncdofs + 1];
-    int d_td_d_offd_nnz = 0;
-    for (int i = 0; i < ncdofs; i++)
+    int* offd_i = new int[num_edofs + 1]();
+    for (int i = 0; i < num_edofs; i++)
     {
-        d_td_d_offd_i[i] = d_td_d_offd_nnz;
-        if (d_td_d_tmp_offd.RowSize(i))
-            d_td_d_offd_nnz++;
+        offd_i[i + 1] = offd_i[i] + (d_td_d_tmp_offd.RowSize(i) > 0);
     }
-    d_td_d_offd_i[ncdofs] = d_td_d_offd_nnz;
-    int* d_td_d_offd_j = new int[d_td_d_offd_nnz];
-    d_td_d_offd_nnz = 0;
 
-    mfem::SparseMatrix face_trueface_face_offd;
+    int* offd_j = new int[offd_i[num_edofs]];
+    int offd_nnz = 0;
+
+    mfem::SparseMatrix edge_is_shared;
     HYPRE_Int* junk_map;
-    face_trueface_face_.GetOffd(face_trueface_face_offd, junk_map);
+    edge_trueedge_edge->GetOffd(edge_is_shared, junk_map);
 
-    int face_1st_cdof, face_ncdofs;
-    int* face_cdof_i = face_cdof.GetI();
-    int* face_cdof_j = face_cdof.GetJ();
-    mfem::Array<int> face_cdofs;
-    for (int i = 0; i < nfaces; i++)
+    mfem::Array<int> local_edofs;
+    for (int i = 0; i < num_edges; i++)
     {
-        if (face_trueface_face_offd.RowSize(i))
+        if (edge_is_shared.RowSize(i))
         {
-            face_ncdofs = face_cdof_i[i + 1] - face_cdof_i[i];
-            face_1st_cdof = face_cdof_j[face_cdof_i[i]];
-            GetTableRow(d_td_d_tmp_offd, face_1st_cdof, face_cdofs);
-            assert(face_cdofs.Size() == face_ncdofs);
-            for (int j = 0; j < face_ncdofs; j++)
-                d_td_d_offd_j[d_td_d_offd_nnz++] = face_cdofs[j];
+            const int num_local_edofs = edge_edof_.RowSize(i);
+            const int edge_1st_edof = edge_edof_.GetRowColumns(i)[0];
+            GetTableRow(d_td_d_tmp_offd, edge_1st_edof, local_edofs);
+            assert(local_edofs.Size() == num_local_edofs);
+            std::copy_n(local_edofs.GetData(), num_local_edofs, offd_j + offd_nnz);
+            offd_nnz += num_local_edofs;
         }
     }
-    assert(d_td_d_offd_i[ncdofs] == d_td_d_offd_nnz);
-    mfem::SparseMatrix d_td_d_offd(d_td_d_offd_i, d_td_d_offd_j,
-                                   d_td_d_diag_data.GetData(), ncdofs, d_td_d_offd_nnz,
-                                   true, false, false);
+    assert(offd_i[num_edofs] == offd_nnz);
+    mfem::SparseMatrix offd(offd_i, offd_j, diag.GetData(), num_edofs, offd_nnz,
+                            true, false, false);
 
-    mfem::HypreParMatrix d_td_d(
-        comm, edge_cd_start.Last(), edge_cd_start.Last(), edge_cd_start,
-        edge_cd_start, &d_td_d_diag, &d_td_d_offd, d_td_d_map);
+    mfem::HypreParMatrix d_td_d(comm, edge_edof.N(), edge_edof.N(), edof_starts,
+                                edof_starts, &diag, &offd, col_map);
 
     return BuildEntityToTrueEntity(d_td_d);
 }
 
-mfem::SparseMatrix GraphCoarsen::BuildAggToCoarseEdgeDof(
-    const Graph& coarse_graph,
-    const mfem::SparseMatrix& agg_coarse_vdof,
-    const mfem::SparseMatrix& face_coarse_edof)
+mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
 {
-    const unsigned int num_aggs = agg_coarse_vdof.NumRows();
-    const mfem::SparseMatrix& agg_face = coarse_graph.VertexToEdge();
+    const unsigned int num_vertices = vertex_vdof_.NumRows();
+    const mfem::SparseMatrix& vertex_edge = graph_.VertexToEdge();
 
-    int* I = new int[num_aggs + 1];
+    int* I = new int[num_vertices + 1];
     I[0] = 0;
 
-    mfem::Array<int> faces; // this is repetitive of InitializePEdgesNNZ
-    for (unsigned int agg = 0; agg < num_aggs; agg++)
+    mfem::Array<int> edges;
+    for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
     {
-        int nlocal_coarse_edofs = agg_coarse_vdof.RowSize(agg) - 1;
-        GetTableRow(agg_face, agg, faces);
-        for (int& face : faces)
+        int num_local_edofs = vertex_vdof_.RowSize(vertex) - 1;
+        GetTableRow(vertex_edge, vertex, edges);
+        for (int& edge : edges)
         {
-            nlocal_coarse_edofs += face_coarse_edof.RowSize(face);
+            num_local_edofs += edge_edof_.RowSize(edge);
         }
-        I[agg + 1] = I[agg] + nlocal_coarse_edofs;
+        I[vertex + 1] = I[vertex] + num_local_edofs;
     }
 
-    const int nnz = I[num_aggs];
+    const int nnz = I[num_vertices];
     int* J = new int[nnz];
     double* data = new double[nnz];
 
-    int edof_counter = face_coarse_edof.NumCols(); // start with num_traces
+    int edof_counter = edge_edof_.NumCols();
 
     int* J_begin = J;
     double* data_begin = data;
 
     // data values are chosen for the ease of extended aggregate construction
-    for (unsigned int agg = 0; agg < num_aggs; agg++)
+    for (unsigned int vertex = 0; vertex < num_vertices; vertex++)
     {
-        const int num_bubbles_agg = agg_coarse_vdof.RowSize(agg) - 1;
+        const int num_local_bubbles = vertex_vdof_.RowSize(vertex) - 1;
 
-        int* J_end = J_begin + num_bubbles_agg;
+        int* J_end = J_begin + num_local_bubbles;
         std::iota(J_begin, J_end, edof_counter);
         J_begin = J_end;
 
-        double* data_end = data_begin + num_bubbles_agg;
+        double* data_end = data_begin + num_local_bubbles;
         std::fill(data_begin, data_end, 2.0);
         data_begin = data_end;
 
-        edof_counter += num_bubbles_agg;
+        edof_counter += num_local_bubbles;
 
-        GetTableRow(agg_face, agg, faces);
-        for (int& face : faces)
+        GetTableRow(vertex_edge, vertex, edges);
+        for (int& face : edges)
         {
-            J_end += face_coarse_edof.RowSize(face);
-            std::iota(J_begin, J_end, *face_coarse_edof.GetRowColumns(face));
+            J_end += edge_edof_.RowSize(face);
+            std::iota(J_begin, J_end, *edge_edof_.GetRowColumns(face));
             J_begin = J_end;
 
-            data_end += face_coarse_edof.RowSize(face);
+            data_end += edge_edof_.RowSize(face);
         }
         std::fill(data_begin, data_end, 1.0);
         data_begin = data_end;
     }
 
-    return mfem::SparseMatrix(I, J, data, num_aggs, edof_counter);
+    return mfem::SparseMatrix(I, J, data, num_vertices, edof_counter);
 }
 
 } // namespace smoothg
