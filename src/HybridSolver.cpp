@@ -165,11 +165,9 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     mfem::Array<bool> edge_marker(num_edge_dofs_);
     edge_marker = true;
 
-    mfem::SparseMatrix edof_IsOwned;
-    multiplier_d_td_->GetDiag(edof_IsOwned);
+    mfem::SparseMatrix edof_IsOwned = GetDiag(*multiplier_d_td_);
 
     mfem::DenseMatrix DlocT, ClocT, Aloc, CMinvDT, DMinvCT, CMDADMC;
-    mfem::DenseMatrix Hybrid_el;
 
     mfem::DenseMatrixInverse Mloc_solver;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
@@ -602,8 +600,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
 void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
                                         const mfem::Array<int>* ess_edofs)
 {
-    mfem::SparseMatrix mult_truemult;
-    multiplier_d_td_->GetDiag(mult_truemult);
+    mfem::SparseMatrix mult_truemult = GetDiag(*multiplier_d_td_);
     mfem::Array<int> true_multiplier;
 
     // Note: there is a 1-1 map from multipliers to edge dofs on faces

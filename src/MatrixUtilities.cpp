@@ -188,11 +188,9 @@ mfem::Table MatrixToTable(const mfem::SparseMatrix& mat)
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
                           const mfem::HypreParMatrix& P)
 {
-    // TODO(gelever1): Remove const cast once mfem version update
-    unique_ptr<mfem::HypreParMatrix> RT(const_cast<mfem::HypreParMatrix&>(R).Transpose());
+    unique_ptr<mfem::HypreParMatrix> RT(R.Transpose());
     assert(RT);
-    unique_ptr<mfem::HypreParMatrix> AP(mfem::ParMult(const_cast<mfem::HypreParMatrix*>(&A),
-                                                      const_cast<mfem::HypreParMatrix*>(&P)));
+    unique_ptr<mfem::HypreParMatrix> AP(mfem::ParMult(&A, &P));
 
     mfem::HypreParMatrix* rap = mfem::ParMult(RT.get(), AP.get());
     assert(rap);
@@ -632,12 +630,8 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
 
 double MaxNorm(const mfem::HypreParMatrix& A)
 {
-    mfem::SparseMatrix diag;
-    mfem::SparseMatrix offd;
-
-    HYPRE_Int* junk_map;
-    A.GetDiag(diag);
-    A.GetOffd(offd, junk_map);
+    mfem::SparseMatrix diag = GetDiag(A);
+    mfem::SparseMatrix offd = GetOffd(A);
 
     double local_max = std::max(diag.MaxNorm(), offd.MaxNorm());
 
@@ -1274,5 +1268,21 @@ unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat)
     copy->CopyColStarts();
     return copy;
 }
+
+mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat)
+{
+    mfem::SparseMatrix diag;
+    mat.GetDiag(diag);
+    return diag;
+}
+
+mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
+{
+    HYPRE_Int* col_map;
+    mfem::SparseMatrix offd;
+    mat.GetOffd(offd, col_map);
+    return offd;
+}
+
 
 } // namespace smoothg

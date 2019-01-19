@@ -386,25 +386,19 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     ParMatrix permute_eT( permute_e->Transpose() );
 
-    ParMatrix tmpM(ParMult(permute_e.get(), &mgL_.GetParallelM()) );
-    ParMatrix pM_ext(ParMult(tmpM.get(), permute_eT.get()) );
+    ParMatrix tmpM(mfem::ParMult(permute_e.get(), &mgL_.GetParallelM()) );
+    ParMatrix pM_ext(mfem::ParMult(tmpM.get(), permute_eT.get()) );
 
-    ParMatrix tmpD(ParMult(permute_v.get(), &mgL_.GetParallelD()) );
-    ParMatrix pD_ext(ParMult(tmpD.get(), permute_eT.get()) );
+    ParMatrix tmpD(mfem::ParMult(permute_v.get(), &mgL_.GetParallelD()) );
+    ParMatrix pD_ext(mfem::ParMult(tmpD.get(), permute_eT.get()) );
 
-    mfem::SparseMatrix M_ext, D_ext, W_ext;
-    pM_ext->GetDiag(M_ext);
-    pD_ext->GetDiag(D_ext);
+    mfem::SparseMatrix M_ext = GetDiag(*pM_ext);
+    mfem::SparseMatrix D_ext = GetDiag(*pD_ext);
 
-    ParMatrix pW_ext;
-    if (mgL_.CheckW())
-    {
-        ParMatrix permute_vT( permute_v->Transpose() );
-        ParMatrix tmpW(ParMult(permute_v.get(), mgL_.GetParallelW()) );
-
-        pW_ext.reset(ParMult(tmpW.get(), permute_vT.get()));
-        pW_ext->GetDiag(W_ext);
-    }
+    // SET W in eigenvalues
+    const bool use_w = false && mgL_.CheckW();
+    ParMatrix pW_ext(use_w ? RAP(*mgL_.GetParallelW(), *permute_v) : nullptr);
+    mfem::SparseMatrix W_ext = use_w ? GetDiag(*pW_ext) : mfem::SparseMatrix();
 
     // Compute face to permuted edge dofs relation table
     const mfem::SparseMatrix& f_e = dof_agg_.face_edof_;
@@ -423,9 +417,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     mfem::Vector first_evect;
     mfem::DenseMatrix evects, evects_restricted;
     mfem::DenseMatrix evects_T, evects_restricted_T;
-
-    // SET W in eigenvalues
-    const bool use_w = false && mgL_.CheckW();
 
     // ---
     // solve eigenvalue problem on each extended aggregate, our (3.1)
@@ -636,12 +627,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     mfem::Array<int> ext_loc_edofs, iface_edofs;
     mfem::DenseMatrix collected_sigma;
 
-    mfem::SparseMatrix face_perm_edof_diag;
-    face_perm_edof_->GetDiag(face_perm_edof_diag);
-
-    mfem::SparseMatrix face_IsShared;
-    HYPRE_Int* junk_map;
-    topology_.face_trueface_face_->GetOffd(face_IsShared, junk_map);
+    mfem::SparseMatrix face_perm_edof_diag = GetDiag(*face_perm_edof_);
+    mfem::SparseMatrix face_IsShared = GetOffd(*topology_.face_trueface_face_);
 
     // Send and receive traces
     const auto& face_trueface = topology_.CoarseGraph().EdgeToTrueEdge();

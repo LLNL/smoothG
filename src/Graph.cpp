@@ -267,9 +267,7 @@ mfem::Vector Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 void Graph::FixSharedEdgeWeight(mfem::Vector& edge_weight_local)
 {
     unique_ptr<mfem::HypreParMatrix> e_te_e = AAt(*edge_trueedge_);
-    mfem::SparseMatrix edge_is_shared;
-    HYPRE_Int* junk_map;
-    e_te_e->GetOffd(edge_is_shared, junk_map);
+    mfem::SparseMatrix edge_is_shared = GetOffd(*e_te_e);
 
     assert(edge_is_shared.Height() == edge_weight_local.Size());
     for (int edge = 0; edge < edge_is_shared.Height(); ++edge)

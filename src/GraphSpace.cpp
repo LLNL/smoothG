@@ -187,9 +187,7 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
     mfem::SparseMatrix d_td_d_diag = SparseIdentity(num_edofs);
     mfem::SparseMatrix d_td_d_offd(num_edofs, d_te_d_offd.Width());
     {
-        mfem::SparseMatrix e_te_e_offd;
-        HYPRE_Int* junk_map;
-        edge_trueedge_edge->GetOffd(e_te_e_offd, junk_map);
+        mfem::SparseMatrix e_te_e_offd = GetOffd(*edge_trueedge_edge);
 
         mfem::Array<int> local_edofs, offd_edofs;
         for (int i = 0; i < e_te_e_offd.NumRows(); i++)
