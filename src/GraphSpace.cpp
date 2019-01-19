@@ -163,15 +163,11 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
 unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
 {
     const int num_edofs = vertex_edof_.NumCols();
-    const int num_edges = edge_edof_.Height();
-
     auto edge_trueedge_edge = AAt(graph_.EdgeToTrueEdge());
 
     MPI_Comm comm = graph_.GetComm();
     mfem::Array<HYPRE_Int> edof_starts;
     GenerateOffsets(comm, num_edofs, edof_starts);
-
-    mfem::SparseMatrix diag = SparseIdentity(num_edofs);
 
     unique_ptr<mfem::HypreParMatrix> d_te_d; // dofs sharing the same true edge
     {
@@ -184,42 +180,37 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
         d_te_d = ParMult(edof_edge, *tmp, edof_starts);
     }
 
-    HYPRE_Int* col_map;
+    HYPRE_Int* d_te_d_col_map;
     mfem::SparseMatrix d_te_d_offd;
-    d_te_d->GetOffd(d_te_d_offd, col_map);
+    d_te_d->GetOffd(d_te_d_offd, d_te_d_col_map);
 
-    int* offd_i = new int[num_edofs + 1]();
-    for (int i = 0; i < num_edofs; i++)
+    mfem::SparseMatrix d_td_d_diag = SparseIdentity(num_edofs);
+    mfem::SparseMatrix d_td_d_offd(num_edofs, d_te_d_offd.Width());
     {
-        offd_i[i + 1] = offd_i[i] + (d_te_d_offd.RowSize(i) > 0);
-    }
+        mfem::SparseMatrix e_te_e_offd;
+        HYPRE_Int* junk_map;
+        edge_trueedge_edge->GetOffd(e_te_e_offd, junk_map);
 
-    int* offd_j = new int[offd_i[num_edofs]];
-    int offd_nnz = 0;
-
-    mfem::SparseMatrix edge_is_shared;
-    HYPRE_Int* junk_map;
-    edge_trueedge_edge->GetOffd(edge_is_shared, junk_map);
-
-    mfem::Array<int> offd_edofs;
-    for (int i = 0; i < num_edges; i++)
-    {
-        if (edge_is_shared.RowSize(i))
+        mfem::Array<int> local_edofs, offd_edofs;
+        for (int i = 0; i < e_te_e_offd.NumRows(); i++)
         {
-            const int num_local_edofs = edge_edof_.RowSize(i);
-            const int edge_1st_edof = edge_edof_.GetRowColumns(i)[0];
-            GetTableRow(d_te_d_offd, edge_1st_edof, offd_edofs);
-            assert(offd_edofs.Size() == num_local_edofs);
-            std::copy_n(offd_edofs.GetData(), num_local_edofs, offd_j += offd_nnz);
+            if (e_te_e_offd.RowSize(i)) // edge is shared by other processors
+            {
+                GetTableRow(edge_edof_, i, local_edofs);
+                GetTableRow(d_te_d_offd, local_edofs[0], offd_edofs);
+                assert(local_edofs.Size() == offd_edofs.Size());
+
+                for (int j = 0; j < local_edofs.Size(); ++j)
+                {
+                    d_td_d_offd.Set(local_edofs[j], offd_edofs[j], 1.0);
+                }
+            }
         }
+        d_td_d_offd.Finalize();
     }
-    assert(offd_i[num_edofs] == offd_nnz);
-    mfem::SparseMatrix offd(offd_i, offd_j, diag.GetData(), num_edofs, offd_nnz,
-                            true, false, false);
 
-    mfem::HypreParMatrix d_td_d(comm, d_te_d->N(), d_te_d->N(), edof_starts,
-                                edof_starts, &diag, &offd, col_map);
-
+    mfem::HypreParMatrix d_td_d(comm, d_te_d->N(), d_te_d->N(), edof_starts, edof_starts,
+                                &d_td_d_diag, &d_td_d_offd, d_te_d_col_map);
     return BuildEntityToTrueEntity(d_td_d);
 }
 
