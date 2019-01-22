@@ -62,8 +62,8 @@ GraphSpace::GraphSpace(Graph graph)
 }
 
 GraphSpace::GraphSpace(Graph graph,
-                       const std::vector<mfem::DenseMatrix> edge_traces,
-                       const std::vector<mfem::DenseMatrix> vertex_targets)
+                       const std::vector<mfem::DenseMatrix>& edge_traces,
+                       const std::vector<mfem::DenseMatrix>& vertex_targets)
     : graph_(std::move(graph)),
       vertex_vdof_(BuildEntityToDof(vertex_targets)),
       edge_edof_(BuildEntityToDof(edge_traces)),

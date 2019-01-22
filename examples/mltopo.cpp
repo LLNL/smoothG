@@ -92,10 +92,10 @@ int main(int argc, char* argv[])
     auto graph_topos = MultilevelGraphTopology(graph, num_levels, coarsening_factor);
 
     // Visualize aggregates in all levels
-    if (visualization)
-    {
-        ShowAggregates(graph_topos, pmesh.get());
-    }
+//    if (visualization)
+//    {
+//        ShowAggregates(graph_topos, pmesh.get());
+//    }
 
     return EXIT_SUCCESS;
 }
@@ -106,83 +106,83 @@ std::vector<GraphTopology> MultilevelGraphTopology(
     std::vector<GraphTopology> topologies;
     topologies.reserve(num_levels - 1);
 
-    std::vector<std::shared_ptr<Graph>> graphs;
+    std::vector<Graph> graphs;
     graphs.reserve(num_levels);
-    graphs.push_back(std::make_shared<Graph>(graph));
+    graphs.push_back(graph);
 
     // Construct coarser levels graph topology by recursion
     for (int i = 0; i < num_levels - 1; i++)
     {
-        topologies.emplace_back(*graphs[i]);
+        topologies.emplace_back(graphs[i]);
         graphs.push_back(topologies.back().Coarsen(coarsening_factor));
     }
 
     return topologies;
 }
 
-void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)
-{
-    mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
-    mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
-    mfem::ParGridFunction attr(&attr_fespace);
+//void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)
+//{
+//    mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
+//    mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
+//    mfem::ParGridFunction attr(&attr_fespace);
 
-    mfem::socketstream sol_sock;
-    for (unsigned int i = 0; i < graph_topos.size(); i++)
-    {
-        // Compute partitioning vector on level i+1
-        mfem::SparseMatrix Agg_vertex = graph_topos[0].Agg_vertex_;
-        for (unsigned int j = 1; j < i + 1; j++)
-        {
-            auto tmp = smoothg::Mult(graph_topos[j].Agg_vertex_, Agg_vertex);
-            Agg_vertex.Swap(tmp);
-        }
-        auto vertex_Agg = smoothg::Transpose(Agg_vertex);
-        int* partitioning = vertex_Agg.GetJ();
+//    mfem::socketstream sol_sock;
+//    for (unsigned int i = 0; i < graph_topos.size(); i++)
+//    {
+//        // Compute partitioning vector on level i+1
+//        mfem::SparseMatrix Agg_vertex = graph_topos[0].Agg_vertex_;
+//        for (unsigned int j = 1; j < i + 1; j++)
+//        {
+//            auto tmp = smoothg::Mult(graph_topos[j].Agg_vertex_, Agg_vertex);
+//            Agg_vertex.Swap(tmp);
+//        }
+//        auto vertex_Agg = smoothg::Transpose(Agg_vertex);
+//        int* partitioning = vertex_Agg.GetJ();
 
-        // Make better coloring (better with serial run)
-        mfem::SparseMatrix Agg_Agg = AAt(graph_topos[i].CoarseGraph().VertexToEdge());
-        mfem::Array<int> colors;
-        GetElementColoring(colors, Agg_Agg);
-        const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());
+//        // Make better coloring (better with serial run)
+//        mfem::SparseMatrix Agg_Agg = AAt(graph_topos[i].CoarseGraph().VertexToEdge());
+//        mfem::Array<int> colors;
+//        GetElementColoring(colors, Agg_Agg);
+//        const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());
 
-        for (int j = 0; j < vertex_Agg.Height(); j++)
-        {
-            attr(j) = (colors[partitioning[j]] + pmesh->GetMyRank()) % num_colors;
-        }
+//        for (int j = 0; j < vertex_Agg.Height(); j++)
+//        {
+//            attr(j) = (colors[partitioning[j]] + pmesh->GetMyRank()) % num_colors;
+//        }
 
-        char vishost[] = "localhost";
-        int  visport   = 19916;
-        sol_sock.open(vishost, visport);
-        if (sol_sock.is_open())
-        {
-            sol_sock.precision(8);
-            sol_sock << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
-            if (pmesh->SpaceDimension() == 2)
-            {
-                sol_sock << "fem2d_gf_data_keys\n";
-            }
-            else
-            {
-                sol_sock << "fem3d_gf_data_keys\n";
-            }
+//        char vishost[] = "localhost";
+//        int  visport   = 19916;
+//        sol_sock.open(vishost, visport);
+//        if (sol_sock.is_open())
+//        {
+//            sol_sock.precision(8);
+//            sol_sock << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
+//            if (pmesh->SpaceDimension() == 2)
+//            {
+//                sol_sock << "fem2d_gf_data_keys\n";
+//            }
+//            else
+//            {
+//                sol_sock << "fem3d_gf_data_keys\n";
+//            }
 
-            pmesh->PrintWithPartitioning(partitioning, sol_sock, 0);
-            attr.Save(sol_sock);
+//            pmesh->PrintWithPartitioning(partitioning, sol_sock, 0);
+//            attr.Save(sol_sock);
 
-            sol_sock << "window_size 500 800\n";
-            sol_sock << "window_title 'Level " << i + 1 << " aggregation'\n";
-            if (pmesh->SpaceDimension() == 2)
-            {
-                sol_sock << "view 0 0\n"; // view from top
-                sol_sock << "keys jl\n";  // turn off perspective and light
-                sol_sock << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-                sol_sock << "keys b\n";  // draw interface
-            }
-            else
-            {
-                sol_sock << "keys ]]]]]]]]]]]]]\n";  // increase size
-            }
-            MPI_Barrier(pmesh->GetComm());
-        }
-    }
-}
+//            sol_sock << "window_size 500 800\n";
+//            sol_sock << "window_title 'Level " << i + 1 << " aggregation'\n";
+//            if (pmesh->SpaceDimension() == 2)
+//            {
+//                sol_sock << "view 0 0\n"; // view from top
+//                sol_sock << "keys jl\n";  // turn off perspective and light
+//                sol_sock << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+//                sol_sock << "keys b\n";  // draw interface
+//            }
+//            else
+//            {
+//                sol_sock << "keys ]]]]]]]]]]]]]\n";  // increase size
+//            }
+//            MPI_Barrier(pmesh->GetComm());
+//        }
+//    }
+//}

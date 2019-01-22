@@ -127,10 +127,8 @@ std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
     return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&pA, &B));
 }
 
-mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
+mfem::SparseMatrix DropSmall(const mfem::SparseMatrix& mat, double tol)
 {
-    // TODO(gelever1): Perform this more better
-
     mfem::SparseMatrix out(mat.Height(), mat.Width());
 
     for (int i = 0; i < mat.Height(); ++i)
@@ -138,9 +136,7 @@ mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
         for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; ++j)
         {
             const double val = mat.GetData()[j];
-            // if (std::fabs(val) > tol)
-            // Keep diagonal always??
-            if (std::fabs(val) > tol || i == mat.GetJ()[j])
+            if (std::fabs(val) >= tol)
             {
                 out.Add(i, mat.GetJ()[j], val);
             }
@@ -1283,6 +1279,5 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
     mat.GetOffd(offd, col_map);
     return offd;
 }
-
 
 } // namespace smoothg

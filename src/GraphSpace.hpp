@@ -48,8 +48,8 @@ public:
        @brief Constructor that essentially collects all members from input
     */
     GraphSpace(Graph graph,
-               const std::vector<mfem::DenseMatrix> edge_traces,
-               const std::vector<mfem::DenseMatrix> vertex_targets);
+               const std::vector<mfem::DenseMatrix>& edge_traces,
+               const std::vector<mfem::DenseMatrix>& vertex_targets);
 
     /// Default constructor
     GraphSpace() = default;

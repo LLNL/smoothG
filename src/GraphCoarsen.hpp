@@ -64,25 +64,19 @@ public:
        @param mgL describes fine graph
        @param dof_agg describes various dofs aggregation
     */
-    GraphCoarsen(const MixedMatrix& mgL, const DofAggregate& dof_agg);
-
-    /**
-       @brief Build coarse graph space (coarse entities to coarse dofs tables)
-    */
-    void BuildCoarseSpace(Graph coarse_graph,
-                          const std::vector<mfem::DenseMatrix>& edge_traces,
-                          const std::vector<mfem::DenseMatrix>& vertex_targets);
+    GraphCoarsen(const MixedMatrix& mgL, const DofAggregate& dof_agg,
+                 const std::vector<mfem::DenseMatrix>& edge_traces,
+                 const std::vector<mfem::DenseMatrix>& vertex_targets,
+                 Graph coarse_graph);
 
     /**
        @brief Build coarse mixed system
     */
-    MixedMatrix BuildCoarseMatrix(GraphSpace coarse_space,
-                                  const MixedMatrix& fine_mgL,
+    MixedMatrix BuildCoarseMatrix(const MixedMatrix& fine_mgL,
                                   const mfem::SparseMatrix& Pvertices);
 
     /// take vertex-based target functions and assemble them in matrix
-    mfem::SparseMatrix BuildPVertices(
-        const std::vector<mfem::DenseMatrix>& vertex_targets);
+    mfem::SparseMatrix BuildPVertices();
 
     /**
        @brief Construct Pedges, the projector from coarse edge degrees of freedom
@@ -108,19 +102,12 @@ public:
        @param coarse_space the coarse graph space
        @return the interpolation matrix Pedges for edge space
     */
-    mfem::SparseMatrix BuildPEdges(
-            const GraphSpace& coarse_space,
-            std::vector<mfem::DenseMatrix>& edge_traces,
-            std::vector<mfem::DenseMatrix>& vertex_target,
-            bool build_coarse_components);
+    mfem::SparseMatrix BuildPEdges(bool build_coarse_components);
 
     /**
        @brief Build the projection operator from fine to coarse edge space
     */
-    mfem::SparseMatrix BuildEdgeProjection(
-            const GraphSpace& coarse_space,
-            const std::vector<mfem::DenseMatrix>& edge_traces,
-            const std::vector<mfem::DenseMatrix>& vertex_targets);
+    mfem::SparseMatrix BuildEdgeProjection();
 private:
     /**
        Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
@@ -153,7 +140,7 @@ private:
        The product computed below is a clever way to compute this more efficiently.
     */
     double DTTraceProduct(const mfem::SparseMatrix& DtransferT,
-                          mfem::DenseMatrix& potentials,
+                          const mfem::DenseMatrix &potentials,
                           int j,
                           const mfem::Vector& trace);
 
@@ -169,6 +156,9 @@ private:
                              const int agg,
                              mfem::DenseMatrix& Mloc);
 
+    const std::vector<mfem::DenseMatrix>& edge_traces_;
+    const std::vector<mfem::DenseMatrix>& vertex_targets_;
+
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix* W_proc_;
@@ -177,6 +167,8 @@ private:
     const GraphTopology& topology_;
     const DofAggregate& dof_agg_;
     const GraphSpace& fine_space_;
+
+    GraphSpace coarse_space_;
 
     /// basically just some storage to allocate
     mfem::Array<int> col_map_;

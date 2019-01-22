@@ -100,6 +100,28 @@ void HybridSolver::Init(
     agg_weights_.SetSize(nAggs_);
     agg_weights_ = 1.0;
 
+    CreateMultiplierRelations(face_edgedof, edgedof_d_td);
+
+    CollectEssentialDofs(edgedof_bdrattr, ess_edge_dofs);
+
+    // Assemble the hybridized system on each processor
+    mfem::SparseMatrix H_proc = AssembleHybridSystem(M_el);
+    if (myid_ == 0 && print_level_ > 0)
+        std::cout << "  Timing: Hybridized system built in "
+                  << chrono.RealTime() << "s. \n";
+
+    BuildParallelSystemAndSolver(H_proc);
+
+    trueHrhs_.SetSize(multiplier_d_td_->GetNumCols());
+    trueMu_.SetSize(trueHrhs_.Size());
+    Hrhs_.SetSize(num_multiplier_dofs_);
+    Mu_.SetSize(num_multiplier_dofs_);
+}
+
+void HybridSolver::CreateMultiplierRelations(
+        const mfem::SparseMatrix& face_edgedof,
+        const mfem::HypreParMatrix& edgedof_d_td)
+{
     // Constructing the relation table (in SparseMatrix format) between edge
     // dof and multiplier dof. For every edge dof that is associated with a
     // face, a Lagrange multiplier dof associated with the edge dof is created
@@ -137,21 +159,6 @@ void HybridSolver::Init(
     // Construct multiplier "dof to true dof" table
     multiplier_d_td_ = BuildEntityToTrueEntity(*multiplier_d_td_d);
     multiplier_td_d_.reset(multiplier_d_td_->Transpose());
-
-    // Assemble the hybridized system on each processor
-    mfem::SparseMatrix H_proc = AssembleHybridSystem(M_el);
-    if (myid_ == 0 && print_level_ > 0)
-        std::cout << "  Timing: Hybridized system built in "
-                  << chrono.RealTime() << "s. \n";
-
-    CollectEssentialDofs(edgedof_bdrattr, ess_edge_dofs);
-
-    BuildParallelSystemAndSolver(H_proc);
-
-    trueHrhs_.SetSize(multiplier_d_td_->GetNumCols());
-    trueMu_.SetSize(trueHrhs_.Size());
-    Hrhs_.SetSize(num_multiplier_dofs_);
-    Mu_.SetSize(num_multiplier_dofs_);
 }
 
 mfem::SparseMatrix HybridSolver::AssembleHybridSystem(

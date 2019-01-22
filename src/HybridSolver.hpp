@@ -157,6 +157,9 @@ private:
               const mfem::SparseMatrix& face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
+    void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
+                                   const mfem::HypreParMatrix& edgedof_d_td);
+
     mfem::SparseMatrix AssembleHybridSystem(
         const std::vector<mfem::DenseMatrix>& M_el);
 
