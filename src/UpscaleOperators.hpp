@@ -80,7 +80,8 @@ namespace smoothg
 class UpscaleBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleBlockSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetNumTotalDofs()), A_(A)
+    UpscaleBlockSolve(const Upscale& A)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(0).GetNumTotalDofs()), A_(A)
     {
         A_.BlockOffsets(0, offsets_);
     }
@@ -100,7 +101,8 @@ private:
 class UpscaleFineSolve : public mfem::Operator
 {
 public:
-    UpscaleFineSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetD().Height()), A_(A)  { }
+    UpscaleFineSolve(const Upscale& A)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(0).GetD().Height()), A_(A)  { }
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(0, x, y); }
 
 private:
@@ -112,8 +114,8 @@ private:
 class UpscaleFineBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleFineBlockSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetNumTotalDofs()),
-        A_(A)
+    UpscaleFineBlockSolve(const Upscale& A)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(0).GetNumTotalDofs()), A_(A)
     {
         A_.BlockOffsets(0, offsets_);
     }
@@ -134,9 +136,9 @@ private:
 class UpscaleCoarseSolve : public mfem::Operator
 {
 public:
-    UpscaleCoarseSolve(const Upscale& A, int level = 1) :
-        mfem::Operator(A.GetMatrix(1).GetD().Height()),
-        A_(A), level_(level)  {}
+    UpscaleCoarseSolve(const Upscale& A, int level = 1)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(1).GetD().Height()),
+          A_(A), level_(level)  {}
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(level_, x, y); }
 
 private:
@@ -149,10 +151,9 @@ private:
 class UpscaleCoarseBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleCoarseBlockSolve(const Upscale& A, int level = 1) :
-        mfem::Operator(A.GetMatrix(level).GetNumTotalDofs()),
-        level_(level),
-        A_(A)
+    UpscaleCoarseBlockSolve(const Upscale& A, int level = 1)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(level).GetNumTotalDofs()),
+          A_(A), level_(level)
     {
         A_.BlockOffsets(level_, offsets_);
     }
@@ -165,8 +166,8 @@ public:
     }
 
 private:
-    int level_;
     const Upscale& A_;
+    int level_;
     mfem::Array<int> offsets_;
 };
 

@@ -116,8 +116,7 @@ private:
     */
     void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                          const mfem::SparseMatrix& agg_vdof,
-                         const mfem::SparseMatrix& face_edof,
-                         const mfem::Vector& constant_rep);
+                         const mfem::SparseMatrix& face_edof);
 
     /**
        Figure out NNZ for each row of PEdges, which is to say, for each fine
@@ -140,7 +139,7 @@ private:
        The product computed below is a clever way to compute this more efficiently.
     */
     double DTTraceProduct(const mfem::SparseMatrix& DtransferT,
-                          const mfem::DenseMatrix &potentials,
+                          const mfem::DenseMatrix& potentials,
                           int j,
                           const mfem::Vector& trace);
 

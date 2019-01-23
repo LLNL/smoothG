@@ -47,13 +47,13 @@
 
 using namespace smoothg;
 
-mfem::Vector InterpolateToFine(const Upscale& upscale, int level, const mfem::Vector& in)
+mfem::Vector InterpolateToFine(const PDESampler& pdesampler, int level, const mfem::Vector& in)
 {
     mfem::Vector vec1, vec2;
     vec1 = in;
     for (int k = level; k > 0; k--)
     {
-        vec2 = upscale.Interpolate(k, vec1);
+        vec2 = pdesampler.GetHierarchy().Interpolate(k, vec1);
         vec2.Swap(vec1);
     }
     return vec1;
@@ -162,15 +162,13 @@ int main(int argc, char* argv[])
         total_time[level] = 0.0;
     }
 
-    // Create Upscaler
+    // Create Hierarchy
     upscale_param.coarse_factor = 4;
-    auto upscale = std::make_shared<Upscale>(
-                       graph, upscale_param, &partitioning, &ess_attr, W_block);
+    Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
 
-    upscale->PrintInfo();
-    upscale->ShowSetupTime();
+    hierarchy.PrintInfo();
 
-    PDESampler pdesampler(upscale, nDimensions, cell_volume, kappa, seed + myid);
+    PDESampler pdesampler(std::move(hierarchy), nDimensions, cell_volume, kappa, seed + myid);
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)
@@ -186,9 +184,9 @@ int main(int argc, char* argv[])
         for (int i = 0; i < sol_fine.Size(); ++i)
             sol_fine(i) = std::log(sol_fine(i));
         par_orthogonalize_from_constant(sol_fine, graph.VertexStarts().Last());
-        int iterations = upscale->GetSolveIters(0);
+        int iterations = pdesampler.GetHierarchy().GetSolveIters(0);
         total_iterations[0] += iterations;
-        double time = upscale->GetSolveTime(0);
+        double time = pdesampler.GetHierarchy().GetSolveTime(0);
         total_time[0] += time;
         for (int i = 0; i < mean[0].Size(); ++i)
         {
@@ -202,13 +200,13 @@ int main(int argc, char* argv[])
         for (int level = 1; level < num_levels; ++level)
         {
             auto sol_coarse = pdesampler.GetCoefficientForVisualization(level);
-            auto sol_upscaled = InterpolateToFine(*upscale, level, sol_coarse);
+            auto sol_upscaled = InterpolateToFine(pdesampler, level, sol_coarse);
             for (int i = 0; i < sol_upscaled.Size(); ++i)
                 sol_upscaled(i) = std::log(sol_upscaled(i));
             par_orthogonalize_from_constant(sol_upscaled, graph.VertexStarts().Last());
-            iterations = upscale->GetSolveIters(level);
+            iterations = pdesampler.GetHierarchy().GetSolveIters(level);
             total_iterations[level] += iterations;
-            time = upscale->GetSolveTime(level);
+            time = pdesampler.GetHierarchy().GetSolveTime(level);
             total_time[level] += time;
             for (int i = 0; i < mean[level].Size(); ++i)
             {

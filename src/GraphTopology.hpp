@@ -73,16 +73,11 @@ public:
         return *fine_graph_;
     }
 
-    /// Return number of faces in aggregated graph
-    unsigned int NumFaces() const { return face_edge_.NumRows(); }
-    /// Return number of aggregates in coarse graph
-    unsigned int NumAggs() const { return Agg_vertex_.NumRows(); }
-
-    ///@name topology relation tables, connecting aggregates, edges, faces, and vertices
-    ///@{
+    /// aggregate to vertex relation table
     mfem::SparseMatrix Agg_vertex_;
+
+    /// face to edge relation table
     mfem::SparseMatrix face_edge_;
-    ///@}
 
 private:
     const Graph* fine_graph_;

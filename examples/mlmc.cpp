@@ -122,7 +122,6 @@ int main(int argc, char* argv[])
     Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
-    upscale.ShowSetupTime();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
@@ -132,7 +131,7 @@ int main(int argc, char* argv[])
     unique_ptr<MultilevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {
-        std::vector<int> vertex_sizes = upscale.GetVertexSizes();
+        auto vertex_sizes = upscale.GetHierarchy().GetVertexSizes();
         sampler = make_unique<SimpleSampler>(vertex_sizes);
     }
     else if (std::string(sampler_type) == "pde")

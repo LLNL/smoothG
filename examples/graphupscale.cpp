@@ -79,23 +79,23 @@ int main(int argc, char* argv[])
 
     // Using coarse space
     {
-        const auto upscale = Upscale(graph, param);
+        const auto hierarchy = Hierarchy(graph, param);
 
         // Start at Fine Level
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);
 
         // Do work at Coarse Level
-        auto rhs_u_coarse = upscale.Restrict(1, rhs_u_fine);
-        auto sol_u_coarse = upscale.SolveAtLevel(1, rhs_u_coarse);
+        auto rhs_u_coarse = hierarchy.Restrict(0, rhs_u_fine);
+        auto sol_u_coarse = hierarchy.Solve(1, rhs_u_coarse);
 
         // If multiple iterations, reuse vector
         for (int i = 0; i < 5; ++i)
         {
-            upscale.SolveAtLevel(1, rhs_u_coarse, sol_u_coarse);
+            hierarchy.Solve(1, rhs_u_coarse, sol_u_coarse);
         }
 
         // Interpolate back to Fine Level
-        auto sol_u_fine = upscale.Interpolate(1, sol_u_coarse);
+        auto sol_u_fine = hierarchy.Interpolate(1, sol_u_coarse);
 
         graph.WriteVertexVector(sol_u_fine, "sol3.out");
     }
@@ -113,15 +113,12 @@ int main(int argc, char* argv[])
 
         upscale.PrintInfo();
 
-        auto error_info = upscale.ComputeErrors(upscaled_sol, fine_sol, 1);
-
         if (myid == 0)
         {
             std::cout << "Upscale:\n";
             std::cout << "---------------------\n";
-
-            ShowErrors(error_info);
         }
+        upscale.ShowErrors(upscaled_sol, fine_sol, 1);
     }
 
     // Compare Minres vs hybridization solvers

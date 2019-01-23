@@ -108,8 +108,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPVertices()
 
 void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
                                    const mfem::SparseMatrix& agg_vdof,
-                                   const mfem::SparseMatrix& face_edof,
-                                   const mfem::Vector& constant_rep)
+                                   const mfem::SparseMatrix& face_edof)
 {
     const unsigned int num_faces = face_edof.Height();
     const auto& face_Agg = coarse_space_.GetGraph().EdgeToVertex();
@@ -130,7 +129,7 @@ void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
         int num_traces = edge_traces_f.Width();
 
         mfem::Vector local_constant;
-        constant_rep.GetSubVector(local_vdofs, local_constant);
+        constant_rep_.GetSubVector(local_vdofs, local_constant);
 
         edge_traces_f.GetColumnReference(0, PV_trace);
         double oneDpv = Dtransfer.InnerProduct(PV_trace, local_constant);
@@ -297,7 +296,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     // this is Gelever's "ScaleEdgeTargets"
-    NormalizeTraces(const_cast<std::vector<mfem::DenseMatrix>&>(edge_traces_), agg_vdof, face_edof, constant_rep_);
+    NormalizeTraces(const_cast<std::vector<mfem::DenseMatrix>&>(edge_traces_), agg_vdof, face_edof);
 
     if (build_coarse_components)
     {
@@ -582,7 +581,7 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(const MixedMatrix& fine_mgL,
     mfem::Vector coarse_const_rep(Pvertices.NumCols());
     Pvertices.MultTranspose(constant_rep_, coarse_const_rep);
 
-    mfem::Vector agg_sizes(topology_.NumAggs());
+    mfem::Vector agg_sizes(coarse_space_.GetGraph().NumVertices());
     topology_.Agg_vertex_.Mult(fine_mgL.GetVertexSizes(), agg_sizes);
 
     auto tmp = smoothg::Mult(fine_mgL.GetPWConstProj(), Pvertices);
@@ -606,8 +605,8 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
     const mfem::SparseMatrix& agg_face = coarse_space_.GetGraph().VertexToEdge();
     const mfem::SparseMatrix& face_agg = coarse_space_.GetGraph().EdgeToVertex();
 
-    const int num_aggs = topology_.NumAggs();
-    const int num_faces = topology_.NumFaces();
+    const int num_aggs = agg_face.NumRows();
+    const int num_faces = agg_face.NumCols();
 
     mfem::SparseMatrix Q_edge(agg_edof.NumCols(), coarse_D_->NumCols());
     mfem::DenseMatrix Q_i;

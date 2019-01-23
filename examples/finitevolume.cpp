@@ -119,7 +119,6 @@ int main(int argc, char* argv[])
     Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
-    upscale.ShowSetupTime();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();

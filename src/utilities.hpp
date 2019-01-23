@@ -69,75 +69,7 @@ struct mpi_session
 };
 
 class MixedMatrix;
-class Mixed_GL_Coarsener;
 class MixedLaplacianSolver;
-
-/**
-   @brief Collect information about upscaling process for systematic output.
-
-   This class is convenience code shared between generalgraph.cpp and
-   finitevolume.cpp, to keep track of error metrics, timings, and some other
-   information and to output it in a machine-readable way that
-   facilitates automated testing.
-
-   @todo Actually populate ndofs
-   @todo make the enum { TOPOLOGY = 0, COARSENING, SOLVER } a public typedef
-*/
-class UpscalingStatistics
-{
-public:
-    UpscalingStatistics(int nLevels);
-    ~UpscalingStatistics();
-
-    /// given vector of solutions on various levels, calculate upscaling errors
-    void ComputeErrorSquare(int k,
-                            const std::vector<MixedMatrix>& mgL,
-                            const Mixed_GL_Coarsener& mgLc,
-                            const std::vector<std::unique_ptr<mfem::BlockVector> >& sol);
-
-    /// Output upscaling information on master processor's stdout
-    void PrintStatistics(MPI_Comm comm,
-                         picojson::object& serialize);
-
-    /// Record iterations, norms, etc from linear solver in this object
-    void RegisterSolve(const MixedLaplacianSolver& solver, int level);
-
-    /**
-       Return the solution on a coarse level, interpolated to the
-       finest level, often for visualization purposes.
-
-       This interpolation is done in ComputeErrorSquare(), so whatever
-       solution is calculated then is what is returned here.
-    */
-    const mfem::BlockVector& GetInterpolatedSolution();
-
-    ///@name Routines to handle timing of different stages of example codes
-    ///@{
-    void BeginTiming();
-    void EndTiming(int level, int stage);
-    double GetTiming(int level, int stage);
-    ///@}
-private:
-    const int NSTAGES = 3;
-    mfem::DenseMatrix timings_;
-    mfem::DenseMatrix sigma_weighted_l2_error_square_;
-    mfem::DenseMatrix u_l2_error_square_;
-    mfem::DenseMatrix Dsigma_l2_error_square_;
-    std::vector<std::unique_ptr<mfem::BlockVector> > help_;
-
-    mfem::Array<int> iter_;
-    mfem::Array<int> ndofs_;
-    mfem::Array<int> nnzs_;
-
-    mfem::StopWatch chrono_; // should probably have one for each STAGE?
-};
-
-/// Use GLVis to visualize finite volume solution
-void VisualizeSolution(int k,
-                       mfem::ParFiniteElementSpace* sigmafespace,
-                       mfem::ParFiniteElementSpace* ufespace,
-                       const mfem::SparseMatrix& D,
-                       const mfem::BlockVector& sol);
 
 class GraphTopology;
 

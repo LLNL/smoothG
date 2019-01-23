@@ -92,10 +92,10 @@ int main(int argc, char* argv[])
     auto graph_topos = MultilevelGraphTopology(graph, num_levels, coarsening_factor);
 
     // Visualize aggregates in all levels
-//    if (visualization)
-//    {
-//        ShowAggregates(graph_topos, pmesh.get());
-//    }
+    //    if (visualization)
+    //    {
+    //        ShowAggregates(graph_topos, pmesh.get());
+    //    }
 
     return EXIT_SUCCESS;
 }

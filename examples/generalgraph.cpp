@@ -167,9 +167,7 @@ int main(int argc, char* argv[])
     {
         /// [Upscale]
         Upscale upscale(graph, upscale_param, &partitioning);
-
         upscale.PrintInfo();
-        upscale.ShowSetupTime();
         /// [Upscale]
 
         mfem::Vector rhs_u_fine;
@@ -177,7 +175,7 @@ int main(int argc, char* argv[])
         /// [Right Hand Side]
         if (generate_graph || generate_fiedler)
         {
-            rhs_u_fine = ComputeFiedlerVector(upscale.GetMatrix(0));
+            rhs_u_fine = ComputeFiedlerVector(upscale.GetHierarchy().GetMatrix(0));
         }
         else
         {

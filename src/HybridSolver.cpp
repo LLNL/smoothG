@@ -119,8 +119,8 @@ void HybridSolver::Init(
 }
 
 void HybridSolver::CreateMultiplierRelations(
-        const mfem::SparseMatrix& face_edgedof,
-        const mfem::HypreParMatrix& edgedof_d_td)
+    const mfem::SparseMatrix& face_edgedof,
+    const mfem::HypreParMatrix& edgedof_d_td)
 {
     // Constructing the relation table (in SparseMatrix format) between edge
     // dof and multiplier dof. For every edge dof that is associated with a
