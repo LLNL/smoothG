@@ -22,7 +22,6 @@
 
 #include "utilities.hpp"
 #include "MatrixUtilities.hpp"
-#include "SpectralAMG_MGL_Coarsener.hpp"
 #include "MixedLaplacianSolver.hpp"
 
 using std::unique_ptr;

@@ -47,7 +47,7 @@ public:
        @param w_block the W matrix in the saddle-point system. If not provided,
               it will assumed to be zero
     */
-    Upscale(const Graph& graph,
+    Upscale(Graph graph,
             const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,

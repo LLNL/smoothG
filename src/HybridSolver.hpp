@@ -36,7 +36,6 @@
 #include "LocalMixedGraphSpectralTargets.hpp"
 #include "utilities.hpp"
 #include "MixedLaplacianSolver.hpp"
-#include "Mixed_GL_Coarsener.hpp"
 #include "MixedMatrix.hpp"
 
 #if SMOOTHG_USE_SAAMGE

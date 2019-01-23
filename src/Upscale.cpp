@@ -25,13 +25,13 @@
 namespace smoothg
 {
 
-Upscale::Upscale(const Graph& graph,
+Upscale::Upscale(Graph graph,
                  const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning,
                  const mfem::Array<int>* ess_attr,
                  const mfem::SparseMatrix& w_block)
     : Operator(graph.NumVertices()), comm_(graph.GetComm()),
-      hierarchy_(graph, param, partitioning, ess_attr, w_block),
+      hierarchy_(std::move(graph), param, partitioning, ess_attr, w_block),
       rhs_(param.max_levels), sol_(param.max_levels)
 {
     MPI_Comm_rank(comm_, &myid_);

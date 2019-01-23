@@ -19,18 +19,18 @@
 */
 
 #include "Hierarchy.hpp"
+#include "GraphCoarsen.hpp"
 #include <iostream>
 #include <fstream>
 
 namespace smoothg
 {
 
-Hierarchy::Hierarchy(const Graph& graph,
+Hierarchy::Hierarchy(MixedMatrix mixed_system,
                      const UpscaleParameters& param,
                      const mfem::Array<int>* partitioning,
-                     const mfem::Array<int>* ess_attr,
-                     const mfem::SparseMatrix& w_block)
-    : comm_(graph.GetComm()),
+                     const mfem::Array<int>* ess_attr)
+    : comm_(mixed_system.GetComm()),
       solvers_(param.max_levels),
       setup_time_(0.0),
       ess_attr_(ess_attr),
@@ -42,7 +42,7 @@ Hierarchy::Hierarchy(const Graph& graph,
     MPI_Comm_rank(comm_, &myid_);
 
     mixed_systems_.reserve(param_.max_levels);
-    mixed_systems_.emplace_back(graph, w_block);
+    mixed_systems_.push_back(std::move(mixed_system));
     MakeSolver(0);
 
     for (int level = 0; level < param_.max_levels - 1; ++level)

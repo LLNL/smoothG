@@ -52,11 +52,17 @@ public:
        @param w_block the W matrix in the saddle-point system. If not provided,
               it will assumed to be zero
     */
-    Hierarchy(const Graph& graph,
+    Hierarchy(Graph graph,
               const UpscaleParameters& param = UpscaleParameters(),
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr,
-              const mfem::SparseMatrix& w_block = SparseIdentity(0));
+              const mfem::SparseMatrix& w_block = SparseIdentity(0))
+        : Hierarchy(MixedMatrix(std::move(graph), w_block), param, partitioning, ess_attr) {}
+
+    Hierarchy(MixedMatrix mixed_system,
+              const UpscaleParameters& param = UpscaleParameters(),
+              const mfem::Array<int>* partitioning = nullptr,
+              const mfem::Array<int>* ess_attr = nullptr);
 
     /// Multiply mixed system of a given level to the given vector
     virtual void Mult(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;

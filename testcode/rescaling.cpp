@@ -21,9 +21,6 @@
 
 #include "../examples/pde.hpp"
 
-#include "../src/SpectralAMG_MGL_Coarsener.hpp"
-#include "../src/MetisGraphPartitioner.hpp"
-
 using namespace smoothg;
 using std::unique_ptr;
 
