@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
     upscale.PrintInfo();
     upscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
+    mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = -1.0 * fv_problem.CellVolume();
 
@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
         std::cout << "\n";
     }
 
-    mfem::BlockVector rhs(upscale.GetBlockVector(0));
+    mfem::BlockVector rhs(upscale.BlockOffsets(0));
     rhs.GetBlock(0) = 0.0;
     rhs.GetBlock(1) = fv_problem.GetVertexRHS();
 
@@ -220,7 +220,7 @@ int main(int argc, char* argv[])
     chrono.Clear();
     chrono.Start();
 
-    mfem::BlockVector sol_picard(upscale.GetBlockVector(0));
+    mfem::BlockVector sol_picard(upscale.BlockOffsets(0));
     sol_picard = 0.0;
 
     SingleLevelSolver sls(upscale, 0, Picard);
@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
     chrono.Clear();
     chrono.Start();
 
-    mfem::BlockVector sol_nlmg(upscale.GetBlockVector(0));
+    mfem::BlockVector sol_nlmg(upscale.BlockOffsets(0));
     sol_nlmg = 0.0;
     NonlinearEllipticHierarchy hierarchy(upscale, Picard);
     NonlinearMG nlmg(hierarchy, V_CYCLE);

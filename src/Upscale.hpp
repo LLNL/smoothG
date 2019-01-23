@@ -51,9 +51,10 @@ public:
             const UpscaleParameters& param = UpscaleParameters(),
             const mfem::Array<int>* partitioning = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
-            const mfem::SparseMatrix& w_block = SparseIdentity(0));
+            const mfem::SparseMatrix& w_block = SparseIdentity(0))
+        : Upscale(Hierarchy(std::move(graph), param, partitioning, ess_attr, w_block)) {}
 
-    Upscale(Hierarchy hierarchy) : hierarchy_(std::move(hierarchy)) { }
+    Upscale(Hierarchy hierarchy);
 
     /**
        @brief Apply the upscaling.
@@ -82,13 +83,7 @@ public:
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
 
     /// Get block offsets for sigma, u blocks of mixed form dofs
-    void BlockOffsets(int level, mfem::Array<int>& offsets) const;
-
-    /// Create an appropriately sized vertex-space vector
-    mfem::Vector GetVector(int level) const;
-
-    /// Create an approritately sized mixed form vector
-    mfem::BlockVector GetBlockVector(int level) const;
+    const mfem::Array<int>& BlockOffsets(int level) const;
 
     // Get hierarchy of mixed systems
     const Hierarchy& GetHierarchy() const { return hierarchy_; }
@@ -116,19 +111,13 @@ public:
 
 protected:
 
-    void MakeVectors(int level)
-    {
-        rhs_[level] = make_unique<mfem::BlockVector>(hierarchy_.GetMatrix(level).GetBlockOffsets());
-        sol_[level] = make_unique<mfem::BlockVector>(hierarchy_.GetMatrix(level).GetBlockOffsets());
-    }
-
     MPI_Comm comm_;
     int myid_;
 
     Hierarchy hierarchy_;
 
-    std::vector<std::unique_ptr<mfem::BlockVector> > rhs_;
-    std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
+    mutable std::vector<mfem::BlockVector> rhs_;
+    mutable std::vector<mfem::BlockVector> sol_;
 private:
     void SetOperator(const mfem::Operator& op) {}
 };

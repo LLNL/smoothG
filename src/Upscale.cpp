@@ -25,49 +25,47 @@
 namespace smoothg
 {
 
-Upscale::Upscale(Graph graph,
-                 const UpscaleParameters& param,
-                 const mfem::Array<int>* partitioning,
-                 const mfem::Array<int>* ess_attr,
-                 const mfem::SparseMatrix& w_block)
-    : Operator(graph.NumVertices()), comm_(graph.GetComm()),
-      hierarchy_(std::move(graph), param, partitioning, ess_attr, w_block),
-      rhs_(param.max_levels), sol_(param.max_levels)
+Upscale::Upscale(Hierarchy hierarchy)
+    : Operator(hierarchy.GetMatrix(0).GetNumVertexDofs()),
+      comm_(hierarchy.GetMatrix(0).GetComm()), hierarchy_(std::move(hierarchy))
 {
     MPI_Comm_rank(comm_, &myid_);
 
-    for (int level = 0; level < param.max_levels; ++level)
+    rhs_.reserve(hierarchy_.NumLevels());
+    sol_.reserve(hierarchy_.NumLevels());
+    for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
-        MakeVectors(level);
+        rhs_.emplace_back(hierarchy_.GetMatrix(level).GetBlockOffsets());
+        sol_.emplace_back(hierarchy_.GetMatrix(level).GetBlockOffsets());
     }
 }
 
 void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     // restrict right-hand-side x
-    rhs_[0]->GetBlock(1) = x;
+    rhs_[0].GetBlock(1) = x;
     for (int i = 0; i < level; ++i)
     {
-        hierarchy_.Restrict(i, rhs_[i]->GetBlock(1), rhs_[i + 1]->GetBlock(1));
+        hierarchy_.Restrict(i, rhs_[i].GetBlock(1), rhs_[i + 1].GetBlock(1));
     }
 
     // solve
     if (level > 0)
     {
-        rhs_[level]->GetBlock(1) *= -1.0;
+        rhs_[level].GetBlock(1) *= -1.0;
     }
-    hierarchy_.Solve(level, rhs_[level]->GetBlock(1), sol_[level]->GetBlock(1));
+    hierarchy_.Solve(level, rhs_[level].GetBlock(1), sol_[level].GetBlock(1));
     if (level == 0)
     {
-        sol_[level]->GetBlock(1) *= -1.0;
+        sol_[level].GetBlock(1) *= -1.0;
     }
 
     // interpolate solution
     for (int i = level; i > 0; --i)
     {
-        hierarchy_.Interpolate(i, sol_[i]->GetBlock(1), sol_[i - 1]->GetBlock(1));
+        hierarchy_.Interpolate(i, sol_[i].GetBlock(1), sol_[i - 1].GetBlock(1));
     }
-    y = sol_[0]->GetBlock(1);
+    y = sol_[0].GetBlock(1);
 }
 
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
@@ -92,52 +90,37 @@ mfem::Vector Upscale::Solve(int level, const mfem::Vector& x) const
 void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
 {
     // restrict right-hand-side x
-    *rhs_[0] = x;
+    rhs_[0] = x;
     for (int i = 0; i < level; ++i)
     {
-        hierarchy_.Restrict(i, *rhs_[i], * rhs_[i + 1]);
+        hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
     }
 
     // solve
-    rhs_[level]->GetBlock(1) *= -1.0; // for reasons I do not fully understand
+    rhs_[level].GetBlock(1) *= -1.0; // for reasons I do not fully understand
 
-    hierarchy_.Solve(level, *rhs_[level], *sol_[level]);
+    hierarchy_.Solve(level, rhs_[level], sol_[level]);
 
     // interpolate solution
     for (int i = level; i > 0; --i)
     {
-        hierarchy_.Interpolate(i, *sol_[i], *sol_[i - 1]);
+        hierarchy_.Interpolate(i, sol_[i], sol_[i - 1]);
     }
-    y = *sol_[0];
+    y = sol_[0];
 }
 
 mfem::BlockVector Upscale::Solve(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetBlockVector(0));
+    mfem::BlockVector y(BlockOffsets(0));
 
     Solve(level, x, y);
 
     return y;
 }
 
-void Upscale::BlockOffsets(int level, mfem::Array<int>& offsets) const
+const mfem::Array<int>& Upscale::BlockOffsets(int level) const
 {
-    hierarchy_.GetMatrix(level).GetBlockOffsets().Copy(offsets);
-}
-
-mfem::Vector Upscale::GetVector(int level) const
-{
-    const auto& offsets = hierarchy_.GetMatrix(level).GetBlockOffsets();
-    const int vsize = offsets[2] - offsets[1];
-
-    return mfem::Vector(vsize);
-}
-
-mfem::BlockVector Upscale::GetBlockVector(int level) const
-{
-    const auto& offsets = hierarchy_.GetMatrix(level).GetBlockOffsets();
-
-    return mfem::BlockVector(offsets);
+    return hierarchy_.GetMatrix(level).GetBlockOffsets();
 }
 
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,

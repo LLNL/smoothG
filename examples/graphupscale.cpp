@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     {
         const auto upscale = Upscale(graph, param);
 
-        mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
+        mfem::BlockVector fine_rhs(upscale.BlockOffsets(0));
         fine_rhs.GetBlock(0) = 0.0;
         fine_rhs.GetBlock(1) = graph.ReadVertexVector(rhs_filename);
 
