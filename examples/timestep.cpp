@@ -124,42 +124,22 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     mfem::SparseMatrix W_block = SparseIdentity(graph.VertexToEdge().Height());
-    const double cell_volume = spe10problem.CellVolume();
-    W_block *= cell_volume / delta_t;     // W_block = Mass matrix / delta_t
-
-    //W_block *= 1.0 / delta_t;
+    W_block *= spe10problem.CellVolume() / delta_t;     // Mass matrix / delta_t
 
     // Time Stepping
     {
         Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
-
         hierarchy.PrintInfo();
-
-        // Input Vectors
-        mfem::BlockVector fine_rhs(hierarchy.GetMatrix(0).GetBlockOffsets());
-        fine_rhs = 0.0;
 
         // Set some pressure initial condition
         mfem::BlockVector fine_u(hierarchy.GetMatrix(0).GetBlockOffsets());
         fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace
-        mfem::BlockVector tmp(hierarchy.GetMatrix(k).GetBlockOffsets());
-        tmp = 0.0;
-
         mfem::BlockVector work_rhs(hierarchy.GetMatrix(k).GetBlockOffsets());
-        mfem::BlockVector work_u(hierarchy.GetMatrix(k).GetBlockOffsets());
+        work_rhs = 0.0;
 
-        if (k == 0)
-        {
-            work_rhs = fine_rhs;
-            work_u = fine_u;
-        }
-        else
-        {
-            hierarchy.Restrict(0, fine_u, work_u);
-            hierarchy.Restrict(0, fine_rhs, work_rhs);
-        }
+        mfem::BlockVector work_u = k == 0 ? fine_u : hierarchy.Restrict(0, fine_u);
 
         const mfem::SparseMatrix* W = hierarchy.GetMatrix(k).GetW();
         assert(W);
@@ -173,8 +153,6 @@ int main(int argc, char* argv[])
                                   std::fabs(initial_val), caption);
         }
 
-        hierarchy.ShowSetupTime();
-
         double time = 0.0;
         int count = 0;
 
@@ -183,12 +161,12 @@ int main(int argc, char* argv[])
 
         while (time < total_time)
         {
-            W->Mult(work_u.GetBlock(1), tmp.GetBlock(1));
+            W->Mult(work_u.GetBlock(1), work_rhs.GetBlock(1));
 
             //tmp += work_rhs; // RHS is zero for now
-            tmp *= -1.0;
+            work_rhs *= -1.0;
 
-            hierarchy.Solve(0, tmp, work_u);
+            hierarchy.Solve(k, work_rhs, work_u);
 
             if (myid == 0)
             {
