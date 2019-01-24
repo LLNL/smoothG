@@ -31,16 +31,6 @@ using std::unique_ptr;
 
 using namespace smoothg;
 
-void InitialCondition(mfem::ParFiniteElementSpace& ufespace, mfem::BlockVector& fine_u,
-                      double initial_val);
-
-void VisSetup(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-              mfem::ParMesh& pmesh,
-              double range = 1.0, const std::string& caption = "");
-
-void VisUpdate(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-               mfem::ParMesh& pmesh);
-
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -246,63 +236,4 @@ int main(int argc, char* argv[])
     }
 
     return 0;
-}
-
-
-
-void VisSetup(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-              mfem::ParMesh& pmesh,
-              double range, const std::string& caption)
-{
-    const char vishost[] = "localhost";
-    const int  visport   = 19916;
-    vis_v.open(vishost, visport);
-    vis_v.precision(8);
-
-    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
-    vis_v << "solution\n" << pmesh << field;
-    vis_v << "window_size 500 800\n";
-    vis_v << "window_title 'pressure'\n";
-    vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
-    vis_v << "valuerange " << -std::fabs(range) << " " << std::fabs(range) <<
-          "\n"; // update value-range; keep mesh-extents fixed
-
-    if (pmesh.SpaceDimension() == 2)
-    {
-        vis_v << "view 0 0\n"; // view from top
-        vis_v << "keys jl\n";  // turn off perspective and light
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-    }
-    else
-    {
-        vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
-        //vis_v << "keys IYYYYY\n";  // cut and rotate
-    }
-
-    vis_v << "keys c\n";         // show colorbar and mesh
-    //vis_v << "pause\n"; // Press space to play!
-
-    if (!caption.empty())
-    {
-        vis_v << "plot_caption '" << caption << "'\n";
-    }
-
-    MPI_Barrier(comm);
-
-    vis_v << "keys S\n";         //Screenshot
-
-    MPI_Barrier(comm);
-}
-
-void VisUpdate(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-               mfem::ParMesh& pmesh)
-{
-    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
-    vis_v << "solution\n" << pmesh << field;
-
-    MPI_Barrier(comm);
-
-    vis_v << "keys S\n";         //Screenshot
-
-    MPI_Barrier(comm);
 }
