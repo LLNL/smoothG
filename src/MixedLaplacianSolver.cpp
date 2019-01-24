@@ -38,17 +38,17 @@ void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector
 
 void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
-    rhs_.GetBlock(0) = 0.0;
-    rhs_.GetBlock(1) = rhs;
-
-    Solve(rhs_, sol_);
-
-    sol = sol_.GetBlock(1);
+    Mult(rhs, sol);
 }
 
 void MixedLaplacianSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
-    Solve(rhs, sol);
+    rhs_.GetBlock(0) = 0.0;
+    rhs_.GetBlock(1) = rhs;
+
+    Mult(rhs_, sol_);
+
+    sol = sol_.GetBlock(1);
 }
 
 void MixedLaplacianSolver::Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr)
@@ -57,18 +57,12 @@ void MixedLaplacianSolver::Init(const MixedMatrix& mgL, const mfem::Array<int>* 
     const_rep_ = &(mgL.GetConstantRep());
     if (ess_attr)
     {
-        for (int i = 0; i < ess_attr->Size(); ++i)
-        {
-            if ((*ess_attr)[i] == 0) // if Dirichlet pressure boundary is not empty
-            {
-                remove_one_dof_ = false;
-                break;
-            }
-        }
         assert(mgL.GetGraph().HasBoundary());
-        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
+        ess_edofs_.SetSize(mgL.GetNumEdgeDofs(), 0);
         BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
-        ess_edofs_.SetSize(sol_.BlockSize(0));
+        ess_edofs_.SetSize(mgL.GetNumEdgeDofs());
+
+        remove_one_dof_ = (ess_attr->Find(0) == -1); // all attributes are essential
     }
 }
 

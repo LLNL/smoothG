@@ -141,7 +141,7 @@ public:
     mfem::Vector& GetCoefficient(int level);
 
     /// Only for debugging/visualization, most users should use GetCoefficient
-    mfem::Vector& GetCoefficientForVisualization(int level);
+    mfem::Vector GetCoefficientForVisualization(int level);
 
     const Hierarchy& GetHierarchy() const { return hierarchy_; }
 

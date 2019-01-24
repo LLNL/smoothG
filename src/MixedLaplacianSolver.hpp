@@ -49,7 +49,7 @@ public:
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
     ///@name Set solver parameters
     ///@{

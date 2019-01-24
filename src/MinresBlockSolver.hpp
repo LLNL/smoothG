@@ -125,6 +125,8 @@ public:
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
 
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+
 private:
     const MixedMatrix& mixed_matrix_;
 };

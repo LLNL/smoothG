@@ -192,16 +192,16 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Clear();
     chrono.Start();
 
-    double rhs0 = rhs[0];
+    double rhs0 = rhs.GetBlock(1)[0];
 
     if (!W_is_nonzero_ && remove_one_dof_ && myid_ == 0)
     {
-        const_cast<mfem::Vector&>(rhs.GetBlock(1))(0) = 0.0;
+        const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = 0.0;
     }
 
     minres_.Mult(rhs_, sol);
 
-    const_cast<mfem::Vector&>(rhs.GetBlock(1))(0) = rhs0;
+    const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 
     if (!W_is_nonzero_ && remove_one_dof_)
     {
@@ -256,6 +256,16 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
 
     edof_trueedof.Mult(sol_.GetBlock(0), sol.GetBlock(0));
     sol.GetBlock(1) = sol_.GetBlock(1);
+}
+
+void MinresBlockSolverFalse::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const
+{
+    rhs_.GetBlock(0) = 0.0;
+    rhs_.GetBlock(1) = rhs;
+
+    MinresBlockSolver::Mult(rhs_, sol_);
+
+    sol = sol_.GetBlock(1);
 }
 
 void MinresBlockSolver::SetPrintLevel(int print_level)

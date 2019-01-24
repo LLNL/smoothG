@@ -96,7 +96,7 @@ void PDESampler::Initialize(int dimension, double kappa)
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
         num_aggs_[level] = hierarchy_.NumVertices(level);
-        rhs_[level].SetSize(hierarchy_.GetMatrix(level).GetD().Height());
+        rhs_[level].SetSize(hierarchy_.GetMatrix(level).GetNumVertexDofs());
         coefficient_[level].SetSize(num_aggs_[level]);
     }
 
@@ -127,6 +127,11 @@ void PDESampler::NewSample()
         rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) *
                      normal_distribution_.Sample();
     }
+
+    for (int level = 0; level < hierarchy_.NumLevels() - 1; ++level)
+    {
+        hierarchy_.Restrict(level, rhs_[level], rhs_[level + 1]);
+    }
 }
 
 /**
@@ -150,16 +155,12 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
     MFEM_ASSERT(sampled_,
                 "PDESampler object in wrong state (call NewSample() first)!");
 
-    for (int k = 0; k < level; ++k)
-    {
-        hierarchy_.Restrict(k, rhs_[k], rhs_[k + 1]);
-    }
     mfem::Vector coarse_sol = hierarchy_.Solve(level, rhs_[level]);
 
     // coarse solution projected to piece-wise constant on aggregates
     mfem::Vector pw1_coarse_sol = hierarchy_.PWConstProject(level, coarse_sol);
 
-    for (int i = 0; i < coefficient_[level].Size(); ++i)
+    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
     {
         coefficient_[level](i) = std::exp(pw1_coarse_sol(i));
     }
@@ -167,15 +168,13 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
     return coefficient_[level];
 }
 
-mfem::Vector& PDESampler::GetCoefficientForVisualization(int level)
+mfem::Vector PDESampler::GetCoefficientForVisualization(int level)
 {
     // coarse solution projected to piece-wise constant on aggregates
     mfem::Vector pw1_coarse_sol = GetCoefficient(level);
 
     // interpolate piece-wise constant function to vertex space
-    coefficient_[level] = hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);
-
-    return coefficient_[level];
+    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;
 }
 
 }

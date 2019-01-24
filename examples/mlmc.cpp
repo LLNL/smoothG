@@ -120,7 +120,6 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
-
     upscale.PrintInfo();
 
     mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
