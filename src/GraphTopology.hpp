@@ -42,45 +42,30 @@ public:
        @brief Build agglomerated topology relation tables of a given graph
 
        All of this data is local to a single processor
-
-       @param graph graph oject containing vertex edge relation
     */
-    GraphTopology(const Graph& fine_graph);
+    GraphTopology() = default;
 
     /**
-       @brief Move constructor
-    */
-    GraphTopology(GraphTopology&& graph_topology) noexcept;
-
-    /**
-       @brief Coarsen fine graph
+       @brief Coarsen a given graph
+       @param fine_graph graph to be coarsened
        @param coarsening_factor intended number of vertices in an aggregate
        @return coarse graph
     */
-    Graph Coarsen(int coarsening_factor);
+    Graph Coarsen(const Graph& fine_graph, int coarsening_factor);
 
     /**
-       @brief Coarsen fine graph
+       @brief Coarsen a given graph
+       @param fine_graph graph to be coarsened
        @param partitioning partitioning vector for vertices
        @return coarse graph
     */
-    Graph Coarsen(const mfem::Array<int>& partitioning);
-
-    /// Getter for fine graph
-    const Graph& FineGraph() const
-    {
-        assert(fine_graph_);
-        return *fine_graph_;
-    }
+    Graph Coarsen(const Graph& fine_graph, const mfem::Array<int>& partitioning);
 
     /// aggregate to vertex relation table
     mfem::SparseMatrix Agg_vertex_;
 
     /// face to edge relation table
     mfem::SparseMatrix face_edge_;
-
-private:
-    const Graph* fine_graph_;
 }; // class GraphTopology
 
 } // namespace smoothg

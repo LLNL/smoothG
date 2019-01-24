@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
-    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
+    Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
 

@@ -30,10 +30,9 @@
 
 using namespace smoothg;
 
-std::vector<GraphTopology> MultilevelGraphTopology(
-    const Graph& graph, int num_levels, int coarsening_factor);
-
-void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh);
+void ShowAggregates(const std::vector<Graph>& graphs,
+                    const std::vector<GraphTopology>& topos,
+                    mfem::ParMesh* pmesh);
 
 int main(int argc, char* argv[])
 {
@@ -86,103 +85,93 @@ int main(int argc, char* argv[])
 
     // Construct a graph from a finite volume problem defined on the mesh
     DarcyProblem spe10problem(*pmesh, ess_attr);
-    Graph graph = spe10problem.GetFVGraph();
 
     // Build multilevel graph topology
-    auto graph_topos = MultilevelGraphTopology(graph, num_levels, coarsening_factor);
+    std::vector<GraphTopology> topologies(num_levels - 1);
+
+    std::vector<Graph> graphs;
+    graphs.reserve(num_levels);
+    graphs.push_back(spe10problem.GetFVGraph());
+
+    for (int i = 0; i < num_levels - 1; i++)
+    {
+        graphs.push_back(topologies[i].Coarsen(graphs[i], coarsening_factor));
+    }
 
     // Visualize aggregates in all levels
-    //    if (visualization)
-    //    {
-    //        ShowAggregates(graph_topos, pmesh.get());
-    //    }
+    if (visualization)
+    {
+        ShowAggregates(graphs, topologies, pmesh.get());
+    }
 
     return EXIT_SUCCESS;
 }
 
-std::vector<GraphTopology> MultilevelGraphTopology(
-    const Graph& graph, int num_levels, int coarsening_factor)
+void ShowAggregates(const std::vector<Graph>& graphs,
+                    const std::vector<GraphTopology>& topos,
+                    mfem::ParMesh* pmesh)
 {
-    std::vector<GraphTopology> topologies;
-    topologies.reserve(num_levels - 1);
+    mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
+    mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
+    mfem::ParGridFunction attr(&attr_fespace);
 
-    std::vector<Graph> graphs;
-    graphs.reserve(num_levels);
-    graphs.push_back(graph);
-
-    // Construct coarser levels graph topology by recursion
-    for (int i = 0; i < num_levels - 1; i++)
+    mfem::socketstream sol_sock;
+    for (unsigned int i = 0; i < topos.size(); i++)
     {
-        topologies.emplace_back(graphs[i]);
-        graphs.push_back(topologies.back().Coarsen(coarsening_factor));
+        // Compute partitioning vector on level i+1
+        mfem::SparseMatrix Agg_vertex = topos[0].Agg_vertex_;
+        for (unsigned int j = 1; j < i + 1; j++)
+        {
+            auto tmp = smoothg::Mult(topos[j].Agg_vertex_, Agg_vertex);
+            Agg_vertex.Swap(tmp);
+        }
+        auto vertex_Agg = smoothg::Transpose(Agg_vertex);
+        int* partitioning = vertex_Agg.GetJ();
+
+        // Make better coloring (better with serial run)
+        mfem::SparseMatrix Agg_Agg = AAt(graphs[i + 1].VertexToEdge());
+        mfem::Array<int> colors;
+        GetElementColoring(colors, Agg_Agg);
+        const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());
+
+        for (int j = 0; j < vertex_Agg.Height(); j++)
+        {
+            attr(j) = (colors[partitioning[j]] + pmesh->GetMyRank()) % num_colors;
+        }
+
+        char vishost[] = "localhost";
+        int  visport   = 19916;
+        sol_sock.open(vishost, visport);
+        if (sol_sock.is_open())
+        {
+            sol_sock.precision(8);
+            sol_sock << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
+            if (pmesh->SpaceDimension() == 2)
+            {
+                sol_sock << "fem2d_gf_data_keys\n";
+            }
+            else
+            {
+                sol_sock << "fem3d_gf_data_keys\n";
+            }
+
+            pmesh->PrintWithPartitioning(partitioning, sol_sock, 0);
+            attr.Save(sol_sock);
+
+            sol_sock << "window_size 500 800\n";
+            sol_sock << "window_title 'Level " << i + 1 << " aggregation'\n";
+            if (pmesh->SpaceDimension() == 2)
+            {
+                sol_sock << "view 0 0\n"; // view from top
+                sol_sock << "keys jl\n";  // turn off perspective and light
+                sol_sock << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+                sol_sock << "keys b\n";  // draw interface
+            }
+            else
+            {
+                sol_sock << "keys ]]]]]]]]]]]]]\n";  // increase size
+            }
+            MPI_Barrier(pmesh->GetComm());
+        }
     }
-
-    return topologies;
 }
-
-//void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)
-//{
-//    mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
-//    mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
-//    mfem::ParGridFunction attr(&attr_fespace);
-
-//    mfem::socketstream sol_sock;
-//    for (unsigned int i = 0; i < graph_topos.size(); i++)
-//    {
-//        // Compute partitioning vector on level i+1
-//        mfem::SparseMatrix Agg_vertex = graph_topos[0].Agg_vertex_;
-//        for (unsigned int j = 1; j < i + 1; j++)
-//        {
-//            auto tmp = smoothg::Mult(graph_topos[j].Agg_vertex_, Agg_vertex);
-//            Agg_vertex.Swap(tmp);
-//        }
-//        auto vertex_Agg = smoothg::Transpose(Agg_vertex);
-//        int* partitioning = vertex_Agg.GetJ();
-
-//        // Make better coloring (better with serial run)
-//        mfem::SparseMatrix Agg_Agg = AAt(graph_topos[i].CoarseGraph().VertexToEdge());
-//        mfem::Array<int> colors;
-//        GetElementColoring(colors, Agg_Agg);
-//        const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());
-
-//        for (int j = 0; j < vertex_Agg.Height(); j++)
-//        {
-//            attr(j) = (colors[partitioning[j]] + pmesh->GetMyRank()) % num_colors;
-//        }
-
-//        char vishost[] = "localhost";
-//        int  visport   = 19916;
-//        sol_sock.open(vishost, visport);
-//        if (sol_sock.is_open())
-//        {
-//            sol_sock.precision(8);
-//            sol_sock << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
-//            if (pmesh->SpaceDimension() == 2)
-//            {
-//                sol_sock << "fem2d_gf_data_keys\n";
-//            }
-//            else
-//            {
-//                sol_sock << "fem3d_gf_data_keys\n";
-//            }
-
-//            pmesh->PrintWithPartitioning(partitioning, sol_sock, 0);
-//            attr.Save(sol_sock);
-
-//            sol_sock << "window_size 500 800\n";
-//            sol_sock << "window_title 'Level " << i + 1 << " aggregation'\n";
-//            if (pmesh->SpaceDimension() == 2)
-//            {
-//                sol_sock << "view 0 0\n"; // view from top
-//                sol_sock << "keys jl\n";  // turn off perspective and light
-//                sol_sock << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-//                sol_sock << "keys b\n";  // draw interface
-//            }
-//            else
-//            {
-//                sol_sock << "keys ]]]]]]]]]]]]]\n";  // increase size
-//            }
-//            MPI_Barrier(pmesh->GetComm());
-//        }
-//    }
-//}

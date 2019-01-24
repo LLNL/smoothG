@@ -92,7 +92,7 @@ public:
 LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     :
     n_(graph.GetN()),
-    graph_topology_(graph.GetGraph()),
+    graph_topology_(),
     face_identity_(SparseIdentity(partitions - 1))
 {
     mfem::SparseMatrix face_edge(partitions - 1, n_ - 1);

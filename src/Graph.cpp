@@ -84,7 +84,13 @@ Graph::Graph(mfem::SparseMatrix edge_vertex_local,
     vertex_starts.Copy(vertex_starts_);
     edge_starts.Copy(edge_starts_);
 
-    Init(edge_bdratt);
+    if (edge_bdratt != nullptr)
+    {
+        mfem::SparseMatrix tmp(*edge_bdratt);
+        edge_bdratt_.Swap(tmp);
+    }
+
+    vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
 }
 
 Graph::Graph(const Graph& other) noexcept

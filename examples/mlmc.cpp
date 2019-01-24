@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
-    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
+    Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
     upscale.PrintInfo();
 
     mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
@@ -138,7 +138,8 @@ int main(int argc, char* argv[])
         const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
                       nDimensions, spe10problem.CellVolume(), kappa, seed,
-                      graph, partitioning, ess_attr, upscale_param);
+                      upscale.GetHierarchy().GetMatrix(0).GetGraph(),
+                      partitioning, ess_attr, upscale_param);
     }
     else
     {

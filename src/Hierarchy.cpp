@@ -60,9 +60,9 @@ void Hierarchy::Coarsen(int level, const mfem::Array<int>* partitioning)
     MixedMatrix& mgL = GetMatrix(level);
     mgL.BuildM();
 
-    GraphTopology topology(mgL.GetGraph());
-    Graph coarse_graph = partitioning ? topology.Coarsen(*partitioning)
-                         : topology.Coarsen(param_.coarse_factor);
+    GraphTopology topology;
+    Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning)
+                         : topology.Coarsen(mgL.GetGraph(), param_.coarse_factor);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 

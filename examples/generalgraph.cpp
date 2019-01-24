@@ -166,25 +166,24 @@ int main(int argc, char* argv[])
     // Set up Upscale
     {
         /// [Upscale]
-        Upscale upscale(graph, upscale_param, &partitioning);
+        Upscale upscale(std::move(graph), upscale_param, &partitioning);
         upscale.PrintInfo();
         /// [Upscale]
 
-        mfem::Vector rhs_u_fine;
 
         /// [Right Hand Side]
+        mfem::BlockVector fine_rhs(upscale.BlockOffsets(0));
+        fine_rhs.GetBlock(0) = 0.0;
+
+        const MixedMatrix& fine_mgL = upscale.GetHierarchy().GetMatrix(0);
         if (generate_graph || generate_fiedler)
         {
-            rhs_u_fine = ComputeFiedlerVector(upscale.GetHierarchy().GetMatrix(0));
+            fine_rhs.GetBlock(1) = ComputeFiedlerVector(fine_mgL);
         }
         else
         {
-            rhs_u_fine = graph.ReadVertexVector(FiedlerFileName);
+            fine_rhs.GetBlock(1) = fine_mgL.GetGraph().ReadVertexVector(FiedlerFileName);
         }
-
-        mfem::BlockVector fine_rhs(upscale.BlockOffsets(0));
-        fine_rhs.GetBlock(0) = 0.0;
-        fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
 
         /// [Solve]
@@ -203,7 +202,7 @@ int main(int argc, char* argv[])
 
         if (save_fiedler)
         {
-            graph.WriteVertexVector(rhs_u_fine, FiedlerFileName);
+            graph.WriteVertexVector(fine_rhs.GetBlock(1), FiedlerFileName);
         }
     }
 
