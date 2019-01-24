@@ -127,9 +127,6 @@ public:
 
 private:
     const MixedMatrix& mixed_matrix_;
-
-    mutable mfem::BlockVector true_rhs_;
-    mutable mfem::BlockVector true_sol_;
 };
 
 } // namespace smoothg

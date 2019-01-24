@@ -34,7 +34,7 @@ class MixedLaplacianSolver : public mfem::Operator
 {
 public:
     MixedLaplacianSolver(MPI_Comm comm, const mfem::Array<int>& block_offsets,
-                         const mfem::Array<int>* ess_attr, bool W_is_nonzero);
+                         bool W_is_nonzero);
     MixedLaplacianSolver() = delete;
 
     virtual ~MixedLaplacianSolver() = default;
@@ -67,6 +67,7 @@ public:
     ///@}
 
 protected:
+    void Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
     void Orthogonalize(mfem::Vector& vec) const;
 
     MPI_Comm comm_;

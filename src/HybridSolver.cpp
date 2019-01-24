@@ -34,20 +34,13 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.GetComm(), mgL.GetBlockOffsets(), ess_attr, mgL.CheckW()),
+    MixedLaplacianSolver(mgL.GetComm(), mgL.GetBlockOffsets(), mgL.CheckW()),
     D_(mgL.GetD()),
     W_(mgL.GetW()),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
-    const_rep_ = &(mgL.GetConstantRep());
-    if (ess_attr)
-    {
-        assert(mgL.GetGraph().HasBoundary());
-        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
-        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
-        ess_edofs_.SetSize(sol_.BlockSize(0));
-    }
+    MixedLaplacianSolver::Init(mgL, ess_attr);
 
     auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
     if (!mbuilder)
@@ -60,7 +53,7 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
     Agg_edgedof_.MakeRef(mgL.GetGraphSpace().VertexToEDof());
 
     Init(mgL.GetGraphSpace().EdgeToEDof(), mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), mgL.EDofToBdrAtt(), &ess_edofs_);
+         mgL.GetEdgeDofToTrueDof(), mgL.EDofToBdrAtt());
 }
 
 HybridSolver::~HybridSolver()
@@ -78,8 +71,7 @@ void HybridSolver::Init(
     const mfem::SparseMatrix& face_edgedof,
     const std::vector<mfem::DenseMatrix>& M_el,
     const mfem::HypreParMatrix& edgedof_d_td,
-    const mfem::SparseMatrix& edgedof_bdrattr,
-    const mfem::Array<int>* ess_edge_dofs)
+    const mfem::SparseMatrix& edgedof_bdrattr)
 {
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -102,7 +94,7 @@ void HybridSolver::Init(
 
     CreateMultiplierRelations(face_edgedof, edgedof_d_td);
 
-    CollectEssentialDofs(edgedof_bdrattr, ess_edge_dofs);
+    CollectEssentialDofs(edgedof_bdrattr);
 
     // Assemble the hybridized system on each processor
     mfem::SparseMatrix H_proc = AssembleHybridSystem(M_el);
@@ -365,7 +357,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     multiplier_d_td_->Mult(trueMu_, Mu_);
     RecoverOriginalSolution(Mu_, Sol);
 
-    if (!W_is_nonzero_ && remove_one_dof_ )
+    if (!W_is_nonzero_ && remove_one_dof_)
     {
         Orthogonalize(Sol.GetBlock(1));
     }
@@ -604,8 +596,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
                   " constructed in " << chrono.RealTime() << "s. \n";
 }
 
-void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
-                                        const mfem::Array<int>* ess_edofs)
+void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
 {
     mfem::SparseMatrix mult_truemult = GetDiag(*multiplier_d_td_);
     mfem::Array<int> true_multiplier;
@@ -618,7 +609,7 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
         for (int i = 0; i < num_multiplier_dofs_; ++i)
         {
             // natural BC for H(div) dof <=> essential BC for multiplier dof
-            if (edof_bdrattr.RowSize(i) && !(*ess_edofs)[i])
+            if (edof_bdrattr.RowSize(i) && !ess_edofs_[i])
             {
                 GetTableRow(mult_truemult, i, true_multiplier);
                 ess_true_multipliers_.Append(true_multiplier);

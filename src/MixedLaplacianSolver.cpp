@@ -26,26 +26,10 @@ namespace smoothg
 
 MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
                                            const mfem::Array<int>& block_offsets,
-                                           const mfem::Array<int>* ess_attr,
                                            bool W_is_nonzero)
-    : comm_(comm), rhs_(block_offsets), sol_(block_offsets),
-      nnz_(0), num_iterations_(0), timing_(0), remove_one_dof_(true),
-      W_is_nonzero_(W_is_nonzero)
-{
-    MPI_Comm_rank(comm_, &myid_);
-
-    if (ess_attr)
-    {
-        for (int i = 0; i < ess_attr->Size(); ++i)
-        {
-            if ((*ess_attr)[i] == 0) // if Dirichlet pressure boundary is not empty
-            {
-                remove_one_dof_ = false;
-                break;
-            }
-        }
-    }
-}
+    : comm_(comm), rhs_(block_offsets), sol_(block_offsets), nnz_(0),
+      num_iterations_(0), timing_(0), remove_one_dof_(true), W_is_nonzero_(W_is_nonzero)
+{ }
 
 void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
 {
@@ -54,9 +38,6 @@ void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector
 
 void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
-    assert(rhs_);
-    assert(sol_);
-
     rhs_.GetBlock(0) = 0.0;
     rhs_.GetBlock(1) = rhs;
 
@@ -68,6 +49,27 @@ void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) con
 void MixedLaplacianSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
     Solve(rhs, sol);
+}
+
+void MixedLaplacianSolver::Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr)
+{
+    MPI_Comm_rank(comm_, &myid_);
+    const_rep_ = &(mgL.GetConstantRep());
+    if (ess_attr)
+    {
+        for (int i = 0; i < ess_attr->Size(); ++i)
+        {
+            if ((*ess_attr)[i] == 0) // if Dirichlet pressure boundary is not empty
+            {
+                remove_one_dof_ = false;
+                break;
+            }
+        }
+        assert(mgL.GetGraph().HasBoundary());
+        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
+        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
+        ess_edofs_.SetSize(sol_.BlockSize(0));
+    }
 }
 
 void MixedLaplacianSolver::Orthogonalize(mfem::Vector& vec) const

@@ -153,8 +153,7 @@ private:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
-              const mfem::SparseMatrix& face_bdrattr,
-              const mfem::Array<int>* ess_edge_dofs);
+              const mfem::SparseMatrix& face_bdrattr);
 
     void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
                                    const mfem::HypreParMatrix& edgedof_d_td);
@@ -171,8 +170,7 @@ private:
     // Assemble parallel hybridized system and build a solver for it
     void BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc);
 
-    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
-                              const mfem::Array<int>* ess_edofs);
+    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr);
 
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
