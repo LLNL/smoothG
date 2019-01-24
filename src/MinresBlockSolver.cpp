@@ -199,7 +199,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
         const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = 0.0;
     }
 
-    minres_.Mult(rhs_, sol);
+    minres_.Mult(rhs, sol);
 
     const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 

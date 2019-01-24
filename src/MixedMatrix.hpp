@@ -240,17 +240,6 @@ public:
         return total;
     }
 
-    /**
-     * Construct a BlockVector from given subvectors for u and p.
-     *
-     * Note that this MixedMatrix owns the Array<int> of block offsets
-     * that is used in this new BlockVector. This means that this
-     * MixedMatrix must stay alive as long as this BlockVector is
-     * alive or there will be undefined behavior.
-     */
-    std::unique_ptr<mfem::BlockVector> SubVectorsToBlockVector(
-        const mfem::Vector& vec_u, const mfem::Vector& vec_p) const;
-
     /** @brief Get the Array of offsets representing the block structure of
         the matrix.
 

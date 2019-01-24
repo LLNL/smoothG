@@ -111,33 +111,27 @@ int main(int argc, char* argv[])
         w = 0.0;
     }
 
-    // set the appropriate right hand side and weights for graph problem
-    mfem::Vector rhs_u_fine;
-    mfem::Vector rhs_p_fine;
-    rhs_u_fine.SetSize(nedges);
-    rhs_u_fine = 0.0;
-    rhs_p_fine.SetSize(nvertices);
-    rhs_p_fine = 1.0;
-
-    // make rhs average zero so the problem is well defined when W block is zero
-    if (!w_block && myid == 0)
-        rhs_p_fine(0) = -5.0;
-
     // setup mixed problem
     auto edge_d_td_diag = SparseIdentity(nedges);
     mfem::Array<HYPRE_Int> edge_start(2);
     edge_start[0] = 0;
     edge_start[1] = nedges;
 
-    mfem::HypreParMatrix edge_d_td(comm, nedges, edge_start,
-                                   &edge_d_td_diag);
+    mfem::HypreParMatrix edge_d_td(comm, nedges, edge_start, &edge_d_td_diag);
 
     Graph graph(vertex_edge, edge_d_td, weight);
     MixedMatrix mixed_graph_laplacian(graph, VectorToMatrix(w));
 
-    mfem::Array<int>& blockOffsets(mixed_graph_laplacian.GetBlockOffsets());
-    mfem::BlockVector rhs = *mixed_graph_laplacian.SubVectorsToBlockVector(rhs_u_fine, rhs_p_fine);
-    mfem::BlockVector sol(blockOffsets);
+    // set the appropriate right hand side
+    mfem::BlockVector rhs(mixed_graph_laplacian.GetBlockOffsets());
+    rhs.GetBlock(0) = 0.0;
+    rhs.GetBlock(1) = 1.0;
+
+    // make rhs average zero so the problem is well-defined when W block is zero
+    if (!w_block && myid == 0)
+        rhs.GetBlock(1)[0] = -5.0;
+
+    mfem::BlockVector sol(mixed_graph_laplacian.GetBlockOffsets());
 
     // setup solvers
     std::map<MixedLaplacianSolver*, std::string> solver_to_name;

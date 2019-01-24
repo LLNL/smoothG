@@ -156,6 +156,7 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
                 "PDESampler object in wrong state (call NewSample() first)!");
 
     mfem::Vector coarse_sol = hierarchy_.Solve(level, rhs_[level]);
+    coarse_sol *= -1.0; // not needed, but to match with Upscale::SolveAtLevel (deprecated)
 
     // coarse solution projected to piece-wise constant on aggregates
     mfem::Vector pw1_coarse_sol = hierarchy_.PWConstProject(level, coarse_sol);

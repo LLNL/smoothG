@@ -122,15 +122,6 @@ void MixedMatrix::GenerateRowStarts()
     GenerateOffsets(comm, nvertices, *Drow_start_);
 }
 
-unique_ptr<mfem::BlockVector> MixedMatrix::SubVectorsToBlockVector(
-    const mfem::Vector& vec_u, const mfem::Vector& vec_p) const
-{
-    auto blockvec = make_unique<mfem::BlockVector>(GetBlockOffsets());
-    blockvec->GetBlock(0) = vec_u;
-    blockvec->GetBlock(1) = vec_p;
-    return blockvec;
-}
-
 mfem::Array<int>& MixedMatrix::GetBlockOffsets() const
 {
     if (!blockOffsets_)
