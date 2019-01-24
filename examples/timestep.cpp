@@ -132,11 +132,11 @@ int main(int argc, char* argv[])
         hierarchy.PrintInfo();
 
         // Set some pressure initial condition
-        mfem::BlockVector fine_u(hierarchy.GetMatrix(0).GetBlockOffsets());
+        mfem::BlockVector fine_u(hierarchy.GetMatrix(0).BlockOffsets());
         fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace
-        mfem::BlockVector work_rhs(hierarchy.GetMatrix(k).GetBlockOffsets());
+        mfem::BlockVector work_rhs(hierarchy.GetMatrix(k).BlockOffsets());
         work_rhs = 0.0;
 
         mfem::BlockVector work_u = k == 0 ? fine_u : hierarchy.Restrict(0, fine_u);

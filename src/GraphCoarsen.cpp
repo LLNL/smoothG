@@ -292,7 +292,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
     const int num_coarse_vdofs = coarse_space_.VertexToVDof().NumCols();
     const int num_coarse_edofs = coarse_space_.VertexToEDof().NumCols();
 
-    coarse_D_ = make_unique<mfem::SparseMatrix>(num_coarse_vdofs, num_coarse_edofs);
+    mfem::SparseMatrix coarse_D(num_coarse_vdofs, num_coarse_edofs);
 
     // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
     // this is Gelever's "ScaleEdgeTargets"
@@ -400,8 +400,8 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                 if (k == 0)
                 {
                     vertex_target_i.GetColumnReference(0, first_vert_target);
-                    coarse_D_->Set(bubble_counter + i, row,
-                                   -(local_rhs_trace1 * first_vert_target));
+                    coarse_D.Set(bubble_counter + i, row,
+                                 -(local_rhs_trace1 * first_vert_target));
                 }
 
                 // instead of doing local_rhs *= -1, we store -trace later
@@ -478,8 +478,8 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
         // storing local coarse D
         for (int l = 0; l < num_bubbles_i; l++)
         {
-            coarse_D_->Set(bubble_counter + i + 1 + l,
-                           num_traces + bubble_counter + l, 1.);
+            coarse_D.Set(bubble_counter + i + 1 + l,
+                         num_traces + bubble_counter + l, 1.);
         }
 
         // storing local coarse M (bubble part)
@@ -500,7 +500,8 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
         bubble_counter += num_bubbles_i;
     }
 
-    coarse_D_->Finalize();
+    coarse_D.Finalize();
+    coarse_D_.Swap(coarse_D);
 
     mfem::SparseMatrix face_Agg(smoothg::Transpose(Agg_face));
 
@@ -608,7 +609,7 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
     const int num_aggs = agg_face.NumRows();
     const int num_faces = agg_face.NumCols();
 
-    mfem::SparseMatrix Q_edge(agg_edof.NumCols(), coarse_D_->NumCols());
+    mfem::SparseMatrix Q_edge(agg_edof.NumCols(), coarse_D_.NumCols());
     mfem::DenseMatrix Q_i;
 
     mfem::DenseMatrix DT_one_pi_f_PV;

@@ -71,69 +71,24 @@ public:
     */
     MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
-                std::unique_ptr<mfem::SparseMatrix> D,
+                mfem::SparseMatrix D,
                 std::unique_ptr<mfem::SparseMatrix> W,
                 mfem::Vector constant_rep,
                 mfem::Vector vertex_sizes,
                 mfem::SparseMatrix P_pwc);
 
+    MixedMatrix(MixedMatrix&& other) noexcept;
+
     MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
 
-    /// Get the associated graph space
-    const GraphSpace& GetGraphSpace() const { return graph_space_; }
+    /// Get the number of vertex dofs in this matrix.
+    int NumVDofs() const { return graph_space_.VertexToVDof().NumCols(); }
 
-    /// Get the associated graph
-    const Graph& GetGraph() const { return graph_space_.GetGraph(); }
+    /// Get the number of edge dofs in this matrix.
+    int NumEDofs() const { return graph_space_.VertexToEDof().NumCols(); }
 
-    /// Get edge-based dofs to boundary attribute
-    const mfem::SparseMatrix& EDofToBdrAtt() const
-    {
-        return GetGraphSpace().EDofToBdrAtt();
-    }
-
-    /// Get constant representation (null vector of D)
-    const mfem::Vector& GetConstantRep() const { return constant_rep_; }
-
-    /// Get piecewise constant projector
-    const mfem::SparseMatrix& GetPWConstProj() const { return P_pwc_; }
-
-    /**
-       @brief Interpret vertex at this level as aggregate of fine level vertices,
-       this returns number of fine level vertices contained in each aggregate
-    */
-    const mfem::Vector& GetVertexSizes() const { return vertex_sizes_; }
-
-    /**
-       @brief Get a const reference to the mass matrix M.
-    */
-    const mfem::SparseMatrix& GetM() const
-    {
-        assert(M_);
-        return *M_;
-    }
-
-    /**
-       @brief Get a reference to the mass matrix M.
-
-       @todo non-const version of GetM() and getD() are for elimination
-             in the case when MinresBlockSolver is used. Since the solver makes
-             a copy of these matrices, the non-const version can be removed
-             if the elimination step is moved inside the solver
-    */
-    mfem::SparseMatrix& GetM()
-    {
-        assert(M_ || mbuilder_);
-        return *M_;
-    }
-
-    /**
-       @brief Get a const reference to the mass matrix M builder.
-    */
-    const MBuilder& GetMBuilder() const
-    {
-        assert(mbuilder_);
-        return *mbuilder_;
-    }
+    /// Get the total number of dofs in this matrix.
+    int NumTotalDofs() const { return NumEDofs() + NumVDofs(); }
 
     /**
        @brief Assemble the mass matrix M.
@@ -147,181 +102,17 @@ public:
         }
     }
 
-    /**
-       @brief Set (or reset) the mass matrix M.
+    /// assemble the parallel edge mass matrix
+    mfem::HypreParMatrix* MakeParallelM(const mfem::SparseMatrix& M) const;
 
-       Useful for rescaling coefficients without re-coarsening.
-    */
-    void SetM(mfem::SparseMatrix& M_in)
-    {
-        M_ = make_unique<mfem::SparseMatrix>();
-        M_->Swap(M_in);
-    }
+    /// assemble the parallel signed vertex_edge (divergence) matrix
+    mfem::HypreParMatrix* MakeParallelD(const mfem::SparseMatrix& D) const;
 
-    /**
-       @brief Get a const reference to the edge_vertex matrix D.
-    */
-    const mfem::SparseMatrix& GetD() const
-    {
-        return *D_;
-    }
-
-    /**
-       @brief Get a reference to the edge_vertex matrix D.
-    */
-    mfem::SparseMatrix& GetD()
-    {
-        return *D_;
-    }
-
-    /**
-       @brief Get a const reference to the matrix W.
-    */
-    const mfem::SparseMatrix* GetW() const
-    {
-        return W_.get();
-    }
-
-    /**
-       Set the matrix W.
-    */
-    void SetW(mfem::SparseMatrix W_in)
-    {
-        W_ = make_unique<mfem::SparseMatrix>();
-        W_->Swap(W_in);
-    }
-
-    /** Get the number of vertex dofs in this matrix.
-     */
-    int GetNumVertexDofs() const
-    {
-        return D_->Height();
-    }
-
-    /** Get the number of edge dofs in this matrix.
-     */
-    int GetNumEdgeDofs() const
-    {
-        return D_->Width();
-    }
-
-    /** Get the total number of dofs in this matrix.
-     */
-    int GetNumTotalDofs() const
-    {
-        return D_->Width() + D_->Height();
-    }
-
-    int NNZ() const
-    {
-        int total = 0;
-
-        if (M_)
-            total += M_->NumNonZeroElems();
-        if (D_)
-            total += D_->NumNonZeroElems();
-        if (W_)
-            total += W_->NumNonZeroElems();
-
-        return total;
-    }
-
-    int GlobalNNZ() const
-    {
-        int total = 0;
-
-        if (M_)
-            total += GetParallelM().NNZ();
-        if (D_)
-            total += 2 * GetParallelD().NNZ();
-        if (W_)
-            total += GetParallelW()->NNZ();
-
-        return total;
-    }
-
-    /** @brief Get the Array of offsets representing the block structure of
-        the matrix.
-
-        The Array is of length 3. The first element is the starting
-        index of the first block (always 0), the second element is the
-        starting index of the second block, and the third element is
-        the total number of rows in the matrix.
-    */
-    mfem::Array<int>& GetBlockOffsets() const;
-    mfem::Array<int>& GetBlockTrueOffsets() const;
-
-    /// return edge dof_truedof relation
-    const mfem::HypreParMatrix& GetEdgeDofToTrueDof() const
-    {
-        assert(edge_d_td_);
-        return *edge_d_td_;
-    }
-
-    /// return edge dof_truedof relation
-    const mfem::HypreParMatrix& GetEdgeTrueDofToDof() const
-    {
-        assert(edge_td_d_);
-        return *edge_td_d_;
-    }
-
-    /// return the row starts (parallel row partitioning) of \f$ D \f$
-    mfem::Array<HYPRE_Int>& GetDrowStarts() const
-    {
-        if (!Drow_start_)
-            Drow_start_ = make_unique<mfem::Array<HYPRE_Int>>();
-        assert(Drow_start_);
-        return *Drow_start_;
-    }
-
-    /// get the parallel edge mass matrix
-    mfem::HypreParMatrix& GetParallelM(bool recompute = false) const
-    {
-        if (!pM_ || recompute)
-        {
-            assert(M_);
-            mfem::HypreParMatrix M_diag(edge_d_td_->GetComm(), edge_d_td_->M(),
-                                        edge_d_td_->GetRowStarts(), M_.get());
-
-            std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M_diag, edge_d_td_));
-            pM_.reset(ParMult(edge_td_d_.get(), M_tmp.get()));
-        }
-
-        assert(pM_);
-        return *pM_;
-    }
-
-    /// get the parallel signed vertex_edge (divergence) matrix
-    mfem::HypreParMatrix& GetParallelD(bool recompute = false) const
-    {
-        if (!pD_ || recompute)
-        {
-            assert(D_);
-            pD_ = ParMult(*D_, *edge_d_td_, *Drow_start_);
-        }
-
-        assert(pD_);
-        return *pD_;
-    }
-
-    /// get the parallel W matrix
-    mfem::HypreParMatrix* GetParallelW() const
-    {
-        if (W_ && !pW_)
-        {
-            pW_ = make_unique<mfem::HypreParMatrix>(edge_d_td_->GetComm(), Drow_start_->Last(),
-                                                    Drow_start_->GetData(), W_.get());
-        }
-
-        return pW_.get();
-    }
+    /// assemble the parallel W matrix
+    mfem::HypreParMatrix* MakeParallelW(const mfem::SparseMatrix& W) const;
 
     /// Determine if W block is nonzero
     bool CheckW() const;
-
-    void SetMFromWeightVector(const mfem::Vector& weight);
-
-    void ScaleM(const mfem::Vector& weight);
 
     /**
        @brief Update mass matrix M based on new agg weight.
@@ -333,6 +124,28 @@ public:
     */
     void UpdateM(const mfem::Vector& agg_weights_inverse);
 
+    ///@name Getters
+    ///@{
+    const GraphSpace& GetGraphSpace() const { return graph_space_; }
+    const Graph& GetGraph() const { return graph_space_.GetGraph(); }
+    const mfem::Vector& GetConstantRep() const { return constant_rep_; }
+    const mfem::SparseMatrix& GetM() const { assert(M_); return *M_; }
+    const MBuilder& GetMBuilder() const { assert(mbuilder_); return *mbuilder_; }
+    const mfem::SparseMatrix& GetD() const { return D_; }
+    const mfem::SparseMatrix* GetW() const { return W_.get(); }
+    const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
+    const mfem::Array<int>& BlockTrueOffsets() const { return block_true_offsets_; }
+    ///@}
+
+    /// Get piecewise constant projector
+    const mfem::SparseMatrix& GetPWConstProj() const { return P_pwc_; }
+
+    /**
+       @brief Interpret vertex at this level as aggregate of fine level vertices,
+       this returns number of fine level vertices contained in each aggregate
+    */
+    const mfem::Vector& GetVertexSizes() const { return vertex_sizes_; }
+
 private:
     /**
        Helper routine for the constructors of distributed graph. Note well that
@@ -343,26 +156,18 @@ private:
               const std::vector<mfem::Vector>& edge_weight_split,
               const mfem::SparseMatrix& w_block);
 
-    std::unique_ptr<mfem::SparseMatrix> ConstructD(
-        const mfem::SparseMatrix& vertex_edge, const mfem::HypreParMatrix& edge_trueedge);
+    void ConstructD(const mfem::SparseMatrix& vertex_edge);
 
-    void GenerateRowStarts();
+    void MakeBlockOffsets();
 
     GraphSpace graph_space_;
 
     std::unique_ptr<mfem::SparseMatrix> M_;
-    std::unique_ptr<mfem::SparseMatrix> D_;
+    mfem::SparseMatrix D_;
     std::unique_ptr<mfem::SparseMatrix> W_;
 
-    const mfem::HypreParMatrix* edge_d_td_;
-    std::unique_ptr<mfem::HypreParMatrix> edge_td_d_;
-
-    mutable std::unique_ptr<mfem::HypreParMatrix> pM_;
-    mutable std::unique_ptr<mfem::HypreParMatrix> pD_;
-    mutable std::unique_ptr<mfem::HypreParMatrix> pW_;
-    mutable std::unique_ptr<mfem::Array<HYPRE_Int>> Drow_start_;
-    mutable std::unique_ptr<mfem::Array<int>> blockOffsets_;
-    mutable std::unique_ptr<mfem::Array<int>> blockTrueOffsets_;
+    mfem::Array<int> block_offsets_;
+    mfem::Array<int> block_true_offsets_;
 
     std::unique_ptr<MBuilder> mbuilder_;
 
@@ -384,7 +189,6 @@ private:
        MLMC simulations and nonlinear multigrids without visiting finest level.
     */
     mfem::SparseMatrix P_pwc_;
-
 }; // class MixedMatrix
 
 } // namespace smoothg

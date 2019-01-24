@@ -58,9 +58,9 @@ void MixedLaplacianSolver::Init(const MixedMatrix& mgL, const mfem::Array<int>* 
     if (ess_attr)
     {
         assert(mgL.GetGraph().HasBoundary());
-        ess_edofs_.SetSize(mgL.GetNumEdgeDofs(), 0);
-        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
-        ess_edofs_.SetSize(mgL.GetNumEdgeDofs());
+        ess_edofs_.SetSize(mgL.NumEDofs(), 0);
+        BooleanMult(mgL.GetGraphSpace().EDofToBdrAtt(), *ess_attr, ess_edofs_);
+        ess_edofs_.SetSize(mgL.NumEDofs());
 
         remove_one_dof_ = (ess_attr->Find(0) == -1); // all attributes are essential
     }

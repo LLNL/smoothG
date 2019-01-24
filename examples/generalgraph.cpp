@@ -229,19 +229,24 @@ void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& par
 
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 {
-    auto& pM = mixed_laplacian.GetParallelM();
-    auto& pD = mixed_laplacian.GetParallelD();
-    auto* pW = mixed_laplacian.GetParallelW();
+    unique_ptr<mfem::HypreParMatrix> pM, pD, pW;
 
-    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
-
-    mfem::Vector M_inv;
-    pM.GetDiag(M_inv);
-    MinvDT->InvScaleRows(M_inv);
-
-    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
+    pM.reset(mixed_laplacian.MakeParallelM(mixed_laplacian.GetM()));
+    pD.reset(mixed_laplacian.MakeParallelD(mixed_laplacian.GetD()));
 
     const bool use_w = mixed_laplacian.CheckW();
+    if (use_w)
+    {
+        pW.reset(mixed_laplacian.MakeParallelW(*mixed_laplacian.GetW()));
+    }
+
+    unique_ptr<mfem::HypreParMatrix> MinvDT(pD->Transpose());
+
+    mfem::Vector M_inv;
+    pM->GetDiag(M_inv);
+    MinvDT->InvScaleRows(M_inv);
+
+    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(pD.get(), MinvDT.get()));
 
     if (use_w)
     {

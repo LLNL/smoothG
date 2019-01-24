@@ -26,7 +26,7 @@ namespace smoothg
 {
 
 Upscale::Upscale(Hierarchy hierarchy)
-    : Operator(hierarchy.GetMatrix(0).GetNumVertexDofs()),
+    : Operator(hierarchy.GetMatrix(0).NumVDofs()),
       comm_(hierarchy.GetMatrix(0).GetComm()), hierarchy_(std::move(hierarchy))
 {
     MPI_Comm_rank(comm_, &myid_);
@@ -35,8 +35,8 @@ Upscale::Upscale(Hierarchy hierarchy)
     sol_.reserve(hierarchy_.NumLevels());
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
-        rhs_.emplace_back(hierarchy_.GetMatrix(level).GetBlockOffsets());
-        sol_.emplace_back(hierarchy_.GetMatrix(level).GetBlockOffsets());
+        rhs_.emplace_back(hierarchy_.GetMatrix(level).BlockOffsets());
+        sol_.emplace_back(hierarchy_.GetMatrix(level).BlockOffsets());
     }
 }
 
@@ -120,7 +120,7 @@ mfem::BlockVector Upscale::Solve(int level, const mfem::BlockVector& x) const
 
 const mfem::Array<int>& Upscale::BlockOffsets(int level) const
 {
-    return hierarchy_.GetMatrix(level).GetBlockOffsets();
+    return hierarchy_.GetMatrix(level).BlockOffsets();
 }
 
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,

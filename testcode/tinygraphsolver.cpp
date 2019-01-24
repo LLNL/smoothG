@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
     MixedMatrix mixed_graph_laplacian(std::move(graph), VectorToMatrix(w));
 
     // set the appropriate right hand side
-    mfem::BlockVector rhs(mixed_graph_laplacian.GetBlockOffsets());
+    mfem::BlockVector rhs(mixed_graph_laplacian.BlockOffsets());
     rhs.GetBlock(0) = 0.0;
     rhs.GetBlock(1) = 1.0;
 
@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
     if (!w_block && myid == 0)
         rhs.GetBlock(1)[0] = -5.0;
 
-    mfem::BlockVector sol(mixed_graph_laplacian.GetBlockOffsets());
+    mfem::BlockVector sol(mixed_graph_laplacian.BlockOffsets());
 
     // setup solvers
     std::map<MixedLaplacianSolver*, std::string> solver_to_name;

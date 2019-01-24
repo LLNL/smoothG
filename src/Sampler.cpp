@@ -96,7 +96,7 @@ void PDESampler::Initialize(int dimension, double kappa)
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
         num_aggs_[level] = hierarchy_.NumVertices(level);
-        rhs_[level].SetSize(hierarchy_.GetMatrix(level).GetNumVertexDofs());
+        rhs_[level].SetSize(hierarchy_.GetMatrix(level).NumVDofs());
         coefficient_[level].SetSize(num_aggs_[level]);
     }
 

@@ -34,7 +34,7 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const int rescale_iter,
                            const SAAMGeParam* saamge_param)
     :
-    MixedLaplacianSolver(mgL.GetComm(), mgL.GetBlockOffsets(), mgL.CheckW()),
+    MixedLaplacianSolver(mgL.GetComm(), mgL.BlockOffsets(), mgL.CheckW()),
     D_(mgL.GetD()),
     W_(mgL.GetW()),
     rescale_iter_(rescale_iter),
@@ -49,11 +49,13 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
         std::abort();
     }
 
-    Agg_vertexdof_.MakeRef(mgL.GetGraphSpace().VertexToVDof());
-    Agg_edgedof_.MakeRef(mgL.GetGraphSpace().VertexToEDof());
+    const GraphSpace& graph_space = mgL.GetGraphSpace();
 
-    Init(mgL.GetGraphSpace().EdgeToEDof(), mbuilder->GetElementMatrices(),
-         mgL.GetEdgeDofToTrueDof(), mgL.EDofToBdrAtt());
+    Agg_vertexdof_.MakeRef(graph_space.VertexToVDof());
+    Agg_edgedof_.MakeRef(graph_space.VertexToEDof());
+
+    Init(graph_space.EdgeToEDof(), mbuilder->GetElementMatrices(),
+         graph_space.EDofToTrueEDof(), graph_space.EDofToBdrAtt());
 }
 
 HybridSolver::~HybridSolver()

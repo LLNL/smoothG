@@ -142,8 +142,8 @@ public:
     const mfem::HypreParMatrix& VertexToTrueEdge() const { return *vertex_trueedge_; }
     const std::vector<mfem::Vector>& EdgeWeight() const { return split_edge_weight_; }
     const mfem::SparseMatrix& EdgeToBdrAtt() const { return edge_bdratt_; }
-    const mfem::Array<int>& VertexStarts() const { return vertex_starts_; }
-    const mfem::Array<int>& EdgeStarts() const { return edge_starts_; }
+    const mfem::Array<HYPRE_Int>& VertexStarts() const { return vertex_starts_; }
+    const mfem::Array<HYPRE_Int>& EdgeStarts() const { return edge_starts_; }
     const int NumVertices() const { return vertex_edge_local_.NumRows(); }
     const int NumEdges() const { return vertex_edge_local_.NumCols(); }
     MPI_Comm GetComm() const { return edge_trueedge_->GetComm(); }

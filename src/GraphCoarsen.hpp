@@ -173,7 +173,7 @@ private:
     mfem::Array<int> col_map_;
 
     /// Coarse D operator
-    std::unique_ptr<mfem::SparseMatrix> coarse_D_;
+    mfem::SparseMatrix coarse_D_;
 
     /// Coarse W operator
     std::unique_ptr<mfem::SparseMatrix> coarse_W_;

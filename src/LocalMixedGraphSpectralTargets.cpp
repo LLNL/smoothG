@@ -93,7 +93,7 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates(const GraphSpace& s
     SetConstantValue(*ExtAgg_vert, 1.);
 
     // Construct extended aggregate to "interior" dofs relation tables
-    ExtAgg_vdof_ = ParMult(*ExtAgg_vert, space.VertexToVDof(), mgL_.GetDrowStarts());
+    ExtAgg_vdof_ = ParMult(*ExtAgg_vert, space.VertexToVDof(), space.VDofStarts());
 
     auto vert_trueedof = ParMult(space.VertexToEDof(), space.EDofToTrueEDof(), vert_starts);
     ExtAgg_edof_.reset(mfem::ParMult(ExtAgg_vert.get(), vert_trueedof.get()));
@@ -389,10 +389,12 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     ParMatrix permute_eT( permute_e->Transpose() );
 
-    ParMatrix tmpM(mfem::ParMult(permute_e.get(), &mgL_.GetParallelM()) );
+    ParMatrix pM(mgL_.MakeParallelM(mgL_.GetM()));
+    ParMatrix tmpM(mfem::ParMult(permute_e.get(), pM.get()) );
     ParMatrix pM_ext(mfem::ParMult(tmpM.get(), permute_eT.get()) );
 
-    ParMatrix tmpD(mfem::ParMult(permute_v.get(), &mgL_.GetParallelD()) );
+    ParMatrix pD(mgL_.MakeParallelD(mgL_.GetD()));
+    ParMatrix tmpD(mfem::ParMult(permute_v.get(), pD.get()));
     ParMatrix pD_ext(mfem::ParMult(tmpD.get(), permute_eT.get()) );
 
     mfem::SparseMatrix M_ext = GetDiag(*pM_ext);
@@ -400,7 +402,8 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     // SET W in eigenvalues
     const bool use_w = false && mgL_.CheckW();
-    ParMatrix pW_ext(use_w ? RAP(*mgL_.GetParallelW(), *permute_v) : nullptr);
+    ParMatrix pW(use_w ? mgL_.MakeParallelW(*mgL_.GetW()) : nullptr);
+    ParMatrix pW_ext(use_w ? RAP(*pW, *permute_v) : nullptr);
     mfem::SparseMatrix W_ext = use_w ? GetDiag(*pW_ext) : mfem::SparseMatrix();
 
     // Compute face to permuted edge dofs relation table

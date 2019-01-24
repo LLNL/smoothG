@@ -109,7 +109,7 @@ void Hierarchy::Mult(int level, const mfem::BlockVector& x, mfem::BlockVector& y
 
 mfem::BlockVector Hierarchy::Mult(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetMatrix(level).GetBlockOffsets());
+    mfem::BlockVector y(GetMatrix(level).BlockOffsets());
     Solve(level, x, y);
     return y;
 }
@@ -122,7 +122,7 @@ void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& 
 
 mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetMatrix(level).GetBlockOffsets());
+    mfem::BlockVector y(GetMatrix(level).BlockOffsets());
     Solve(level, x, y);
     return y;
 }
@@ -162,7 +162,7 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
 
 mfem::BlockVector Hierarchy::Interpolate(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector fine_vect(GetMatrix(level - 1).GetBlockOffsets());
+    mfem::BlockVector fine_vect(GetMatrix(level - 1).BlockOffsets());
     Interpolate(level, x, fine_vect);
     return fine_vect;
 }
@@ -189,7 +189,7 @@ void Hierarchy::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVecto
 
 mfem::BlockVector Hierarchy::Restrict(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetMatrix(level + 1).GetBlockOffsets());
+    mfem::BlockVector coarse_vect(GetMatrix(level + 1).BlockOffsets());
     Restrict(level, x, coarse_vect);
     return coarse_vect;
 }
@@ -213,7 +213,7 @@ void Hierarchy::Project(int level, const mfem::BlockVector& x, mfem::BlockVector
 
 mfem::BlockVector Hierarchy::Project(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetMatrix(level + 1).GetBlockOffsets());
+    mfem::BlockVector coarse_vect(GetMatrix(level + 1).BlockOffsets());
     Project(level, x, coarse_vect);
     return coarse_vect;
 }
@@ -269,10 +269,9 @@ void Hierarchy::PrintInfo(std::ostream& out) const
         {
             tout << "Level " << i << " Matrix\n";
             tout << "---------------------\n";
-            tout << "M Size\t\t" << GetMatrix(i).GetParallelD().N() << "\n";
-            tout << "D Size\t\t" << GetMatrix(i).GetParallelD().M() << "\n";
-            // tout << "+ Size\t\t" << GetMatrix(i).GlobalRows() << "\n";
-            tout << "NonZeros:\t" << GetMatrix(i).GlobalNNZ() << "\n";
+            tout << "M Size\t\t" << GetMatrix(i).GetGraphSpace().EDofToTrueEDof().N() << "\n";
+            tout << "D Size\t\t" << GetMatrix(i).GetGraphSpace().VDofStarts().Last() << "\n";
+            tout << "NonZeros:\t" << solvers_[i]->GetNNZ() << "\n";
             tout << "\n";
 
             if (i != 0)
@@ -306,7 +305,7 @@ double Hierarchy::OperatorComplexity(int level) const
         nnz_all += solvers_[i]->GetNNZ();
     }
 
-    int nnz_fine = solvers_[0] ? solvers_[0]->GetNNZ() : GetMatrix(0).GlobalNNZ();
+    int nnz_fine = solvers_[0]->GetNNZ();
 
     return nnz_all / (double) nnz_fine;
 }

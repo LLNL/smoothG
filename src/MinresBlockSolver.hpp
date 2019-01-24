@@ -68,7 +68,7 @@ public:
        @param block_true_offsets describes parallel partitioning (@todo can this be inferred from the matrices?)
        @param use_W use the W block
     */
-    MinresBlockSolver(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
+    MinresBlockSolver(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::SparseMatrix* W,
                       const mfem::Array<int>& block_true_offsets);
 
     /**
@@ -97,20 +97,12 @@ protected:
 
 private:
     void Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-              mfem::HypreParMatrix* W);
+              mfem::SparseMatrix* W);
 
     mfem::BlockOperator operator_;
     mfem::BlockDiagonalPreconditioner prec_;
 
     std::unique_ptr<mfem::HypreParMatrix> schur_block_;
-
-    // Solvers' copy of potentially modified data
-    mfem::SparseMatrix W_;
-
-    std::unique_ptr<mfem::HypreParMatrix> hM_;
-    std::unique_ptr<mfem::HypreParMatrix> hD_;
-    std::unique_ptr<mfem::HypreParMatrix> hDt_;
-    std::unique_ptr<mfem::HypreParMatrix> hW_;
 };
 
 /**

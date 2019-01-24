@@ -119,7 +119,7 @@ mfem::HypreParMatrix* build_tiny_graph()
     return out;
 }
 
-mfem::HypreParMatrix* build_tiny_w_block()
+mfem::SparseMatrix* build_tiny_w_block()
 {
     int num_procs, myid;
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -131,14 +131,11 @@ mfem::HypreParMatrix* build_tiny_w_block()
                 "Only implemented for assumed partition!");
 
     int nrows = 3;
-    HYPRE_Int glob_nrows = 6;
-    HYPRE_Int glob_ncols = 6;
     int local_nnz = 3;
 
     HYPRE_Int* I = new HYPRE_Int[nrows + 1];
     HYPRE_Int* J = new HYPRE_Int[local_nnz];
     double* data = new double[local_nnz];
-    HYPRE_Int* rows = new HYPRE_Int[2];
     if (myid == 0)
     {
         I[0] = 0;
@@ -152,9 +149,6 @@ mfem::HypreParMatrix* build_tiny_w_block()
         data[1] = -2.0;
         J[2] = 2;
         data[2] = -3.0;
-
-        rows[0] = 0;
-        rows[1] = 3;
     }
     else
     {
@@ -165,26 +159,15 @@ mfem::HypreParMatrix* build_tiny_w_block()
         I[2] = 2;
         I[3] = 3;
 
-        J[0] = 3;
+        J[0] = 0;
         data[0] = -4.0;
-        J[1] = 4;
+        J[1] = 1;
         data[1] = -5.0;
-        J[2] = 5;
+        J[2] = 2;
         data[2] = -6.0;
-
-        rows[0] = 3;
-        rows[1] = 6;
     }
 
-    mfem::HypreParMatrix* out =  new mfem::HypreParMatrix(
-        comm, nrows, glob_nrows, glob_ncols, I, J, data, rows, rows);
-
-    delete [] I;
-    delete [] J;
-    delete [] data;
-    delete [] rows;
-
-    return out;
+    return new mfem::SparseMatrix(I, J, data, nrows, nrows);
 }
 
 mfem::HypreParMatrix* build_tiny_graph_weights(bool weighted = false)
@@ -291,7 +274,7 @@ int main(int argc, char* argv[])
         std::cout << "Building parallel graph..." << std::endl;
     mfem::HypreParMatrix* D = build_tiny_graph();
     mfem::HypreParMatrix* M = build_tiny_graph_weights(weighted);
-    mfem::HypreParMatrix* W = w_block ? build_tiny_w_block() : nullptr;
+    mfem::SparseMatrix* W = w_block ? build_tiny_w_block() : nullptr;
 
     // setup mixed problem
     if (myid == 0)

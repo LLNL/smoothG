@@ -55,10 +55,13 @@ GraphSpace::GraphSpace(Graph graph)
 {
     vertex_edof_.MakeRef(graph_.VertexToEdge());
     edof_trueedof_->MakeRef(graph_.EdgeToTrueEdge());
+    edof_starts_.MakeRef(graph_.EdgeStarts());
     if (graph_.HasBoundary())
     {
         edof_bdratt_.MakeRef(graph_.EdgeToBdrAtt());
     }
+
+    Init();
 }
 
 GraphSpace::GraphSpace(Graph graph,
@@ -72,10 +75,12 @@ GraphSpace::GraphSpace(Graph graph,
 {
     if (graph_.HasBoundary())
     {
-        mfem::SparseMatrix edof_edge = smoothg::Transpose(edge_edof_);
-        mfem::SparseMatrix tmp = smoothg::Mult(edof_edge, graph_.EdgeToBdrAtt());
+        auto edof_edge = smoothg::Transpose(edge_edof_);
+        auto tmp = smoothg::Mult(edof_edge, graph_.EdgeToBdrAtt());
         edof_bdratt_.Swap(tmp);
     }
+
+    Init();
 }
 
 GraphSpace::GraphSpace(GraphSpace&& other) noexcept
@@ -92,13 +97,23 @@ GraphSpace& GraphSpace::operator=(GraphSpace other) noexcept
 
 void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept
 {
+    swap(lhs.graph_, rhs.graph_);
+
+    mfem::Swap(lhs.vdof_starts_, rhs.vdof_starts_);
+    mfem::Swap(lhs.edof_starts_, rhs.edof_starts_);
+
     lhs.vertex_vdof_.Swap(rhs.vertex_vdof_);
     lhs.vertex_edof_.Swap(rhs.vertex_edof_);
     lhs.edge_edof_.Swap(rhs.edge_edof_);
     std::swap(lhs.edof_trueedof_, rhs.edof_trueedof_);
+    std::swap(lhs.trueedof_edof_, rhs.trueedof_edof_);
     lhs.edof_bdratt_.Swap(rhs.edof_bdratt_);
+}
 
-    swap(lhs.graph_, rhs.graph_);
+void GraphSpace::Init()
+{
+    trueedof_edof_.reset(edof_trueedof_->Transpose());
+    GenerateOffsets(graph_.GetComm(), vertex_vdof_.NumCols(), vdof_starts_);
 }
 
 mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
@@ -163,11 +178,10 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
 unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
 {
     const int num_edofs = vertex_edof_.NumCols();
-    auto edge_trueedge_edge = AAt(graph_.EdgeToTrueEdge());
+    const auto& edge_trueedge_edge = graph_.EdgeToTrueEdgeToEdge();
 
     MPI_Comm comm = graph_.GetComm();
-    mfem::Array<HYPRE_Int> edof_starts;
-    GenerateOffsets(comm, num_edofs, edof_starts);
+    GenerateOffsets(comm, num_edofs, edof_starts_);
 
     unique_ptr<mfem::HypreParMatrix> d_te_d; // dofs sharing the same true edge
     {
@@ -176,8 +190,8 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
         edge_edof.SetWidth(num_edofs);
         mfem::SparseMatrix edof_edge = smoothg::Transpose(edge_edof);
 
-        auto tmp = ParMult(*edge_trueedge_edge, edge_edof, edof_starts);
-        d_te_d = ParMult(edof_edge, *tmp, edof_starts);
+        auto tmp = ParMult(edge_trueedge_edge, edge_edof, edof_starts_);
+        d_te_d = ParMult(edof_edge, *tmp, edof_starts_);
     }
 
     HYPRE_Int* d_te_d_col_map;
@@ -187,7 +201,7 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
     mfem::SparseMatrix d_td_d_diag = SparseIdentity(num_edofs);
     mfem::SparseMatrix d_td_d_offd(num_edofs, d_te_d_offd.Width());
     {
-        mfem::SparseMatrix e_te_e_offd = GetOffd(*edge_trueedge_edge);
+        mfem::SparseMatrix e_te_e_offd = GetOffd(edge_trueedge_edge);
 
         mfem::Array<int> local_edofs, offd_edofs;
         for (int i = 0; i < e_te_e_offd.NumRows(); i++)
@@ -207,7 +221,7 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
         d_td_d_offd.Finalize();
     }
 
-    mfem::HypreParMatrix d_td_d(comm, d_te_d->N(), d_te_d->N(), edof_starts, edof_starts,
+    mfem::HypreParMatrix d_td_d(comm, d_te_d->N(), d_te_d->N(), edof_starts_, edof_starts_,
                                 &d_td_d_diag, &d_td_d_offd, d_te_d_col_map);
     return BuildEntityToTrueEntity(d_td_d);
 }

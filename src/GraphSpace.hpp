@@ -69,19 +69,27 @@ public:
     const mfem::SparseMatrix& VertexToEDof() const { return vertex_edof_; }
     const mfem::SparseMatrix& EdgeToEDof() const { return edge_edof_; }
     const mfem::HypreParMatrix& EDofToTrueEDof() const { return *edof_trueedof_; }
+    const mfem::HypreParMatrix& TrueEDofToEDof() const { return *trueedof_edof_; }
     const mfem::SparseMatrix& EDofToBdrAtt() const { return edof_bdratt_; }
     const Graph& GetGraph() const { return graph_; }
+    const mfem::Array<HYPRE_Int>& VDofStarts() const { return vdof_starts_; }
+    const mfem::Array<HYPRE_Int>& EDofStarts() const { return edof_starts_; }
     ///@}
 private:
+    void Init();
     mfem::SparseMatrix BuildVertexToEDof();
     std::unique_ptr<mfem::HypreParMatrix> BuildEdofToTrueEdof();
 
     Graph graph_;
 
+    mfem::Array<HYPRE_Int> vdof_starts_;
+    mfem::Array<HYPRE_Int> edof_starts_;
+
     mfem::SparseMatrix vertex_vdof_;
     mfem::SparseMatrix edge_edof_;
     mfem::SparseMatrix vertex_edof_;
     std::unique_ptr<mfem::HypreParMatrix> edof_trueedof_;
+    std::unique_ptr<mfem::HypreParMatrix> trueedof_edof_;
     mfem::SparseMatrix edof_bdratt_;
 }; // class GraphSpace
 
