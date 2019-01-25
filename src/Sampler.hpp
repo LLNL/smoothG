@@ -106,7 +106,7 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(std::shared_ptr<Upscale> upscale,
+    PDESampler(Hierarchy hierarchy,
                int dimension, double cell_volume,
                double kappa, int seed);
 
@@ -141,10 +141,12 @@ public:
     mfem::Vector& GetCoefficient(int level);
 
     /// Only for debugging/visualization, most users should use GetCoefficient
-    mfem::Vector& GetCoefficientForVisualization(int level);
+    mfem::Vector GetCoefficientForVisualization(int level);
+
+    const Hierarchy& GetHierarchy() const { return hierarchy_; }
 
 private:
-    std::shared_ptr<Upscale> fvupscale_;
+    Hierarchy hierarchy_;
     NormalDistribution normal_distribution_;
     std::vector<int> num_aggs_;
     double cell_volume_;

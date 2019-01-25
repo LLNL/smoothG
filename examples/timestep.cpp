@@ -31,16 +31,6 @@ using std::unique_ptr;
 
 using namespace smoothg;
 
-void InitialCondition(mfem::ParFiniteElementSpace& ufespace, mfem::BlockVector& fine_u,
-                      double initial_val);
-
-void VisSetup(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-              mfem::ParMesh& pmesh,
-              double range = 1.0, const std::string& caption = "");
-
-void VisUpdate(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-               mfem::ParMesh& pmesh);
-
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -134,50 +124,26 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     mfem::SparseMatrix W_block = SparseIdentity(graph.VertexToEdge().Height());
-    const double cell_volume = spe10problem.CellVolume();
-    W_block *= cell_volume / delta_t;     // W_block = Mass matrix / delta_t
-
-    //W_block *= 1.0 / delta_t;
+    W_block *= spe10problem.CellVolume() / delta_t;     // Mass matrix / delta_t
 
     // Time Stepping
     {
-        Upscale fvupscale(graph, upscale_param, &partitioning,
-                          &ess_attr, W_block);
-
-        fvupscale.PrintInfo();
-
-        // Input Vectors
-        std::vector<mfem::Array<int>> offsets(2);
-        fvupscale.BlockOffsets(0, offsets[0]);
-        fvupscale.BlockOffsets(1, offsets[1]);
-
-        mfem::BlockVector fine_rhs(offsets[0]);
-        fine_rhs = 0.0;
+        Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
+        hierarchy.PrintInfo();
 
         // Set some pressure initial condition
-        mfem::BlockVector fine_u(offsets[0]);
+        mfem::BlockVector fine_u(hierarchy.GetMatrix(0).BlockOffsets());
         fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace
-        mfem::BlockVector tmp(offsets[k]);
-        tmp = 0.0;
+        mfem::BlockVector work_rhs(hierarchy.GetMatrix(k).BlockOffsets());
+        work_rhs = 0.0;
 
-        mfem::BlockVector work_rhs(offsets[k]);
-        mfem::BlockVector work_u(offsets[k]);
+        mfem::BlockVector work_u = k == 0 ? fine_u : hierarchy.Restrict(0, fine_u);
 
-        if (k == 0)
-        {
-            work_rhs = fine_rhs;
-            work_u = fine_u;
-        }
-        else
-        {
-            fvupscale.Restrict(1, fine_u, work_u);
-            fvupscale.Restrict(1, fine_rhs, work_rhs);
-        }
+        assert(hierarchy.GetMatrix(k).CheckW());
+        const mfem::SparseMatrix& W = hierarchy.GetMatrix(k).GetW();
 
-        const mfem::SparseMatrix* W = fvupscale.GetMatrix(k).GetW();
-        assert(W);
 
         // Setup visualization
         mfem::socketstream vis_v;
@@ -188,8 +154,6 @@ int main(int argc, char* argv[])
                                   std::fabs(initial_val), caption);
         }
 
-        fvupscale.ShowSetupTime();
-
         double time = 0.0;
         int count = 0;
 
@@ -198,19 +162,12 @@ int main(int argc, char* argv[])
 
         while (time < total_time)
         {
-            W->Mult(work_u.GetBlock(1), tmp.GetBlock(1));
+            W.Mult(work_u.GetBlock(1), work_rhs.GetBlock(1));
 
             //tmp += work_rhs; // RHS is zero for now
-            tmp *= -1.0;
+            work_rhs *= -1.0;
 
-            if (k == 0)
-            {
-                fvupscale.Solve(0, tmp, work_u);
-            }
-            else
-            {
-                fvupscale.SolveAtLevel(1, tmp, work_u);
-            }
+            hierarchy.Solve(k, work_rhs, work_u);
 
             if (myid == 0)
             {
@@ -228,7 +185,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    fvupscale.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
+                    hierarchy.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
                 }
 
                 spe10problem.VisUpdate(vis_v, fine_u.GetBlock(1));
@@ -237,8 +194,6 @@ int main(int argc, char* argv[])
 
         chrono.Stop();
 
-        fvupscale.ShowSolveInfo(1);
-
         if (myid == 0)
         {
             std::cout << "Total Time: " << chrono.RealTime() << "\n";
@@ -246,63 +201,4 @@ int main(int argc, char* argv[])
     }
 
     return 0;
-}
-
-
-
-void VisSetup(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-              mfem::ParMesh& pmesh,
-              double range, const std::string& caption)
-{
-    const char vishost[] = "localhost";
-    const int  visport   = 19916;
-    vis_v.open(vishost, visport);
-    vis_v.precision(8);
-
-    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
-    vis_v << "solution\n" << pmesh << field;
-    vis_v << "window_size 500 800\n";
-    vis_v << "window_title 'pressure'\n";
-    vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
-    vis_v << "valuerange " << -std::fabs(range) << " " << std::fabs(range) <<
-          "\n"; // update value-range; keep mesh-extents fixed
-
-    if (pmesh.SpaceDimension() == 2)
-    {
-        vis_v << "view 0 0\n"; // view from top
-        vis_v << "keys jl\n";  // turn off perspective and light
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-    }
-    else
-    {
-        vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
-        //vis_v << "keys IYYYYY\n";  // cut and rotate
-    }
-
-    vis_v << "keys c\n";         // show colorbar and mesh
-    //vis_v << "pause\n"; // Press space to play!
-
-    if (!caption.empty())
-    {
-        vis_v << "plot_caption '" << caption << "'\n";
-    }
-
-    MPI_Barrier(comm);
-
-    vis_v << "keys S\n";         //Screenshot
-
-    MPI_Barrier(comm);
-}
-
-void VisUpdate(MPI_Comm comm, mfem::socketstream& vis_v, mfem::ParGridFunction& field,
-               mfem::ParMesh& pmesh)
-{
-    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
-    vis_v << "solution\n" << pmesh << field;
-
-    MPI_Barrier(comm);
-
-    vis_v << "keys S\n";         //Screenshot
-
-    MPI_Barrier(comm);
 }

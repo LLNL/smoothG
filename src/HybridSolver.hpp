@@ -36,7 +36,6 @@
 #include "LocalMixedGraphSpectralTargets.hpp"
 #include "utilities.hpp"
 #include "MixedLaplacianSolver.hpp"
-#include "Mixed_GL_Coarsener.hpp"
 #include "MixedMatrix.hpp"
 
 #if SMOOTHG_USE_SAAMGE
@@ -131,16 +130,15 @@ public:
                                  mfem::BlockVector& RecoveredSol) const;
 
     /**
-       @brief Update weights of local M matrices on aggregates
+       @brief Update weights of local M matrices on "elements"
 
-       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
-       that is, agg_weights_inverse in the input is like the coefficient in
-       a finite volume problem, agg_weights is the weights on the mass matrix
+       elem_scaling_inverse in the input is like the coefficient in
+       a finite volume problem, elem_scaling is the weights on the mass matrix
        in the mixed form, which is the reciprocal of that.
 
        @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
     */
-    void UpdateAggScaling(const mfem::Vector& agg_weights_inverse);
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 
     ///@name Set solver parameters
     ///@{
@@ -154,8 +152,10 @@ private:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
-              const mfem::SparseMatrix& face_bdrattr,
-              const mfem::Array<int>* ess_edge_dofs);
+              const mfem::SparseMatrix& face_bdrattr);
+
+    void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
+                                   const mfem::HypreParMatrix& edgedof_d_td);
 
     mfem::SparseMatrix AssembleHybridSystem(
         const std::vector<mfem::DenseMatrix>& M_el);
@@ -169,15 +169,14 @@ private:
     // Assemble parallel hybridized system and build a solver for it
     void BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc);
 
-    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
-                              const mfem::Array<int>* ess_edofs);
+    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr);
 
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
 
     const mfem::SparseMatrix& D_;
-    const mfem::SparseMatrix* W_;
+    const mfem::SparseMatrix& W_;
 
     std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
@@ -214,8 +213,6 @@ private:
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
-
-    mfem::Vector agg_weights_;
 
     const SAAMGeParam* saamge_param_;
 #if SMOOTHG_USE_SAAMGE

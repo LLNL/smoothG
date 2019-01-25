@@ -89,11 +89,11 @@ int main(int argc, char* argv[])
                               metis_agglomeration, ess_attr);
     Graph graph = spe10problem.GetFVGraph();
 
-    // Create Upscaler
-    Upscale upscale(graph, upscale_param, nullptr, &ess_attr);
+    // Create Hierarchy
+    Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
 
-    upscale.PrintInfo();
-    upscale.ShowSetupTime();
+    hierarchy.PrintInfo();
+    hierarchy.ShowSetupTime();
 
     auto CoarseNotEqualRAP = [&](const char* name)
     {
@@ -101,12 +101,12 @@ int main(int argc, char* argv[])
         const bool is_M = !(std::strcmp(name, "M"));
         for (int level = 1; level < upscale_param.max_levels; ++level)
         {
-            auto& fine_system = upscale.GetMatrix(level - 1);
-            auto& coarse_system = upscale.GetMatrix(level);
+            auto& fine_system = hierarchy.GetMatrix(level - 1);
+            auto& coarse_system = hierarchy.GetMatrix(level);
             auto& fine_mat = is_M ? fine_system.GetM() : fine_system.GetD();
 
-            auto& P = upscale.GetPsigma(level - 1);
-            auto& R = is_M ? P : upscale.GetPu(level - 1);
+            auto& P = hierarchy.GetPsigma(level - 1);
+            auto& R = is_M ? P : hierarchy.GetPu(level - 1);
             unique_ptr<mfem::SparseMatrix> coarse_mat_RAP(mfem::RAP(R, fine_mat, P));
 
             coarse_system.BuildM();

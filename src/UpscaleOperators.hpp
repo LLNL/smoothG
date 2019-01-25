@@ -80,10 +80,9 @@ namespace smoothg
 class UpscaleBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleBlockSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetNumTotalDofs()), A_(A)
-    {
-        A_.BlockOffsets(0, offsets_);
-    }
+    UpscaleBlockSolve(const Upscale& A)
+        : mfem::Operator(A.BlockOffsets(0)[2]), A_(A), offsets_(A.BlockOffsets(0))
+    { }
 
     void Mult(const mfem::Vector& x, mfem::Vector& y) const
     {
@@ -93,14 +92,15 @@ public:
     }
 private:
     const Upscale& A_;
-    mfem::Array<int> offsets_;
+    const mfem::Array<int>& offsets_;
 };
 
 /// UpscaleFineSolve Solves the fine problem in primal form as its operation
 class UpscaleFineSolve : public mfem::Operator
 {
 public:
-    UpscaleFineSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetD().Height()), A_(A)  { }
+    UpscaleFineSolve(const Upscale& A)
+        : mfem::Operator(A.BlockOffsets(0)[2] - A.BlockOffsets(0)[1]), A_(A)  { }
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(0, x, y); }
 
 private:
@@ -112,11 +112,9 @@ private:
 class UpscaleFineBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleFineBlockSolve(const Upscale& A) : mfem::Operator(A.GetMatrix(0).GetNumTotalDofs()),
-        A_(A)
-    {
-        A_.BlockOffsets(0, offsets_);
-    }
+    UpscaleFineBlockSolve(const Upscale& A)
+        : mfem::Operator(A.BlockOffsets(0)[2]), A_(A), offsets_(A_.BlockOffsets(0))
+    { }
 
     void Mult(const mfem::Vector& x, mfem::Vector& y) const
     {
@@ -126,7 +124,7 @@ public:
     }
 private:
     const Upscale& A_;
-    mfem::Array<int> offsets_;
+    const mfem::Array<int>& offsets_;
 };
 
 /// UpscaleCoarseSolve Solves the coarse problem in the primal form as its operation
@@ -134,9 +132,9 @@ private:
 class UpscaleCoarseSolve : public mfem::Operator
 {
 public:
-    UpscaleCoarseSolve(const Upscale& A, int level = 1) :
-        mfem::Operator(A.GetMatrix(1).GetD().Height()),
-        A_(A), level_(level)  {}
+    UpscaleCoarseSolve(const Upscale& A, int level = 1)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(level).NumVDofs()),
+          A_(A), level_(level)  {}
     void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(level_, x, y); }
 
 private:
@@ -149,13 +147,10 @@ private:
 class UpscaleCoarseBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleCoarseBlockSolve(const Upscale& A, int level = 1) :
-        mfem::Operator(A.GetMatrix(level).GetNumTotalDofs()),
-        level_(level),
-        A_(A)
-    {
-        A_.BlockOffsets(level_, offsets_);
-    }
+    UpscaleCoarseBlockSolve(const Upscale& A, int level = 1)
+        : mfem::Operator(A.GetHierarchy().GetMatrix(level).NumTotalDofs()),
+          A_(A), level_(level), offsets_(A_.BlockOffsets(level_))
+    { }
 
     void Mult(const mfem::Vector& x, mfem::Vector& y) const
     {
@@ -165,9 +160,9 @@ public:
     }
 
 private:
-    int level_;
     const Upscale& A_;
-    mfem::Array<int> offsets_;
+    int level_;
+    const mfem::Array<int>& offsets_;
 };
 
 

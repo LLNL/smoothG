@@ -37,9 +37,9 @@ void Print(const mfem::SparseMatrix& mat, const std::string& label = "",
            std::ostream& out = std::cout);
 
 /**
-    @brief Remove small entries from a matrix
+    @brief Remove small entries (absolute value < tol) from a matrix
 */
-mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol = 1e-8);
+mfem::SparseMatrix DropSmall(const mfem::SparseMatrix& mat, double tol = 1e-8);
 
 /**
     @brief Creates a sparse matrix from a table
@@ -470,6 +470,12 @@ void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
 
 /// Make a copy of mfem::HypreParMatrix
 std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
+
+/// @return "diagonal block" of a HypreParMatrix
+mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat);
+
+/// @return "off diagonal block" of a HypreParMatrix
+mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 
 } // namespace smoothg
 

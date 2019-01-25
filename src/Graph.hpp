@@ -103,6 +103,15 @@ public:
           const std::vector<mfem::Vector>& split_edge_weight,
           const mfem::SparseMatrix* edge_bdratt = nullptr);
 
+    /**
+       @brief Constructor for building a coarse graph in coarsening
+    */
+    Graph(mfem::SparseMatrix edge_vertex_local,
+          std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge,
+          const mfem::Array<int>& vertex_starts,
+          const mfem::Array<int>& edge_starts,
+          const mfem::SparseMatrix* edge_bdratt);
+
     /// Default constructor
     Graph() = default;
 
@@ -126,46 +135,17 @@ public:
 
     ///@name Getters for tables/arrays that describe parallel graph
     ///@{
-    const mfem::SparseMatrix& VertexToEdge() const
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::HypreParMatrix& VertexToTrueEdge() const
-    {
-        return *vertex_trueedge_;
-    }
-
-    const mfem::HypreParMatrix& EdgeToTrueEdge() const
-    {
-        return *edge_trueedge_;
-    }
-
-    const std::vector<mfem::Vector>& EdgeWeight() const
-    {
-        return split_edge_weight_;
-    }
-
-    const mfem::SparseMatrix& EdgeToBdrAtt() const
-    {
-        return edge_bdratt_;
-    }
-
-    const mfem::Array<int>& VertexStarts() const
-    {
-        return vertex_starts_;
-    }
-
-    const int NumVertices() const
-    {
-        return vertex_edge_local_.Height();
-    }
-
-    const int NumEdges() const
-    {
-        return vertex_edge_local_.Width();
-    }
-
+    const mfem::SparseMatrix& VertexToEdge() const { return vertex_edge_local_; }
+    const mfem::SparseMatrix& EdgeToVertex() const { return edge_vertex_local_; }
+    const mfem::HypreParMatrix& EdgeToTrueEdge() const { return *edge_trueedge_; }
+    const mfem::HypreParMatrix& EdgeToTrueEdgeToEdge() const { return *edge_trueedge_edge_; }
+    const mfem::HypreParMatrix& VertexToTrueEdge() const { return *vertex_trueedge_; }
+    const std::vector<mfem::Vector>& EdgeWeight() const { return split_edge_weight_; }
+    const mfem::SparseMatrix& EdgeToBdrAtt() const { return edge_bdratt_; }
+    const mfem::Array<HYPRE_Int>& VertexStarts() const { return vertex_starts_; }
+    const mfem::Array<HYPRE_Int>& EdgeStarts() const { return edge_starts_; }
+    const int NumVertices() const { return vertex_edge_local_.NumRows(); }
+    const int NumEdges() const { return vertex_edge_local_.NumCols(); }
     MPI_Comm GetComm() const { return edge_trueedge_->GetComm(); }
     ///@}
 
@@ -203,10 +183,13 @@ private:
     std::vector<mfem::Vector> split_edge_weight_;
     mfem::SparseMatrix edge_bdratt_; // edge to "boundary attribute"
 
+    mfem::SparseMatrix edge_vertex_local_;
+    std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;
     mfem::Array<int> vert_loc_to_glo_;
     mfem::Array<int> edge_loc_to_glo_;
     mfem::Array<HYPRE_Int> vertex_starts_;
+    mfem::Array<HYPRE_Int> edge_starts_;
 }; // class Graph
 
 } // namespace smoothg

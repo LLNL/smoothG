@@ -166,27 +166,24 @@ int main(int argc, char* argv[])
     // Set up Upscale
     {
         /// [Upscale]
-        Upscale upscale(graph, upscale_param, &partitioning);
-
+        Upscale upscale(std::move(graph), upscale_param, &partitioning);
         upscale.PrintInfo();
-        upscale.ShowSetupTime();
         /// [Upscale]
 
-        mfem::Vector rhs_u_fine;
 
         /// [Right Hand Side]
+        mfem::BlockVector fine_rhs(upscale.BlockOffsets(0));
+        fine_rhs.GetBlock(0) = 0.0;
+
+        const MixedMatrix& fine_mgL = upscale.GetHierarchy().GetMatrix(0);
         if (generate_graph || generate_fiedler)
         {
-            rhs_u_fine = ComputeFiedlerVector(upscale.GetMatrix(0));
+            fine_rhs.GetBlock(1) = ComputeFiedlerVector(fine_mgL);
         }
         else
         {
-            rhs_u_fine = graph.ReadVertexVector(FiedlerFileName);
+            fine_rhs.GetBlock(1) = fine_mgL.GetGraph().ReadVertexVector(FiedlerFileName);
         }
-
-        mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
-        fine_rhs.GetBlock(0) = 0.0;
-        fine_rhs.GetBlock(1) = rhs_u_fine;
         /// [Right Hand Side]
 
         /// [Solve]
@@ -205,7 +202,7 @@ int main(int argc, char* argv[])
 
         if (save_fiedler)
         {
-            graph.WriteVertexVector(rhs_u_fine, FiedlerFileName);
+            graph.WriteVertexVector(fine_rhs.GetBlock(1), FiedlerFileName);
         }
     }
 
@@ -232,32 +229,29 @@ void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& par
 
 mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 {
-    auto& pM = mixed_laplacian.GetParallelM();
-    auto& pD = mixed_laplacian.GetParallelD();
-    auto* pW = mixed_laplacian.GetParallelW();
+    unique_ptr<mfem::HypreParMatrix> pM, pD, pW;
 
-    unique_ptr<mfem::HypreParMatrix> MinvDT(pD.Transpose());
+    pM.reset(mixed_laplacian.MakeParallelM(mixed_laplacian.GetM()));
+    pD.reset(mixed_laplacian.MakeParallelD(mixed_laplacian.GetD()));
+
+    unique_ptr<mfem::HypreParMatrix> MinvDT(pD->Transpose());
 
     mfem::Vector M_inv;
-    pM.GetDiag(M_inv);
+    pM->GetDiag(M_inv);
     MinvDT->InvScaleRows(M_inv);
 
-    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(&pD, MinvDT.get()));
+    unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(pD.get(), MinvDT.get()));
 
     const bool use_w = mixed_laplacian.CheckW();
-
     if (use_w)
     {
-        (*pW) *= -1.0;
-        // TODO(gelever1): define ParSub lol
+        pW.reset(mixed_laplacian.MakeParallelW(mixed_laplacian.GetW()));
         A.reset(ParAdd(*A, *pW));
-        (*pW) *= -1.0;
     }
     else
     {
         // Adding identity to A so that it is non-singular
-        mfem::SparseMatrix diag;
-        A->GetDiag(diag);
+        mfem::SparseMatrix diag = GetDiag(*A);
         for (int i = 0; i < diag.Width(); i++)
             diag(i, i) += 1.0;
     }

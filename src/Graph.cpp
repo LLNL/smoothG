@@ -71,16 +71,41 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
     Init(edge_bdratt);
 }
 
+Graph::Graph(mfem::SparseMatrix edge_vertex_local,
+             std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge,
+             const mfem::Array<int>& vertex_starts,
+             const mfem::Array<int>& edge_starts,
+             const mfem::SparseMatrix* edge_bdratt)
+    : vertex_edge_local_(smoothg::Transpose(edge_vertex_local)),
+      edge_trueedge_(BuildEntityToTrueEntity(*edge_trueedge_edge)),
+      edge_vertex_local_(std::move(edge_vertex_local)),
+      edge_trueedge_edge_(std::move(edge_trueedge_edge))
+{
+    vertex_starts.Copy(vertex_starts_);
+    edge_starts.Copy(edge_starts_);
+
+    if (edge_bdratt != nullptr)
+    {
+        mfem::SparseMatrix tmp(*edge_bdratt);
+        edge_bdratt_.Swap(tmp);
+    }
+
+    vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
+}
+
 Graph::Graph(const Graph& other) noexcept
     : vertex_edge_local_(other.vertex_edge_local_),
       edge_trueedge_(Copy(*other.edge_trueedge_)),
       split_edge_weight_(other.split_edge_weight_),
       edge_bdratt_(other.edge_bdratt_),
+      edge_vertex_local_(other.edge_vertex_local_),
+      edge_trueedge_edge_(Copy(*other.edge_trueedge_edge_)),
       vertex_trueedge_(Copy(*other.vertex_trueedge_))
 {
     other.vert_loc_to_glo_.Copy(vert_loc_to_glo_);
     other.edge_loc_to_glo_.Copy(edge_loc_to_glo_);
     other.vertex_starts_.Copy(vertex_starts_);
+    other.edge_starts_.Copy(edge_starts_);
 }
 
 Graph::Graph(Graph&& other) noexcept
@@ -102,10 +127,13 @@ void swap(Graph& lhs, Graph& rhs) noexcept
     std::swap(lhs.edge_trueedge_, rhs.edge_trueedge_);
     lhs.edge_bdratt_.Swap(rhs.edge_bdratt_);
 
+    lhs.edge_vertex_local_.Swap(rhs.edge_vertex_local_);
+    std::swap(lhs.edge_trueedge_edge_, rhs.edge_trueedge_edge_);
     std::swap(lhs.vertex_trueedge_, rhs.vertex_trueedge_);
     mfem::Swap(lhs.vert_loc_to_glo_, rhs.vert_loc_to_glo_);
     mfem::Swap(lhs.edge_loc_to_glo_, rhs.edge_loc_to_glo_);
     mfem::Swap(lhs.vertex_starts_, rhs.vertex_starts_);
+    mfem::Swap(lhs.edge_starts_, rhs.edge_starts_);
 }
 
 void Graph::Init(const mfem::SparseMatrix* edge_bdratt)
@@ -116,7 +144,17 @@ void Graph::Init(const mfem::SparseMatrix* edge_bdratt)
         edge_bdratt_.Swap(tmp);
     }
 
+    auto edge_vertex_local_tmp = smoothg::Transpose(vertex_edge_local_);
+    edge_vertex_local_.Swap(edge_vertex_local_tmp);
+    edge_trueedge_edge_ = AAt(*edge_trueedge_);
+
     GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
+
+    edge_starts_.SetSize(3);
+    edge_starts_[0] = edge_trueedge_->GetRowStarts()[0];
+    edge_starts_[1] = edge_trueedge_->GetRowStarts()[1];
+    edge_starts_[2] = edge_trueedge_->M();
+
     vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
 }
 
@@ -267,9 +305,7 @@ mfem::Vector Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 void Graph::FixSharedEdgeWeight(mfem::Vector& edge_weight_local)
 {
     unique_ptr<mfem::HypreParMatrix> e_te_e = AAt(*edge_trueedge_);
-    mfem::SparseMatrix edge_is_shared;
-    HYPRE_Int* junk_map;
-    e_te_e->GetOffd(edge_is_shared, junk_map);
+    mfem::SparseMatrix edge_is_shared = GetOffd(*e_te_e);
 
     assert(edge_is_shared.Height() == edge_weight_local.Size());
     for (int edge = 0; edge < edge_is_shared.Height(); ++edge)

@@ -34,7 +34,7 @@ class MixedLaplacianSolver : public mfem::Operator
 {
 public:
     MixedLaplacianSolver(MPI_Comm comm, const mfem::Array<int>& block_offsets,
-                         const mfem::Array<int>* ess_attr, bool W_is_nonzero);
+                         bool W_is_nonzero);
     MixedLaplacianSolver() = delete;
 
     virtual ~MixedLaplacianSolver() = default;
@@ -49,7 +49,10 @@ public:
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+
+    /// Update solver based on new "element" scaling for M matrix
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse) = 0;
 
     ///@name Set solver parameters
     ///@{
@@ -67,6 +70,7 @@ public:
     ///@}
 
 protected:
+    void Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
     void Orthogonalize(mfem::Vector& vec) const;
 
     MPI_Comm comm_;
@@ -74,6 +78,8 @@ protected:
 
     mutable mfem::BlockVector rhs_;
     mutable mfem::BlockVector sol_;
+
+    mfem::Vector elem_scaling_;
 
     // default linear solver options
     int print_level_ = 0;
