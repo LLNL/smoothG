@@ -111,9 +111,8 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     mfem::SparseMatrix M_proc(mgL.GetM());
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
-        // Assume M diagonal, no ess data
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true);
+            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
     }
 
     hM_.reset(mgL.MakeParallelM(M_proc));
@@ -197,6 +196,13 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
 {
     auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
+
+    for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
+    {
+        if (ess_edofs_[mm])
+            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+    }
+
     hM_.reset(mixed_matrix_.MakeParallelM(M_proc));
 
     Init(hM_.get(), hD_.get(), W_.get());
