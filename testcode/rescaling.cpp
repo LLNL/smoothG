@@ -152,11 +152,8 @@ int main(int argc, char* argv[])
     part_mat.MultTranspose(agg_scale, interp_agg_scale);
 
     // Assemble rescaled fine and coarse M through MixedMatrix
-    fine_mgL.UpdateM(interp_agg_scale);
-    auto& fine_M1 = fine_mgL.GetM();
-
-    coarse_mgL.UpdateM(agg_scale);
-    auto& coarse_M1 = coarse_mgL.GetM();
+    auto fine_M1 = fine_mgL.GetMBuilder().BuildAssembledM(interp_agg_scale);
+    auto coarse_M1 = coarse_mgL.GetMBuilder().BuildAssembledM(agg_scale);
 
     // Assembled rescaled fine and coarse M through direct assembling and RAP
     auto fine_M2 = RescaledFineM(sigmafespace, elem_scale, interp_agg_scale);

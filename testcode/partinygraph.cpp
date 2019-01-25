@@ -144,11 +144,11 @@ mfem::SparseMatrix* build_tiny_w_block()
         I[3] = 3;
 
         J[0] = 0;
-        data[0] = -1.0;
+        data[0] = 1.0;
         J[1] = 1;
-        data[1] = -2.0;
+        data[1] = 2.0;
         J[2] = 2;
-        data[2] = -3.0;
+        data[2] = 3.0;
     }
     else
     {
@@ -160,11 +160,11 @@ mfem::SparseMatrix* build_tiny_w_block()
         I[3] = 3;
 
         J[0] = 0;
-        data[0] = -4.0;
+        data[0] = 4.0;
         J[1] = 1;
-        data[1] = -5.0;
+        data[1] = 5.0;
         J[2] = 2;
-        data[2] = -6.0;
+        data[2] = 6.0;
     }
 
     return new mfem::SparseMatrix(I, J, data, nrows, nrows);

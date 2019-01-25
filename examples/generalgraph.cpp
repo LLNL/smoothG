@@ -234,12 +234,6 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
     pM.reset(mixed_laplacian.MakeParallelM(mixed_laplacian.GetM()));
     pD.reset(mixed_laplacian.MakeParallelD(mixed_laplacian.GetD()));
 
-    const bool use_w = mixed_laplacian.CheckW();
-    if (use_w)
-    {
-        pW.reset(mixed_laplacian.MakeParallelW(mixed_laplacian.GetW()));
-    }
-
     unique_ptr<mfem::HypreParMatrix> MinvDT(pD->Transpose());
 
     mfem::Vector M_inv;
@@ -248,18 +242,16 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
 
     unique_ptr<mfem::HypreParMatrix> A(mfem::ParMult(pD.get(), MinvDT.get()));
 
+    const bool use_w = mixed_laplacian.CheckW();
     if (use_w)
     {
-        (*pW) *= -1.0;
-        // TODO(gelever1): define ParSub lol
+        pW.reset(mixed_laplacian.MakeParallelW(mixed_laplacian.GetW()));
         A.reset(ParAdd(*A, *pW));
-        (*pW) *= -1.0;
     }
     else
     {
         // Adding identity to A so that it is non-singular
-        mfem::SparseMatrix diag;
-        A->GetDiag(diag);
+        mfem::SparseMatrix diag = GetDiag(*A);
         for (int i = 0; i < diag.Width(); i++)
             diag(i, i) += 1.0;
     }

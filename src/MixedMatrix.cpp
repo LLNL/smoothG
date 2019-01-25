@@ -37,21 +37,15 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& w_block)
       graph_space_(std::move(graph)), constant_rep_(NumVDofs()),
       vertex_sizes_(&constant_rep_[0], NumVDofs()), P_pwc_(SparseIdentity(NumVDofs()))
 {
-    if (w_block.Height() > 0 || w_block.Width() > 0)
-    {
-        assert(w_block.Height() == NumVDofs() && w_block.Width() == NumVDofs());
-        W_ *= -1.0;
-    }
     constant_rep_ = 1.0;
 
     Init();
 }
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
-                         mfem::SparseMatrix D,
-                         mfem::SparseMatrix W,
-                         mfem::Vector constant_rep,
-                         mfem::Vector vertex_sizes, mfem::SparseMatrix P_pwc)
+                         mfem::SparseMatrix D, mfem::SparseMatrix W,
+                         mfem::Vector constant_rep, mfem::Vector vertex_sizes,
+                         mfem::SparseMatrix P_pwc)
     : mbuilder_(std::move(mbuilder)), D_(std::move(D)), W_(std::move(W)),
       graph_space_(std::move(graph_space)), constant_rep_(std::move(constant_rep)),
       vertex_sizes_(std::move(vertex_sizes)), P_pwc_(std::move(P_pwc))
@@ -71,10 +65,21 @@ MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
     constant_rep_.Swap(other.constant_rep_);
     vertex_sizes_.Swap(other.vertex_sizes_);
     P_pwc_.Swap(other.P_pwc_);
+    W_is_nonzero_ = other.W_is_nonzero_;
 }
 
 void MixedMatrix::Init()
 {
+    W_is_nonzero_ = false;
+    if (W_.Height() > 0 || W_.Width() > 0)
+    {
+        assert(W_.Height() == NumVDofs() && W_.Width() == NumVDofs());
+
+        const double zero_tol = 1e-6;
+        unique_ptr<mfem::HypreParMatrix> pW(MakeParallelW(W_));
+        W_is_nonzero_ = (MaxNorm(*pW) > zero_tol);
+    }
+
     block_offsets_.SetSize(3, 0);
     block_offsets_[1] = NumEDofs();
     block_offsets_[2] = NumTotalDofs();
@@ -82,12 +87,6 @@ void MixedMatrix::Init()
     block_true_offsets_.SetSize(3, 0);
     block_true_offsets_[1] = graph_space_.EDofToTrueEDof().NumCols();
     block_true_offsets_[2] = block_true_offsets_[1] + NumVDofs();
-}
-
-void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
-{
-    auto M_tmp = mbuilder_->BuildAssembledM(agg_weights_inverse);
-    M_.Swap(M_tmp);
 }
 
 mfem::HypreParMatrix* MixedMatrix::MakeParallelM(const mfem::SparseMatrix& M) const
@@ -107,15 +106,6 @@ mfem::HypreParMatrix* MixedMatrix::MakeParallelW(const mfem::SparseMatrix& W) co
     auto& vdof_starts = const_cast<mfem::Array<int>&>(graph_space_.VDofStarts());
     auto W_ptr = const_cast<mfem::SparseMatrix*>(&W);
     return new mfem::HypreParMatrix(GetComm(), vdof_starts.Last(), vdof_starts, W_ptr);
-}
-
-bool MixedMatrix::CheckW() const
-{
-    const double zero_tol = 1e-6;
-
-    unique_ptr<mfem::HypreParMatrix> pW(W_.Width() ? MakeParallelW(W_) : nullptr);
-
-    return pW && MaxNorm(*pW) > zero_tol;
 }
 
 mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const

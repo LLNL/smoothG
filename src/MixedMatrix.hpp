@@ -79,17 +79,6 @@ public:
 
     MixedMatrix(MixedMatrix&& other) noexcept;
 
-    MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
-
-    /// Get the number of vertex dofs in this matrix
-    int NumVDofs() const { return graph_space_.VertexToVDof().NumCols(); }
-
-    /// Get the number of edge dofs in this matrix
-    int NumEDofs() const { return graph_space_.VertexToEDof().NumCols(); }
-
-    /// Get the total number of dofs in this matrix
-    int NumTotalDofs() const { return NumEDofs() + NumVDofs(); }
-
     /// Assemble the mass matrix M
     void BuildM()
     {
@@ -107,20 +96,11 @@ public:
     mfem::HypreParMatrix* MakeParallelW(const mfem::SparseMatrix& W) const;
 
     /// Determine if W block is nonzero
-    bool CheckW() const;
-
-    /**
-       @brief Update mass matrix M based on new agg weight.
-
-       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
-       that is, agg_weights_inverse in the input is like the coefficient in
-       a finite volume problem, agg_weights is the weights on the mass matrix
-       in the mixed form, which is the reciprocal of that.
-    */
-    void UpdateM(const mfem::Vector& agg_weights_inverse);
+    bool CheckW() const { return W_is_nonzero_; }
 
     ///@name Getters
     ///@{
+    MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
     const Graph& GetGraph() const { return graph_space_.GetGraph(); }
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
@@ -131,6 +111,15 @@ public:
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
     const mfem::Array<int>& BlockTrueOffsets() const { return block_true_offsets_; }
     ///@}
+
+    /// Get the number of vertex dofs in this matrix
+    int NumVDofs() const { return graph_space_.VertexToVDof().NumCols(); }
+
+    /// Get the number of edge dofs in this matrix
+    int NumEDofs() const { return graph_space_.VertexToEDof().NumCols(); }
+
+    /// Get the total number of dofs in this matrix
+    int NumTotalDofs() const { return NumEDofs() + NumVDofs(); }
 
     /// Get piecewise constant projector
     const mfem::SparseMatrix& GetPWConstProj() const { return P_pwc_; }
@@ -180,6 +169,8 @@ private:
        MLMC simulations and nonlinear multigrids without visiting finest level.
     */
     mfem::SparseMatrix P_pwc_;
+
+    bool W_is_nonzero_;
 }; // class MixedMatrix
 
 } // namespace smoothg

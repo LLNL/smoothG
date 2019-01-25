@@ -55,7 +55,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     operator_.SetBlock(1, 0, D);
     if (W)
     {
-        operator_.SetBlock(1, 1, W);
+        operator_.SetBlock(1, 1, W, -1.0);
     }
 
     mfem::Vector Md;
@@ -69,12 +69,8 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     if (W_is_nonzero_)
     {
         mfem::HypreParMatrix pW(comm_, D->M(), D->RowPart(), W);
-
         nnz_ += pW.NNZ();
-
-        pW *= -1.0;
         schur_block_.reset(ParAdd(pW, *schur_block_));
-        pW *= -1.0;
     }
     else if (remove_one_dof_)
     {
@@ -133,15 +129,10 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     {
         W_.reset(new mfem::SparseMatrix(mgL.GetW()));
     }
-    else if (remove_one_dof_)
+    else if (remove_one_dof_ && myid_ == 0)
     {
         W_.reset(new mfem::SparseMatrix(mgL.NumVDofs()));
-
-        if (myid_ == 0)
-        {
-            W_->Add(0, 0, 1.0);
-        }
-        W_->Finalize();
+        W_->Add(0, 0, -1.0);
     }
 
     Init(hM_.get(), hD_.get(), W_.get());
