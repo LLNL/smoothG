@@ -81,13 +81,12 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
         nnz_ += 1;
     }
 
-    mfem::HypreDiagScale* Mprec = new mfem::HypreDiagScale(*M);
-    mfem::HypreBoomerAMG* Sprec = new mfem::HypreBoomerAMG(*schur_block_);
-    Sprec->SetPrintLevel(0);
+    Mprec_.reset(new mfem::HypreDiagScale(*M));
+    Sprec_.reset(new mfem::HypreBoomerAMG(*schur_block_));
+    Sprec_->SetPrintLevel(0);
 
-    prec_.owns_blocks = 1;
-    prec_.SetDiagonalBlock(0, Mprec);
-    prec_.SetDiagonalBlock(1, Sprec);
+    prec_.SetDiagonalBlock(0, Mprec_.get());
+    prec_.SetDiagonalBlock(1, Sprec_.get());
 
     minres_.SetPrintLevel(print_level_);
     minres_.SetMaxIter(max_num_iter_);
