@@ -46,8 +46,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     assert(M && D);
 
     mfem::HypreParMatrix* Dt = D->Transpose();
-
-    nnz_ = M->NNZ() + D->NNZ() + Dt->NNZ();
+    Dt_.reset(operator_.owns_blocks == 0 ? Dt : nullptr);
 
     operator_.SetBlock(0, 0, M);
     operator_.SetBlock(0, 1, Dt);
@@ -57,21 +56,16 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
         operator_.SetBlock(1, 1, W);
     }
 
-    std::unique_ptr<mfem::HypreParMatrix> MinvDt(D->Transpose());
     mfem::Vector Md;
     M->GetDiag(Md);
-    MinvDt->InvScaleRows(Md);
-    schur_block_.reset(mfem::ParMult(D, MinvDt.get()));
+    Dt->InvScaleRows(Md);
+    schur_block_.reset(mfem::ParMult(D, Dt));
+    Dt->ScaleRows(Md);
 
-    // D retains ownership of rows, but MinvDt will be deleted, so we need to
-    // take ownership of col_starts here.
-    hypre_ParCSRMatrixSetColStartsOwner(*schur_block_, 1);
-    hypre_ParCSRMatrixSetColStartsOwner(*MinvDt, 0);
+    nnz_ = M->NNZ() + D->NNZ() + Dt->NNZ();
 
     if (W_is_nonzero_)
     {
-        hypre_ParCSRMatrixSetColStartsOwner(*schur_block_, 0);
-        hypre_ParCSRMatrixSetColStartsOwner(*MinvDt, 1);
         mfem::HypreParMatrix pW(comm_, D->M(), D->RowPart(), W);
 
         nnz_ += pW.NNZ();
@@ -121,8 +115,6 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     }
 
     mfem::HypreParMatrix* pM = mgL.MakeParallelM(M_proc);
-    pM->CopyRowStarts();
-    pM->CopyColStarts();
 
     mfem::SparseMatrix D_proc(mgL.GetD());
     if (ess_edofs_.Size())
@@ -136,8 +128,6 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     }
 
     mfem::HypreParMatrix* pD = mgL.MakeParallelD(D_proc);
-    pD->CopyRowStarts();
-    pD->CopyColStarts();
 
     mfem::SparseMatrix* W = nullptr;
     if (W_is_nonzero_)
@@ -155,7 +145,7 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
         W->Finalize();
     }
 
-    operator_.owns_blocks = true;
+    operator_.owns_blocks = 1;
     Init(pM, pD, W);
 }
 

@@ -102,6 +102,7 @@ private:
     mfem::BlockOperator operator_;
     mfem::BlockDiagonalPreconditioner prec_;
 
+    std::unique_ptr<mfem::HypreParMatrix> Dt_;
     std::unique_ptr<mfem::HypreParMatrix> schur_block_;
 };
 
