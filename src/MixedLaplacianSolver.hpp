@@ -51,6 +51,9 @@ public:
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
     virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
+    /// Update solver based on new "element" scaling for M matrix
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse) = 0;
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) { print_level_ = print_level; }
@@ -75,6 +78,8 @@ protected:
 
     mutable mfem::BlockVector rhs_;
     mutable mfem::BlockVector sol_;
+
+    mfem::Vector elem_scaling_;
 
     // default linear solver options
     int print_level_ = 0;

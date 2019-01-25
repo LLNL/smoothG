@@ -237,7 +237,7 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
     const bool use_w = mixed_laplacian.CheckW();
     if (use_w)
     {
-        pW.reset(mixed_laplacian.MakeParallelW(*mixed_laplacian.GetW()));
+        pW.reset(mixed_laplacian.MakeParallelW(mixed_laplacian.GetW()));
     }
 
     unique_ptr<mfem::HypreParMatrix> MinvDT(pD->Transpose());

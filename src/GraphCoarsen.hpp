@@ -144,7 +144,7 @@ private:
                           const mfem::Vector& trace);
 
 
-    void BuildCoarseW(const mfem::SparseMatrix& Pvertices);
+    mfem::SparseMatrix BuildCoarseW(const mfem::SparseMatrix& Pvertices) const;
 
     /**
        @brief Build fine-level aggregate sub-M corresponding to dofs on a face
@@ -160,7 +160,7 @@ private:
 
     const mfem::SparseMatrix& M_proc_;
     const mfem::SparseMatrix& D_proc_;
-    const mfem::SparseMatrix* W_proc_;
+    const mfem::SparseMatrix& W_proc_;
     const mfem::Vector& constant_rep_;
     const ElementMBuilder* fine_mbuilder_;
     const GraphTopology& topology_;
@@ -174,9 +174,6 @@ private:
 
     /// Coarse D operator
     mfem::SparseMatrix coarse_D_;
-
-    /// Coarse W operator
-    std::unique_ptr<mfem::SparseMatrix> coarse_W_;
 
     /// Builder for coarse M operator
     std::unique_ptr<CoarseMBuilder> coarse_m_builder_;

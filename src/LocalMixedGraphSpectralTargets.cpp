@@ -70,9 +70,6 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     scaled_dual_(param.scaled_dual),
     energy_dual_(param.energy_dual),
     mgL_(mgL),
-    M_local_(mgL.GetM()),
-    D_local_(mgL.GetD()),
-    W_local_(mgL.GetW()),
     constant_rep_(mgL.GetConstantRep()),
     coarse_graph_(coarse_graph),
     dof_agg_(dof_agg),
@@ -402,7 +399,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
     // SET W in eigenvalues
     const bool use_w = false && mgL_.CheckW();
-    ParMatrix pW(use_w ? mgL_.MakeParallelW(*mgL_.GetW()) : nullptr);
+    ParMatrix pW(use_w ? mgL_.MakeParallelW(mgL_.GetW()) : nullptr);
     ParMatrix pW_ext(use_w ? RAP(*pW, *permute_v) : nullptr);
     mfem::SparseMatrix W_ext = use_w ? GetDiag(*pW_ext) : mfem::SparseMatrix();
 
@@ -626,6 +623,9 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const mfem::SparseMatrix& agg_edof = dof_agg_.agg_edof_;
     const mfem::SparseMatrix& face_edof = dof_agg_.face_edof_;
 
+    const mfem::SparseMatrix& M_proc = mgL_.GetM();
+    const mfem::SparseMatrix& D_proc = mgL_.GetD();
+
     const int nfaces = face_Agg.Height(); // Number of coarse faces
     local_edge_trace_targets.resize(nfaces);
 
@@ -738,7 +738,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 dof_counter += local_dof.Size();
             }
 
-            auto Dloc = ExtractRowAndColumns(D_local_, vertex_local_dof,
+            auto Dloc = ExtractRowAndColumns(D_proc, vertex_local_dof,
                                              face_nbh_dofs, col_map_);
             sec_D.ReduceSend(iface, Dloc);
         }
@@ -780,7 +780,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 dof_counter += local_dof.Size();
             }
 
-            auto Mloc = ExtractRowAndColumns(M_local_, face_nbh_dofs,
+            auto Mloc = ExtractRowAndColumns(M_proc, face_nbh_dofs,
                                              face_nbh_dofs, col_map_);
             sec_M.ReduceSend(iface, Mloc);
         }

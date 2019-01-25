@@ -141,8 +141,9 @@ int main(int argc, char* argv[])
 
         mfem::BlockVector work_u = k == 0 ? fine_u : hierarchy.Restrict(0, fine_u);
 
-        const mfem::SparseMatrix* W = hierarchy.GetMatrix(k).GetW();
-        assert(W);
+        assert(hierarchy.GetMatrix(k).CheckW());
+        const mfem::SparseMatrix& W = hierarchy.GetMatrix(k).GetW();
+
 
         // Setup visualization
         mfem::socketstream vis_v;
@@ -161,7 +162,7 @@ int main(int argc, char* argv[])
 
         while (time < total_time)
         {
-            W->Mult(work_u.GetBlock(1), work_rhs.GetBlock(1));
+            W.Mult(work_u.GetBlock(1), work_rhs.GetBlock(1));
 
             //tmp += work_rhs; // RHS is zero for now
             work_rhs *= -1.0;

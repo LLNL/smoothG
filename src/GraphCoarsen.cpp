@@ -566,19 +566,20 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
     return Pedges;
 }
 
-void GraphCoarsen::BuildCoarseW(const mfem::SparseMatrix& Pvertices)
+mfem::SparseMatrix GraphCoarsen::BuildCoarseW(const mfem::SparseMatrix& Pvertices) const
 {
-    if (W_proc_)
+    if (W_proc_.Width() > 0)
     {
-        coarse_W_.reset(mfem::RAP(Pvertices, *W_proc_, Pvertices));
+        auto PT = smoothg::Transpose(Pvertices);
+        auto WP = smoothg::Mult(W_proc_, Pvertices);
+        return smoothg::Mult(PT, WP);
     }
+    return SparseIdentity(0);
 }
 
 MixedMatrix GraphCoarsen::BuildCoarseMatrix(const MixedMatrix& fine_mgL,
                                             const mfem::SparseMatrix& Pvertices)
 {
-    BuildCoarseW(Pvertices);
-
     mfem::Vector coarse_const_rep(Pvertices.NumCols());
     Pvertices.MultTranspose(constant_rep_, coarse_const_rep);
 
@@ -594,7 +595,7 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(const MixedMatrix& fine_mgL,
     }
 
     return MixedMatrix(std::move(coarse_space_), std::move(coarse_m_builder_),
-                       std::move(coarse_D_), std::move(coarse_W_),
+                       std::move(coarse_D_), BuildCoarseW(Pvertices),
                        std::move(coarse_const_rep), std::move(agg_sizes), std::move(P_pwc));
 }
 

@@ -91,8 +91,8 @@ void HybridSolver::Init(
     Ainv_.resize(nAggs_);
     Hybrid_el_.resize(nAggs_);
 
-    agg_weights_.SetSize(nAggs_);
-    agg_weights_ = 1.0;
+    elem_scaling_.SetSize(nAggs_);
+    elem_scaling_ = 1.0;
 
     CreateMultiplierRelations(face_edgedof, edgedof_d_td);
 
@@ -248,14 +248,12 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         // Compute Aloc = DMinvDT = Dloc * MinvDT
         MultSparseDense(Dloc, MinvDT_i, Aloc);
 
-        if (W_)
+        if (W_.Width())
         {
-            auto Wloc = ExtractRowAndColumns(*W_, local_vertexdof, local_vertexdof,
-                                             edof_global_to_local_map);
-            mfem::DenseMatrix tmpW;
-            Full(Wloc, tmpW);
-
-            Aloc -= tmpW;
+            mfem::DenseMatrix Wloc;
+            auto& W_ref = const_cast<mfem::SparseMatrix&>(W_);
+            W_ref.GetSubMatrix(local_vertexdof, local_vertexdof, Wloc);
+            Aloc -= Wloc;
         }
 
         // Compute DMinvCT Dloc * MinvCT
@@ -406,7 +404,7 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
         // Save the element rhs (DMinvDT)^-1 f for solution recovery
         Ainv_f_[iAgg].SetSize(nlocal_vertexdof);
         Ainv_[iAgg].Mult(f_loc, Ainv_f_[iAgg]);
-        Ainv_f_[iAgg] *= agg_weights_(iAgg);
+        Ainv_f_[iAgg] *= elem_scaling_(iAgg);
     }
 }
 
@@ -452,7 +450,7 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
             sigma_loc.SetSize(nlocal_edgedof);
             MinvDT_[iAgg].Mult(u_loc, sigma_loc);
             MinvCT_[iAgg].AddMult(mu_loc, sigma_loc);
-            sigma_loc /= agg_weights_(iAgg);
+            sigma_loc /= elem_scaling_(iAgg);
         }
 
         // Save local solution to the global solution vector
@@ -630,13 +628,13 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
     }
 }
 
-void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weights_inverse)
+void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
 {
-    // This is for consistency, could simply work with agg_weight_inverse
-    agg_weights_.SetSize(agg_weights_inverse.Size());
-    for (int i = 0; i < agg_weights_.Size(); ++i)
+    // This is for consistency, could simply work with elem_scaling_inverse
+    elem_scaling_.SetSize(elem_scaling_inverse.Size());
+    for (int i = 0; i < elem_scaling_.Size(); ++i)
     {
-        agg_weights_[i] = 1.0 / agg_weights_inverse[i];
+        elem_scaling_[i] = 1.0 / elem_scaling_inverse[i];
     }
 
     // TODO: this is not valid when W is nonzero
@@ -648,7 +646,7 @@ void HybridSolver::UpdateAggScaling(const mfem::Vector& agg_weights_inverse)
     {
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
         mfem::DenseMatrix H_el = Hybrid_el_[iAgg]; // deep copy
-        H_el *= (1.0 / agg_weights_(iAgg));
+        H_el *= (1.0 / elem_scaling_(iAgg));
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, H_el);
     }
     BuildParallelSystemAndSolver(H_proc);

@@ -32,75 +32,48 @@ namespace smoothg
 {
 
 MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& w_block)
-    : graph_space_(std::move(graph))
+    : mbuilder_(new ElementMBuilder(graph.EdgeWeight(), graph.VertexToEdge())),
+      M_(mbuilder_->BuildAssembledM()), D_(ConstructD(graph)), W_(w_block),
+      graph_space_(std::move(graph)), constant_rep_(NumVDofs()),
+      vertex_sizes_(&constant_rep_[0], NumVDofs()), P_pwc_(SparseIdentity(NumVDofs()))
 {
-    const Graph& graph_ref = graph_space_.GetGraph();
-    Init(graph_ref.VertexToEdge(), graph_ref.EdgeWeight(), w_block);
+    if (w_block.Height() > 0 || w_block.Width() > 0)
+    {
+        assert(w_block.Height() == NumVDofs() && w_block.Width() == NumVDofs());
+        W_ *= -1.0;
+    }
+    constant_rep_ = 1.0;
+
+    Init();
 }
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
                          mfem::SparseMatrix D,
-                         std::unique_ptr<mfem::SparseMatrix> W,
+                         mfem::SparseMatrix W,
                          mfem::Vector constant_rep,
                          mfem::Vector vertex_sizes, mfem::SparseMatrix P_pwc)
-    : graph_space_(std::move(graph_space)), D_(std::move(D)), W_(std::move(W)),
-      mbuilder_(std::move(mbuilder)), constant_rep_(std::move(constant_rep)),
+    : mbuilder_(std::move(mbuilder)), D_(std::move(D)), W_(std::move(W)),
+      graph_space_(std::move(graph_space)), constant_rep_(std::move(constant_rep)),
       vertex_sizes_(std::move(vertex_sizes)), P_pwc_(std::move(P_pwc))
 {
-    MakeBlockOffsets();
+    Init();
 }
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
 {
-    swap(graph_space_, other.graph_space_);
-    std::swap(M_, other.M_);
+    std::swap(mbuilder_, other.mbuilder_);
+    M_.Swap(other.M_);
     D_.Swap(other.D_);
-    std::swap(W_, other.W_);
+    W_.Swap(other.W_);
+    swap(graph_space_, other.graph_space_);
     mfem::Swap(block_offsets_, other.block_offsets_);
     mfem::Swap(block_true_offsets_, other.block_true_offsets_);
-    std::swap(mbuilder_, other.mbuilder_);
     constant_rep_.Swap(other.constant_rep_);
     vertex_sizes_.Swap(other.vertex_sizes_);
     P_pwc_.Swap(other.P_pwc_);
 }
 
-void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
-{
-    assert(mbuilder_);
-    M_ = mbuilder_->BuildAssembledM(agg_weights_inverse);
-}
-
-/// @todo better documentation of the 1/-1 issue, make it optional?
-void MixedMatrix::Init(const mfem::SparseMatrix& vertex_edge,
-                       const std::vector<mfem::Vector>& edge_weight_split,
-                       const mfem::SparseMatrix& w_block)
-{
-    const int nvertices = vertex_edge.Height();
-
-    //    SetMFromWeightVector(weight);
-    mbuilder_ = make_unique<ElementMBuilder>(edge_weight_split, vertex_edge);
-    M_ = mbuilder_->BuildAssembledM();
-
-    if (w_block.Height() == nvertices && w_block.Width() == nvertices)
-    {
-        W_ = make_unique<mfem::SparseMatrix>(w_block);
-        (*W_) *= -1.0;
-    }
-
-    ConstructD(vertex_edge);
-
-    MakeBlockOffsets();
-
-    constant_rep_.SetSize(NumVDofs());
-    constant_rep_ = 1.0;
-
-    vertex_sizes_.SetDataAndSize(constant_rep_.GetData(), constant_rep_.Size());
-
-    mfem::SparseMatrix identity_v = SparseIdentity(GetGraph().NumVertices());
-    P_pwc_.Swap(identity_v);
-}
-
-void MixedMatrix::MakeBlockOffsets()
+void MixedMatrix::Init()
 {
     block_offsets_.SetSize(3, 0);
     block_offsets_[1] = NumEDofs();
@@ -109,6 +82,12 @@ void MixedMatrix::MakeBlockOffsets()
     block_true_offsets_.SetSize(3, 0);
     block_true_offsets_[1] = graph_space_.EDofToTrueEDof().NumCols();
     block_true_offsets_[2] = block_true_offsets_[1] + NumVDofs();
+}
+
+void MixedMatrix::UpdateM(const mfem::Vector& agg_weights_inverse)
+{
+    auto M_tmp = mbuilder_->BuildAssembledM(agg_weights_inverse);
+    M_.Swap(M_tmp);
 }
 
 mfem::HypreParMatrix* MixedMatrix::MakeParallelM(const mfem::SparseMatrix& M) const
@@ -134,14 +113,15 @@ bool MixedMatrix::CheckW() const
 {
     const double zero_tol = 1e-6;
 
-    unique_ptr<mfem::HypreParMatrix> pW(W_ ? MakeParallelW(*W_) : nullptr);
+    unique_ptr<mfem::HypreParMatrix> pW(W_.Width() ? MakeParallelW(W_) : nullptr);
 
     return pW && MaxNorm(*pW) > zero_tol;
 }
 
-void MixedMatrix::ConstructD(const mfem::SparseMatrix& vertex_edge)
+mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
 {
-    const mfem::HypreParMatrix& edge_trueedge = GetGraph().EdgeToTrueEdge();
+    const mfem::SparseMatrix& vertex_edge = graph.VertexToEdge();
+    const mfem::HypreParMatrix& edge_trueedge = graph.EdgeToTrueEdge();
 
     // Nonzero row of edge_owned means the edge is owned by the local proc
     mfem::SparseMatrix edge_owned;
@@ -173,8 +153,7 @@ void MixedMatrix::ConstructD(const mfem::SparseMatrix& vertex_edge)
         }
     }
 
-    mfem::SparseMatrix D = smoothg::Transpose(graphDT);
-    D_.Swap(D);
+    return smoothg::Transpose(graphDT);
 }
 
 } // namespace smoothg

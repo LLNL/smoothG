@@ -72,7 +72,7 @@ public:
     MixedMatrix(GraphSpace graph_space,
                 std::unique_ptr<MBuilder> mbuilder,
                 mfem::SparseMatrix D,
-                std::unique_ptr<mfem::SparseMatrix> W,
+                mfem::SparseMatrix W,
                 mfem::Vector constant_rep,
                 mfem::Vector vertex_sizes,
                 mfem::SparseMatrix P_pwc);
@@ -81,25 +81,20 @@ public:
 
     MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
 
-    /// Get the number of vertex dofs in this matrix.
+    /// Get the number of vertex dofs in this matrix
     int NumVDofs() const { return graph_space_.VertexToVDof().NumCols(); }
 
-    /// Get the number of edge dofs in this matrix.
+    /// Get the number of edge dofs in this matrix
     int NumEDofs() const { return graph_space_.VertexToEDof().NumCols(); }
 
-    /// Get the total number of dofs in this matrix.
+    /// Get the total number of dofs in this matrix
     int NumTotalDofs() const { return NumEDofs() + NumVDofs(); }
 
-    /**
-       @brief Assemble the mass matrix M.
-    */
+    /// Assemble the mass matrix M
     void BuildM()
     {
-        if (!M_)
-        {
-            assert(mbuilder_);
-            M_ = mbuilder_->BuildAssembledM();
-        }
+        auto M_tmp = mbuilder_->BuildAssembledM();
+        M_.Swap(M_tmp);
     }
 
     /// assemble the parallel edge mass matrix
@@ -129,10 +124,10 @@ public:
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
     const Graph& GetGraph() const { return graph_space_.GetGraph(); }
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
-    const mfem::SparseMatrix& GetM() const { assert(M_); return *M_; }
-    const MBuilder& GetMBuilder() const { assert(mbuilder_); return *mbuilder_; }
+    const mfem::SparseMatrix& GetM() const { return M_; }
+    const MBuilder& GetMBuilder() const { return *mbuilder_; }
     const mfem::SparseMatrix& GetD() const { return D_; }
-    const mfem::SparseMatrix* GetW() const { return W_.get(); }
+    const mfem::SparseMatrix& GetW() const { return W_; }
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
     const mfem::Array<int>& BlockTrueOffsets() const { return block_true_offsets_; }
     ///@}
@@ -147,29 +142,25 @@ public:
     const mfem::Vector& GetVertexSizes() const { return vertex_sizes_; }
 
 private:
+    void Init();
+
     /**
        Helper routine for the constructors of distributed graph. Note well that
        vertex_edge is assumed undirected (all ones) when it comes in, and we
        modify it to have -1, 1 in the resulting D_ matrix.
     */
-    void Init(const mfem::SparseMatrix& vertex_edge,
-              const std::vector<mfem::Vector>& edge_weight_split,
-              const mfem::SparseMatrix& w_block);
+    mfem::SparseMatrix ConstructD(const Graph& graph) const;
 
-    void ConstructD(const mfem::SparseMatrix& vertex_edge);
+    std::unique_ptr<MBuilder> mbuilder_;
 
-    void MakeBlockOffsets();
+    mfem::SparseMatrix M_;
+    mfem::SparseMatrix D_;
+    mfem::SparseMatrix W_;
 
     GraphSpace graph_space_;
 
-    std::unique_ptr<mfem::SparseMatrix> M_;
-    mfem::SparseMatrix D_;
-    std::unique_ptr<mfem::SparseMatrix> W_;
-
     mfem::Array<int> block_offsets_;
     mfem::Array<int> block_true_offsets_;
-
-    std::unique_ptr<MBuilder> mbuilder_;
 
     mfem::Vector constant_rep_;
 

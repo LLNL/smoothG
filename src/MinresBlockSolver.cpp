@@ -45,11 +45,13 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 {
     assert(M && D);
 
-    mfem::HypreParMatrix* Dt = D->Transpose();
-    Dt_.reset(operator_.owns_blocks == 0 ? Dt : nullptr);
+    if (!hDt_)
+    {
+        hDt_.reset(D->Transpose());
+    }
 
     operator_.SetBlock(0, 0, M);
-    operator_.SetBlock(0, 1, Dt);
+    operator_.SetBlock(0, 1, hDt_.get());
     operator_.SetBlock(1, 0, D);
     if (W)
     {
@@ -58,11 +60,11 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 
     mfem::Vector Md;
     M->GetDiag(Md);
-    Dt->InvScaleRows(Md);
-    schur_block_.reset(mfem::ParMult(D, Dt));
-    Dt->ScaleRows(Md);
+    hDt_->InvScaleRows(Md);
+    schur_block_.reset(mfem::ParMult(D, hDt_.get()));
+    hDt_->ScaleRows(Md);
 
-    nnz_ = M->NNZ() + D->NNZ() + Dt->NNZ();
+    nnz_ = M->NNZ() + D->NNZ() + hDt_->NNZ();
 
     if (W_is_nonzero_)
     {
@@ -114,7 +116,7 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
             M_proc.EliminateRowCol(mm, true);
     }
 
-    mfem::HypreParMatrix* pM = mgL.MakeParallelM(M_proc);
+    hM_.reset(mgL.MakeParallelM(M_proc));
 
     mfem::SparseMatrix D_proc(mgL.GetD());
     if (ess_edofs_.Size())
@@ -127,30 +129,24 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
         D_proc.EliminateRow(0);
     }
 
-    mfem::HypreParMatrix* pD = mgL.MakeParallelD(D_proc);
+    hD_.reset(mgL.MakeParallelD(D_proc));
 
-    mfem::SparseMatrix* W = nullptr;
     if (W_is_nonzero_)
     {
-        W = new mfem::SparseMatrix(*mgL.GetW());
+        W_.reset(new mfem::SparseMatrix(mgL.GetW()));
     }
     else if (remove_one_dof_)
     {
-        W = new mfem::SparseMatrix(mgL.NumVDofs());
+        W_.reset(new mfem::SparseMatrix(mgL.NumVDofs()));
 
         if (myid_ == 0)
         {
-            W->Add(0, 0, 1.0);
+            W_->Add(0, 0, 1.0);
         }
-        W->Finalize();
+        W_->Finalize();
     }
 
-    operator_.owns_blocks = 1;
-    Init(pM, pD, W);
-}
-
-MinresBlockSolver::~MinresBlockSolver()
-{
+    Init(hM_.get(), hD_.get(), W_.get());
 }
 
 void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
@@ -198,18 +194,20 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     num_iterations_ = minres_.GetNumIterations();
 }
 
-/**
-   MinresBlockSolver acts on "true" dofs, this one does not.
-*/
+void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
+{
+    auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
+    hM_.reset(mixed_matrix_.MakeParallelM(M_proc));
+
+    Init(hM_.get(), hD_.get(), W_.get());
+}
+
+
 MinresBlockSolverFalse::MinresBlockSolverFalse(const MixedMatrix& mgL,
                                                const mfem::Array<int>* ess_attr)
     :
     MinresBlockSolver(mgL, ess_attr),
     mixed_matrix_(mgL)
-{
-}
-
-MinresBlockSolverFalse::~MinresBlockSolverFalse()
 {
 }
 

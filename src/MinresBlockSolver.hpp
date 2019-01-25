@@ -77,12 +77,15 @@ public:
     MinresBlockSolver(const MixedMatrix& mgL,
                       const mfem::Array<int>* ess_attr = nullptr);
 
-    ~MinresBlockSolver();
-
     /**
        @brief Use block-preconditioned MINRES to solve the problem.
     */
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
+    {
+        mfem::mfem_error("This is currently not supported!\n");
+    }
 
     ///@name Set solver parameters
     ///@{
@@ -95,15 +98,19 @@ public:
 protected:
     mfem::MINRESSolver minres_;
 
-private:
     void Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
               mfem::SparseMatrix* W);
 
     mfem::BlockOperator operator_;
     mfem::BlockDiagonalPreconditioner prec_;
 
-    std::unique_ptr<mfem::HypreParMatrix> Dt_;
     std::unique_ptr<mfem::HypreParMatrix> schur_block_;
+
+    std::unique_ptr<mfem::SparseMatrix> W_;
+
+    std::unique_ptr<mfem::HypreParMatrix> hM_;
+    std::unique_ptr<mfem::HypreParMatrix> hD_;
+    std::unique_ptr<mfem::HypreParMatrix> hDt_;
 };
 
 /**
@@ -114,12 +121,12 @@ class MinresBlockSolverFalse : public MinresBlockSolver
 public:
     MinresBlockSolverFalse(const MixedMatrix& mgL,
                            const mfem::Array<int>* ess_attr = nullptr);
-    ~MinresBlockSolverFalse();
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
 
     virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 private:
     const MixedMatrix& mixed_matrix_;
 };

@@ -20,7 +20,7 @@
 namespace smoothg
 {
 
-std::unique_ptr<mfem::SparseMatrix> MBuilder::BuildAssembledM() const
+mfem::SparseMatrix MBuilder::BuildAssembledM() const
 {
     mfem::Vector agg_weights_inverse(num_aggs_);
     agg_weights_inverse = 1.0;
@@ -29,8 +29,8 @@ std::unique_ptr<mfem::SparseMatrix> MBuilder::BuildAssembledM() const
 
 ElementMBuilder::ElementMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
                                  const mfem::SparseMatrix& elem_edgedof)
-    : elem_edgedof_(elem_edgedof)
 {
+    elem_edgedof_.MakeRef(elem_edgedof);
     num_aggs_ = elem_edgedof_.Height();
     M_el_.resize(num_aggs_);
 
@@ -146,20 +146,20 @@ void ElementMBuilder::AddTraceAcross(int row, int col, int agg, double value)
     M_el_loc(id0_in_agg, id1_in_agg) += value;
 }
 
-std::unique_ptr<mfem::SparseMatrix> ElementMBuilder::BuildAssembledM(
+mfem::SparseMatrix ElementMBuilder::BuildAssembledM(
     const mfem::Vector& agg_weights_inverse) const
 {
     mfem::Array<int> edofs;
-    auto M = make_unique<mfem::SparseMatrix>(elem_edgedof_.Width());
+    mfem::SparseMatrix M(elem_edgedof_.Width());
     for (int Agg = 0; Agg < elem_edgedof_.Height(); Agg++)
     {
         GetTableRow(elem_edgedof_, Agg, edofs);
         const double agg_weight = 1. / agg_weights_inverse(Agg);
         mfem::DenseMatrix agg_M = M_el_[Agg];
         agg_M *= agg_weight;
-        M->AddSubMatrix(edofs, edofs, agg_M);
+        M.AddSubMatrix(edofs, edofs, agg_M);
     }
-    M->Finalize();
+    M.Finalize();
     return M;
 }
 
@@ -196,7 +196,7 @@ mfem::DenseMatrix CoefficientMBuilder::RTDP(const mfem::DenseMatrix& R,
     mfem::DenseMatrix Rt;
     Rt.Transpose(R);
     Rt.RightScaling(D);
-    Mult(Rt, P, out);
+    mfem::Mult(Rt, P, out);
     return out;
 }
 
@@ -295,7 +295,7 @@ void CoefficientMBuilder::BuildComponents(const mfem::Vector& fineMdiag,
 
 /// this shares a lot of code with BuildComponents, but I'm not sure it makes
 /// sense to combine them in any way.
-std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
+mfem::SparseMatrix CoefficientMBuilder::BuildAssembledM(
     const mfem::Vector& agg_weights_inverse) const
 {
     const int num_aggs = Agg_face_ref_.Height();
@@ -304,9 +304,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
     // ---
     // assemble from components...
     // ---
-    auto CoarseM = make_unique<mfem::SparseMatrix>(
-                       total_num_traces_ + ncoarse_vertexdofs_ - num_aggs,
-                       total_num_traces_ + ncoarse_vertexdofs_ - num_aggs);
+    mfem::SparseMatrix CoarseM(total_num_traces_ + ncoarse_vertexdofs_ - num_aggs);
 
     // F_F block, the P_F^T M_F P_F pieces
     mfem::Array<int> neighbor_aggs;
@@ -326,7 +324,7 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
                                  agg_weights_inverse[neighbor_aggs[1]]);
         }
         GetCoarseFaceDofs(face_cdof_ref_, face, coarse_face_dofs);
-        AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_face_dofs,
+        AddScaledSubMatrix(CoarseM, coarse_face_dofs, coarse_face_dofs,
                            comp_F_F_[face], face_weight);
     }
 
@@ -347,13 +345,13 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
             {
                 int faceprime = local_faces[fprime];
                 GetCoarseFaceDofs(face_cdof_ref_, faceprime, coarse_face_dofs_prime);
-                AddScaledSubMatrix(*CoarseM, coarse_face_dofs,
+                AddScaledSubMatrix(CoarseM, coarse_face_dofs,
                                    coarse_face_dofs_prime, comp_EF_EF_[counter],
                                    agg_weight);
                 if (f != fprime)
                 {
                     mfem::DenseMatrix EFEFtrans(comp_EF_EF_[counter], 't');
-                    AddScaledSubMatrix(*CoarseM, coarse_face_dofs_prime,
+                    AddScaledSubMatrix(CoarseM, coarse_face_dofs_prime,
                                        coarse_face_dofs, EFEFtrans,
                                        agg_weight);
                 }
@@ -369,24 +367,24 @@ std::unique_ptr<mfem::SparseMatrix> CoefficientMBuilder::BuildAssembledM(
     {
         double agg_weight = 1. / agg_weights_inverse[agg];
         GetCoarseAggDofs(agg, coarse_agg_dofs);
-        AddScaledSubMatrix(*CoarseM, coarse_agg_dofs, coarse_agg_dofs,
+        AddScaledSubMatrix(CoarseM, coarse_agg_dofs, coarse_agg_dofs,
                            comp_E_E_[agg], agg_weight);
         GetTableRow(Agg_face_ref_, agg, local_faces);
         for (int af = 0; af < local_faces.Size(); ++af)
         {
             int face = local_faces[af];
             GetCoarseFaceDofs(face_cdof_ref_, face, coarse_face_dofs);
-            AddScaledSubMatrix(*CoarseM, coarse_face_dofs, coarse_agg_dofs,
+            AddScaledSubMatrix(CoarseM, coarse_face_dofs, coarse_agg_dofs,
                                comp_EF_E_[counter], agg_weight);
             mfem::DenseMatrix E_EF(comp_EF_E_[counter], 't');
-            AddScaledSubMatrix(*CoarseM, coarse_agg_dofs, coarse_face_dofs,
+            AddScaledSubMatrix(CoarseM, coarse_agg_dofs, coarse_face_dofs,
                                E_EF, agg_weight);
             counter++;
         }
     }
 
-    CoarseM->Finalize(0);
-    return std::move(CoarseM);
+    CoarseM.Finalize(0);
+    return CoarseM;
 }
 
 }

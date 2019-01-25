@@ -405,17 +405,7 @@ void Hierarchy::DumpDebug(const std::string& prefix) const
 
 void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coeff)
 {
-    if (!param_.hybridization)
-    {
-        GetMatrix(level).UpdateM(coeff);
-        MakeSolver(level);
-    }
-    else
-    {
-        auto hybrid_solver = dynamic_cast<HybridSolver*>(solvers_[level].get());
-        assert(hybrid_solver);
-        hybrid_solver->UpdateAggScaling(coeff);
-    }
+    solvers_[level]->UpdateElemScaling(coeff);
 }
 
 int Hierarchy::NumVertices(int level) const

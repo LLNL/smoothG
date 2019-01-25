@@ -255,9 +255,6 @@ private:
     const bool energy_dual_;
 
     const MixedMatrix& mgL_;
-    const mfem::SparseMatrix& M_local_;
-    const mfem::SparseMatrix& D_local_;
-    const mfem::SparseMatrix* W_local_;
     const mfem::Vector& constant_rep_;
 
     const Graph& coarse_graph_;
