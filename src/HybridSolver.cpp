@@ -250,7 +250,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         if (W_.Width())
         {
-            mfem::DenseMatrix Wloc;
+            mfem::DenseMatrix Wloc(nlocal_vertexdof, nlocal_vertexdof);
             auto& W_ref = const_cast<mfem::SparseMatrix&>(W_);
             W_ref.GetSubMatrix(local_vertexdof, local_vertexdof, Wloc);
             Aloc -= Wloc;
