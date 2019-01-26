@@ -292,7 +292,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 }
 
 
-/// @todo nonzero BC, solve on true dof
+/// @todo nonzero Neumann BC (edge unknown), solve on true dof (original system)
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
     RHSTransform(Rhs, Hrhs_);
