@@ -141,7 +141,6 @@ void HybridSolver::CreateMultiplierRelations(
     mfem::Array<int> j_array(mult_edof.GetJ(), mult_edof.NumNonZeroElems());
     j_array.Copy(multiplier_to_edof_);
 
-    Agg_multiplier_.Clear(); // FIXME(CSL 1/14/2019): this line is not needed?
     mfem::SparseMatrix Agg_m_tmp(smoothg::Mult(Agg_edgedof_, edgedof_multiplier));
     Agg_multiplier_.Swap(Agg_m_tmp);
 
@@ -290,7 +289,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 }
 
 
-/// @todo nonzero BC, solve on true dof
+/// @todo nonzero Neumann BC (edge unknown), solve on true dof (original system)
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
     RHSTransform(Rhs, Hrhs_);
