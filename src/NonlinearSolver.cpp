@@ -23,8 +23,8 @@
 namespace smoothg
 {
 
-NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size)
-    : comm_(comm), size_(size), residual_(size)
+NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, std::string tag)
+    : comm_(comm), size_(size), tag_(tag), residual_(size)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -41,51 +41,71 @@ double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector
     return mfem::ParNormlp(true_resid, 2, comm_);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle)
-    : NonlinearSolver(comm, size), cycle_(cycle), num_levels_(num_levels),
-      rhs_(num_levels_), sol_(num_levels_), help_(num_levels_)
+void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 {
+    if (max_num_iter_ == 1)
+    {
+        IterationStep(rhs, sol);
+    }
+    else
+    {
+        mfem::StopWatch chrono;
+        chrono.Start();
+
+        mfem::Vector zero_vec(sol);
+        zero_vec = 0.0;
+        double norm = ResidualNorm(zero_vec, rhs);
+
+        converged_ = false;
+        for (iter_ = 0; iter_ < max_num_iter_; iter_++)
+        {
+            double resid = ResidualNorm(sol, rhs);
+            double rel_resid = resid / norm;
+
+            if (myid_ == 0 && print_level_ > 0)
+            {
+                std::cout << tag_ << " iter " << iter_ << ":  rel resid = "
+                          << rel_resid << "  abs resid = " << resid << "\n";
+            }
+
+            if (resid < atol_ || rel_resid < rtol_)
+            {
+                converged_ = true;
+                break;
+            }
+
+            IterationStep(rhs, sol);
+        }
+
+        if (myid_ == 0 && !converged_ && print_level_ >= 0)
+        {
+            std::cout << "Warning: " << tag_ << " solver reached maximum "
+                      << "number of iterations!\n";
+        }
+        else if (myid_ == 0 && print_level_ >= 0)
+        {
+            std::cout << tag_ << " solver took " << iter_ << " iterations in "
+                      << chrono.RealTime() << " seconds.\n\n";
+        }
+    }
 }
+
+NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle)
+    : NonlinearSolver(comm, size, "Nonlinear MG"), cycle_(cycle),
+      num_levels_(num_levels), rhs_(num_levels_), sol_(num_levels_), help_(num_levels_)
+{ }
 
 void NonlinearMG::Mult(const mfem::Vector& x, mfem::Vector& Rx)
 {
     Mult(0, x, Rx);
 }
 
-void NonlinearMG::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
+void NonlinearMG::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    mfem::Vector zero_vec(sol);
-    zero_vec = 0.0;
-    double norm = ResidualNorm(zero_vec, rhs);
-
     rhs_[0] = rhs;
     sol_[0] = sol;
-    converged_ = false;
 
-    for (iter_ = 0; iter_ < max_num_iter_; iter_++)
-    {
-        double resid = ResidualNorm(sol_[0], rhs);
-        double rel_resid = resid / norm;
-
-        if (myid_ == 0 && print_level_ > 0)
-        {
-            std::cout << "Nonlinear MG iter " << iter_ << ":  rel resid = "
-                      << rel_resid << "  abs resid = " << resid << "\n";
-        }
-
-        if (resid < atol_ || rel_resid < rtol_)
-        {
-            converged_ = true;
-            break;
-        }
-
-        FAS_Cycle(0);
-    }
-
-    if (myid_ == 0 && !converged_ && print_level_ >= 0)
-    {
-        std::cout << "Warning: Nonlinear MG reached maximum number of iterations!\n";
-    }
+    FAS_Cycle(0);
 
     sol = sol_[0];
 }
@@ -134,11 +154,5 @@ void NonlinearMG::FAS_Cycle(int level)
         Smoothing(level, rhs_[level], sol_[level]);
     }
 }
-
-//mfem::Vector NonlinearMG::AssembleTrueVector(const mfem::Vector& vec_dof) const
-//{
-//    return hierarchy_.AssembleTrueVector(0, vec_dof);
-//}
-
 
 } // namespace smoothg

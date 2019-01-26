@@ -43,18 +43,16 @@ public:
     */
     SingleLevelSolver(Hierarchy& hierarchy, int level, SolveType solve_type);
 
-    // Solve A(sol) = rhs
-    virtual void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
-
     // Compute Ax = A(x).
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
 
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const;
-
 private:
-    void PicardSolve(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
-    void NewtonSolve(const mfem::BlockVector& rhs, mfem::BlockVector& x);
+    void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
+
+    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
+
+    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
 
     int level_;
     Hierarchy& hierarchy_;
@@ -72,11 +70,9 @@ class EllipticNLMG : public NonlinearMG
 {
 public:
     EllipticNLMG(Hierarchy& hierarchy_, Cycle cycle, SolveType solve_type);
-    EllipticNLMG() = delete;
-
-    virtual void Solve(const mfem::Vector& rhs, mfem::Vector& sol)
+    void Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     {
-        NonlinearMG::Solve(rhs, sol);
+        NonlinearSolver::Solve(rhs, sol);
     }
 
 private:
@@ -85,21 +81,14 @@ private:
     virtual void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const;
     virtual void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const;
     virtual void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const;
-    virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) const;
-//    virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec_dof) const;
-//    virtual mfem::Vector SelectTrueVector(int level, const mfem::Vector& vec_dof) const;
-//    virtual mfem::Vector RestrictTrueVector(int level, const mfem::Vector& vec_tdof) const;
-//    virtual mfem::Vector DistributeTrueVector(int level, const mfem::Vector& vec_tdof) const;
-    virtual int DomainSize(int level) const { return solvers_[level]->Size(); }
-    virtual int RangeSize(int level) const { return solvers_[level]->Size(); }
-
-    const mfem::Array<int>& Offsets(int level) const;
+    virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out);
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
     virtual int LevelSize(int level) const;
 
+    const mfem::Array<int>& Offsets(int level) const;
+
     Hierarchy& hierarchy_;
-    std::vector<unique_ptr<SingleLevelSolver> > solvers_;
-    mfem::Vector PuTPu_diag_;
+    std::vector<SingleLevelSolver> solvers_;
 };
 
 void Kappa(const mfem::Vector& p, mfem::Vector& kp);
@@ -107,7 +96,6 @@ void Kappa(const mfem::Vector& p, mfem::Vector& kp);
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
-    picojson::object serialize;
 
     // 1. Initialize MPI
     mpi_session session(argc, argv);
@@ -165,10 +153,10 @@ int main(int argc, char* argv[])
     coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
 
     mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
-    // Egg, Lognormal
-    //    ess_attr = 0;
-    // Richard
+    // SPE10, Egg model, Lognormal coefficient
     ess_attr = 0;
+    // Richard
+//    ess_attr = 0;
 //    ess_attr[0] = 0;
 
     // Setting up finite volume discretization problem
@@ -220,9 +208,7 @@ int main(int argc, char* argv[])
     rhs.GetBlock(0) = 0.0;//fv_problem.GetEdgeRHS();;
     rhs.GetBlock(1) = 1.0;//fv_problem.GetVertexRHS();
 
-    mfem::StopWatch chrono;
-    chrono.Clear();
-    chrono.Start();
+
 
     mfem::BlockVector sol_picard(rhs);
     sol_picard = 0.0;
@@ -233,18 +219,7 @@ int main(int argc, char* argv[])
     //    sol_picard.GetBlock(1) = Z_vector_glo;
     //    sol_picard.GetBlock(1) *= -1.0;;
 
-//    hierarchy.Solve(0, rhs, sol_picard);
-
     sls.Solve(rhs, sol_picard);
-
-    if (myid == 0)
-    {
-        std::cout << "Picard iteration took " << sls.GetNumIterations()
-                  << " iterations in " << chrono.RealTime() << " seconds.\n\n";
-    }
-
-    chrono.Clear();
-    chrono.Start();
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
@@ -261,12 +236,6 @@ int main(int argc, char* argv[])
     //    int kk = 4;
     //    upscale.Solve(kk, rhs, sol_nlmg);
     //    upscale.ShowSolveInfo(kk);
-
-    if (myid == 0)
-    {
-        std::cout << "Nonlinear MG took " << nlmg.GetNumIterations()
-                  << " iterations in " << chrono.RealTime() << " seconds.\n";
-    }
 
     double p_err = CompareError(comm, sol_picard.GetBlock(1), sol_nlmg.GetBlock(1));
     if (myid == 0)
@@ -291,7 +260,7 @@ int main(int argc, char* argv[])
 /// @todo take MixedMatrix only
 SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level, SolveType solve_type)
     : NonlinearSolver(hierarchy.GetMatrix(level).GetComm(),
-                      hierarchy.GetMatrix(level).NumTotalDofs()),
+                      hierarchy.GetMatrix(level).NumTotalDofs(), "Picard"),
       level_(level), hierarchy_(hierarchy), solve_type_(solve_type),
       offsets_(hierarchy_.GetMatrix(level).BlockOffsets()),
       p_(hierarchy_.GetMatrix(level).GetGraph().NumVertices()),
@@ -310,62 +279,22 @@ void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
     hierarchy_.GetMatrix(level_).Mult(kp_, block_x, block_Ax);
 }
 
-mfem::Vector SingleLevelSolver::AssembleTrueVector(const mfem::Vector& vec_dof) const
+mfem::Vector SingleLevelSolver::AssembleTrueVector(const mfem::Vector& vec) const
 {
-    return hierarchy_.GetMatrix(level_).AssembleTrueVector(vec_dof);
+    return hierarchy_.GetMatrix(level_).AssembleTrueVector(vec);
 }
 
-void SingleLevelSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
+void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    assert(solve_type_ == Newton || solve_type_ == Picard);
-
     mfem::BlockVector block_sol(sol.GetData(), offsets_);
     mfem::BlockVector block_rhs(rhs.GetData(), offsets_);
     if (solve_type_ == Picard)
     {
-        PicardSolve(block_rhs, block_sol);
+        PicardStep(block_rhs, block_sol);
     }
     else
     {
-        NewtonSolve(block_rhs, block_sol);
-    }
-    sol = block_sol;
-}
-
-void SingleLevelSolver::PicardSolve(const mfem::BlockVector& rhs, mfem::BlockVector& x)
-{
-    if (max_num_iter_ == 1)
-    {
-        PicardStep(rhs, x);
-    }
-    else
-    {
-        double norm = mfem::ParNormlp(rhs, 2, comm_);
-        converged_ = false;
-        for (iter_ = 0; iter_ < max_num_iter_; iter_++)
-        {
-            double resid = ResidualNorm(x, rhs);
-            double rel_resid = resid / norm;
-
-            if (myid_ == 0 && print_level_ > 0)
-            {
-                std::cout << "Picard iter " << iter_ << ":  rel resid = "
-                          << rel_resid << "  abs resid = " << resid << "\n";
-            }
-
-            if (resid < atol_ || rel_resid < rtol_)
-            {
-                converged_ = true;
-                break;
-            }
-
-            PicardStep(rhs, x);
-        }
-
-        if (myid_ == 0 && !converged_ && print_level_ >= 0)
-        {
-            std::cout << "Warning: Picard iteration reached maximum number of iterations!\n";
-        }
+        NewtonStep(block_rhs, block_sol);
     }
 }
 
@@ -376,7 +305,7 @@ void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVect
     hierarchy_.RescaleCoefficient(level_, kp_);
 
     //    if (level_  < up_.NumLevels())
-    hierarchy_.SetMaxIter(max_num_iter_ * 1000);
+//    hierarchy_.SetMaxIter(max_num_iter_ * 1000);
     //    else
     //        up_.SetMaxIter(20);
 
@@ -384,7 +313,7 @@ void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVect
     //    up_.ShowSolveInfo(level_);
 }
 
-void SingleLevelSolver::NewtonSolve(const mfem::BlockVector& rhs, mfem::BlockVector& x)
+void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     // TBD...
 }
@@ -418,22 +347,22 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, Cycle cycle, SolveType solve_ty
         sol_[level] = 0.0;
         help_[level] = 0.0;
 
-        solvers_.emplace_back(new SingleLevelSolver(hierarchy_, level, solve_type));
-        solvers_[level]->SetPrintLevel(-1);
-        solvers_[level]->SetMaxIter(1);
+        solvers_.emplace_back(hierarchy_, level, solve_type);
+        solvers_[level].SetPrintLevel(-1);
+        solvers_[level].SetMaxIter(1);
     }
 }
 
 void EllipticNLMG::Mult(
     int level, const mfem::Vector& x, mfem::Vector& Ax)
 {
-    solvers_[level]->Mult(x, Ax);
+    solvers_[level].Mult(x, Ax);
 }
 
 void EllipticNLMG::Solve(
     int level, const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    solvers_[level]->Solve(rhs, sol);
+    solvers_[level].Solve(rhs, sol);
 }
 
 void EllipticNLMG::Restrict(
@@ -458,10 +387,9 @@ void EllipticNLMG::Project(
     coarse = hierarchy_.Project(level, block_fine);
 }
 
-void EllipticNLMG::Smoothing(
-    int level, const mfem::Vector& in, mfem::Vector& out) const
+void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
-    solvers_[level]->Solve(in, out);
+    solvers_[level].Solve(in, out);
 }
 
 //mfem::Vector EllipticNLMG::SelectTrueVector(

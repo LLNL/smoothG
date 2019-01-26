@@ -139,15 +139,9 @@ public:
 
     double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
 
-    const mfem::SparseMatrix& GetPsigma(int level) const
-    {
-        return Psigma_[level];
-    }
+    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
 
-    const mfem::SparseMatrix& GetPu(int level) const
-    {
-        return Pu_[level];
-    }
+    const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
 
     /// Create solver on level
     void MakeSolver(int level);

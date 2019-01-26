@@ -90,7 +90,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     minres_.SetAbsTol(atol_);
     minres_.SetPreconditioner(prec_);
     minres_.SetOperator(operator_);
-    minres_.iterative_mode = false;
+//    minres_.iterative_mode = false;
 }
 
 MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
