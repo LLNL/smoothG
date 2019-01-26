@@ -33,3 +33,4 @@
 #include "Sampler.hpp"
 #include "GraphSpace.hpp"
 #include "Hierarchy.hpp"
+#include "NonlinearSolver.hpp"

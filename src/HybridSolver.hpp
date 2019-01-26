@@ -171,16 +171,20 @@ private:
 
     void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr);
 
+    void CheckSharing();
+
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
+
+    mfem::Array<int> is_edgedof_shared_;
 
     const mfem::SparseMatrix& D_;
     const mfem::SparseMatrix& W_;
 
     std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
-    std::unique_ptr<mfem::CGSolver> cg_;
+    mfem::CGSolver cg_;
 
     // eliminated part of H_ (for applying elimination in repeated solves)
     std::unique_ptr<mfem::HypreParMatrix> H_elim_;
@@ -191,8 +195,10 @@ private:
     std::vector<mfem::DenseMatrix> MinvCT_;
     std::vector<mfem::DenseMatrix> AinvDMinvCT_;
     std::vector<mfem::DenseMatrix> Ainv_;
+    std::vector<mfem::DenseMatrix> Minv_;
 
-    mutable std::vector<mfem::Vector> Ainv_f_;
+    mutable std::vector<mfem::Vector> Minv_g_;
+    mutable std::vector<mfem::Vector> local_rhs_;
 
     mfem::Array<int> ess_true_multipliers_;
     mfem::Array<int> multiplier_to_edof_;

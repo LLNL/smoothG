@@ -95,6 +95,11 @@ public:
     /// assemble the parallel W matrix
     mfem::HypreParMatrix* MakeParallelW(const mfem::SparseMatrix& W) const;
 
+    /// assemble a local vector into true vector
+    mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
+
+    void Mult(const mfem::Vector& scale, const mfem::BlockVector &x, mfem::BlockVector &y) const;
+
     /// Determine if W block is nonzero
     bool CheckW() const { return W_is_nonzero_; }
 
