@@ -122,18 +122,12 @@ public:
        which is used to generate samples on both fine and coarse grids, where w
        is a white noise right-hand side.
 
-       @param vertex_edge the fine graph structure
-       @param weight edge weights on fine graph
+       @param graph the (distributed and weighted) fine graph
        @param partitioning pre-calculated agglomerate partitioning
-       @param edge_d_td parallel dof-truedof relation for fine edges
     */
-    PDESampler(MPI_Comm comm, int dimension,
-               double cell_volume, double kappa, int seed,
-               const mfem::SparseMatrix& vertex_edge,
-               const mfem::Vector& weight,
+    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+               const Graph& graph,
                const mfem::Array<int>& partitioning,
-               const mfem::HypreParMatrix& edge_d_td,
-               const mfem::SparseMatrix& edge_boundary_att,
                const mfem::Array<int>& ess_attr,
                const UpscaleParameters& param);
 
@@ -150,7 +144,6 @@ public:
     mfem::Vector& GetCoefficientForVisualization(int level);
 
 private:
-    Graph graph_;
     std::shared_ptr<Upscale> fvupscale_;
     NormalDistribution normal_distribution_;
     std::vector<int> num_aggs_;
@@ -163,7 +156,6 @@ private:
     std::vector<mfem::Vector> coefficient_;
 
     void Initialize(int dimension, double kappa);
-    mfem::Vector& GetFineCoefficient();
 };
 
 }

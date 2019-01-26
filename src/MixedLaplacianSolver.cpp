@@ -19,16 +19,37 @@
 */
 
 #include "MixedLaplacianSolver.hpp"
+#include "MixedMatrix.hpp"
 
 namespace smoothg
 {
 
-MixedLaplacianSolver::MixedLaplacianSolver(const mfem::Array<int>& block_offsets)
-    : rhs_(make_unique<mfem::BlockVector>(block_offsets)),
-      sol_(make_unique<mfem::BlockVector>(block_offsets)),
-      nnz_(0), num_iterations_(0), timing_(0)
+MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
+                                           const mfem::Array<int>& block_offsets,
+                                           const mfem::Array<int>* ess_attr,
+                                           bool W_is_nonzero)
+    : comm_(comm), rhs_(block_offsets), sol_(block_offsets),
+      nnz_(0), num_iterations_(0), timing_(0), remove_one_dof_(true),
+      W_is_nonzero_(W_is_nonzero)
 {
+    MPI_Comm_rank(comm_, &myid_);
 
+    if (ess_attr)
+    {
+        for (int i = 0; i < ess_attr->Size(); ++i)
+        {
+            if ((*ess_attr)[i] == 0) // if Dirichlet pressure boundary is not empty
+            {
+                remove_one_dof_ = false;
+                break;
+            }
+        }
+    }
+}
+
+void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
+{
+    Mult(rhs, sol);
 }
 
 void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) const
@@ -36,17 +57,32 @@ void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) con
     assert(rhs_);
     assert(sol_);
 
-    rhs_->GetBlock(0) = 0.0;
-    rhs_->GetBlock(1) = rhs;
+    rhs_.GetBlock(0) = 0.0;
+    rhs_.GetBlock(1) = rhs;
 
-    Solve(*rhs_, *sol_);
+    Solve(rhs_, sol_);
 
-    sol = sol_->GetBlock(1);
+    sol = sol_.GetBlock(1);
 }
 
 void MixedLaplacianSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
     Solve(rhs, sol);
+}
+
+void MixedLaplacianSolver::Orthogonalize(mfem::Vector& vec) const
+{
+    assert(const_rep_);
+
+    double local_dot = (vec * (*const_rep_));
+    double global_dot;
+    MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
+
+    double local_scale = ((*const_rep_) * (*const_rep_));
+    double global_scale;
+    MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
+
+    vec.Add(-global_dot / global_scale, *const_rep_);
 }
 
 } // namespace smoothg

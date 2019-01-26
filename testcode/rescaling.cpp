@@ -19,7 +19,7 @@
           coefficient. This test requires the notion of finite volume and MFEM.
 */
 
-#include "mfem.hpp"
+#include "../examples/pde.hpp"
 
 #include "../src/SpectralAMG_MGL_Coarsener.hpp"
 #include "../src/MetisGraphPartitioner.hpp"

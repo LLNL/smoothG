@@ -32,68 +32,16 @@
 #include <sstream>
 #include <mpi.h>
 
-#include "mfem.hpp"
-#include "spe10.hpp"
+#include "pde.hpp"
 
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
 
-void SaveFigure(const mfem::Vector& sol,
-                mfem::ParFiniteElementSpace& fespace,
-                const std::string& name)
-{
-    mfem::ParGridFunction field(&fespace);
-    mfem::ParMesh* pmesh = fespace.GetParMesh();
-    field = sol;
-    {
-        std::stringstream filename;
-        filename << name << ".mesh";
-        std::ofstream out(filename.str().c_str());
-        pmesh->Print(out);
-    }
-    {
-        std::stringstream filename;
-        filename << name << ".gridfunction";
-        std::ofstream out(filename.str().c_str());
-        field.Save(out);
-    }
-}
-
-void Visualize(const mfem::Vector& sol, mfem::ParGridFunction& field,
-               const mfem::ParMesh& pmesh, const std::string& title)
-{
-    char vishost[] = "localhost";
-    int  visport   = 19916;
-
-    mfem::socketstream vis_v;
-    vis_v.open(vishost, visport);
-    vis_v.precision(8);
-
-    field = sol;
-
-    vis_v << "parallel " << pmesh.GetNRanks() << " " << pmesh.GetMyRank() << "\n";
-    vis_v << "solution\n" << pmesh << field;
-    vis_v << "window_size 500 800\n";
-    vis_v << "window_title '" << title << "'\n";
-    vis_v << "autoscale values\n";
-
-    if (pmesh.Dimension() == 2)
-    {
-        vis_v << "view 0 0\n"; // view from top
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-    }
-
-    vis_v << "keys cjl\n";
-
-    MPI_Barrier(pmesh.GetComm());
-};
-
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
-    picojson::object serialize;
 
     // 1. Initialize MPI
     mpi_session session(argc, argv);
@@ -154,128 +102,31 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 10;
-    coarseningFactor[1] = 10;
-    if (nDimensions == 3)
-        coarseningFactor[2] = 5;
+    mfem::Array<int> coarsening_factors(nDimensions);
+    coarsening_factors = 10;
+    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
 
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    mfem::Array<int> ess_zeros(nbdr);
-    mfem::Array<int> nat_one(nbdr);
-    mfem::Array<int> nat_zeros(nbdr);
-    ess_zeros = 1;
-    nat_one = 0;
-    nat_zeros = 0;
-
-    mfem::Array<int> ess_attr;
-    mfem::Vector weight;
-    std::vector<mfem::Vector> local_weight;
-    mfem::Vector rhs_u_fine;
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
+    ess_attr = 1;
 
     // Setting up finite volume discretization problem
-    const double proc_part_ubal = 2.0;
-    SPE10Problem spe10problem(
-        permFile, nDimensions, spe10_scale, slice, metis_agglomeration,
-        proc_part_ubal, coarseningFactor);
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
-
-    if (myid == 0)
-    {
-        std::cout << pmesh->GetNEdges() << " fine FE edges, " <<
-                  pmesh->GetNFaces() << " fine FE faces, " <<
-                  pmesh->GetNE() << " fine FE elements\n";
-    }
-
-    ess_attr.SetSize(nbdr);
-    for (int i(0); i < nbdr; ++i)
-        ess_attr[i] = ess_zeros[i];
-
-    // Construct "finite volume mass" matrix using mfem
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-    {
-        mfem::ParBilinearForm a(&sigmafespace);
-        a.AddDomainIntegrator(
-            new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-
-        a.Assemble();
-        a.Finalize();
-        a.SpMat().GetDiag(weight);
-        for (int i = 0; i < weight.Size(); ++i)
-        {
-            weight[i] = 1.0 / weight[i];
-        }
-        if (elem_mass)
-        {
-            local_weight.resize(pmesh->GetNE());
-            mfem::DenseMatrix M_el_i;
-            for (int i = 0; i < pmesh->GetNE(); i++)
-            {
-                a.ComputeElementMatrix(i, M_el_i);
-                mfem::Vector& local_weight_i = local_weight[i];
-                local_weight_i.SetSize(M_el_i.Height());
-                for (int j = 0; j < local_weight_i.Size(); j++)
-                {
-                    local_weight_i[j] = 1.0 / M_el_i(j, j);
-                }
-            }
-        }
-    }
-
-    mfem::L2_FECollection ufec(0, nDimensions);
-    mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
-
-    mfem::LinearForm q(&ufespace);
-    q.AddDomainIntegrator(
-        new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
-    q.Assemble();
-    rhs_u_fine = q;
-
-    // Construct vertex_edge table in mfem::SparseMatrix format
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
+    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+                              metis_agglomeration, ess_attr);
+    Graph graph = spe10problem.GetFVGraph(elem_mass);
 
     // Construct agglomerated topology based on METIS or Cartesion aggloemration
     mfem::Array<int> partitioning;
-    if (metis_agglomeration)
-    {
-        FESpaceMetisPartition(partitioning, sigmafespace, ufespace, coarseningFactor);
-    }
-    else
-    {
-        auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
-    }
-
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-
-    auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
-
-    unique_ptr<Graph> graph;
-    if (elem_mass == false)
-    {
-        graph = make_unique<Graph>(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
-    }
-    else
-    {
-        graph = make_unique<Graph>(vertex_edge, *edge_d_td, local_weight, &edge_boundary_att);
-    }
+    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
-    Upscale upscale(*graph, upscale_param, &partitioning, &ess_attr);
+    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
-    rhs_fine.GetBlock(0) = 0.0;
-    rhs_fine.GetBlock(1) = rhs_u_fine;
+    rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
+    rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
     const int num_levels = upscale_param.max_levels;
     unique_ptr<MultilevelSampler> sampler;
@@ -288,9 +139,8 @@ int main(int argc, char* argv[])
     {
         const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
-                      comm, nDimensions, spe10problem.CellVolume(nDimensions), kappa, seed,
-                      vertex_edge, weight, partitioning, *edge_d_td, edge_boundary_att, ess_attr,
-                      upscale_param);
+                      nDimensions, spe10problem.CellVolume(), kappa, seed,
+                      graph, partitioning, ess_attr, upscale_param);
     }
     else
     {
@@ -322,13 +172,13 @@ int main(int argc, char* argv[])
 
             std::stringstream filename;
             filename << "pressure_s" << sample << "_l" << level;
-            SaveFigure(sol[level].GetBlock(1), ufespace, filename.str());
+            spe10problem.SaveFigure(sol[level].GetBlock(1), filename.str());
             if (visualization)
             {
-                mfem::ParGridFunction field(&ufespace);
+                mfem::socketstream vis_v;
                 std::stringstream caption;
                 caption << "pressure sample " << sample << " level " << level;
-                Visualize(sol[level].GetBlock(1), field, *pmesh, caption.str());
+                spe10problem.VisSetup(vis_v, sol[level].GetBlock(1), 0.0, 0.0, caption.str());
             }
         }
 
@@ -339,14 +189,14 @@ int main(int argc, char* argv[])
         }
         std::stringstream coeffname;
         coeffname << "coefficient" << sample;
-        SaveFigure(coefficient[0], ufespace, coeffname.str());
+        spe10problem.SaveFigure(coefficient[0], coeffname.str());
 
         if (visualization)
         {
-            mfem::ParGridFunction field(&ufespace);
+            mfem::socketstream vis_v;
             std::stringstream caption;
             caption << "coefficient" << sample;
-            Visualize(coefficient[0], field, *pmesh, caption.str());
+            spe10problem.VisSetup(vis_v, coefficient[0], 0.0, 0.0, caption.str());
         }
     }
 

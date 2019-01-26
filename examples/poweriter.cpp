@@ -89,7 +89,6 @@ int main(int argc, char* argv[])
 
             // Normalize
             result /= ParNormlp(result, 2, comm);
-            upscale.Orthogonalize(0, result);
 
             // Match Signs
             double true_sign = true_sol[0] / std::fabs(true_sol[0]);
