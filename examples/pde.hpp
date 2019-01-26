@@ -14,10 +14,10 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file spe10.hpp
-   @brief Implementation of spe10 problem.
+   @file pde.hpp
+   @brief Implementation of some partial differential equation problems.
 
-   Reads data from file and creates the appropriate finite element structures.
+   Reads data from file and creates the appropriate finite element/volume structures.
 */
 
 #include "../src/smoothG.hpp"
@@ -838,6 +838,8 @@ void SPE10Problem::MakeRHS()
 
     if (no_flow_bc)
     {
+        rhs_sigma_ = 0.0;
+
         mfem::LinearForm q(u_fes_.get());
         q.AddDomainIntegrator(new mfem::DomainLFIntegrator(*source_coeff_));
         q.Assemble();
@@ -857,6 +859,8 @@ void SPE10Problem::MakeRHS()
             new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
         g.Assemble();
         rhs_sigma_ = g;
+
+        rhs_u_ = 0.0;
     }
 }
 

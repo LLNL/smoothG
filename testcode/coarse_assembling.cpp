@@ -93,7 +93,6 @@ int main(int argc, char* argv[])
     Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
 
     hierarchy.PrintInfo();
-    hierarchy.ShowSetupTime();
 
     auto CoarseNotEqualRAP = [&](const char* name)
     {
