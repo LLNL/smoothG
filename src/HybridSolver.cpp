@@ -125,7 +125,6 @@ void HybridSolver::Init(
     mfem::Array<int> j_array(mult_edof.GetJ(), mult_edof.NumNonZeroElems());
     j_array.Copy(multiplier_to_edof_);
 
-    Agg_multiplier_.Clear(); // FIXME(CSL 1/14/2019): this line is not needed?
     mfem::SparseMatrix Agg_m_tmp(smoothg::Mult(Agg_edgedof_, edgedof_multiplier));
     Agg_multiplier_.Swap(Agg_m_tmp);
 
