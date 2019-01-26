@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
     upscale.ShowSetupTime();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
-    rhs_fine.GetBlock(0) = 0.0;
+     rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
     rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
     const int num_levels = upscale_param.max_levels;
