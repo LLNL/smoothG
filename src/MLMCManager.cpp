@@ -22,6 +22,7 @@ FunctionalQoI::FunctionalQoI(const Upscale& upscale,
                              const mfem::Vector& functional,
                              bool on_pressure)
     :
+    comm_(upscale.GetComm()),
     on_pressure_(on_pressure)
 {
     functional_.push_back(functional);
@@ -42,9 +43,13 @@ double FunctionalQoI::Evaluate(const mfem::Vector& coefficient,
         if (functional_[i].Size() == pressure.Size())
         {
             if (on_pressure_)
-                return functional_[i] * pressure;
+            {
+                return mfem::InnerProduct(comm_, functional_[i], pressure);
+            }
             else
-                return functional_[i] * coefficient;
+            {
+                return mfem::InnerProduct(comm_, functional_[i], pressure);
+            }
         }
     }
     std::cerr << "Wrong size vector input!" << std::endl;
@@ -75,7 +80,7 @@ double LogLikelihood::Evaluate(const mfem::Vector& coefficient,
     {
         double v = measured_qoi_[i]->Evaluate(coefficient, pressure);
         squared_sum += (v - measured_mean_[i]) * (v - measured_mean_[i]) /
-            (measured_sigma_[i] * measured_sigma_[i]);
+                       (measured_sigma_[i] * measured_sigma_[i]);
     }
     return -squared_sum;
 }
@@ -126,7 +131,7 @@ void MLMCManager::FineSample(bool verbose)
 
     const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
     varsum_[level] += scale * ((double) sample_count_[level]) *
-        (fineq - mean_[level]) * (fineq - mean_[level]);
+                      (fineq - mean_[level]) * (fineq - mean_[level]);
     mean_[level] += scale * (fineq  - mean_[level]);
     cost_[level] += scale * (current_cost - cost_[level]);
 
@@ -185,7 +190,7 @@ mfem::BlockVector InterpolateToFine(const Upscale& upscale, int level,
         vec2.SetSize(upscale.GetMatrix(k - 1).GetBlockOffsets().Last());
         mfem::BlockVector block_vec2(vec2.GetData(),
                                      upscale.GetMatrix(k - 1).GetBlockOffsets());
-        /// Interpolate from k to the finer k-1            
+        /// Interpolate from k to the finer k-1
         upscale.Interpolate(k, block_vec1, block_vec2);
         vec2.Swap(vec1);
     }
@@ -245,7 +250,7 @@ void MLMCManager::CoarseSample(bool verbose)
 
     const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
     varsum_[level] += scale * ((double) sample_count_[level]) *
-        (upscaledq - mean_[level]) * (upscaledq - mean_[level]);
+                      (upscaledq - mean_[level]) * (upscaledq - mean_[level]);
     mean_[level] += scale * (upscaledq - mean_[level]);
     cost_[level] += scale * (current_cost - cost_[level]);
 
@@ -297,7 +302,7 @@ void MLMCManager::CorrectionSample(int level,
 
     const double scale = 1.0 / ((double) sample_count_[fine_level] + 1.0);
     varsum_[fine_level] += scale * ((double) sample_count_[fine_level]) *
-        ((fineq - upscaledq) - mean_[fine_level]) * ((fineq - upscaledq) - mean_[fine_level]);
+                           ((fineq - upscaledq) - mean_[fine_level]) * ((fineq - upscaledq) - mean_[fine_level]);
     mean_[fine_level] += scale * ((fineq - upscaledq) - mean_[fine_level]);
     cost_[fine_level] += scale * (temp_cost - cost_[fine_level]);
 
@@ -413,7 +418,8 @@ void MLMCManager::DisplayStatus(picojson::object& serialize)
         std::cout << "        mean/correction: " << mean_[level] << std::endl;
         std::cout << "        variance: " << variance[level] << std::endl;
         std::cout << "        sample count: " << sample_count_[level] << std::endl;
-        std::cout << "        recommended samples: " << best_sample_frac[level] * current_total_samples << std::endl;
+        std::cout << "        recommended samples: " << best_sample_frac[level] * current_total_samples <<
+                  std::endl;
     }
     std::cout << "MLMC estimate: " << GetEstimate() << std::endl;
 

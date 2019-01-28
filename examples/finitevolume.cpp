@@ -128,6 +128,7 @@ int main(int argc, char* argv[])
     /// [Solve]
     std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
     std::vector<double> QoI(upscale_param.max_levels);
+    FunctionalQoI qoi_evaluator(upscale, rhs_fine.GetBlock(1));
     for (int level = 0; level < upscale_param.max_levels; ++level)
     {
         upscale.Solve(level, rhs_fine, sol[level]);
@@ -135,7 +136,8 @@ int main(int argc, char* argv[])
 
         if (lateral_pressure)
         {
-            QoI[level] = mfem::InnerProduct(comm, sol[level], rhs_fine);
+            mfem::Vector dummy;
+            QoI[level] = qoi_evaluator.Evaluate(dummy, sol[level].GetBlock(1));
             if (myid == 0)
             {
                 std::cout << "Quantity of interest on level " << level

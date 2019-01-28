@@ -69,11 +69,12 @@ private:
 class FunctionalQoI : public QuantityOfInterest
 {
 public:
+    /// functional must be given on *finest* level
     /// functional can be on pressure or coefficient (not both),
     /// setting bool pressure=false makes it on coefficient.
     FunctionalQoI(const Upscale& upscale,
                   const mfem::Vector& functional,
-                  bool on_pressure=true);
+                  bool on_pressure = true);
 
     ~FunctionalQoI() {}
 
@@ -81,6 +82,7 @@ public:
                     const mfem::Vector& pressure) const;
 
 private:
+    MPI_Comm comm_;
     bool on_pressure_;
     std::vector<mfem::Vector> functional_;
 };
@@ -183,7 +185,7 @@ public:
                     const mfem::Vector& pressure) const
     {
         return unknown_qoi_.Evaluate(coefficient, pressure) *
-            likelihood_.Evaluate(coefficient, pressure);
+               likelihood_.Evaluate(coefficient, pressure);
     }
 };
 
@@ -215,7 +217,7 @@ public:
 private:
     /// remove super-small values from a coefficient
     /// (not recommended)
-    void FloorCoefficient(mfem::Vector& coef, double floor=1.e-8);
+    void FloorCoefficient(mfem::Vector& coef, double floor = 1.e-8);
 
     MultilevelSampler& sampler_;
     const QuantityOfInterest& qoi_;
