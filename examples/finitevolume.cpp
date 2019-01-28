@@ -18,6 +18,12 @@
    @brief This is an example for upscaling a graph Laplacian coming from a finite
    volume discretization of a simple reservior model in parallel.
 
+   If lateral_pressure == true, Dirichlet pressure boundary condition will be
+   imposed on left (p = -1) and right (p = 0) side of the domain boundary.
+   No flow boundary condition (v.n = 0) is imposed on the rest of the boundary.
+   In this case, the quantity of interest (QoI) is the total out flux
+   \f$ \int v \cdot n dS \f$ on the left boundary.
+
    A simple way to run the example:
 
    mpirun -n 4 ./finitevolume
@@ -28,7 +34,7 @@
 #include <mpi.h>
 
 #include "mfem.hpp"
-#include "spe10.hpp"
+#include "pde.hpp"
 
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"
@@ -62,15 +68,16 @@ int main(int argc, char* argv[])
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of geometric).");
-    double proc_part_ubal = 2.0;
-    args.AddOption(&proc_part_ubal, "-pub", "--part-unbalance",
-                   "Processor partition unbalance factor.");
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    bool lateral_pressure = false;
+    args.AddOption(&lateral_pressure, "-lat-pres", "--lateral-pressure",
+                   "-no-lat-pres", "--no-lateral-pressure",
+                   "Impose Dirichlet pressure condition on lateral sides.");
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
@@ -88,92 +95,25 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = 10;
-    coarseningFactor[1] = 10;
-    if (nDimensions == 3)
-        coarseningFactor[2] = 5;
+    mfem::Array<int> coarsening_factors(nDimensions);
+    coarsening_factors = 10;
+    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
 
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    mfem::Array<int> ess_zeros(nbdr);
-    mfem::Array<int> nat_one(nbdr);
-    mfem::Array<int> nat_zeros(nbdr);
-    ess_zeros = 1;
-    nat_one = 0;
-    nat_zeros = 0;
-
-    mfem::Array<int> ess_attr;
-    mfem::Vector weight;
-    mfem::Vector rhs_u_fine;
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
+    ess_attr = 1;
+    if (lateral_pressure)
+    {
+        ess_attr[0] = ess_attr[2] = 0;
+    }
 
     // Setting up finite volume discretization problem
     SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, proc_part_ubal, coarseningFactor);
-
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
-
-    if (myid == 0)
-    {
-        std::cout << pmesh->GetNEdges() << " fine edges, " <<
-                  pmesh->GetNFaces() << " fine faces, " <<
-                  pmesh->GetNE() << " fine elements\n";
-    }
-
-    ess_attr.SetSize(nbdr);
-    for (int i(0); i < nbdr; ++i)
-        ess_attr[i] = ess_zeros[i];
-
-    // Construct "finite volume mass" matrix using mfem instead of parelag
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-
-    mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight);
-
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        weight[i] = 1.0 / weight[i];
-    }
-
-    mfem::L2_FECollection ufec(0, nDimensions);
-    mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
-
-    mfem::LinearForm q(&ufespace);
-    q.AddDomainIntegrator(
-        new mfem::DomainLFIntegrator(*spe10problem.GetForceCoeff()) );
-    q.Assemble();
-    rhs_u_fine = q;
-
-    // Construct vertex_edge table in mfem::SparseMatrix format
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
+                              metis_agglomeration, ess_attr);
+    Graph graph = spe10problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
-    if (metis_agglomeration)
-    {
-        FESpaceMetisPartition(partitioning, sigmafespace, ufespace, coarseningFactor);
-    }
-    else
-    {
-        auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
-    }
-
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-
-    auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
-
-    Graph graph(vertex_edge, *edge_d_td, weight, &edge_boundary_att);
+    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
     Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
@@ -182,61 +122,48 @@ int main(int argc, char* argv[])
     upscale.ShowSetupTime();
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
-    rhs_fine.GetBlock(0) = 0.0;
-    rhs_fine.GetBlock(1) = rhs_u_fine;
+    rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
+    rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
     /// [Solve]
     std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
+    std::vector<double> QoI(upscale_param.max_levels);
     for (int level = 0; level < upscale_param.max_levels; ++level)
     {
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);
 
+        if (lateral_pressure)
+        {
+            QoI[level] = mfem::InnerProduct(comm, sol[level], rhs_fine);
+            if (myid == 0)
+            {
+                std::cout << "Quantity of interest on level " << level
+                          << " = " << QoI[level] << "\n";
+            }
+        }
+
         if (level > 0)
         {
             upscale.ShowErrors(sol[level], sol[0], level);
+            if (lateral_pressure)
+            {
+                serialize["quantity-error-level-" + std::to_string(level)] =
+                    picojson::value(fabs(QoI[level] - QoI[0]) / QoI[0]);
+            }
+        }
+
+        // Visualize the solution
+        if (visualization)
+        {
+            mfem::socketstream vis_v;
+            spe10problem.VisSetup(vis_v, sol[level].GetBlock(1));
         }
     }
     /// [Solve]
 
-    // Visualize the solution
-    if (visualization)
-    {
-        mfem::ParGridFunction field(&ufespace);
-
-        auto Visualize = [&](const mfem::Vector & sol)
-        {
-            char vishost[] = "localhost";
-            int  visport   = 19916;
-
-            mfem::socketstream vis_v;
-            vis_v.open(vishost, visport);
-            vis_v.precision(8);
-
-            field = sol;
-
-            vis_v << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
-            vis_v << "solution\n" << *pmesh << field;
-            vis_v << "window_size 500 800\n";
-            vis_v << "window_title 'pressure'\n";
-            vis_v << "autoscale values\n";
-
-            if (nDimensions == 2)
-            {
-                vis_v << "view 0 0\n"; // view from top
-                vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-            }
-
-            vis_v << "keys cjl\n";
-
-            MPI_Barrier(comm);
-        };
-
-        for (int level = 0; level < upscale_param.max_levels; ++level)
-        {
-            Visualize(sol[level].GetBlock(1));
-        }
-    }
+    if (lateral_pressure && myid == 0)
+        std::cout << picojson::value(serialize).serialize(true) << std::endl;
 
     return EXIT_SUCCESS;
 }

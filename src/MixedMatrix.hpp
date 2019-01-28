@@ -77,6 +77,8 @@ public:
                 mfem::Vector vertex_sizes,
                 mfem::SparseMatrix P_pwc);
 
+    MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
+
     /// Get the associated graph space
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
 

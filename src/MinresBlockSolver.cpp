@@ -27,18 +27,17 @@ namespace smoothg
 {
 
 /// implementation largely lifted from ex5p.cpp
-MinresBlockSolver::MinresBlockSolver(
-    MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
-    const mfem::Array<int>& block_true_offsets,
-    bool use_W)
+MinresBlockSolver::MinresBlockSolver(mfem::HypreParMatrix* M,
+                                     mfem::HypreParMatrix* D,
+                                     mfem::HypreParMatrix* W,
+                                     const mfem::Array<int>& block_true_offsets)
     :
-    MixedLaplacianSolver(block_true_offsets),
-    minres_(comm),
-    comm_(comm),
-    use_W_(use_W),
+    MixedLaplacianSolver(M->GetComm(), block_true_offsets, nullptr, W),
+    minres_(comm_),
     operator_(block_true_offsets),
     prec_(block_true_offsets)
 {
+    remove_one_dof_ = false;
     Init(M, D, W);
 }
 
@@ -68,7 +67,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     hypre_ParCSRMatrixSetColStartsOwner(*schur_block_, 1);
     hypre_ParCSRMatrixSetColStartsOwner(*MinvDt, 0);
 
-    if (use_W_ && W)
+    if (W_is_nonzero_)
     {
         hypre_ParCSRMatrixSetColStartsOwner(*schur_block_, 0);
         hypre_ParCSRMatrixSetColStartsOwner(*MinvDt, 1);
@@ -82,7 +81,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 
         hypre_ParCSRMatrixSetColStartsOwner(*schur_block_, 0);
     }
-    else
+    else if (remove_one_dof_)
     {
         mfem::SparseMatrix W(D->Height());
         W_.Swap(W);
@@ -93,8 +92,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
         }
         W_.Finalize();
 
-        hW_ = make_unique<mfem::HypreParMatrix>(comm_, D->GetGlobalNumRows(),
-                                                D->RowPart(), &W_);
+        hW_ = make_unique<mfem::HypreParMatrix>(comm_, D->M(), D->RowPart(), &W_);
 
         operator_.SetBlock(1, 1, hW_.get());
 
@@ -118,44 +116,55 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     minres_.iterative_mode = false;
 }
 
-MinresBlockSolver::MinresBlockSolver(
-    MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-    const mfem::Array<int>& block_true_offsets)
-    : MinresBlockSolver(comm, M, D, nullptr, block_true_offsets)
-{
-}
-
-MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
+MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
+                                     const mfem::Array<int>* ess_attr)
     :
-    MixedLaplacianSolver(mgL.GetBlockOffsets()),
-    minres_(comm),
-    comm_(comm),
-    use_W_(mgL.CheckW()),
+    MixedLaplacianSolver(mgL.GetComm(), mgL.GetBlockOffsets(), ess_attr, mgL.CheckW()),
+    minres_(comm_),
     operator_(mgL.GetBlockTrueOffsets()),
-    prec_(mgL.GetBlockTrueOffsets()),
-    M_(mgL.GetM()),
-    D_(mgL.GetD())
+    prec_(mgL.GetBlockTrueOffsets())
 {
-    MPI_Comm_rank(comm_, &myid_);
+    const_rep_ = &(mgL.GetConstantRep());
+    if (ess_attr)
+    {
+        assert(mgL.GetGraph().HasBoundary());
+        ess_edofs_.SetSize(sol_.BlockSize(0), 0);
+        BooleanMult(mgL.EDofToBdrAtt(), *ess_attr, ess_edofs_);
+        ess_edofs_.SetSize(sol_.BlockSize(0));
+    }
+
+    mfem::SparseMatrix M_proc(mgL.GetM());
+    for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
+    {
+        // Assume M diagonal, no ess data
+        if (ess_edofs_[mm])
+            M_proc.EliminateRowCol(mm, true);
+    }
+
+    mfem::SparseMatrix D_proc(mgL.GetD());
+    if (ess_edofs_.Size())
+    {
+        D_proc.EliminateCols(ess_edofs_);
+    }
 
     mfem::Array<int>& D_row_start(mgL.GetDrowStarts());
 
     const mfem::HypreParMatrix& edge_d_td(mgL.GetEdgeDofToTrueDof());
     const mfem::HypreParMatrix& edge_td_d(mgL.GetEdgeTrueDofToDof());
 
-    mfem::HypreParMatrix M(comm, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_);
+    mfem::HypreParMatrix M(comm_, edge_d_td.M(), edge_d_td.GetRowStarts(), &M_proc);
     std::unique_ptr<mfem::HypreParMatrix> M_tmp(ParMult(&M, &edge_d_td));
     hM_.reset(ParMult(&edge_td_d, M_tmp.get()));
 
     hM_->CopyRowStarts();
     hM_->CopyColStarts();
 
-    if (!use_W_ && myid_ == 0)
+    if (!W_is_nonzero_ && remove_one_dof_ && myid_ == 0)
     {
-        D_.EliminateRow(0);
+        D_proc.EliminateRow(0);
     }
 
-    hD_ = ParMult(D_, edge_d_td, D_row_start);
+    hD_ = ParMult(D_proc, edge_d_td, D_row_start);
     hDt_.reset(hD_->Transpose());
 
     hD_->CopyRowStarts();
@@ -164,7 +173,7 @@ MinresBlockSolver::MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL)
     hD_->CopyColStarts();
     hDt_->CopyColStarts();
 
-    if (use_W_)
+    if (W_is_nonzero_)
     {
         const mfem::SparseMatrix* W = mgL.GetW();
         assert(W);
@@ -194,14 +203,19 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Clear();
     chrono.Start();
 
-    *rhs_ = rhs;
+    rhs_ = rhs;
 
-    if (!use_W_ && myid_ == 0)
+    if (!W_is_nonzero_ && remove_one_dof_ && myid_ == 0)
     {
-        rhs_->GetBlock(1)(0) = 0.0;
+        rhs_.GetBlock(1)(0) = 0.0;
     }
 
-    minres_.Mult(*rhs_, sol);
+    minres_.Mult(rhs_, sol);
+
+    if (!W_is_nonzero_ && remove_one_dof_)
+    {
+        Orthogonalize(sol.GetBlock(1));
+    }
 
     chrono.Stop();
     timing_ = chrono.RealTime();
@@ -228,10 +242,10 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 /**
    MinresBlockSolver acts on "true" dofs, this one does not.
 */
-MinresBlockSolverFalse::MinresBlockSolverFalse(
-    MPI_Comm comm, const MixedMatrix& mgL)
+MinresBlockSolverFalse::MinresBlockSolverFalse(const MixedMatrix& mgL,
+                                               const mfem::Array<int>* ess_attr)
     :
-    MinresBlockSolver(comm, mgL),
+    MinresBlockSolver(mgL, ess_attr),
     mixed_matrix_(mgL),
     true_rhs_(mgL.GetBlockTrueOffsets()),
     true_sol_(mgL.GetBlockTrueOffsets())
@@ -254,15 +268,21 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     edgedof_d_td.MultTranspose(rhs.GetBlock(0), true_rhs_.GetBlock(0));
     true_rhs_.GetBlock(1) = rhs.GetBlock(1);
 
-    if (!use_W_ && myid_ == 0)
+    if (!W_is_nonzero_ && remove_one_dof_ && myid_ == 0)
     {
         true_rhs_.GetBlock(1)(0) = 0.0;
     }
 
+    true_sol_ = 0.0;
     minres_.Mult(true_rhs_, true_sol_);
 
     edgedof_d_td.Mult(true_sol_.GetBlock(0), sol.GetBlock(0));
     sol.GetBlock(1) = true_sol_.GetBlock(1);
+
+    if (!W_is_nonzero_ && remove_one_dof_)
+    {
+        Orthogonalize(sol.GetBlock(1));
+    }
 
     chrono.Stop();
 

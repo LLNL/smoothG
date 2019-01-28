@@ -123,10 +123,6 @@ public:
     /// Get true block offsets for sigma, u blocks of mixed form dofs
     virtual void TrueBlockOffsets(int level, mfem::Array<int>& offsets) const;
 
-    /// Orthogonalize against the constant vector
-    virtual void Orthogonalize(int level, mfem::Vector& vect) const;
-    virtual void Orthogonalize(int level, mfem::BlockVector& vect) const;
-
     /// Create an appropriately sized vertex-space vector
     virtual mfem::Vector GetVector(int level) const;
 
@@ -257,6 +253,8 @@ protected:
     std::vector<std::unique_ptr<mfem::BlockVector> > sol_;
 
     const mfem::Array<int>* ess_attr_;
+
+    bool remove_one_dof_; // whether the 1st dof of 2nd block should be eliminated
 
     const UpscaleParameters& param_;
 private:

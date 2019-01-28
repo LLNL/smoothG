@@ -77,36 +77,17 @@ void Upscale::Init(const mfem::Array<int>* partitioning)
 
 void Upscale::MakeSolver(int level)
 {
-    mfem::SparseMatrix& Dref = GetMatrix(level).GetD();
-    mfem::Array<int> marker(Dref.Width());
-    marker = 0;
-    if (GetMatrix(level).GetGraph().HasBoundary())
-    {
-        BooleanMult(GetMatrix(level).EDofToBdrAtt(), *ess_attr_, marker);
-        marker.SetSize(Dref.Width());
-    }
-
     if (param_.hybridization) // Hybridization solver
     {
         SAAMGeParam* saamge_param = level > 0 ? param_.saamge_param : nullptr;
         solver_[level] = make_unique<HybridSolver>(
-                             comm_, GetMatrix(level), &marker, 0, saamge_param);
+                             GetMatrix(level), ess_attr_, 0, saamge_param);
     }
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        mfem::SparseMatrix& Mref = GetMatrix(level).GetM();
-        for (int mm = 0; mm < marker.Size(); ++mm)
-        {
-            // Assume M diagonal, no ess data
-            if (marker[mm])
-                Mref.EliminateRowCol(mm, true);
-        }
-        if (marker.Size())
-        {
-            Dref.EliminateCols(marker);
-        }
-        solver_[level] = make_unique<MinresBlockSolverFalse>(comm_, GetMatrix(level));
+        solver_[level] = make_unique<MinresBlockSolverFalse>(GetMatrix(level),
+                                                             ess_attr_);
     }
     MakeVectors(level);
 }
@@ -130,7 +111,6 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     {
         sol_[level]->GetBlock(1) *= -1.0;
     }
-    // orthogonalize at coarse level, every level, or fine level?
 
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
@@ -138,7 +118,6 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
         coarsener_[i]->Interpolate(sol_[i + 1]->GetBlock(1), sol_[i]->GetBlock(1));
     }
     y = sol_[0]->GetBlock(1);
-    Orthogonalize(0, y);
 }
 
 void Upscale::Mult(const mfem::Vector& x, mfem::Vector& y) const
@@ -177,9 +156,6 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
 
     solver_[level]->Solve(*rhs_[level], *sol_[level]);
 
-    // orthogonalize at coarse level, every level, or fine level?
-    Orthogonalize(level, sol_[level]->GetBlock(1));
-
     // interpolate solution
     for (int i = level - 1; i >= 0; --i)
     {
@@ -203,7 +179,6 @@ void Upscale::SolveAtLevel(int level, const mfem::Vector& x, mfem::Vector& y) co
 
     solver_[level]->Solve(x, y);
     y *= -1.0; // ????
-    Orthogonalize(level, y);
 }
 
 mfem::Vector Upscale::SolveAtLevel(int level, const mfem::Vector& x) const
@@ -220,7 +195,6 @@ void Upscale::SolveAtLevel(int level, const mfem::BlockVector& x, mfem::BlockVec
 
     solver_[level]->Solve(x, y);
     y *= -1.0;
-    Orthogonalize(level, y); // TODO: temporary literal 1!
 }
 
 mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) const
@@ -330,25 +304,6 @@ void Upscale::BlockOffsets(int level, mfem::Array<int>& offsets) const
 void Upscale::TrueBlockOffsets(int level, mfem::Array<int>& offsets) const
 {
     GetMatrix(level).GetBlockTrueOffsets().Copy(offsets);
-}
-
-void Upscale::Orthogonalize(int level, mfem::BlockVector& vect) const
-{
-    Orthogonalize(level, vect.GetBlock(1));
-}
-
-void Upscale::Orthogonalize(int level, mfem::Vector& vect) const
-{
-    const mfem::Vector& coarse_constant_rep = GetConstantRep(level);
-    double local_dot = (vect * coarse_constant_rep);
-    double global_dot;
-    MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, comm_);
-
-    double local_scale = (coarse_constant_rep * coarse_constant_rep);
-    double global_scale;
-    MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
-
-    vect.Add(-global_dot / global_scale, coarse_constant_rep);
 }
 
 mfem::Vector Upscale::GetVector(int level) const

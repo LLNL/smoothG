@@ -25,7 +25,7 @@
 
 #include <mpi.h>
 
-#include "mfem.hpp"
+#include "pde.hpp"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
@@ -69,6 +69,7 @@ int main(int argc, char* argv[])
 
     constexpr auto num_levels = 4;
     const int coarsening_factor = nDimensions == 2 ? 8 : 32;
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
 
     // Setting up a mesh (2D or 3D SPE10 model)
     std::unique_ptr<mfem::ParMesh> pmesh;
@@ -83,17 +84,9 @@ int main(int argc, char* argv[])
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
 
-    // Construct vertex_edge, edge_trueedge, edge_boundaryattr tables from mesh
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
-
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh.get(), &sigmafec);
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-    auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh.get());
-
-    Graph graph(vertex_edge, *edge_d_td, mfem::Vector(), &edge_boundaryattr);
+    // Construct a graph from a finite volume problem defined on the mesh
+    DarcyProblem spe10problem(*pmesh, ess_attr);
+    Graph graph = spe10problem.GetFVGraph();
 
     // Build multilevel graph topology
     auto graph_topos = MultilevelGraphTopology(graph, num_levels, coarsening_factor);

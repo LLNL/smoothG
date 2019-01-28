@@ -97,23 +97,15 @@ public:
               hybridized system if saamge_param is not nullptr, otherwise
               BoomerAMG is used instead.
     */
-    HybridSolver(MPI_Comm comm,
-                 const MixedMatrix& mgL,
-                 const mfem::Array<int>* ess_edge_dofs = nullptr,
+    HybridSolver(const MixedMatrix& mgL,
+                 const mfem::Array<int>* ess_attr = nullptr,
                  const int rescale_iter = 0,
                  const SAAMGeParam* saamge_param = nullptr);
 
     virtual ~HybridSolver();
 
     /// Wrapper for solving the saddle point system through hybridization
-    void Mult(const mfem::BlockVector& Rhs,
-              mfem::BlockVector& Sol) const;
-
-    /// Same as Mult()
-    void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
-    {
-        Mult(rhs, sol);
-    }
+    void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
 
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const mfem::BlockVector& OriginalRHS,
@@ -158,16 +150,15 @@ public:
     virtual void SetAbsTol(double atol) override;
     ///@}
 
-protected:
+private:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
               const mfem::SparseMatrix& face_bdrattr,
               const mfem::Array<int>* ess_edge_dofs);
 
-    void AssembleHybridSystem(
-        const std::vector<mfem::DenseMatrix>& M_el,
-        const mfem::Array<int>& j_multiplier_edgedof);
+    mfem::SparseMatrix AssembleHybridSystem(
+        const std::vector<mfem::DenseMatrix>& M_el);
 
     // Compute scaling vector and the scaled hybridized system
     void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
@@ -176,26 +167,24 @@ protected:
     void BuildSpectralAMGePreconditioner();
 
     // Assemble parallel hybridized system and build a solver for it
-    void BuildParallelSystemAndSolver();
+    void BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc);
 
-private:
-    MPI_Comm comm_;
-    int myid_;
+    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr,
+                              const mfem::Array<int>* ess_edofs);
 
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
-    mfem::SparseMatrix edgedof_IsOwned_;
 
     const mfem::SparseMatrix& D_;
     const mfem::SparseMatrix* W_;
 
-    std::unique_ptr<mfem::SparseMatrix> HybridSystem_;
-    std::unique_ptr<mfem::SparseMatrix> HybridSystemElim_;
-    std::unique_ptr<mfem::HypreParMatrix> pHybridSystem_;
+    std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
     std::unique_ptr<mfem::CGSolver> cg_;
 
+    // eliminated part of H_ (for applying elimination in repeated solves)
+    std::unique_ptr<mfem::HypreParMatrix> H_elim_;
 
     std::vector<mfem::DenseMatrix> Hybrid_el_;
 
@@ -206,11 +195,13 @@ private:
 
     mutable std::vector<mfem::Vector> Ainv_f_;
 
-    bool ess_multiplier_bc_;
-    mfem::Array<int> ess_multiplier_dofs_;
+    mfem::Array<int> ess_true_multipliers_;
+    mfem::Array<int> multiplier_to_edof_;
+    mfem::Array<int> ess_true_mult_to_edof_;
     mfem::Array<HYPRE_Int> multiplier_start_;
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
+    std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;
 
     mutable mfem::Vector trueHrhs_;
     mutable mfem::Vector trueMu_;
@@ -220,8 +211,6 @@ private:
     int nAggs_;
     int num_edge_dofs_;
     int num_multiplier_dofs_;
-
-    bool use_w_;
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
