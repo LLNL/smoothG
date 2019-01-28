@@ -136,7 +136,7 @@ public:
 
     /// Set state (if you draw new white noise into state before
     /// calling this, this is equivalent to NewSample())
-    void SetSample(mfem::Vector& state);
+    void SetSample(const mfem::Vector& state);
 
     /// Solve PDE with current white-noise RHS to find coeffiicent
     /// on coarser level, the result is on *aggregates*

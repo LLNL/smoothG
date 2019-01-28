@@ -139,7 +139,7 @@ void PDESampler::NewSample()
 }
 
 /// @todo cell_volume should be variable rather than constant
-void PDESampler::SetSample(mfem::Vector& state)
+void PDESampler::SetSample(const mfem::Vector& state)
 {
     MFEM_ASSERT(state.Size() == num_aggs_[0],
                 "state vector is the wrong size!");
