@@ -188,7 +188,7 @@ public:
     double GetSetupTime() const;
 
     /// Compare errors between upscaled and fine solution.
-    /// Returns {vertex_error, edge_error, div_error} array.
+    /// Returns {vertex_error, edge_error, div_error, complexity} array.
     std::vector<double> ComputeErrors(const mfem::BlockVector& upscaled_sol,
                                       const mfem::BlockVector& fine_sol,
                                       int level) const;

@@ -81,6 +81,8 @@ void Mixed_GL_Coarsener::Debug_tests(const mfem::SparseMatrix& D) const
     mfem::Vector random_vec(Proj_sigma_.Height());
     random_vec.Randomize();
 
+    const double error_tolerance = 5e-10;
+
     mfem::Vector Psigma_rand(Psigma_.Height());
     Psigma_.Mult(random_vec, Psigma_rand);
     mfem::Vector out(Proj_sigma_.Height());
@@ -88,12 +90,12 @@ void Mixed_GL_Coarsener::Debug_tests(const mfem::SparseMatrix& D) const
 
     out -= random_vec;
     double diff = out.Norml2();
-    if (diff >= 1e-10)
+    if (diff >= error_tolerance)
     {
         std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || = " << diff
                   << "\nEdge projection operator is not a projection!\n";
     }
-    assert(diff < 1e-10);
+    assert(diff < error_tolerance);
 
     random_vec.SetSize(Psigma_.Height());
     random_vec.Randomize();
@@ -120,12 +122,12 @@ void Mixed_GL_Coarsener::Debug_tests(const mfem::SparseMatrix& D) const
 
     pi_u_D_rand -= D_pi_sigma_rand;
     diff = pi_u_D_rand.Norml2();
-    if (diff >= 1e-10)
+    if (diff >= error_tolerance)
     {
         std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || = " << diff
                   << "\nCommutativity does not hold!\n";
     }
-    assert(diff < 1e-10);
+    assert(diff < error_tolerance);
 }
 
 } // namespace smoothg

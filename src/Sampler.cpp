@@ -79,9 +79,9 @@ PDESampler::PDESampler(std::shared_ptr<Upscale> fvupscale,
 
 PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
                        const Graph& graph,
-                       const mfem::Array<int>& partitioning,
-                       const mfem::Array<int>& ess_attr,
-                       const UpscaleParameters& param)
+                       const UpscaleParameters& param,
+                       const mfem::Array<int>* partitioning,
+                       const mfem::Array<int>* ess_attr)
     :
     normal_distribution_(0.0, 1.0, seed),
     num_aggs_(param.max_levels),
@@ -93,8 +93,8 @@ PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed
     mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
     W_block *= cell_volume_ * kappa * kappa;
 
-    fvupscale_ = std::make_shared<Upscale>(graph, param, &partitioning,
-                                           &ess_attr, W_block);
+    fvupscale_ = std::make_shared<Upscale>(graph, param, partitioning,
+                                           ess_attr, W_block);
 
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
     {
@@ -127,17 +127,29 @@ PDESampler::~PDESampler()
 {
 }
 
-/// @todo cell_volume should be variable rather than constant
 void PDESampler::NewSample()
 {
+    mfem::Vector state(num_aggs_[0]);
+    for (int i = 0; i < num_aggs_[0]; ++i)
+    {
+        state(i) = normal_distribution_.Sample();
+    }
+
+    SetSample(state);
+}
+
+/// @todo cell_volume should be variable rather than constant
+void PDESampler::SetSample(const mfem::Vector& state)
+{
+    MFEM_ASSERT(state.Size() == num_aggs_[0],
+                "state vector is the wrong size!");
     sampled_ = true;
 
-    // construct white noise right-hand side
+    // build right-hand side for PDE-sampler based on white noise in state
     // (cell_volume is supposed to represent fine-grid W_h)
     for (int i = 0; i < num_aggs_[0]; ++i)
     {
-        rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) *
-                     normal_distribution_.Sample();
+        rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
     }
 }
 

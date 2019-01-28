@@ -140,7 +140,7 @@ int main(int argc, char* argv[])
         const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
                       nDimensions, spe10problem.CellVolume(), kappa, seed,
-                      graph, partitioning, ess_attr, upscale_param);
+                      graph, upscale_param, &partitioning, &ess_attr);
     }
     else
     {
