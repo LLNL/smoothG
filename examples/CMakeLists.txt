@@ -40,6 +40,9 @@ target_link_libraries(mltopo smoothg ${TPL_LIBRARIES})
 add_executable(samplesolve samplesolve.cpp)
 target_link_libraries(samplesolve smoothg ${TPL_LIBRARIES})
 
+add_executable(qoi qoi.cpp)
+target_link_libraries(qoi smoothg ${TPL_LIBRARIES})
+
 # add tests
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
     set(SMOOTHG_TEST_PROCS 2)
