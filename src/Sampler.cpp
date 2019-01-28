@@ -79,9 +79,9 @@ PDESampler::PDESampler(std::shared_ptr<Upscale> fvupscale,
 
 PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
                        const Graph& graph,
-                       const mfem::Array<int>& partitioning,
-                       const mfem::Array<int>& ess_attr,
-                       const UpscaleParameters& param)
+                       const UpscaleParameters& param,
+                       const mfem::Array<int>* partitioning,
+                       const mfem::Array<int>* ess_attr)
     :
     normal_distribution_(0.0, 1.0, seed),
     num_aggs_(param.max_levels),
@@ -93,8 +93,8 @@ PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed
     mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
     W_block *= cell_volume_ * kappa * kappa;
 
-    fvupscale_ = std::make_shared<Upscale>(graph, param, &partitioning,
-                                           &ess_attr, W_block);
+    fvupscale_ = std::make_shared<Upscale>(graph, param, partitioning,
+                                           ess_attr, W_block);
 
     for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
     {
