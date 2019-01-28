@@ -132,17 +132,29 @@ PDESampler::~PDESampler()
 {
 }
 
-/// @todo cell_volume should be variable rather than constant
 void PDESampler::NewSample()
 {
+    mfem::Vector state(num_aggs_[0]);
+    for (int i = 0; i < num_aggs_[0]; ++i)
+    {
+        state(i) = normal_distribution_.Sample();
+    }
+
+    SetSample(state);
+}
+
+/// @todo cell_volume should be variable rather than constant
+void PDESampler::SetSample(mfem::Vector& state)
+{
+    MFEM_ASSERT(state.Size() == num_aggs_[0],
+                "state vector is the wrong size!");
     sampled_ = true;
 
-    // construct white noise right-hand side
+    // build right-hand side for PDE-sampler based on white noise in state
     // (cell_volume is supposed to represent fine-grid W_h)
     for (int i = 0; i < num_aggs_[0]; ++i)
     {
-        rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) *
-                     normal_distribution_.Sample();
+        rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
     }
 }
 
