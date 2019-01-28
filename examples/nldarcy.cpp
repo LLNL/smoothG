@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
 
     // program options from command line
     UpscaleParameters upscale_param;
+    upscale_param.spect_tol = 1.0;
     mfem::OptionsParser args(argc, argv);
     const char* permFile = "spe_perm.dat";
     args.AddOption(&permFile, "-p", "--perm",

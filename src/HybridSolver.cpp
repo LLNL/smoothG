@@ -169,10 +169,10 @@ void HybridSolver::CreateMultiplierRelations(
 void HybridSolver::CheckSharing()
 {
     auto edgedof_Agg = smoothg::Transpose(Agg_edgedof_);
-    is_edgedof_shared_.SetSize(edgedof_Agg.NumRows());
+    edgedof_is_shared_.SetSize(edgedof_Agg.NumRows());
     for (int i = 0; i < edgedof_Agg.NumRows(); ++i)
     {
-        is_edgedof_shared_ = (edgedof_Agg.RowSize(i) > 1);
+        edgedof_is_shared_[i] = (edgedof_Agg.RowSize(i) > 1);
     }
 }
 
@@ -313,17 +313,20 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 /// @todo nonzero Neumann BC (edge unknown), solve on true dof (original system)
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
-    RHSTransform(Rhs, Hrhs_);
-
-    // assemble true right hand side
-    multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
-
+    rhs_ = Rhs;
     // TODO: nonzero b.c.
     // correct right hand side due to boundary condition
     for (int m = 0; m < ess_true_multipliers_.Size(); ++m)
     {
         trueMu_(ess_true_multipliers_[m]) = -Rhs(ess_true_mult_to_edof_[m]);
+        rhs_(ess_true_mult_to_edof_[m]) = 0.0;
     }
+
+    RHSTransform(rhs_, Hrhs_);
+
+    // assemble true right hand side
+    multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
+
     H_elim_->Mult(-1.0, trueMu_, 1.0, trueHrhs_);
     for (int ess_true_mult : ess_true_multipliers_)
     {
@@ -418,7 +421,7 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
         OriginalRHS.GetSubVector(local_edgedof, g_loc);
         for (int i = 0; i < nlocal_edgedof; ++i)
         {
-            if (is_edgedof_shared_[local_edgedof[i]])
+            if (edgedof_is_shared_[local_edgedof[i]])
             {
                 g_loc[i] /= 2.0;
             }

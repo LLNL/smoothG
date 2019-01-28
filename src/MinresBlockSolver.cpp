@@ -214,6 +214,10 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     edof_trueedof.MultTranspose(rhs.GetBlock(0), rhs_.GetBlock(0));
     rhs_.GetBlock(1) = rhs.GetBlock(1);
 
+    mfem::SparseMatrix edof_trueedof_diag = GetDiag(edof_trueedof);
+    edof_trueedof_diag.MultTranspose(sol.GetBlock(0), sol_.GetBlock(0));
+    sol_.GetBlock(1) = sol.GetBlock(1);
+
     MinresBlockSolver::Mult(rhs_, sol_);
 
     edof_trueedof.Mult(sol_.GetBlock(0), sol.GetBlock(0));

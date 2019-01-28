@@ -106,29 +106,6 @@ public:
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
 
-    /// Transform original RHS to the RHS of the hybridized system
-    void RHSTransform(const mfem::BlockVector& OriginalRHS,
-                      mfem::Vector& HybridRHS) const;
-
-    /**
-       @brief Recover the solution of the original system from multiplier \f$ \mu \f$.
-
-       \f[
-         \left( \begin{array}{c} u \\ p \end{array} \right)
-         =
-         \left( \begin{array}{c} f \\ g \end{array} \right) -
-         \left( \begin{array}{cc} M&  B^T \\ B& \end{array} \right)^{-1}
-         \left( \begin{array}{c} C \\ 0 \end{array} \right)
-         \mu
-       \f]
-
-       This procedure is done locally in each element
-
-       This function assumes the offsets of RecoveredSol have been defined
-    */
-    void RecoverOriginalSolution(const mfem::Vector& HybridSol,
-                                 mfem::BlockVector& RecoveredSol) const;
-
     /**
        @brief Update weights of local M matrices on "elements"
 
@@ -173,11 +150,34 @@ private:
 
     void CheckSharing();
 
+    /// Transform original RHS to the RHS of the hybridized system
+    void RHSTransform(const mfem::BlockVector& OriginalRHS,
+                      mfem::Vector& HybridRHS) const;
+
+    /**
+       @brief Recover the solution of the original system from multiplier \f$ \mu \f$.
+
+       \f[
+         \left( \begin{array}{c} u \\ p \end{array} \right)
+         =
+         \left( \begin{array}{c} f \\ g \end{array} \right) -
+         \left( \begin{array}{cc} M&  B^T \\ B& \end{array} \right)^{-1}
+         \left( \begin{array}{c} C \\ 0 \end{array} \right)
+         \mu
+       \f]
+
+       This procedure is done locally in each element
+
+       This function assumes the offsets of RecoveredSol have been defined
+    */
+    void RecoverOriginalSolution(const mfem::Vector& HybridSol,
+                                 mfem::BlockVector& RecoveredSol) const;
+
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
 
-    mfem::Array<int> is_edgedof_shared_;
+    mfem::Array<int> edgedof_is_shared_;
 
     const mfem::SparseMatrix& D_;
     const mfem::SparseMatrix& W_;
