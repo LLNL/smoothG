@@ -71,9 +71,13 @@ int main(int argc, char* argv[])
     int dimension = 2;
     args.AddOption(&dimension, "--dimension", "--dimension",
                    "Spatial dimension of simulation.");
-    double cell_volume = 1.0;
+    double cell_volume = 10000.0;
     args.AddOption(&cell_volume, "--volume", "--volume",
                    "Volume of typical cell (for PDE sampler).");
+    int scale = 50;
+    args.AddOption(&scale, "--scale", "--scale",
+                   "Scale of problems (number of volumes in x,y directions)");
+                   
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
@@ -101,7 +105,6 @@ int main(int argc, char* argv[])
 
     // Setting up a mesh
     std::unique_ptr<mfem::ParMesh> pmesh;
-    const int scale = 50;
     if (dimension == 3)
     {
         mfem::Mesh mesh(scale, scale, 10, mfem::Element::HEXAHEDRON, 1,
@@ -131,9 +134,15 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1) = 0.0;
     // TODO: something better with right-hand side
     // rhs_fine.GetBlock(1)(0) = 1.0;
-    rhs_fine.GetBlock(1)(175) = 1.0;
+    // int index = 3.5 * scale;
+    int index = 0.5 * scale * scale + 0.1 * scale;
+    rhs_fine.GetBlock(1)(index) = 1.0;
     // rhs_fine.GetBlock(1)(rhs_fine.GetBlock(1).Size() - 1) = -1.0;
-    rhs_fine.GetBlock(1)(rhs_fine.GetBlock(1).Size() - 115) = -1.0;
+    // index = 2.25 * scale;
+    // rhs_fine.GetBlock(1)(rhs_fine.GetBlock(1).Size() - index) = -1.0;
+    index = 0.6 * scale * scale + 0.75 * scale;
+    rhs_fine.GetBlock(1)(index) = -1.0;
+
 
     std::unique_ptr<MultilevelSampler> sampler;
     const int seed = argseed + myid;
