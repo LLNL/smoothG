@@ -18,12 +18,10 @@
 namespace smoothg
 {
 
-FunctionalQoI::FunctionalQoI(const Upscale& upscale,
-                             const mfem::Vector& functional,
-                             bool on_pressure)
+PressureFunctionalQoI::PressureFunctionalQoI(const Upscale& upscale,
+                                             const mfem::Vector& functional)
     :
-    comm_(upscale.GetComm()),
-    on_pressure_(on_pressure)
+    comm_(upscale.GetComm())
 {
     functional_.push_back(functional);
     for (int i = 0; i < upscale.GetNumLevels() - 1; ++i)
@@ -35,21 +33,44 @@ FunctionalQoI::FunctionalQoI(const Upscale& upscale,
     }
 }
 
-double FunctionalQoI::Evaluate(const mfem::Vector& coefficient,
-                               const mfem::Vector& pressure) const
+double PressureFunctionalQoI::Evaluate(const mfem::Vector& coefficient,
+                                       const mfem::BlockVector& solution) const
 {
     for (unsigned int i = 0; i < functional_.size(); ++i)
     {
-        if (functional_[i].Size() == pressure.Size())
+        if (functional_[i].Size() == solution.GetBlock(1).Size())
         {
-            if (on_pressure_)
-            {
-                return mfem::InnerProduct(comm_, functional_[i], pressure);
-            }
-            else
-            {
-                return mfem::InnerProduct(comm_, functional_[i], pressure);
-            }
+            return mfem::InnerProduct(comm_, functional_[i], solution.GetBlock(1));
+        }
+    }
+    std::cerr << "Wrong size vector input!" << std::endl;
+    assert(false);
+    return 0.0;
+}
+
+FunctionalQoI::FunctionalQoI(const Upscale& upscale,
+                             const mfem::BlockVector& functional)
+    :
+    comm_(upscale.GetComm())
+{
+    functional_.push_back(functional);
+    for (int i = 0; i < upscale.GetNumLevels() - 1; ++i)
+    {
+        mfem::BlockVector temp = upscale.GetBlockVector(i + 1);
+        // level-1 to level
+        upscale.Restrict(i + 1, functional_[i], temp);
+        functional_.push_back(temp); // is this an unnecessary deep copy?
+    }
+}
+
+double FunctionalQoI::Evaluate(const mfem::Vector& coefficient,
+                               const mfem::BlockVector& solution) const
+{
+    for (unsigned int i = 0; i < functional_.size(); ++i)
+    {
+        if (functional_[i].Size() == solution.Size())
+        {
+            return mfem::InnerProduct(comm_, functional_[i], solution);
         }
     }
     std::cerr << "Wrong size vector input!" << std::endl;
@@ -64,21 +85,15 @@ LogLikelihood::LogLikelihood(std::shared_ptr<const QuantityOfInterest> measured_
     measured_qoi_.push_back(measured_qoi);
     measured_mean_.push_back(measured_mean);
     measured_sigma_.push_back(measured_sigma);
-
 }
 
 double LogLikelihood::Evaluate(const mfem::Vector& coefficient,
-                               const mfem::Vector& pressure) const
+                               const mfem::BlockVector& solution) const
 {
-    /*
-      /// the abs should be squared, see Dodwell et. al. (4.12)
-    return -std::fabs(measured_qoi_.Evaluate(coefficient, pressure) - measured_mean_) /
-        (measured_sigma_ *measured_sigma_);
-    */
     double squared_sum = 0.0;
     for (unsigned int i = 0; i < measured_qoi_.size(); ++i)
     {
-        double v = measured_qoi_[i]->Evaluate(coefficient, pressure);
+        double v = measured_qoi_[i]->Evaluate(coefficient, solution);
         squared_sum += (v - measured_mean_[i]) * (v - measured_mean_[i]) /
                        (measured_sigma_[i] * measured_sigma_[i]);
     }
@@ -125,7 +140,7 @@ void MLMCManager::FineSample(bool verbose)
     fvupscale_.RescaleCoefficient(level, fine_coefficient);
     mfem::BlockVector sol_fine(rhs_fine_);
     fvupscale_.Solve(level, rhs_fine_, sol_fine);
-    double fineq = qoi_.Evaluate(fine_coefficient, sol_fine.GetBlock(pressure_block));
+    double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
     // fvupscale->ShowSolveInfo(fine_level);
     double current_cost = fvupscale_.GetSolveTime(level);
 
@@ -244,7 +259,7 @@ void MLMCManager::CoarseSample(bool verbose)
     mfem::BlockVector rhs_coarse = RestrictToLevel(fvupscale_, level, rhs_fine_);
     mfem::BlockVector sol_coarse(rhs_coarse);
     fvupscale_.SolveAtLevel(level, rhs_coarse, sol_coarse);
-    double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse.GetBlock(pressure_block));
+    double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse);
     // fvupscale_->ShowSolveInfo(level);
     double current_cost = fvupscale_.GetSolveTime(level);
 
@@ -290,13 +305,13 @@ void MLMCManager::CorrectionSample(int level,
     mfem::BlockVector rhs_coarse = RestrictToLevel(fvupscale_, coarse_level, rhs_fine_);
     mfem::BlockVector sol_coarse(rhs_coarse);
     fvupscale_.SolveAtLevel(coarse_level, rhs_coarse, sol_coarse);
-    double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse.GetBlock(pressure_block));
+    double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse);
     double temp_cost = fvupscale_.GetSolveTime(coarse_level);
 
     mfem::BlockVector rhs_fine_local = RestrictToLevel(fvupscale_, fine_level, rhs_fine_);
     mfem::BlockVector sol_fine(rhs_fine_local);
     fvupscale_.SolveAtLevel(fine_level, rhs_fine_local, sol_fine);
-    double fineq = qoi_.Evaluate(fine_coefficient, sol_fine.GetBlock(pressure_block));
+    double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
     temp_cost += fvupscale_.GetSolveTime(fine_level);
     // auto error_info = fvupscale_.ComputeErrors(sol_upscaled, sol_fine);
 

@@ -24,7 +24,7 @@ namespace smoothg
 
 /**
    @brief Abstract class to define quantity of interest as
-   a function of coefficient and pressure.
+   a function of coefficient, flux, and pressure.
 */
 class QuantityOfInterest
 {
@@ -36,23 +36,7 @@ public:
        we will just require both all the time even if you use just one.
     */
     virtual double Evaluate(const mfem::Vector& coefficient,
-                            const mfem::Vector& pressure) const = 0;
-};
-
-class AveragePressure : public QuantityOfInterest
-{
-public:
-    AveragePressure(const Upscale& upscale,
-                    const mfem::Array<int>& cells);
-    ~AveragePressure() {}
-
-    double Evaluate(const mfem::Vector& coefficient,
-                    const mfem::Vector& pressure) const;
-
-private:
-    const Upscale& upscale_;
-    const mfem::Array<int>& cells_;
-    std::vector<int> sizes_;
+                            const mfem::BlockVector& solution) const = 0;
 };
 
 /**
@@ -66,25 +50,41 @@ private:
 
    Choice of what level to evaluate at is based on size of vector.
 */
+class PressureFunctionalQoI : public QuantityOfInterest
+{
+public:
+    /// functional must be given on *finest* level
+    PressureFunctionalQoI(const Upscale& upscale,
+                          const mfem::Vector& functional);
+
+    ~PressureFunctionalQoI() {}
+
+    double Evaluate(const mfem::Vector& coefficient,
+                    const mfem::BlockVector& solution) const;
+
+private:
+    MPI_Comm comm_;
+    std::vector<mfem::Vector> functional_;
+};
+
+/**
+   @brief Discretize a QoI as a linear functional on both flux and pressure.
+*/
 class FunctionalQoI : public QuantityOfInterest
 {
 public:
     /// functional must be given on *finest* level
-    /// functional can be on pressure or coefficient (not both),
-    /// setting bool pressure=false makes it on coefficient.
     FunctionalQoI(const Upscale& upscale,
-                  const mfem::Vector& functional,
-                  bool on_pressure = true);
+                  const mfem::BlockVector& functional);
 
     ~FunctionalQoI() {}
 
     double Evaluate(const mfem::Vector& coefficient,
-                    const mfem::Vector& pressure) const;
+                    const mfem::BlockVector& solution) const;
 
 private:
     MPI_Comm comm_;
-    bool on_pressure_;
-    std::vector<mfem::Vector> functional_;
+    std::vector<mfem::BlockVector> functional_;
 };
 
 /**
@@ -115,7 +115,7 @@ public:
     }
 
     double Evaluate(const mfem::Vector& coefficient,
-                    const mfem::Vector& pressure) const;
+                    const mfem::BlockVector& solution) const;
 
 private:
     std::vector<std::shared_ptr<const QuantityOfInterest> > measured_qoi_;
@@ -151,9 +151,9 @@ public:
     ~Likelihood() {}
 
     double Evaluate(const mfem::Vector& coefficient,
-                    const mfem::Vector& pressure) const
+                    const mfem::BlockVector& solution) const
     {
-        return std::exp(log_likelihood_.Evaluate(coefficient, pressure));
+        return std::exp(log_likelihood_.Evaluate(coefficient, solution));
     }
 
     void AddQoI(std::shared_ptr<const QuantityOfInterest> measured_qoi,
@@ -182,10 +182,10 @@ public:
     ~RatioNumerator() {}
 
     double Evaluate(const mfem::Vector& coefficient,
-                    const mfem::Vector& pressure) const
+                    const mfem::BlockVector& solution) const
     {
-        return unknown_qoi_.Evaluate(coefficient, pressure) *
-               likelihood_.Evaluate(coefficient, pressure);
+        return unknown_qoi_.Evaluate(coefficient, solution) *
+               likelihood_.Evaluate(coefficient, solution);
     }
 };
 

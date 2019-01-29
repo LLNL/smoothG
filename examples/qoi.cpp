@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
         functional(i) = dscale;
     }
     mfem::Vector dummy;
-    FunctionalQoI qoi(upscale, functional);
+    PressureFunctionalQoI qoi(upscale, functional);
 
     MLMCManager mlmc(*sampler, qoi, upscale, rhs_fine, dump_number);
 
