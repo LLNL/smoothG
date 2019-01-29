@@ -101,20 +101,22 @@ int main(int argc, char* argv[])
 
     // Setting up a mesh
     std::unique_ptr<mfem::ParMesh> pmesh;
-    const int scale = 40;
+    const int scale = 50;
     if (dimension == 3)
     {
-        mfem::Mesh mesh(scale, scale, 10, mfem::Element::HEXAHEDRON, 1, 4000, 4000, 100);
+        mfem::Mesh mesh(scale, scale, 10, mfem::Element::HEXAHEDRON, 1,
+                        scale * 100.0, scale * 100.0, 100.0);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     else
     {
-        mfem::Mesh mesh(scale, scale, mfem::Element::QUADRILATERAL, 1, 4000, 4000);
+        mfem::Mesh mesh(scale, scale, mfem::Element::QUADRILATERAL, 1,
+                        scale * 100.0, scale * 100.0);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
 
     // Construct a graph from a finite volume problem defined on the mesh
-    mfem::Array<int> ess_attr;
+    mfem::Array<int> ess_attr(dimension == 3 ? 6 : 4);
     DarcyProblem fvproblem(*pmesh, ess_attr);
     Graph graph = fvproblem.GetFVGraph();
     // TODO: think about boundary attributes etc.
@@ -128,8 +130,10 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = 0.0;
     // TODO: something better with right-hand side
-    rhs_fine.GetBlock(1)(0) = 1.0;
-    rhs_fine.GetBlock(1)(rhs_fine.GetBlock(1).Size() - 1) = -1.0;
+    // rhs_fine.GetBlock(1)(0) = 1.0;
+    rhs_fine.GetBlock(1)(175) = 1.0;
+    // rhs_fine.GetBlock(1)(rhs_fine.GetBlock(1).Size() - 1) = -1.0;
+    rhs_fine.GetBlock(1)(rhs_fine.GetBlock(1).Size() - 115) = -1.0;
 
     std::unique_ptr<MultilevelSampler> sampler;
     const int seed = argseed + myid;
