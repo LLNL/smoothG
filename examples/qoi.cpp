@@ -48,6 +48,8 @@
    See Osborn, Vassilevski, and Villa, A multilevel, hierarchical sampling
    technique for spatially correlated random fields, SISC 39 (2017) pp. S543-S562
    and its references for more information on these techniques.
+
+   Output from this example can be visualized (in 2D) with examples/qoivis.py
 */
 
 #include <fstream>
