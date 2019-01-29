@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
         sampler = make_unique<PDESampler>(
                       nDimensions, spe10problem.CellVolume(), kappa, seed,
                       upscale.GetHierarchy().GetMatrix(0).GetGraph(),
-                      partitioning, ess_attr, upscale_param);
+                      upscale_param, &partitioning, &ess_attr);
     }
     else
     {
