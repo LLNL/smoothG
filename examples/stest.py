@@ -698,6 +698,21 @@ def make_tests():
          {"p-error-level-1": 0.15983187318775974,
           "p-error-level-2": 0.34182546133693903}]
 
+    # this is supposed to mimic using --choose-samples, but the choice
+    # depends on cpu time, so for reproducibility we fix everything
+    tests["qoi"] = \
+        [["./qoi",
+          "--coarse-factor", "16",
+          "--max-levels", "2",
+          "--fine-samples", "0",
+          "--coarse-samples", "88",
+          "--shared-samples", "12",
+          "--choose-samples", "0",
+          "--seed", "1"],
+         {"coarse-variance":0.00043875444616974635,
+          "correction-variance":3.1477134555027084e-05,
+          "mlmc-estimate":0.023052574629399848}]
+
     if "tux" in platform.node():
         tests["veigenvector"] = \
             [[memorycheck_command, "--leak-check=full",

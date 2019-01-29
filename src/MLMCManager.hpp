@@ -208,6 +208,13 @@ public:
 
     void CoarseSample(bool verbose = false);
     void CorrectionSample(int level, bool verbose = false);
+
+    /**
+       Choose which level to sample on based on the variances and
+       costs calculated on various levels.
+
+       This is intended to optimize (variance reduction) / (computational cost)
+    */
     void BestSample(bool verbose = false);
 
     void DisplayStatus(picojson::object& serialize);

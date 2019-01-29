@@ -83,6 +83,7 @@ add_test(par-samplesolve python stest.py par-samplesolve)
 add_test(timestep python stest.py timestep)
 add_test(graphupscale graphupscale)
 add_test(mltopo mltopo --no-visualization)
+add_test(qoi python stest.py qoi)
 
 add_test(pareigenvector1 python stest.py pareigenvector1)
 add_test(pareigenvector4 python stest.py pareigenvector4)
