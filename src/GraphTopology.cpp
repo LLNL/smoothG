@@ -361,7 +361,7 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     face_trueface_face_ = ParMult(tmp_face_edge, *e_te_f, face_start_);
     auto tmp_face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
-    // Reorder faces so that their "true face" numbering is increasing
+    // Reorder shared faces so that their "true face" numbering is increasing
     auto face_reorder_map = FaceReorderMap(*tmp_face_trueface, *face_trueface_face_);
 
     auto face_trueface = ParMult(face_reorder_map, *tmp_face_trueface, face_start_);
