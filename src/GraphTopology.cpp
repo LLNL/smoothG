@@ -30,40 +30,55 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-mfem::SparseMatrix FaceReorderMap(const mfem::HypreParMatrix& face_trueface)
+mfem::SparseMatrix FaceReorderMap(const mfem::HypreParMatrix& face_trueface,
+                                  const mfem::HypreParMatrix& face_trueface_face)
 {
-    mfem::SparseMatrix diag, offd;
+    mfem::SparseMatrix face_is_shared, diag, offd;
     HYPRE_Int* colmap;
+    face_trueface_face.GetOffd(face_is_shared, colmap);
     face_trueface.GetDiag(diag);
     face_trueface.GetOffd(offd, colmap);
+    const HYPRE_Int face_start = face_trueface.GetRowStarts()[0];
 
-    HYPRE_Int face_start = face_trueface.GetRowStarts()[0];
+    std::vector<int> sharedface_to_face;
+    sharedface_to_face.reserve(face_is_shared.NumNonZeroElems());
 
-    mfem::SparseMatrix tdof_sort(face_trueface.NumRows());
 
-    std::map<int, int> tdof_map;
+    std::map<int, int> trueface_map;
     for (int face = 0; face < face_trueface.NumRows(); ++face)
     {
-        bool is_owned = diag.RowSize(face);
-        if (is_owned)
+        if (face_is_shared.RowSize(face))
         {
-            assert(diag.RowSize(face) == 1);
-            tdof_map[diag.GetRowColumns(face)[0] + face_start] = face;
-        }
-        else
-        {
-            assert(offd.RowSize(face) == 1);
-            tdof_map[colmap[offd.GetRowColumns(face)[0]]] = face;
-        }
-    }
-    int count = 0;
-    for (auto it = tdof_map.begin(); it != tdof_map.end(); ++it)
-    {
-        tdof_sort.Add(count++, it->second, 1.0);
-    }
-    tdof_sort.Finalize();
+            sharedface_to_face.push_back(face);
 
-    return tdof_sort;
+            if (diag.RowSize(face)) // face is owned
+            {
+                assert(diag.RowSize(face) == 1);
+                trueface_map[diag.GetRowColumns(face)[0] + face_start] = face;
+            }
+            else
+            {
+                assert(offd.RowSize(face) == 1);
+                trueface_map[colmap[offd.GetRowColumns(face)[0]]] = face;
+            }
+        }
+    }
+
+    mfem::SparseMatrix face_reorder_map(face_trueface.NumRows());
+
+    int count = 0;
+    auto it = trueface_map.begin();
+    for (int face = 0; face < face_trueface.NumRows(); ++face)
+    {
+        bool is_shared = face_is_shared.RowSize(face);
+        int row = is_shared ? sharedface_to_face[count++] : face;
+        int col = is_shared ? (it++)->second : face;
+        face_reorder_map.Add(row, col, 1.0);
+    }
+
+    face_reorder_map.Finalize();
+
+    return face_reorder_map;
 }
 
 void GraphTopology::AggregateEdge2AggregateEdgeInt(
@@ -347,18 +362,18 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     auto tmp_face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
     // Reorder faces so that their "true face" numbering is increasing
-    mfem::SparseMatrix face_sort = FaceReorderMap(*tmp_face_trueface);
+    auto face_reorder_map = FaceReorderMap(*tmp_face_trueface, *face_trueface_face_);
 
-    auto face_trueface = ParMult(face_sort, *tmp_face_trueface, face_start_);
+    auto face_trueface = ParMult(face_reorder_map, *tmp_face_trueface, face_start_);
     face_trueface_face_ = AAt(*face_trueface);
     face_trueface_face_->CopyRowStarts();
     face_trueface_face_->CopyColStarts();
 
-    auto reordered_face_Agg = smoothg::Mult(face_sort, tmp_face_Agg);
+    auto reordered_face_Agg = smoothg::Mult(face_reorder_map, tmp_face_Agg);
     face_Agg_.Swap(reordered_face_Agg);
     mfem::SparseMatrix Agg_face = smoothg::Transpose(face_Agg_);
 
-    auto reordered_face_edge = smoothg::Mult(face_sort, tmp_face_edge);
+    auto reordered_face_edge = smoothg::Mult(face_reorder_map, tmp_face_edge);
     face_edge_.Swap(reordered_face_edge);
 
     std::unique_ptr<mfem::SparseMatrix> face_bdratt;
