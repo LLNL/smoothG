@@ -367,6 +367,7 @@ void LocalMixedGraphSpectralTargets::GetExtAggDofs(
         dofs[i + num_ext_loc_dofs_diag] = dofs_offd[i] + num_ext_dofs_diag;
 }
 
+// Check if true id of local entities in shared face have ascending order
 void OrderingCheck(const mfem::HypreParMatrix& face_trueface_face,
                    const mfem::SparseMatrix& face_entity,
                    const mfem::HypreParMatrix& entity_trueentity)
@@ -386,18 +387,12 @@ void OrderingCheck(const mfem::HypreParMatrix& face_trueface_face,
             bool is_owned = e_te_diag.RowSize(local_entities[0]);
             auto& e_te_map = is_owned ? e_te_diag : e_te_offd;
 
-            std::map<int, int> tdof_map;
-            for (int i = 0; i < local_entities.Size(); ++i)
+            for (int i = 1; i < local_entities.Size(); ++i)
             {
-                int local_entity = local_entities[i];
-                assert(e_te_map.RowSize(local_entity) == 1);
-                tdof_map[e_te_map.GetRowColumns(local_entity)[0]] = i;
-            }
-
-            int count = 0;
-            for (auto it = tdof_map.begin(); it != tdof_map.end(); ++it)
-            {
-                assert(count++ == it->second);
+                assert(e_te_map.RowSize(local_entities[i - 1]) == 1);
+                assert(e_te_map.RowSize(local_entities[i]) == 1);
+                assert(e_te_map.GetRowColumns(local_entities[i - 1])[0]
+                       < e_te_map.GetRowColumns(local_entities[i])[0]);
             }
         }
     }
