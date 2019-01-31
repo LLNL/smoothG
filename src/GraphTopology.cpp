@@ -30,6 +30,42 @@ using std::unique_ptr;
 namespace smoothg
 {
 
+mfem::SparseMatrix FaceReorderMap(const mfem::HypreParMatrix& face_trueface)
+{
+    mfem::SparseMatrix diag, offd;
+    HYPRE_Int* colmap;
+    face_trueface.GetDiag(diag);
+    face_trueface.GetOffd(offd, colmap);
+
+    HYPRE_Int face_start = face_trueface.GetRowStarts()[0];
+
+    mfem::SparseMatrix tdof_sort(face_trueface.NumRows());
+
+    std::map<int, int> tdof_map;
+    for (int face = 0; face < face_trueface.NumRows(); ++face)
+    {
+        bool is_owned = diag.RowSize(face);
+        if (is_owned)
+        {
+            assert(diag.RowSize(face) == 1);
+            tdof_map[diag.GetRowColumns(face)[0] + face_start] = face;
+        }
+        else
+        {
+            assert(offd.RowSize(face) == 1);
+            tdof_map[colmap[offd.GetRowColumns(face)[0]]] = face;
+        }
+    }
+    int count = 0;
+    for (auto it = tdof_map.begin(); it != tdof_map.end(); ++it)
+    {
+        tdof_sort.Add(count++, it->second, 1.0);
+    }
+    tdof_sort.Finalize();
+
+    return tdof_sort;
+}
+
 void GraphTopology::AggregateEdge2AggregateEdgeInt(
     const mfem::SparseMatrix& aggregate_edge,
     mfem::SparseMatrix& aggregate_edge_int)
@@ -114,8 +150,6 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     {
         edge_trueedge_edge = AAt(edge_trueedge);
     }
-
-    HYPRE_Int* edge_start = const_cast<HYPRE_Int*>(edge_trueedge.RowPart());
 
     // generate the 'start' array
     int nAggs = partitioning.Max() + 1;
@@ -298,39 +332,40 @@ std::shared_ptr<Graph> GraphTopology::Coarsen(const mfem::Array<int>& partitioni
     }
     double* face_edge_data = new double [face_edge_nnz];
     std::fill_n(face_edge_data, face_edge_nnz, 1.0);
-    mfem::SparseMatrix face_edge_tmp(face_edge_i, face_edge_j, face_edge_data,
+    mfem::SparseMatrix tmp_face_edge(face_edge_i, face_edge_j, face_edge_data,
                                      nfaces, fine_graph_->NumEdges());
-    face_edge_.Swap(face_edge_tmp);
 
-    // TODO: face_bdratt can be built when counting boundary faces
+    // Complete face to aggregate table
+    mfem::SparseMatrix tmp_face_Agg(face_Agg_i, face_Agg_j, face_Agg_data, nfaces, nAggs);
+
+
+    // Construct "face to true face" table
+    GenerateOffsets(comm, nfaces, face_start_);
+    mfem::SparseMatrix edge_face(smoothg::Transpose(tmp_face_edge));
+    auto e_te_f = ParMult(*edge_trueedge_edge, edge_face, face_start_);
+    face_trueface_face_ = ParMult(tmp_face_edge, *e_te_f, face_start_);
+    auto tmp_face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
+
+    // Reorder faces so that their "true face" numbering is increasing
+    mfem::SparseMatrix face_sort = FaceReorderMap(*tmp_face_trueface);
+
+    auto face_trueface = ParMult(face_sort, *tmp_face_trueface, face_start_);
+    face_trueface_face_ = AAt(*face_trueface);
+    face_trueface_face_->CopyRowStarts();
+    face_trueface_face_->CopyColStarts();
+
+    auto reordered_face_Agg = smoothg::Mult(face_sort, tmp_face_Agg);
+    face_Agg_.Swap(reordered_face_Agg);
+    mfem::SparseMatrix Agg_face = smoothg::Transpose(face_Agg_);
+
+    auto reordered_face_edge = smoothg::Mult(face_sort, tmp_face_edge);
+    face_edge_.Swap(reordered_face_edge);
+
     std::unique_ptr<mfem::SparseMatrix> face_bdratt;
     if (fine_graph_->HasBoundary())
     {
         face_bdratt.reset(mfem::Mult(face_edge_, edge_bdratt));
     }
-
-    // Complete face to aggregate table
-    mfem::SparseMatrix f_A(face_Agg_i, face_Agg_j, face_Agg_data, nfaces, nAggs);
-    face_Agg_.Swap(f_A);
-    mfem::SparseMatrix Agg_face = smoothg::Transpose(face_Agg_);
-
-    // Build face "dof-true dof-dof" table from local face_edge and
-    // the edge "dof-true dof-dof" table
-    GenerateOffsets(comm, nfaces, face_start_);
-
-    mfem::SparseMatrix edge_face(smoothg::Transpose(face_edge_));
-
-    // block diagonal edge_face
-    mfem::HypreParMatrix edge_face_d(comm, edge_trueedge.M(), face_start_.Last(),
-                                     edge_start, face_start_, &edge_face);
-
-    assert(edge_trueedge_edge && edge_face_d);
-    face_trueface_face_.reset(smoothg::RAP(*edge_trueedge_edge, edge_face_d));
-    assert(face_trueface_face_);
-    SetConstantValue(*face_trueface_face_, 1.0);
-
-    // Construct "face to true face" table
-    auto face_trueface = BuildEntityToTrueEntity(*face_trueface_face_);
 
     coarse_graph_ = std::make_shared<Graph>(Agg_face, *face_trueface,
                                             mfem::Vector(), face_bdratt.get());
