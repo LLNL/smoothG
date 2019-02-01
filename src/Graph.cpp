@@ -72,14 +72,14 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
 }
 
 Graph::Graph(mfem::SparseMatrix edge_vertex_local,
-             std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge,
+             std::unique_ptr<mfem::HypreParMatrix> edge_trueedge,
              const mfem::Array<int>& vertex_starts,
              const mfem::Array<int>& edge_starts,
              const mfem::SparseMatrix* edge_bdratt)
     : vertex_edge_local_(smoothg::Transpose(edge_vertex_local)),
-      edge_trueedge_(BuildEntityToTrueEntity(*edge_trueedge_edge)),
+      edge_trueedge_(std::move(edge_trueedge)),
       edge_vertex_local_(std::move(edge_vertex_local)),
-      edge_trueedge_edge_(std::move(edge_trueedge_edge))
+      edge_trueedge_edge_(AAt(*edge_trueedge_))
 {
     vertex_starts.Copy(vertex_starts_);
     edge_starts.Copy(edge_starts_);

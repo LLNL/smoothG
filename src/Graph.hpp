@@ -107,7 +107,7 @@ public:
        @brief Constructor for building a coarse graph in coarsening
     */
     Graph(mfem::SparseMatrix edge_vertex_local,
-          std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge,
+          std::unique_ptr<mfem::HypreParMatrix> edge_trueedge,
           const mfem::Array<int>& vertex_starts,
           const mfem::Array<int>& edge_starts,
           const mfem::SparseMatrix* edge_bdratt);

@@ -30,6 +30,57 @@ using std::unique_ptr;
 namespace smoothg
 {
 
+mfem::SparseMatrix FaceReorderMap(const mfem::HypreParMatrix& face_trueface,
+                                  const mfem::HypreParMatrix& face_trueface_face)
+{
+    mfem::SparseMatrix face_is_shared, diag, offd;
+    HYPRE_Int* colmap;
+    face_trueface_face.GetOffd(face_is_shared, colmap);
+    face_trueface.GetDiag(diag);
+    face_trueface.GetOffd(offd, colmap);
+    const HYPRE_Int face_start = face_trueface.GetRowStarts()[0];
+
+    std::vector<int> sharedface_to_face;
+    sharedface_to_face.reserve(face_is_shared.NumNonZeroElems());
+
+
+    std::map<int, int> trueface_map;
+    for (int face = 0; face < face_trueface.NumRows(); ++face)
+    {
+        if (face_is_shared.RowSize(face))
+        {
+            sharedface_to_face.push_back(face);
+
+            if (diag.RowSize(face)) // face is owned
+            {
+                assert(diag.RowSize(face) == 1);
+                trueface_map[diag.GetRowColumns(face)[0] + face_start] = face;
+            }
+            else
+            {
+                assert(offd.RowSize(face) == 1);
+                trueface_map[colmap[offd.GetRowColumns(face)[0]]] = face;
+            }
+        }
+    }
+
+    mfem::SparseMatrix face_reorder_map(face_trueface.NumRows());
+
+    int count = 0;
+    auto it = trueface_map.begin();
+    for (int face = 0; face < face_trueface.NumRows(); ++face)
+    {
+        bool is_shared = face_is_shared.RowSize(face);
+        int row = is_shared ? sharedface_to_face[count++] : face;
+        int col = is_shared ? (it++)->second : face;
+        face_reorder_map.Add(row, col, 1.0);
+    }
+
+    face_reorder_map.Finalize();
+
+    return face_reorder_map;
+}
+
 Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor)
 {
     mfem::Array<int> partitioning;
@@ -227,30 +278,38 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
     }
     double* face_edge_data = new double [face_edge_nnz];
     std::fill_n(face_edge_data, face_edge_nnz, 1.0);
-    mfem::SparseMatrix face_edge_tmp(face_edge_i, face_edge_j, face_edge_data,
-                                     nfaces, fine_graph.NumEdges());
-    face_edge_.Swap(face_edge_tmp);
 
-    // TODO: face_bdratt can be built when counting boundary faces
+    mfem::SparseMatrix tmp_face_edge(face_edge_i, face_edge_j, face_edge_data,
+                                     nfaces, fine_graph.NumEdges());
+
+    // Construct "face to true face" table
+    mfem::Array<int> face_starts;
+    GenerateOffsets(comm, nfaces, face_starts);
+    mfem::SparseMatrix edge_face = smoothg::Transpose(tmp_face_edge);
+    auto e_te_f = ParMult(edge_trueedge_edge, edge_face, face_starts);
+    auto face_trueface_face = ParMult(tmp_face_edge, *e_te_f, face_starts);
+    auto tmp_face_trueface = BuildEntityToTrueEntity(*face_trueface_face);
+
+    // Reorder shared faces so that their "true face" numbering is increasing
+    auto face_reorder_map = FaceReorderMap(*tmp_face_trueface, *face_trueface_face);
+
+    auto face_trueface = ParMult(face_reorder_map, *tmp_face_trueface, face_starts);
+    face_trueface->CopyRowStarts();
+    face_trueface->CopyColStarts();
+
+    mfem::SparseMatrix tmp_face_Agg(face_Agg_i, face_Agg_j, face_Agg_data, nfaces, nAggs);
+    auto face_Agg = smoothg::Mult(face_reorder_map, tmp_face_Agg);
+
+    auto reordered_face_edge = smoothg::Mult(face_reorder_map, tmp_face_edge);
+    face_edge_.Swap(reordered_face_edge);
+
     std::unique_ptr<mfem::SparseMatrix> face_bdratt;
     if (fine_graph.HasBoundary())
     {
         face_bdratt.reset(mfem::Mult(face_edge_, edge_bdratt));
     }
 
-    // Complete face to aggregate table
-    mfem::SparseMatrix face_Agg(face_Agg_i, face_Agg_j, face_Agg_data, nfaces, nAggs);
-
-    mfem::Array<HYPRE_Int> face_starts;
-    GenerateOffsets(comm, nfaces, face_starts);
-    mfem::SparseMatrix edge_face(smoothg::Transpose(face_edge_));
-    auto e_te_f = ParMult(edge_trueedge_edge, edge_face, face_starts);
-    auto face_trueface_face = ParMult(face_edge_, *e_te_f, face_starts);
-    face_trueface_face->CopyRowStarts();
-    face_trueface_face->CopyColStarts();
-    SetConstantValue(*face_trueface_face, 1.0);
-
-    return Graph(std::move(face_Agg), std::move(face_trueface_face),
+    return Graph(std::move(face_Agg), std::move(face_trueface),
                  agg_starts, face_starts, face_bdratt.get());
 }
 
