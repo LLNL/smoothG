@@ -89,16 +89,10 @@ class PDESampler : public MultilevelSampler
 {
 public:
     /**
-       Initialize the PDESampler based on the Upscale object (probably
-       FiniteVolumeUpscale).
+       Initialize the PDESampler based on the given Upscale object.
 
        @param upscale object containing information about fine and coarse grids
                       and how they are connected
-       @param fine_vector_size number of vertices on the fine graph
-       @param coarse_aggs number of aggregates on coarse graph - note well this
-                          is *not* the number of degrees of freedom - we only
-                          sample coefficient on the *constant* component, not
-                          the spectral components
        @param dimension spatial dimension of the mesh
        @param cell_volume size of a typical cell
        @param kappa inverse correlation length for Matern covariance
@@ -111,30 +105,38 @@ public:
                double kappa, int seed);
 
     /**
-       Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object.
+       Initialize the PDESampler based on its own, owned Upscale object.
 
-       Many of these parameters are simply passed to the FiniteVolumeUpscale constructor.
+       Many of these parameters are simply passed to the Upscale constructor.
 
-       The underlying FiniteVolumeUpscale object represents the problem
+       The underlying Upscale object represents the problem
        \f[
          \kappa^2 u - \Delta u = w
        \f]
        which is used to generate samples on both fine and coarse grids, where w
        is a white noise right-hand side.
 
+       @param dimension spatial dimension of the mesh
+       @param cell_volume size of a typical cell
+       @param kappa inverse correlation length for Matern covariance
+       @param seed seed for random number generator used here
        @param graph the (distributed and weighted) fine graph
        @param partitioning pre-calculated agglomerate partitioning
     */
     PDESampler(int dimension, double cell_volume, double kappa, int seed,
                const Graph& graph,
-               const mfem::Array<int>& partitioning,
-               const mfem::Array<int>& ess_attr,
-               const UpscaleParameters& param);
+               const UpscaleParameters& param = UpscaleParameters(),
+               const mfem::Array<int>* partitioning = nullptr,
+               const mfem::Array<int>* ess_attr = nullptr);
 
     ~PDESampler();
 
     /// Draw white noise on fine level
     void NewSample();
+
+    /// Set state (if you draw new white noise into state before
+    /// calling this, this is equivalent to NewSample())
+    void SetSample(const mfem::Vector& state);
 
     /// Solve PDE with current white-noise RHS to find coeffiicent
     /// on coarser level, the result is on *aggregates*
