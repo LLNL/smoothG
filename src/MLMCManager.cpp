@@ -244,16 +244,6 @@ void MLMCManager::FixedLevelSample(int level, bool verbose)
     sample_count_[level]++;
 }
 
-void MLMCManager::FineSample(bool verbose)
-{
-    FixedLevelSample(0, verbose);
-}
-
-void MLMCManager::CoarseSample(bool verbose)
-{
-    FixedLevelSample(num_levels_ - 1, verbose);
-}
-
 void MLMCManager::CorrectionSample(int level,
                                    bool verbose)
 {
@@ -285,7 +275,8 @@ void MLMCManager::CorrectionSample(int level,
 
     const double scale = 1.0 / ((double) sample_count_[fine_level] + 1.0);
     varsum_[fine_level] += scale * ((double) sample_count_[fine_level]) *
-                           ((fineq - upscaledq) - mean_[fine_level]) * ((fineq - upscaledq) - mean_[fine_level]);
+                           ((fineq - upscaledq) - mean_[fine_level]) *
+                           ((fineq - upscaledq) - mean_[fine_level]);
     mean_[fine_level] += scale * ((fineq - upscaledq) - mean_[fine_level]);
     cost_[fine_level] += scale * (temp_cost - cost_[fine_level]);
 
@@ -360,7 +351,7 @@ void MLMCManager::BestSample(bool verbose)
             if (verbose)
                 std::cout << "  Choosing to sample on level " << level << std::endl;
             if (level == num_levels_ - 1)
-                CoarseSample(verbose);
+                FixedLevelSample(level, verbose);
             else
                 CorrectionSample(level, verbose);
             break;

@@ -186,24 +186,25 @@ int main(int argc, char* argv[])
 
     const bool verbose = (myid == 0);
 
-    if (upscale_param.max_levels == 1)
+    const int num_levels = upscale_param.max_levels;
+    if (num_levels == 1)
     {
         for (int sample = 0; sample < fine_samples; ++sample)
         {
             if (myid == 0)
                 std::cout << "---\nFine sample " << sample << "\n---" << std::endl;
 
-            mlmc.FineSample(verbose);
+            mlmc.FixedLevelSample(0, verbose);
         }
     }
-    else if (upscale_param.max_levels == 2)
+    else if (num_levels == 2)
     {
         for (int sample = 0; sample < coarse_samples; ++sample)
         {
             if (myid == 0)
-                std::cout << "---\nCoarsest " << upscale_param.max_levels - 1 << " sample "
+                std::cout << "---\nCoarsest " << num_levels - 1 << " sample "
                           << sample << "\n---" << std::endl;
-            mlmc.CoarseSample(verbose);
+            mlmc.FixedLevelSample(num_levels - 1, verbose);
         }
         for (int sample = 0; sample < shared_samples; ++sample)
         {
@@ -219,11 +220,11 @@ int main(int argc, char* argv[])
         // three is better; sometimes you get stuck if there are very few samples on a level
         for (int i = 0; i < coarse_samples; ++i)
         {
-            std::cout << "---\nCoarsest " << upscale_param.max_levels - 1 << " sample "
+            std::cout << "---\nCoarsest " << num_levels - 1 << " sample "
                       << i << "\n---" << std::endl;
-            mlmc.CoarseSample(verbose);
+            mlmc.FixedLevelSample(num_levels - 1, verbose);
         }
-        for (int level = 0; level < upscale_param.max_levels - 1; ++level)
+        for (int level = 0; level < num_levels - 1; ++level)
         {
             for (int i = 0; i < shared_samples; ++i)
             {
