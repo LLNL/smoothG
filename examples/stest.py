@@ -709,9 +709,9 @@ def make_tests():
           "--shared-samples", "12",
           "--choose-samples", "0",
           "--seed", "1"],
-         {"coarse-variance":0.00043875444616974635,
-          "correction-variance":3.1477134555027084e-05,
-          "mlmc-estimate":0.023052574629399848}]
+         {"coarse-variance":0.00032645932614011391,
+          "correction-variance":9.6428048303302214e-05,
+          "mlmc-estimate":0.024405704716219202}]
 
     tests["qoi-one-level"] = \
         [["./qoi",

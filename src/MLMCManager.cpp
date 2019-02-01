@@ -130,8 +130,7 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
 
 void MLMCManager::Simulate(bool verbose)
 {
-    // for (int level = 0; level < num_levels_; ++level)
-    for (int level = num_levels_ - 1; level >= 0; level--)
+    for (int level = 0; level < num_levels_; ++level)
     {
         for (int sample = 0; sample < initial_samples_[level]; ++sample)
         {
