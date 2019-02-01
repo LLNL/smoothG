@@ -203,6 +203,29 @@ public:
                 int num_levels = -1);
     ~MLMCManager() {}
 
+    /**
+       @brief Sets initial number of samples to take in MLMC simulation at each level.
+
+       To get estimates of variance and cost, we initially do several (at least 5)
+       samples on each level. Then often later samples are chosen to optimally reduce
+       variance per cost, see SetNumChooseSamples();
+    */
+    void SetInitialSamplesLevel(int level, int num) { initial_samples_[level] = num; }
+
+    /// Set same number of initial samples for each level.
+    void SetInitialSamples(int num)
+    {
+        for (auto& n : initial_samples_) { n = num; }
+    }
+
+    void SetNumChooseSamples(int num) { choose_samples_ = num; }
+
+    /**
+       @brief Run sampling, based on number of samples set in SetInitialSamples() and
+       SetNumChooseSamples()
+    */
+    void Simulate(bool verbose = false);
+
     /// For a real multilevel Monte Carlo algorithm, you only use this
     /// on the coarsest level, but it is enabled on other levels for
     /// debugging and comparison purposes.
@@ -251,6 +274,8 @@ private:
     std::vector<double> mean_;
     std::vector<double> varsum_;
     std::vector<double> cost_;
+    std::vector<int> initial_samples_;
+    int choose_samples_;
 };
 
 

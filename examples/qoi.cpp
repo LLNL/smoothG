@@ -179,48 +179,20 @@ int main(int argc, char* argv[])
     PressureFunctionalQoI qoi(upscale, functional);
 
     MLMCManager mlmc(sampler, qoi, upscale, rhs_fine, dump_number);
-
     const bool verbose = (myid == 0);
 
     const int num_levels = upscale_param.max_levels;
     if (num_levels == 1)
     {
-        for (int sample = 0; sample < fine_samples; ++sample)
-        {
-            if (myid == 0)
-                std::cout << "---\nFine sample " << sample << "\n---" << std::endl;
-
-            mlmc.FixedLevelSample(0, verbose);
-        }
+        mlmc.SetInitialSamplesLevel(0, fine_samples);
     }
     else
     {
-        // at least two samples on each level to ensure a meaningful variance (and cost)
-        // three is better; sometimes you get stuck if there are very few samples on a level
-        for (int i = 0; i < coarse_samples; ++i)
-        {
-            std::cout << "---\nCoarsest " << num_levels - 1 << " sample "
-                      << i << "\n---" << std::endl;
-            mlmc.FixedLevelSample(num_levels - 1, verbose);
-        }
-        for (int level = 0; level < num_levels - 1; ++level)
-        {
-            for (int i = 0; i < shared_samples; ++i)
-            {
-                std::cout << "---\nInitial level " << level << " correction " << i
-                          << "\n---" << std::endl;
-                mlmc.CorrectionSample(level, verbose);
-            }
-        }
+        mlmc.SetInitialSamples(shared_samples);
+        mlmc.SetInitialSamplesLevel(num_levels - 1, coarse_samples);
     }
-
-    for (int sample = 0; sample < choose_samples; ++sample)
-    {
-        if (myid == 0)
-            std::cout << "---\nChoose sample " << sample << "\n---" << std::endl;
-
-        mlmc.BestSample(verbose);
-    }
+    mlmc.SetNumChooseSamples(choose_samples);
+    mlmc.Simulate(verbose);
 
     if (myid == 0)
     {

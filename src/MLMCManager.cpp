@@ -110,7 +110,8 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     sampler_(sampler),
     qoi_(qoi),
     fvupscale_(fvupscale),
-    dump_number_(dump_number)
+    dump_number_(dump_number),
+    choose_samples_(0)
 {
     num_levels_ = (num_levels < 0) ? fvupscale.GetNumLevels() : num_levels;
 
@@ -118,11 +119,36 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     mean_.resize(num_levels_);
     varsum_.resize(num_levels_);
     cost_.resize(num_levels_);
+    initial_samples_.resize(num_levels_);
 
     rhs_.push_back(rhs_fine);
     for (int k = 0; k < num_levels_ - 1; ++k)
     {
         rhs_.push_back(fvupscale.Restrict(k + 1, rhs_[k]));
+    }
+}
+
+void MLMCManager::Simulate(bool verbose)
+{
+    // for (int level = 0; level < num_levels_; ++level)
+    for (int level = num_levels_ - 1; level >= 0; level--)
+    {
+        for (int sample = 0; sample < initial_samples_[level]; ++sample)
+        {
+            if (verbose)
+            {
+                std::cout << "---\nLevel " << level << " sample " << sample
+                          << "\n---" << std::endl;
+            }
+            Sample(level, verbose);
+        }
+    }
+
+    for (int sample = 0; sample < choose_samples_; ++sample)
+    {
+        if (verbose)
+            std::cout << "---\nChoose sample " << sample << "\n---" << std::endl;
+        BestSample(verbose);
     }
 }
 

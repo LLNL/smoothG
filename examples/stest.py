@@ -713,6 +713,18 @@ def make_tests():
           "correction-variance":3.1477134555027084e-05,
           "mlmc-estimate":0.023052574629399848}]
 
+    tests["qoi-one-level"] = \
+        [["./qoi",
+          "--coarse-factor", "16",
+          "--max-levels", "1",
+          "--fine-samples", "50",
+          "--coarse-samples", "0",
+          "--shared-samples", "0",
+          "--choose-samples", "0",
+          "--seed", "1"],
+         {"correction-variance":0.00070392964378184961,
+          "mlmc-estimate":0.028261016132007703}]
+
     if "tux" in platform.node():
         tests["veigenvector"] = \
             [[memorycheck_command, "--leak-check=full",
