@@ -100,12 +100,9 @@ int main(int argc, char* argv[])
     int dimension = 2;
     args.AddOption(&dimension, "--dimension", "--dimension",
                    "Spatial dimension of simulation.");
-    double cell_volume = 10000.0;
-    args.AddOption(&cell_volume, "--volume", "--volume",
-                   "Volume of typical cell (for PDE sampler).");
-    int scale = 50;
-    args.AddOption(&scale, "--scale", "--scale",
-                   "Scale of problems (number of volumes in x,y directions)");
+    int problem_size = 50;
+    args.AddOption(&problem_size, "--problem-size", "--problem-size",
+                   "Scale of problem (number of volumes in x,y directions)");
 
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
@@ -136,20 +133,21 @@ int main(int argc, char* argv[])
     std::unique_ptr<mfem::ParMesh> pmesh;
     if (dimension == 3)
     {
-        mfem::Mesh mesh(scale, scale, 10, mfem::Element::HEXAHEDRON, 1,
-                        scale * 100.0, scale * 100.0, 100.0);
+        mfem::Mesh mesh(problem_size, problem_size, 10, mfem::Element::HEXAHEDRON, 1,
+                        problem_size * 100.0, problem_size * 100.0, 100.0);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     else
     {
-        mfem::Mesh mesh(scale, scale, mfem::Element::QUADRILATERAL, 1,
-                        scale * 100.0, scale * 100.0);
+        mfem::Mesh mesh(problem_size, problem_size, mfem::Element::QUADRILATERAL, 1,
+                        problem_size * 100.0, problem_size * 100.0);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
 
     // Construct a graph from a finite volume problem defined on the mesh
     mfem::Array<int> ess_attr(dimension == 3 ? 6 : 4);
     DarcyProblem fvproblem(*pmesh, ess_attr);
+    double cell_volume = fvproblem.CellVolume();
     Graph graph = fvproblem.GetFVGraph();
     Upscale upscale(graph, upscale_param);
 
@@ -161,9 +159,9 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = 0.0;
     // it may make sense to have a more general, not hard-coded, right-hand side
-    int index = 0.5 * scale * scale + 0.1 * scale;
+    int index = 0.5 * problem_size * problem_size + 0.1 * problem_size;
     rhs_fine.GetBlock(1)(index) = 1.0;
-    index = 0.6 * scale * scale + 0.75 * scale;
+    index = 0.6 * problem_size * problem_size + 0.75 * problem_size;
     rhs_fine.GetBlock(1)(index) = -1.0;
 
     const int seed = argseed + myid;
@@ -172,8 +170,8 @@ int main(int argc, char* argv[])
 
     mfem::Vector functional(rhs_fine.GetBlock(1));
     functional = 0.0;
-    double dscale = 1.0 / scale;
-    for (int i = 0; i < scale; ++i)
+    double dscale = 1.0 / problem_size;
+    for (int i = 0; i < problem_size; ++i)
     {
         functional(i) = dscale;
     }
