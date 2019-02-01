@@ -14,19 +14,19 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file mlmc.cpp
+   @file samplesolve.cpp
 
-   @brief This is an example for upscaling a graph Laplacian coming from a finite
-   volume discretization of a simple reservior model, where we change coefficients
-   in the model without re-coarsening.
+   @brief Solve a finite volume problem with an uncertain coefficient on
+   several discretization levels.
+
+   The key ideas are multilevel sampling, resetting coefficients on different
+   grid levels without rediscretization, and using uncertain coefficients in
+   an upscaled setting.
 
    A simple way to run the example:
 
-   ./mlmc --perm spe_perm.dat
+   ./samplesolve --perm spe_perm.dat
 */
-
-// best multilevel command line so far (appears to create a reasonable result):
-// ./mlmc --sampler-type pde --num-samples 2 --max-levels 3 --hybridization --no-coarse-components --max-evects 1 --coarse-factor 8
 
 #include <fstream>
 #include <sstream>
