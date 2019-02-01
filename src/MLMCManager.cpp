@@ -130,60 +130,9 @@ void MLMCManager::FloorCoefficient(mfem::Vector& coef, double floor)
     }
 }
 
-void MLMCManager::FineSample(bool verbose)
-{
-    const int level = 0;
-    const int pressure_block = 1;
-
-    sampler_.NewSample();
-    auto fine_coefficient = sampler_.GetCoefficient(0);
-    fvupscale_.RescaleCoefficient(level, fine_coefficient);
-    mfem::BlockVector sol_fine(rhs_fine_);
-    fvupscale_.Solve(level, rhs_fine_, sol_fine);
-    double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
-    // fvupscale->ShowSolveInfo(fine_level);
-    double current_cost = fvupscale_.GetSolveTime(level);
-
-    const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
-    varsum_[level] += scale * ((double) sample_count_[level]) *
-                      (fineq - mean_[level]) * (fineq - mean_[level]);
-    mean_[level] += scale * (fineq  - mean_[level]);
-    cost_[level] += scale * (current_cost - cost_[level]);
-
-    if (verbose)
-    {
-        std::cout << "    fine qoi: " << fineq << std::endl;
-        std::cout << "    fine cost: " << current_cost << std::endl;
-        std::cout << "    uMLMC estimate: " << GetEstimate() << std::endl;
-    }
-
-    if (sample_count_[level] < dump_number_)
-    {
-        std::stringstream ss1, ss3;
-        ss1 << "c_fine" << sample_count_[level] << ".vector";
-        std::ofstream out1(ss1.str().c_str());
-        sol_fine.GetBlock(pressure_block).Print(out1, 1);
-
-        for (int i = 0; i < fine_coefficient.Size(); ++i)
-        {
-            fine_coefficient[i] = std::log(fine_coefficient[i]);
-        }
-
-        ss3 << "c_coefficient" << sample_count_[level] << ".vector";
-        std::ofstream out3(ss3.str().c_str());
-        fine_coefficient.Print(out3, 1);
-    }
-    sample_count_[level]++;
-}
-
 double MLMCManager::GetEstimate() const
 {
-    double out = 0.0;
-    for (const auto& v : mean_)
-    {
-        out += v;
-    }
-    return out;
+    return std::accumulate(mean_.begin(), mean_.end(), 0.0);
 }
 
 /**
@@ -248,42 +197,61 @@ mfem::BlockVector RestrictToLevel(const Upscale& upscale,
     return out;
 }
 
-void MLMCManager::CoarseSample(bool verbose)
+void MLMCManager::FixedLevelSample(int level, bool verbose)
 {
-    const int level = num_levels_ - 1;
     const int pressure_block = 1;
 
     sampler_.NewSample();
-    auto coarse_coefficient = sampler_.GetCoefficient(level);
-    fvupscale_.RescaleCoefficient(level, coarse_coefficient);
-    mfem::BlockVector rhs_coarse = RestrictToLevel(fvupscale_, level, rhs_fine_);
-    mfem::BlockVector sol_coarse(rhs_coarse);
-    fvupscale_.SolveAtLevel(level, rhs_coarse, sol_coarse);
-    double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse);
-    // fvupscale_->ShowSolveInfo(level);
+    auto coefficient = sampler_.GetCoefficient(level);
+    fvupscale_.RescaleCoefficient(level, coefficient);
+    mfem::BlockVector rhs = RestrictToLevel(fvupscale_, level, rhs_fine_);
+    mfem::BlockVector sol(rhs);
+    fvupscale_.SolveAtLevel(level, rhs, sol);
+    double l_qoi = qoi_.Evaluate(coefficient, sol);
     double current_cost = fvupscale_.GetSolveTime(level);
 
     const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
     varsum_[level] += scale * ((double) sample_count_[level]) *
-                      (upscaledq - mean_[level]) * (upscaledq - mean_[level]);
-    mean_[level] += scale * (upscaledq - mean_[level]);
+                      (l_qoi - mean_[level]) * (l_qoi - mean_[level]);
+    mean_[level] += scale * (l_qoi  - mean_[level]);
     cost_[level] += scale * (current_cost - cost_[level]);
 
     if (verbose)
     {
-        std::cout << "    coarse qoi: " << upscaledq << std::endl;
-        std::cout << "    coarse cost: " << current_cost << std::endl;
+        std::cout << "    fixed level " << level << " qoi: " << l_qoi << std::endl;
+        std::cout << "    fixed level " << level << " cost: " << current_cost << std::endl;
         std::cout << "    uMLMC estimate: " << GetEstimate() << std::endl;
     }
 
     if (sample_count_[level] < dump_number_)
     {
-        std::stringstream ss1;
-        ss1 << "c_upscaled" << sample_count_[level] << ".vector";
+        std::stringstream ss1, ss3;
+        ss1 << "sol_level" << level << "_sample" << sample_count_[level] << ".vector";
         std::ofstream out1(ss1.str().c_str());
-        InterpolateToFine(fvupscale_, level, sol_coarse).GetBlock(pressure_block).Print(out1, 1);
+        sol.GetBlock(pressure_block).Print(out1, 1);
+
+        if (level == 0)
+        {
+            for (int i = 0; i < coefficient.Size(); ++i)
+            {
+                coefficient[i] = std::log(coefficient[i]);
+            }
+            ss3 << "c_coefficient" << sample_count_[level] << ".vector";
+            std::ofstream out3(ss3.str().c_str());
+            coefficient.Print(out3, 1);
+        }
     }
     sample_count_[level]++;
+}
+
+void MLMCManager::FineSample(bool verbose)
+{
+    FixedLevelSample(0, verbose);
+}
+
+void MLMCManager::CoarseSample(bool verbose)
+{
+    FixedLevelSample(num_levels_ - 1, verbose);
 }
 
 void MLMCManager::CorrectionSample(int level,

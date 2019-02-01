@@ -202,10 +202,11 @@ public:
                 int dump_number);
     ~MLMCManager() {}
 
-    /// only for one-level MC, not really part of this object,
-    /// here for debug / comparison purposes
+    /// For a real multilevel Monte Carlo algorithm, you only use this
+    /// on the coarsest level, but it is enabled on other levels for
+    /// debugging and comparison purposes.
+    void FixedLevelSample(int level, bool verbose);
     void FineSample(bool verbose = false);
-
     void CoarseSample(bool verbose = false);
     void CorrectionSample(int level, bool verbose = false);
 
