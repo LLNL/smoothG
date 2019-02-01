@@ -158,8 +158,7 @@ int main(int argc, char* argv[])
     upscale.MakeSolver(0);
 
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
-    rhs_fine.GetBlock(0) = 0.0;
-    rhs_fine.GetBlock(1) = 0.0;
+    rhs_fine = 0.0;
     // it may make sense to have a more general, not hard-coded, right-hand side
     int index = 0.5 * problem_size * problem_size + 0.1 * problem_size;
     rhs_fine.GetBlock(1)(index) = 1.0;
@@ -172,12 +171,12 @@ int main(int argc, char* argv[])
 
     mfem::Vector functional(rhs_fine.GetBlock(1));
     functional = 0.0;
-    double dscale = 1.0 / problem_size;
-    for (int i = 0; i < problem_size; ++i)
+    int face_size = (dimension == 2) ? problem_size : problem_size * problem_size;
+    double dscale = 1.0 / face_size;
+    for (int i = 0; i < face_size; ++i)
     {
         functional(i) = dscale;
     }
-    mfem::Vector dummy;
     PressureFunctionalQoI qoi(upscale, functional);
 
     MLMCManager mlmc(sampler, qoi, upscale, rhs_fine, dump_number);
