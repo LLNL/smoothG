@@ -84,6 +84,8 @@ add_test(timestep python stest.py timestep)
 add_test(graphupscale graphupscale)
 add_test(mltopo mltopo --no-visualization)
 add_test(qoi python stest.py qoi)
+add_test(qoi-one-level python stest.py qoi-one-level)
+add_test(qoi-hb python stest.py qoi-hb)
 
 add_test(pareigenvector1 python stest.py pareigenvector1)
 add_test(pareigenvector4 python stest.py pareigenvector4)

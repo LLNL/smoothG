@@ -29,14 +29,14 @@
    One-level:
 
       ./qoi --coarse-factor 16 \
-          --max-levels 1 --fine-samples 100 \
+          --max-levels 1 --fine-samples 200 \
           --coarse-samples 0 --shared-samples 0 --choose-samples 0
 
    Multi (two)-level
 
       ./qoi --coarse-factor 16 \
           --max-levels 2 --fine-samples 0 \
-          --coarse-samples 5 --shared-samples 5 --choose-samples 90
+          --coarse-samples 10 --shared-samples 10 --choose-samples 180
 
    Each gives essentially the same estimate for the quantity of interest, but
    the two-level estimator is much more efficient because most samples are
@@ -146,10 +146,12 @@ int main(int argc, char* argv[])
 
     // Construct a graph from a finite volume problem defined on the mesh
     mfem::Array<int> ess_attr(dimension == 3 ? 6 : 4);
+    ess_attr = 0;
+    ess_attr[0] = 1;
     DarcyProblem fvproblem(*pmesh, ess_attr);
     double cell_volume = fvproblem.CellVolume();
     Graph graph = fvproblem.GetFVGraph();
-    Upscale upscale(graph, upscale_param);
+    Upscale upscale(graph, upscale_param, nullptr, &ess_attr);
 
     upscale.PrintInfo();
     upscale.ShowSetupTime();
@@ -166,7 +168,7 @@ int main(int argc, char* argv[])
 
     const int seed = argseed + myid;
     PDESampler sampler(dimension, cell_volume, kappa, seed,
-                       graph, upscale_param);
+                       graph, upscale_param, nullptr, &ess_attr);
 
     mfem::Vector functional(rhs_fine.GetBlock(1));
     functional = 0.0;
