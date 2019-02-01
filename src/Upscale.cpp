@@ -183,7 +183,7 @@ void Upscale::SolveAtLevel(int level, const mfem::Vector& x, mfem::Vector& y) co
 
 mfem::Vector Upscale::SolveAtLevel(int level, const mfem::Vector& x) const
 {
-    mfem::Vector coarse_vect = GetVector(1);
+    mfem::Vector coarse_vect = GetVector(level);
     SolveAtLevel(level, x, coarse_vect);
 
     return coarse_vect;
@@ -199,7 +199,7 @@ void Upscale::SolveAtLevel(int level, const mfem::BlockVector& x, mfem::BlockVec
 
 mfem::BlockVector Upscale::SolveAtLevel(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetBlockVector(1));
+    mfem::BlockVector coarse_vect(GetBlockVector(level));
     SolveAtLevel(level, x, coarse_vect);
 
     return coarse_vect;
