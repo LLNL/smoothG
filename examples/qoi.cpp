@@ -160,17 +160,15 @@ int main(int argc, char* argv[])
     mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
     rhs_fine.GetBlock(0) = 0.0;
     rhs_fine.GetBlock(1) = 0.0;
-    // it may make sense to have more general, not hard-coded, right-hand side
+    // it may make sense to have a more general, not hard-coded, right-hand side
     int index = 0.5 * scale * scale + 0.1 * scale;
     rhs_fine.GetBlock(1)(index) = 1.0;
     index = 0.6 * scale * scale + 0.75 * scale;
     rhs_fine.GetBlock(1)(index) = -1.0;
 
-    std::unique_ptr<MultilevelSampler> sampler;
     const int seed = argseed + myid;
-    sampler = make_unique<PDESampler>(
-                  dimension, cell_volume, kappa, seed,
-                  graph, upscale_param);
+    PDESampler sampler(dimension, cell_volume, kappa, seed,
+                       graph, upscale_param);
 
     mfem::Vector functional(rhs_fine.GetBlock(1));
     functional = 0.0;
@@ -182,7 +180,7 @@ int main(int argc, char* argv[])
     mfem::Vector dummy;
     PressureFunctionalQoI qoi(upscale, functional);
 
-    MLMCManager mlmc(*sampler, qoi, upscale, rhs_fine, dump_number);
+    MLMCManager mlmc(sampler, qoi, upscale, rhs_fine, dump_number);
 
     const bool verbose = (myid == 0);
 
@@ -195,23 +193,6 @@ int main(int argc, char* argv[])
                 std::cout << "---\nFine sample " << sample << "\n---" << std::endl;
 
             mlmc.FixedLevelSample(0, verbose);
-        }
-    }
-    else if (num_levels == 2)
-    {
-        for (int sample = 0; sample < coarse_samples; ++sample)
-        {
-            if (myid == 0)
-                std::cout << "---\nCoarsest " << num_levels - 1 << " sample "
-                          << sample << "\n---" << std::endl;
-            mlmc.FixedLevelSample(num_levels - 1, verbose);
-        }
-        for (int sample = 0; sample < shared_samples; ++sample)
-        {
-            if (myid == 0)
-                std::cout << "---\nShared sample " << sample << "\n---" << std::endl;
-
-            mlmc.CorrectionSample(0, verbose);
         }
     }
     else
