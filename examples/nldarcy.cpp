@@ -107,27 +107,27 @@ int main(int argc, char* argv[])
     UpscaleParameters upscale_param;
     upscale_param.spect_tol = 1.0;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
+    const char* problem_name = "spe10";
+
+    args.AddOption(&problem_name, "-mp", "--model-problem",
+                   "Model problem (spe10, egg, lognormal, richard)");
+    const char* perm_file = "spe_perm.dat";
+    args.AddOption(&perm_file, "-p", "--perm",
                    "SPE10 permeability file data.");
-    int nDimensions = 2;
-    args.AddOption(&nDimensions, "-d", "--dim",
+    int dim = 2;
+    args.AddOption(&dim, "-d", "--dim",
                    "Dimension of the physical space.");
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    bool metis_agglomeration = false;
-    args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
-                   "-nm", "--no-metis-agglomeration",
-                   "Use Metis as the partitioner (instead of geometric).");
     int num_sr = 3;
     args.AddOption(&num_sr, "-nsr", "--num-serial-refine",
                    "Number of serial refinement");
     int num_pr = 0;
     args.AddOption(&num_pr, "-npr", "--num-parallel-refine",
                    "Number of parallel refinement");
-    double correlation_length = 0.1;
-    args.AddOption(&correlation_length, "-cl", "--correlation-length",
+    double correlation = 0.1;
+    args.AddOption(&correlation, "-cl", "--correlation-length",
                    "Correlation length");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
@@ -149,56 +149,40 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    mfem::Array<int> coarsening_factors(nDimensions);
-    coarsening_factors = 10;
-    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
-
-    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
-    // SPE10, Egg model, Lognormal coefficient
-    ess_attr = 0;
-    // Richard
-//    ess_attr = 0;
-//    ess_attr[0] = 0;
-
     // Setting up finite volume discretization problem
-    const int spe10_scale = 5;
-    SPE10Problem fv_problem(permFile, nDimensions, spe10_scale, slice,
-                            metis_agglomeration, ess_attr);
-    Graph graph = fv_problem.GetFVGraph();
+    std::string problem(problem_name);
+    mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
+    ess_attr = 0;
+    unique_ptr<DarcyProblem> fv_problem;
 
-    // Construct agglomerated topology based on METIS or Cartesian agglomeration
-    mfem::Array<int> partitioning;
-    fv_problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
+    if (problem == "spe10")
+    {
+        fv_problem.reset(new SPE10Problem(perm_file, dim, 5, slice, 0, ess_attr));
+    }
+    else if (problem == "egg")
+    {
+        fv_problem.reset(new EggModel(num_sr, num_pr, ess_attr));
+    }
+    else if (problem == "lognormal")
+    {
+        fv_problem.reset(new LognormalModel(dim, num_sr, num_pr, correlation, ess_attr));
+    }
+    else if (problem == "richard")
+    {
+        ess_attr = 1;
+        ess_attr[0] = 0;
+        fv_problem.reset(new Richards(num_sr, ess_attr));
+    }
+    else
+    {
+        mfem::mfem_error("Unknown model problem!");
+    }
+
+    Graph graph = fv_problem->GetFVGraph();
 
     // Create hierarchy
-    Hierarchy hierarchy(std::move(graph), upscale_param, &partitioning, &ess_attr);
+    Hierarchy hierarchy(std::move(graph), upscale_param, nullptr, &ess_attr);
     hierarchy.PrintInfo();
-    hierarchy.SetPrintLevel(-1);
-
-    //    /// [Solve]
-    //    std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
-
-    //    mfem::Array<int> ess_attr(dim == 2 ? 4 : 3);
-    //    ess_attr = 1;
-    //    ess_attr[0] = 0;
-    //    Richards fv_problem(num_sr, ess_attr);
-    //    mfem::Vector Z_vector_glo = fv_problem.GetZVector();
-
-    ////    EggModel fv_problem(num_sr, num_pr, ess_v_attr);
-
-    ////    std::vector<int> ess_v_attr(dim == 2 ? 4 : 6, 1);
-    ////    SPE10Problem fv_problem("spe_perm.dat", dim, 5, slice, ess_v_attr, 85, 0);
-    ////    LognormalProblem fv_problem(dim, num_sr, num_pr, correlation_length, ess_v_attr);
-
-    //    Graph graph = fv_problem.GetFVGraph(coarsening_factor, false);
-
-    //    // Construct graph hierarchy
-    //    Upscale upscale(graph, fv_problem.GetLocalWeight(),
-    //                         {spect_tol, max_evects, hybridization, num_levels,
-    //                         coarsening_factor, fv_problem.GetEssentialVertDofs()});
-
-    //    upscale.PrintInfo();
-    //    upscale.ShowSetupTime();
 
     if (myid == 0)
     {
@@ -207,19 +191,13 @@ int main(int argc, char* argv[])
 
     mfem::BlockVector rhs(hierarchy.GetMatrix(0).BlockOffsets());
     rhs.GetBlock(0) = 0.0;//fv_problem.GetEdgeRHS();;
-    rhs.GetBlock(1) = 1.0;//fv_problem.GetVertexRHS();
-
-
+    rhs.GetBlock(1) = fv_problem->CellVolume();//fv_problem.GetVertexRHS();
 
     mfem::BlockVector sol_picard(rhs);
     sol_picard = 0.0;
 
     SingleLevelSolver sls(hierarchy, 0, Picard);
     sls.SetPrintLevel(1);
-//    sls.SetMaxIter(1);
-    //    sol_picard.GetBlock(1) = Z_vector_glo;
-    //    sol_picard.GetBlock(1) *= -1.0;;
-
     sls.Solve(rhs, sol_picard);
 
     mfem::BlockVector sol_nlmg(rhs);
@@ -227,16 +205,7 @@ int main(int argc, char* argv[])
 
     EllipticNLMG nlmg(hierarchy, V_CYCLE, Picard);
     nlmg.SetPrintLevel(1);
-
-    //    upscale.Solve(0, rhs, sol_nlmg);
-
     nlmg.Solve(rhs, sol_nlmg);
-
-    //    upscale.Solve(0, rhs, sol_picard);
-    //    upscale.ShowSolveInfo(0);
-    //    int kk = 4;
-    //    upscale.Solve(kk, rhs, sol_nlmg);
-    //    upscale.ShowSolveInfo(kk);
 
     double p_err = CompareError(comm, sol_picard.GetBlock(1), sol_nlmg.GetBlock(1));
     if (myid == 0)
@@ -247,12 +216,7 @@ int main(int argc, char* argv[])
     if (visualization)
     {
         mfem::socketstream sout;
-        //        std::vector<double> Kp(sol_picard.GetBlock(1).size() );
-        //        Kappa(sol_picard.GetBlock(1), Kp, Z_vector_glo);
-        //        mfem::Vector vis_help(Kp.data(), rhs.GetBlock(1).size());
-
-        //        sol_picard.GetBlock(1) -= Z_vector_glo;
-        fv_problem.VisSetup(sout, sol_picard.GetBlock(1), 0.0, 0.0, "");
+        fv_problem->VisSetup(sout, sol_picard.GetBlock(1), 0.0, 0.0, "");
     }
 
     return EXIT_SUCCESS;
@@ -303,15 +267,9 @@ void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVect
 {
     p_ = hierarchy_.PWConstProject(level_, x.GetBlock(1));
     Kappa(p_, kp_);
+
     hierarchy_.RescaleCoefficient(level_, kp_);
-
-    //    if (level_  < up_.NumLevels())
-//    hierarchy_.SetMaxIter(max_num_iter_ * 1000);
-    //    else
-    //        up_.SetMaxIter(20);
-
     hierarchy_.Solve(level_, rhs, x);
-    //    up_.ShowSolveInfo(level_);
 }
 
 void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
@@ -326,6 +284,10 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, Cycle cycle, SolveType solve_ty
 {
     //    std::vector<Vector> Z_vectors_help(up_.NumLevels());
     //    std::vector<Vector> Z_vectors(up_.NumLevels());
+
+    hierarchy_.SetPrintLevel(-1);
+    hierarchy_.SetMaxIter(10);
+
     solvers_.reserve(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
@@ -393,24 +355,6 @@ void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& ou
     solvers_[level].Solve(in, out);
 }
 
-//mfem::Vector EllipticNLMG::SelectTrueVector(
-//    int level, const mfem::Vector& vec_dof) const
-//{
-//    return hierarchy_.GetMatrix(level).SelectTrueVector(vec_dof);
-//}
-
-//mfem::Vector EllipticNLMG::RestrictTrueVector(
-//    int level, const mfem::Vector& vec_tdof) const
-//{
-//    return hierarchy_.GetMatrix(level).RestrictTrueVector(vec_tdof);
-//}
-
-//mfem::Vector EllipticNLMG::DistributeTrueVector(
-//    int level, const mfem::Vector& vec_tdof) const
-//{
-//    return hierarchy_.GetMatrix(level).DistributeTrueVector(vec_tdof);
-//}
-
 const mfem::Array<int>& EllipticNLMG::Offsets(int level) const
 {
     return hierarchy_.GetMatrix(level).BlockOffsets();
@@ -432,7 +376,7 @@ void Kappa(const mfem::Vector& p, mfem::Vector& kp)
     assert(kp.Size() == p.Size());
     for (int i = 0; i < p.Size(); i++)
     {
-        kp[i] = std::exp(1e-3 * (p[i]));
+        kp[i] = std::exp(5e-1 * (p[i]));
         assert(kp[i] > 0.0);
     }
 }

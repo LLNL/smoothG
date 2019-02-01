@@ -427,16 +427,6 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
             }
         }
 
-//        CMinvDTAinv_f_loc.SetSize(nlocal_multiplier);
-//        AinvDMinvCT_[iAgg].MultTranspose(f_loc, CMinvDTAinv_f_loc);
-
-//        for (int i = 0; i < nlocal_multiplier; ++i)
-//            HybridRHS(local_multiplier[i]) -= CMinvDTAinv_f_loc(i);
-
-//        // Save M^{-1}g, A^{-1} (DM^{-1} g - f) for solution recovery
-//        Ainv_f_[iAgg].SetSize(nlocal_vertexdof);
-//        Ainv_[iAgg].Mult(f_loc, Ainv_f_[iAgg]);
-//        Ainv_f_[iAgg] *= elem_scaling_(iAgg);
         DMinv_g_loc.SetSize(nlocal_vertexdof);
         MinvDT_[iAgg].MultTranspose(g_loc, DMinv_g_loc);
 
@@ -492,7 +482,6 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
 
         // Initialize a vector which will store the local contribution of Hdiv
         // and L2 space
-//        mfem::Vector& u_loc(Ainv_f_[iAgg]);
         mfem::Vector& u_loc(local_rhs_[iAgg]);
         mfem::Vector& sigma_loc(Minv_g_[iAgg]);
 
@@ -503,14 +492,6 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
             // Extract the local portion of the Lagrange multiplier solution
             HybridSol.GetSubVector(local_multiplier, mu_loc);
 
-//            // Compute u = (DMinvDT)^-1(f-DMinvC^T mu)
-//            AinvDMinvCT_[iAgg].AddMult_a(-1., mu_loc, u_loc);
-
-//            // Compute -sigma = Minv(DT u + DT mu)
-//            sigma_loc.SetSize(nlocal_edgedof);
-//            MinvDT_[iAgg].Mult(u_loc, sigma_loc);
-//            MinvCT_[iAgg].AddMult(mu_loc, sigma_loc);
-//            sigma_loc /= elem_scaling_(iAgg);
             // Compute u = A^{-1} (DM^{-1} (g - C^T mu) - f)
             tmp.SetSize(u_loc.Size());
             AinvDMinvCT_[iAgg].Mult(mu_loc, tmp);

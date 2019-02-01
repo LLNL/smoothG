@@ -826,17 +826,7 @@ unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis
 
 void SPE10Problem::MakeRHS()
 {
-    bool no_flow_bc = true;
-    for (auto attr : ess_attr_)
-    {
-        if (attr == 0)
-        {
-            no_flow_bc = false;
-            break;
-        }
-    }
-
-    if (no_flow_bc)
+    if (ess_attr_.Find(0) == -1) // Neumann condition on whole boundary
     {
         rhs_sigma_ = 0.0;
 
@@ -873,10 +863,10 @@ mfem::Vector SPE10Problem::InitialCondition(double initial_val) const
     return init;
 }
 
-class LognormalProblem : public DarcyProblem
+class LognormalModel : public DarcyProblem
 {
 public:
-    LognormalProblem(int nDimensions, int num_ser_ref, int num_par_ref,
+    LognormalModel(int nDimensions, int num_ser_ref, int num_par_ref,
                      double correlation_length, const mfem::Array<int>& ess_attr);
 private:
     void SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref);
@@ -885,9 +875,9 @@ private:
     unique_ptr<mfem::ParMesh> pmesh_c_;
 };
 
-LognormalProblem::LognormalProblem(int nDimensions, int num_ser_ref,
-                                   int num_par_ref, double correlation_length,
-                                   const mfem::Array<int>& ess_attr)
+LognormalModel::LognormalModel(int nDimensions, int num_ser_ref,
+                               int num_par_ref, double correlation_length,
+                               const mfem::Array<int>& ess_attr)
     : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
 {
     SetupMesh(nDimensions, num_ser_ref, num_par_ref);
@@ -900,7 +890,7 @@ LognormalProblem::LognormalProblem(int nDimensions, int num_ser_ref,
     rhs_u_ = -1.0 * CellVolume();
 }
 
-void LognormalProblem::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref)
+void LognormalModel::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref)
 {
     const int N = std::pow(2, num_ser_ref);
     unique_ptr<mfem::Mesh> mesh;
@@ -925,7 +915,7 @@ void LognormalProblem::SetupMesh(int nDimensions, int num_ser_ref, int num_par_r
     }
 }
 
-void LognormalProblem::SetupCoeff(int nDimensions, double correlation_length, int more_ref)
+void LognormalModel::SetupCoeff(int nDimensions, double correlation_length, int more_ref)
 {
     double nu_parameter = nDimensions == 2 ? 1.0 : 0.5;
     double kappa = std::sqrt(2.0 * nu_parameter) / correlation_length;
@@ -1061,35 +1051,26 @@ void Richards::SetupMeshCoeff(int num_ref)
 void Velocity(const mfem::Vector & x, mfem::Vector & out)
 {
     out.SetSize(x.Size());
-    out = 0.0;
-    if (x[0] <= 2000.0 )
-    {
-        out[1] = -10. / 365.0;
-    }
+    out[0] = 0.0;
+    out[0] = x[0] <= 2000.0 ? -10. / 365.0 : 0.0;
 }
 
 void Richards::SetupRHS()
 {
-    mfem::Vector rhs_u_mfem(u_fes_->TrueVSize());
-    rhs_u_mfem = 0.0;
-
     mfem::ParMixedBilinearForm bVarf(sigma_fes_.get(), u_fes_.get());
     bVarf.AddDomainIntegrator(new mfem::VectorFEDivergenceIntegrator);
     bVarf.Assemble();
     bVarf.Finalize();
 
+    mfem::ParGridFunction flux_gf(sigma_fes_.get());
+    flux_gf = 0.0;
+
     mfem::Array<int> bdr_att(4);
     bdr_att = 0; bdr_att[2] = 1;
     mfem::VectorFunctionCoefficient velocity_coeff(2, Velocity);
-    mfem::ParGridFunction flux_gf(sigma_fes_.get());
-    flux_gf = 0.0;
     flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, bdr_att);
-    bVarf.SpMat().Mult(flux_gf, rhs_u_mfem);
 
-    for (int i = 0; i < rhs_u_mfem.Size(); ++i)
-    {
-        rhs_u_[i] = rhs_u_mfem[i];
-    }
+    bVarf.SpMat().Mult(flux_gf, rhs_u_);
 }
 
 mfem::Vector Richards::GetZVector() const
