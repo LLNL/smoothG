@@ -104,20 +104,21 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
                          const QuantityOfInterest& qoi,
                          Upscale& fvupscale,
                          const mfem::BlockVector& rhs_fine,
-                         int dump_number)
+                         int dump_number,
+                         int num_levels)
     :
     sampler_(sampler),
     qoi_(qoi),
     fvupscale_(fvupscale),
     rhs_fine_(rhs_fine),
-    num_levels_(fvupscale.GetNumLevels()),
-    dump_number_(dump_number),
-    sample_count_(num_levels_),
-    mean_(num_levels_),
-    varsum_(num_levels_),
-    cost_(num_levels_)
+    dump_number_(dump_number)
 {
-    // all my std::vectors initialize to 0?
+    num_levels_ = (num_levels < 0) ? fvupscale.GetNumLevels() : num_levels;
+
+    sample_count_.resize(num_levels_);
+    mean_.resize(num_levels_);
+    varsum_.resize(num_levels_);
+    cost_.resize(num_levels_);
 }
 
 /// if you have to use this, you should probably vary kappa or cell_volume instead

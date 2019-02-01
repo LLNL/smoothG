@@ -199,14 +199,24 @@ public:
                 const QuantityOfInterest& qoi,
                 Upscale& fvupscale,
                 const mfem::BlockVector& rhs_fine,
-                int dump_number = 0);
+                int dump_number = 0,
+                int num_levels = -1);
     ~MLMCManager() {}
 
     /// For a real multilevel Monte Carlo algorithm, you only use this
     /// on the coarsest level, but it is enabled on other levels for
     /// debugging and comparison purposes.
-    void FixedLevelSample(int level, bool verbose);
+    void FixedLevelSample(int level, bool verbose = false);
     void CorrectionSample(int level, bool verbose = false);
+
+    /// Convenience interface for sampling in loops
+    void Sample(int level, bool verbose = false)
+    {
+        if (level == num_levels_ - 1)
+            FixedLevelSample(level, verbose);
+        else
+            CorrectionSample(level, verbose);
+    }
 
     /**
        Choose which level to sample on based on the variances and
