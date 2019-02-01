@@ -120,7 +120,7 @@ mfem::BlockVector Upscale::Solve(int level, const mfem::BlockVector& x) const
 
 const mfem::Array<int>& Upscale::BlockOffsets(int level) const
 {
-    return hierarchy_.GetMatrix(level).BlockOffsets();
+    return hierarchy_.BlockOffsets(level);
 }
 
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,

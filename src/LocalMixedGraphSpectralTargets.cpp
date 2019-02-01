@@ -505,7 +505,6 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
         // restricting vertex dofs on extended region to the original aggregate
         GetTableRow(dof_agg_.agg_vdof_, agg, loc_vdofs);
-
         evects_T.Transpose(evects);
         evects_restricted_T.SetSize(nevects, loc_vdofs.Size());
         ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, col_map_, evects_restricted_T);

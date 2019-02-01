@@ -136,15 +136,17 @@ public:
 
     double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
 
-    const mfem::SparseMatrix& GetPsigma(int level) const
+    MPI_Comm GetComm() const { return GetMatrix(0).GetComm(); }
+
+    /// Get block offsets for edge/vertex-based dofs in a given level
+    const mfem::Array<int>& BlockOffsets(int level) const
     {
-        return Psigma_[level];
+        return GetMatrix(level).BlockOffsets();
     }
 
-    const mfem::SparseMatrix& GetPu(int level) const
-    {
-        return Pu_[level];
-    }
+    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
+
+    const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
 
     /// Create solver on level
     void MakeSolver(int level);
