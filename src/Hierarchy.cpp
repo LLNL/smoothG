@@ -109,7 +109,7 @@ void Hierarchy::Mult(int level, const mfem::BlockVector& x, mfem::BlockVector& y
 
 mfem::BlockVector Hierarchy::Mult(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetMatrix(level).BlockOffsets());
+    mfem::BlockVector y(BlockOffsets(level));
     Solve(level, x, y);
     return y;
 }
@@ -122,7 +122,7 @@ void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& 
 
 mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector y(GetMatrix(level).BlockOffsets());
+    mfem::BlockVector y(BlockOffsets(level));
     Solve(level, x, y);
     return y;
 }
@@ -162,7 +162,7 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
 
 mfem::BlockVector Hierarchy::Interpolate(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector fine_vect(GetMatrix(level - 1).BlockOffsets());
+    mfem::BlockVector fine_vect(BlockOffsets(level - 1));
     Interpolate(level, x, fine_vect);
     return fine_vect;
 }
@@ -189,7 +189,7 @@ void Hierarchy::Restrict(int level, const mfem::BlockVector& x, mfem::BlockVecto
 
 mfem::BlockVector Hierarchy::Restrict(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetMatrix(level + 1).BlockOffsets());
+    mfem::BlockVector coarse_vect(BlockOffsets(level + 1));
     Restrict(level, x, coarse_vect);
     return coarse_vect;
 }
@@ -213,7 +213,7 @@ void Hierarchy::Project(int level, const mfem::BlockVector& x, mfem::BlockVector
 
 mfem::BlockVector Hierarchy::Project(int level, const mfem::BlockVector& x) const
 {
-    mfem::BlockVector coarse_vect(GetMatrix(level + 1).BlockOffsets());
+    mfem::BlockVector coarse_vect(BlockOffsets(level + 1));
     Project(level, x, coarse_vect);
     return coarse_vect;
 }

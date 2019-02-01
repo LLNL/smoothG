@@ -56,7 +56,7 @@ FunctionalQoI::FunctionalQoI(const Hierarchy& hierarchy,
     functional_.push_back(functional);
     for (int i = 0; i < hierarchy.NumLevels() - 1; ++i)
     {
-        mfem::BlockVector temp(hierarchy.GetMatrix(i + 1).BlockOffsets());
+        mfem::BlockVector temp(hierarchy.BlockOffsets(i + 1));
         // level to level+1
         hierarchy.Restrict(i, functional_[i], temp);
         functional_.push_back(temp); // is this an unnecessary deep copy?
@@ -178,13 +178,11 @@ mfem::BlockVector InterpolateToFine(const Hierarchy& hierarchy, int level,
     vec1 = in;
     for (int k = level; k > 0; k--)
     {
-        MFEM_ASSERT(vec1.Size() == hierarchy.GetMatrix(k).NumTotalDofs(),
+        MFEM_ASSERT(vec1.Size() == hierarchy.BlockOffsets(k).Last(),
                     "Sizes do not work!");
-        mfem::BlockVector block_vec1(vec1.GetData(),
-                                     hierarchy.GetMatrix(k).BlockOffsets());
-        vec2.SetSize(hierarchy.GetMatrix(k - 1).NumTotalDofs());
-        mfem::BlockVector block_vec2(vec2.GetData(),
-                                     hierarchy.GetMatrix(k - 1).BlockOffsets());
+        mfem::BlockVector block_vec1(vec1.GetData(), hierarchy.BlockOffsets(k));
+        vec2.SetSize(hierarchy.BlockOffsets(k - 1).Last());
+        mfem::BlockVector block_vec2(vec2.GetData(), hierarchy.BlockOffsets(k - 1));
         /// Interpolate from k to the finer k-1
         hierarchy.Interpolate(k, block_vec1, block_vec2);
         vec2.Swap(vec1);

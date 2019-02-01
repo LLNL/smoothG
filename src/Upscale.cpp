@@ -35,8 +35,8 @@ Upscale::Upscale(Hierarchy hierarchy)
     sol_.reserve(hierarchy_.NumLevels());
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
-        rhs_.emplace_back(hierarchy_.GetMatrix(level).BlockOffsets());
-        sol_.emplace_back(hierarchy_.GetMatrix(level).BlockOffsets());
+        rhs_.emplace_back(BlockOffsets(level));
+        sol_.emplace_back(BlockOffsets(level));
     }
 }
 
