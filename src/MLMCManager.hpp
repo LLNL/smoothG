@@ -221,6 +221,9 @@ public:
     double GetEstimate() const;
 
 private:
+    /// Incremental updates of mean_, varsum_, and cost_
+    void UpdateStatistics(int level, double l_qoi, double current_cost);
+
     /// remove super-small values from a coefficient
     /// (not recommended)
     void FloorCoefficient(mfem::Vector& coef, double floor = 1.e-8);

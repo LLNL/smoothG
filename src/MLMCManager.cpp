@@ -197,6 +197,15 @@ mfem::BlockVector RestrictToLevel(const Upscale& upscale,
     return out;
 }
 
+void MLMCManager::UpdateStatistics(int level, double l_qoi, double current_cost)
+{
+    const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
+    varsum_[level] += scale * ((double) sample_count_[level]) *
+                      (l_qoi - mean_[level]) * (l_qoi - mean_[level]);
+    mean_[level] += scale * (l_qoi  - mean_[level]);
+    cost_[level] += scale * (current_cost - cost_[level]);
+}
+
 void MLMCManager::FixedLevelSample(int level, bool verbose)
 {
     const int pressure_block = 1;
@@ -209,12 +218,7 @@ void MLMCManager::FixedLevelSample(int level, bool verbose)
     fvupscale_.SolveAtLevel(level, rhs, sol);
     double l_qoi = qoi_.Evaluate(coefficient, sol);
     double current_cost = fvupscale_.GetSolveTime(level);
-
-    const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
-    varsum_[level] += scale * ((double) sample_count_[level]) *
-                      (l_qoi - mean_[level]) * (l_qoi - mean_[level]);
-    mean_[level] += scale * (l_qoi  - mean_[level]);
-    cost_[level] += scale * (current_cost - cost_[level]);
+    UpdateStatistics(level, l_qoi, current_cost);
 
     if (verbose)
     {
@@ -271,14 +275,8 @@ void MLMCManager::CorrectionSample(int level,
     fvupscale_.SolveAtLevel(fine_level, rhs_fine_local, sol_fine);
     double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
     temp_cost += fvupscale_.GetSolveTime(fine_level);
-    // auto error_info = fvupscale_.ComputeErrors(sol_upscaled, sol_fine);
 
-    const double scale = 1.0 / ((double) sample_count_[fine_level] + 1.0);
-    varsum_[fine_level] += scale * ((double) sample_count_[fine_level]) *
-                           ((fineq - upscaledq) - mean_[fine_level]) *
-                           ((fineq - upscaledq) - mean_[fine_level]);
-    mean_[fine_level] += scale * ((fineq - upscaledq) - mean_[fine_level]);
-    cost_[fine_level] += scale * (temp_cost - cost_[fine_level]);
+    UpdateStatistics(fine_level, fineq - upscaledq, temp_cost);
 
     if (verbose)
     {
@@ -294,7 +292,7 @@ void MLMCManager::CorrectionSample(int level,
         // does it make sense to log some information, like the QoI, to go with the visualization?
         // (conceivably you could even ask qoi_ to make a special picture)
 
-        // for more informative visualization (is it more sensible to do this here or in the python?)
+        // for more informative visualization (is it more sensible to do this here or in the viewer?)
         for (int i = 0; i < fine_coefficient.Size(); ++i)
         {
             fine_coefficient[i] = std::log(fine_coefficient[i]);
