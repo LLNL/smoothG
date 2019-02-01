@@ -241,12 +241,12 @@ private:
     MultilevelSampler& sampler_;
     const QuantityOfInterest& qoi_;
     Upscale& fvupscale_;
-    const mfem::BlockVector& rhs_fine_;
 
     int num_levels_;
     int dump_number_;
 
     /// one for each level (ie, diff -> 0, coarse -> 1)
+    std::vector<mfem::BlockVector> rhs_;
     std::vector<int> sample_count_;
     std::vector<double> mean_;
     std::vector<double> varsum_;

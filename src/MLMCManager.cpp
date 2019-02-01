@@ -110,7 +110,6 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     sampler_(sampler),
     qoi_(qoi),
     fvupscale_(fvupscale),
-    rhs_fine_(rhs_fine),
     dump_number_(dump_number)
 {
     num_levels_ = (num_levels < 0) ? fvupscale.GetNumLevels() : num_levels;
@@ -119,6 +118,12 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     mean_.resize(num_levels_);
     varsum_.resize(num_levels_);
     cost_.resize(num_levels_);
+
+    rhs_.push_back(rhs_fine);
+    for (int k = 0; k < num_levels_ - 1; ++k)
+    {
+        rhs_.push_back(fvupscale.Restrict(k + 1, rhs_[k]));
+    }
 }
 
 /// if you have to use this, you should probably vary kappa or cell_volume instead
@@ -169,35 +174,6 @@ mfem::BlockVector InterpolateToFine(const Upscale& upscale, int level,
     return out;
 }
 
-/// restrict from finest level (level 0) to given level
-mfem::BlockVector RestrictToLevel(const Upscale& upscale,
-                                  int level, const mfem::BlockVector& in)
-{
-    mfem::Vector vec1, vec2;
-    vec1 = in;
-    for (int k = 0; k < level; ++k)
-    {
-        MFEM_ASSERT(vec1.Size() == upscale.GetMatrix(k).GetBlockOffsets().Last(),
-                    "Sizes do not work!");
-        mfem::BlockVector block_vec1(vec1.GetData(),
-                                     upscale.GetMatrix(k).GetBlockOffsets());
-        vec2.SetSize(upscale.GetMatrix(k + 1).GetBlockOffsets().Last());
-        vec2 = 0.0; // ????
-        mfem::BlockVector block_vec2(vec2.GetData(),
-                                     upscale.GetMatrix(k + 1).GetBlockOffsets());
-        upscale.Restrict(k + 1, block_vec1, block_vec2);
-        vec2.Swap(vec1);
-    }
-    mfem::BlockVector out(upscale.GetMatrix(level).GetBlockOffsets());
-    MFEM_ASSERT(out.Size() == vec1.Size(), "Sizes do not work!");
-    // ((mfem::Vector) out) = vec1;
-    for (int i = 0; i < out.Size(); ++i)
-    {
-        out[i] = vec1[i];
-    }
-    return out;
-}
-
 void MLMCManager::UpdateStatistics(int level, double l_qoi, double current_cost)
 {
     const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
@@ -214,9 +190,8 @@ void MLMCManager::FixedLevelSample(int level, bool verbose)
     sampler_.NewSample();
     auto coefficient = sampler_.GetCoefficient(level);
     fvupscale_.RescaleCoefficient(level, coefficient);
-    mfem::BlockVector rhs = RestrictToLevel(fvupscale_, level, rhs_fine_);
-    mfem::BlockVector sol(rhs);
-    fvupscale_.SolveAtLevel(level, rhs, sol);
+    mfem::BlockVector sol(rhs_[level]);
+    fvupscale_.SolveAtLevel(level, rhs_[level], sol);
     double l_qoi = qoi_.Evaluate(coefficient, sol);
     double current_cost = fvupscale_.GetSolveTime(level);
     UpdateStatistics(level, l_qoi, current_cost);
@@ -265,15 +240,13 @@ void MLMCManager::CorrectionSample(int level,
     auto coarse_coefficient = sampler_.GetCoefficient(coarse_level);
     fvupscale_.RescaleCoefficient(coarse_level, coarse_coefficient);
 
-    mfem::BlockVector rhs_coarse = RestrictToLevel(fvupscale_, coarse_level, rhs_fine_);
-    mfem::BlockVector sol_coarse(rhs_coarse);
-    fvupscale_.SolveAtLevel(coarse_level, rhs_coarse, sol_coarse);
+    mfem::BlockVector sol_coarse(rhs_[coarse_level]);
+    fvupscale_.SolveAtLevel(coarse_level, rhs_[coarse_level], sol_coarse);
     double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse);
     double temp_cost = fvupscale_.GetSolveTime(coarse_level);
 
-    mfem::BlockVector rhs_fine_local = RestrictToLevel(fvupscale_, fine_level, rhs_fine_);
-    mfem::BlockVector sol_fine(rhs_fine_local);
-    fvupscale_.SolveAtLevel(fine_level, rhs_fine_local, sol_fine);
+    mfem::BlockVector sol_fine(rhs_[fine_level]);
+    fvupscale_.SolveAtLevel(fine_level, rhs_[fine_level], sol_fine);
     double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
     temp_cost += fvupscale_.GetSolveTime(fine_level);
 
