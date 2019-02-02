@@ -35,8 +35,8 @@ Upscale::Upscale(Hierarchy hierarchy)
     sol_.reserve(hierarchy_.NumLevels());
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
-        rhs_.emplace_back(hierarchy_.GetMatrix(level).BlockOffsets());
-        sol_.emplace_back(hierarchy_.GetMatrix(level).BlockOffsets());
+        rhs_.emplace_back(BlockOffsets(level));
+        sol_.emplace_back(BlockOffsets(level));
         sol_.back() = 0.0;
     }
 }
@@ -121,7 +121,7 @@ mfem::BlockVector Upscale::Solve(int level, const mfem::BlockVector& x) const
 
 const mfem::Array<int>& Upscale::BlockOffsets(int level) const
 {
-    return hierarchy_.GetMatrix(level).BlockOffsets();
+    return hierarchy_.BlockOffsets(level);
 }
 
 std::vector<double> Upscale::ComputeErrors(const mfem::BlockVector& upscaled_sol,

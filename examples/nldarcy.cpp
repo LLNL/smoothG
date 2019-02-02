@@ -224,10 +224,9 @@ int main(int argc, char* argv[])
 
 /// @todo take MixedMatrix only
 SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level, SolveType solve_type)
-    : NonlinearSolver(hierarchy.GetMatrix(level).GetComm(),
-                      hierarchy.GetMatrix(level).NumTotalDofs(), "Picard"),
+    : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2], "Picard"),
       level_(level), hierarchy_(hierarchy), solve_type_(solve_type),
-      offsets_(hierarchy_.GetMatrix(level).BlockOffsets()),
+      offsets_(hierarchy_.BlockOffsets(level)),
       p_(hierarchy_.GetMatrix(level).GetGraph().NumVertices()),
       kp_(p_.Size())
 { }
@@ -278,7 +277,7 @@ void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVect
 }
 
 EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, Cycle cycle, SolveType solve_type)
-    : NonlinearMG(hierarchy.GetMatrix(0).GetComm(), hierarchy.GetMatrix(0).NumTotalDofs(),
+    : NonlinearMG(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2],
                   hierarchy.NumLevels(), cycle),
       hierarchy_(hierarchy)
 {
@@ -316,35 +315,29 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, Cycle cycle, SolveType solve_ty
     }
 }
 
-void EllipticNLMG::Mult(
-    int level, const mfem::Vector& x, mfem::Vector& Ax)
+void EllipticNLMG::Mult(int level, const mfem::Vector& x, mfem::Vector& Ax)
 {
     solvers_[level].Mult(x, Ax);
 }
 
-void EllipticNLMG::Solve(
-    int level, const mfem::Vector& rhs, mfem::Vector& sol)
+void EllipticNLMG::Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol)
 {
     solvers_[level].Solve(rhs, sol);
 }
 
-void EllipticNLMG::Restrict(
-    int level, const mfem::Vector& fine, mfem::Vector& coarse) const
+void EllipticNLMG::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
 {
     mfem::BlockVector block_fine(fine.GetData(), Offsets(level));
-    mfem::BlockVector block_coarse(coarse.GetData(), Offsets(level));
     coarse = hierarchy_.Restrict(level, block_fine);
 }
 
-void EllipticNLMG::Interpolate(
-    int level, const mfem::Vector& coarse, mfem::Vector& fine) const
+void EllipticNLMG::Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const
 {
     mfem::BlockVector block_coarse(coarse.GetData(), Offsets(level));
     fine = hierarchy_.Interpolate(level, block_coarse);
 }
 
-void EllipticNLMG::Project(
-    int level, const mfem::Vector& fine, mfem::Vector& coarse) const
+void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
 {
     mfem::BlockVector block_fine(fine.GetData(), Offsets(level));
     coarse = hierarchy_.Project(level, block_fine);
@@ -357,7 +350,7 @@ void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& ou
 
 const mfem::Array<int>& EllipticNLMG::Offsets(int level) const
 {
-    return hierarchy_.GetMatrix(level).BlockOffsets();
+    return hierarchy_.BlockOffsets(level);
 }
 
 mfem::Vector EllipticNLMG::AssembleTrueVector(const mfem::Vector& vec) const

@@ -32,5 +32,6 @@
 #include "Graph.hpp"
 #include "Sampler.hpp"
 #include "GraphSpace.hpp"
+#include "MLMCManager.hpp"
 #include "Hierarchy.hpp"
 #include "NonlinearSolver.hpp"
