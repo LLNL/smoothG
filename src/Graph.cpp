@@ -37,14 +37,14 @@ Graph::Graph(MPI_Comm comm,
 {
     Distribute(comm, vertex_edge_global, edge_weight_global);
     const mfem::SparseMatrix* edge_bdratt = nullptr;
-    Init(edge_bdratt);
+    Init(*edge_trueedge_, edge_bdratt);
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
              const mfem::Vector& edge_weight_local,
              const mfem::SparseMatrix* edge_bdratt)
-    : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge))
+    : vertex_edge_local_(vertex_edge_local)
 {
     if (edge_weight_local.Size() > 0)
     {
@@ -58,17 +58,16 @@ Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
         SplitEdgeWeight(unit_edge_weight);
     }
 
-    Init(edge_bdratt);
+    Init(edge_trueedge, edge_bdratt);
 }
 
 Graph::Graph(const mfem::SparseMatrix& vertex_edge_local,
              const mfem::HypreParMatrix& edge_trueedge,
              const std::vector<mfem::Vector>& split_edge_weight,
              const mfem::SparseMatrix* edge_bdratt)
-    : vertex_edge_local_(vertex_edge_local), edge_trueedge_(Copy(edge_trueedge)),
-      split_edge_weight_(split_edge_weight)
+    : vertex_edge_local_(vertex_edge_local), split_edge_weight_(split_edge_weight)
 {
-    Init(edge_bdratt);
+    Init(edge_trueedge, edge_bdratt);
 }
 
 Graph::Graph(mfem::SparseMatrix edge_vertex_local,
@@ -136,7 +135,8 @@ void swap(Graph& lhs, Graph& rhs) noexcept
     mfem::Swap(lhs.edge_starts_, rhs.edge_starts_);
 }
 
-void Graph::Init(const mfem::SparseMatrix* edge_bdratt)
+void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
+                 const mfem::SparseMatrix* edge_bdratt)
 {
     if (edge_bdratt != nullptr)
     {
@@ -146,14 +146,23 @@ void Graph::Init(const mfem::SparseMatrix* edge_bdratt)
 
     auto edge_vertex_local_tmp = smoothg::Transpose(vertex_edge_local_);
     edge_vertex_local_.Swap(edge_vertex_local_tmp);
-    edge_trueedge_edge_ = AAt(*edge_trueedge_);
-
-    GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
 
     edge_starts_.SetSize(3);
-    edge_starts_[0] = edge_trueedge_->GetRowStarts()[0];
-    edge_starts_[1] = edge_trueedge_->GetRowStarts()[1];
-    edge_starts_[2] = edge_trueedge_->M();
+    edge_starts_[0] = edge_trueedge.GetRowStarts()[0];
+    edge_starts_[1] = edge_trueedge.GetRowStarts()[1];
+    edge_starts_[2] = edge_trueedge.M();
+
+    edge_trueedge_edge_ = AAt(edge_trueedge);
+
+    if (edge_trueedge_ == nullptr)
+    {
+        auto reorder_map = EntityReorderMap(edge_trueedge, *edge_trueedge_edge_);
+        edge_trueedge_ = ParMult(reorder_map, edge_trueedge, edge_starts_);
+        edge_trueedge_->CopyColStarts();
+        edge_trueedge_edge_ = AAt(*edge_trueedge_);
+    }
+
+    GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
 
     vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
 }

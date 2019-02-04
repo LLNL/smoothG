@@ -30,57 +30,6 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-mfem::SparseMatrix FaceReorderMap(const mfem::HypreParMatrix& face_trueface,
-                                  const mfem::HypreParMatrix& face_trueface_face)
-{
-    mfem::SparseMatrix face_is_shared, diag, offd;
-    HYPRE_Int* colmap;
-    face_trueface_face.GetOffd(face_is_shared, colmap);
-    face_trueface.GetDiag(diag);
-    face_trueface.GetOffd(offd, colmap);
-    const HYPRE_Int face_start = face_trueface.GetRowStarts()[0];
-
-    std::vector<int> sharedface_to_face;
-    sharedface_to_face.reserve(face_is_shared.NumNonZeroElems());
-
-
-    std::map<int, int> trueface_map;
-    for (int face = 0; face < face_trueface.NumRows(); ++face)
-    {
-        if (face_is_shared.RowSize(face))
-        {
-            sharedface_to_face.push_back(face);
-
-            if (diag.RowSize(face)) // face is owned
-            {
-                assert(diag.RowSize(face) == 1);
-                trueface_map[diag.GetRowColumns(face)[0] + face_start] = face;
-            }
-            else
-            {
-                assert(offd.RowSize(face) == 1);
-                trueface_map[colmap[offd.GetRowColumns(face)[0]]] = face;
-            }
-        }
-    }
-
-    mfem::SparseMatrix face_reorder_map(face_trueface.NumRows());
-
-    int count = 0;
-    auto it = trueface_map.begin();
-    for (int face = 0; face < face_trueface.NumRows(); ++face)
-    {
-        bool is_shared = face_is_shared.RowSize(face);
-        int row = is_shared ? sharedface_to_face[count++] : face;
-        int col = is_shared ? (it++)->second : face;
-        face_reorder_map.Add(row, col, 1.0);
-    }
-
-    face_reorder_map.Finalize();
-
-    return face_reorder_map;
-}
-
 Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor)
 {
     mfem::Array<int> partitioning;
@@ -291,7 +240,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
     auto tmp_face_trueface = BuildEntityToTrueEntity(*face_trueface_face);
 
     // Reorder shared faces so that their "true face" numbering is increasing
-    auto face_reorder_map = FaceReorderMap(*tmp_face_trueface, *face_trueface_face);
+    auto face_reorder_map = EntityReorderMap(*tmp_face_trueface, *face_trueface_face);
 
     auto face_trueface = ParMult(face_reorder_map, *tmp_face_trueface, face_starts);
     face_trueface->CopyRowStarts();
