@@ -218,6 +218,9 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
 // Rescale vec by scaling: vec = diag(scaling) * vec
 void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 
+// Rescale vec by scaling: vec = diag(scaling)^{-1} * vec
+void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
+
 /**
    @brief A SERIAL coloring algorithm marking distinct colors for adjacent elements
 
@@ -229,6 +232,10 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
+
+mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
+                                    const mfem::HypreParMatrix& entity_trueentity_entity);
+
 
 } // namespace smoothg
 

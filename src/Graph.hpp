@@ -152,7 +152,8 @@ public:
     /// Indicate if the graph has "boundary"
     bool HasBoundary() const { return edge_bdratt_.Width() > 0; }
 private:
-    void Init(const mfem::SparseMatrix* edge_bdratt);
+    void Init(const mfem::HypreParMatrix& edge_trueedge,
+              const mfem::SparseMatrix* edge_bdratt);
 
     void Distribute(MPI_Comm comm,
                     const mfem::SparseMatrix& vertex_edge_global,
