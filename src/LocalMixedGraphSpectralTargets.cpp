@@ -367,6 +367,37 @@ void LocalMixedGraphSpectralTargets::GetExtAggDofs(
         dofs[i + num_ext_loc_dofs_diag] = dofs_offd[i] + num_ext_dofs_diag;
 }
 
+// Check if true id of local entities in shared face have ascending order
+void OrderingCheck(const mfem::HypreParMatrix& face_trueface_face,
+                   const mfem::SparseMatrix& face_entity,
+                   const mfem::HypreParMatrix& entity_trueentity)
+{
+    mfem::SparseMatrix face_is_shared, e_te_diag, e_te_offd;
+    HYPRE_Int* junk_map;
+    face_trueface_face.GetOffd(face_is_shared, junk_map);
+    entity_trueentity.GetDiag(e_te_diag);
+    entity_trueentity.GetOffd(e_te_offd, junk_map);
+
+    mfem::Array<int> local_entities;
+    for (int face = 0; face < face_entity.NumRows(); ++face)
+    {
+        if (face_is_shared.RowSize(face))
+        {
+            GetTableRow(face_entity, face, local_entities);
+            bool is_owned = e_te_diag.RowSize(local_entities[0]);
+            auto& e_te_map = is_owned ? e_te_diag : e_te_offd;
+
+            for (int i = 1; i < local_entities.Size(); ++i)
+            {
+                assert(e_te_map.RowSize(local_entities[i - 1]) == 1);
+                assert(e_te_map.RowSize(local_entities[i]) == 1);
+                assert(e_te_map.GetRowColumns(local_entities[i - 1])[0]
+                       < e_te_map.GetRowColumns(local_entities[i])[0]);
+            }
+        }
+    }
+}
+
 void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
     std::vector<mfem::DenseMatrix>& local_vertex_targets)
@@ -414,7 +445,12 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
                                       topology_.GetFaceStarts());
     face_perm_edof_.reset(ParMult(face_trueedof.get(), permute_eT.get()));
 
-    auto agg_vdof = smoothg::Mult(topology_.Agg_vertex_, space.VertexToVDof());
+#ifdef SMOOTHG_DEBUG
+    mfem::SparseMatrix face_perm_edof_diag;
+    face_perm_edof_->GetDiag(face_perm_edof_diag);
+    OrderingCheck(*topology_.face_trueface_face_, face_perm_edof_diag, *permute_e);
+    OrderingCheck(*topology_.face_trueface_face_, face_edof, space.EDofToTrueEDof());
+#endif
 
     // Column map for submatrix extraction
     col_map_.SetSize(std::max(permute_e->Height(), permute_v->Height()), -1);
@@ -475,7 +511,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         int nevects = evects.Width();
 
         // restricting vertex dofs on extended region to the original aggregate
-        GetTableRow(agg_vdof, iAgg, loc_vdofs);
+        GetTableRow(dof_agg_.agg_vdof_, iAgg, loc_vdofs);
 
         evects_T.Transpose(evects);
         evects_restricted_T.SetSize(nevects, loc_vdofs.Size());
