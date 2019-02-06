@@ -670,10 +670,11 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
     mfem::SparseMatrix mult_truemult = GetDiag(*multiplier_d_td_);
     mfem::Array<int> true_multiplier;
 
+    mult_on_bdr_.SetSize(num_multiplier_dofs_, false);
+
     // Note: there is a 1-1 map from multipliers to edge dofs on faces
     if (edof_bdrattr.Width())
     {
-        mult_on_bdr_.SetSize(num_multiplier_dofs_, false);
         ess_true_multipliers_.Reserve(edof_bdrattr.NumNonZeroElems());
         ess_true_mult_to_edof_.Reserve(edof_bdrattr.NumNonZeroElems());
         for (int i = 0; i < num_multiplier_dofs_; ++i)
