@@ -943,6 +943,7 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length, int 
 
     MinresBlockSolverFalse solver(mgL, &ess_attr);
     mfem::Vector sol;
+    sol = 0.0;
     solver.Solve(rhs, sol);
 
     for (int i = 0; i < coeff_gf_->Size(); ++i)

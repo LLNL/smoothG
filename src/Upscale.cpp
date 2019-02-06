@@ -98,8 +98,6 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     }
 
     // solve
-    rhs_[level].GetBlock(1) *= -1.0; // for reasons I do not fully understand
-
     hierarchy_.Solve(level, rhs_[level], sol_[level]);
 
     // interpolate solution

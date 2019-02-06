@@ -136,18 +136,15 @@ void NonlinearMG::FAS_Cycle(int level)
         Mult(level + 1, sol_[level + 1], rhs_[level + 1]);
         rhs_[level + 1] -= help_[level + 1];
 
-        // Store approximate coarse solution
-        //        help_[level + 1] = sol_[level + 1];
-        mfem::Vector help_2 = sol_[level + 1];
+        // Store projected coarse solution pi x_l
+        mfem::Vector coarse_sol = sol_[level + 1];
 
         // Go to coarser level (sol_[level + 1] will be updated)
         FAS_Cycle(level + 1);
 
-        // Compute correction
-        //        help_[level + 1] -= sol_[level + 1];
-        //        hierarchy_.Interpolate(level + 1, help_[level + 1], help_[level]);
-        help_2 -= sol_[level + 1];
-        Interpolate(level + 1, help_2, help_[level]);
+        // Compute correction x_l += P( x_{l+1} - pi x_l )
+        coarse_sol -= sol_[level + 1];
+        Interpolate(level + 1, coarse_sol, help_[level]);
         sol_[level] -= help_[level];
 
         // Post-smoothing

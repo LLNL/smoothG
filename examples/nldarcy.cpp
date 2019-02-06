@@ -92,6 +92,7 @@ private:
 };
 
 void Kappa(const mfem::Vector& p, mfem::Vector& kp);
+std::string problem;
 
 int main(int argc, char* argv[])
 {
@@ -108,12 +109,10 @@ int main(int argc, char* argv[])
     upscale_param.spect_tol = 1.0;
     mfem::OptionsParser args(argc, argv);
     const char* problem_name = "spe10";
-
     args.AddOption(&problem_name, "-mp", "--model-problem",
                    "Model problem (spe10, egg, lognormal, richard)");
     const char* perm_file = "spe_perm.dat";
-    args.AddOption(&perm_file, "-p", "--perm",
-                   "SPE10 permeability file data.");
+    args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
     int dim = 2;
     args.AddOption(&dim, "-d", "--dim",
                    "Dimension of the physical space.");
@@ -150,7 +149,7 @@ int main(int argc, char* argv[])
     }
 
     // Setting up finite volume discretization problem
-    std::string problem(problem_name);
+    problem += problem_name;
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
     ess_attr = 0;
     unique_ptr<DarcyProblem> fv_problem;
@@ -178,20 +177,23 @@ int main(int argc, char* argv[])
         mfem::mfem_error("Unknown model problem!");
     }
 
-    Graph graph = fv_problem->GetFVGraph();
+    Graph graph = fv_problem->GetFVGraph(true);
 
     // Create hierarchy
     Hierarchy hierarchy(std::move(graph), upscale_param, nullptr, &ess_attr);
     hierarchy.PrintInfo();
 
-    if (myid == 0)
-    {
-        std::cout << "\n";
-    }
-
     mfem::BlockVector rhs(hierarchy.GetMatrix(0).BlockOffsets());
-    rhs.GetBlock(0) = 0.0;//fv_problem.GetEdgeRHS();;
-    rhs.GetBlock(1) = fv_problem->CellVolume();//fv_problem.GetVertexRHS();
+    if (problem == "richard" )
+    {
+        rhs.GetBlock(0) = fv_problem->GetEdgeRHS();
+        rhs.GetBlock(1) = fv_problem->GetVertexRHS();
+    }
+    else
+    {
+        rhs.GetBlock(0) = 0.0;
+        rhs.GetBlock(1) = -fv_problem->CellVolume();
+    }
 
     mfem::BlockVector sol_picard(rhs);
     sol_picard = 0.0;
@@ -207,7 +209,7 @@ int main(int argc, char* argv[])
     nlmg.SetPrintLevel(1);
     nlmg.Solve(rhs, sol_nlmg);
 
-    double p_err = CompareError(comm, sol_picard.GetBlock(1), sol_nlmg.GetBlock(1));
+    double p_err = CompareError(comm, sol_nlmg.GetBlock(1), sol_picard.GetBlock(1));
     if (myid == 0)
     {
         std::cout << "Relative errors: " << p_err << "\n";
@@ -217,6 +219,7 @@ int main(int argc, char* argv[])
     {
         mfem::socketstream sout;
         fv_problem->VisSetup(sout, sol_picard.GetBlock(1), 0.0, 0.0, "");
+        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "");
     }
 
     return EXIT_SUCCESS;
@@ -265,6 +268,7 @@ void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
 void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     p_ = hierarchy_.PWConstProject(level_, x.GetBlock(1));
+
     Kappa(p_, kp_);
 
     hierarchy_.RescaleCoefficient(level_, kp_);
@@ -364,12 +368,22 @@ int EllipticNLMG::LevelSize(int level) const
 }
 
 // Kappa(p) = exp(\alpha p)
+// SPE10: -7-6    Egg: -5e-1     Lognormal: -8e0 (cl = 0.1)
 void Kappa(const mfem::Vector& p, mfem::Vector& kp)
 {
     assert(kp.Size() == p.Size());
+
+    double alpha;
+    if (problem == "spe10")
+        alpha = -7e-6;
+    else if (problem == "egg")
+        alpha = -5e-1;
+    else if (problem == "lognormal")
+        alpha = -8e0;
+
     for (int i = 0; i < p.Size(); i++)
     {
-        kp[i] = std::exp(5e-1 * (p[i]));
+        kp[i] = std::exp(alpha * p[i]);
         assert(kp[i] > 0.0);
     }
 }
