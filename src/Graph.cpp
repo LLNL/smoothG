@@ -160,6 +160,35 @@ void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
         edge_trueedge_ = ParMult(reorder_map, edge_trueedge, edge_starts_);
         edge_trueedge_->CopyColStarts();
         edge_trueedge_edge_ = AAt(*edge_trueedge_);
+
+        if (edge_bdratt != nullptr)
+        {
+            auto tmp = smoothg::Mult(reorder_map, edge_bdratt_);
+            edge_bdratt_.Swap(tmp);
+        }
+
+        auto edge_vertex_local_tmp = smoothg::Mult(reorder_map, edge_vertex_local_);
+        edge_vertex_local_.Swap(edge_vertex_local_tmp);
+
+        auto vertex_edge_local_tmp = smoothg::Transpose(edge_vertex_local_);
+        vertex_edge_local_.Swap(vertex_edge_local_tmp);
+
+        mfem::Array<int> reordered_edges, original_edges;
+        for (int vert = 0; vert < NumVertices(); ++vert)
+        {
+            GetTableRow(vertex_edge_local_, vert, reordered_edges);
+            GetTableRow(vertex_edge_local_tmp, vert, original_edges);
+            mfem::Vector edge_weight_local(reordered_edges.Size());
+            for (int i = 0; i < reordered_edges.Size(); ++i)
+            {
+                int reordered_edge = reordered_edges[i];
+                int original_edge = reorder_map.GetRowColumns(reordered_edge)[0];
+                int original_local = original_edges.Find(original_edge);
+                assert(original_local != -1);
+                edge_weight_local[i] = split_edge_weight_[vert][original_local];
+            }
+            mfem::Swap(split_edge_weight_[vert], edge_weight_local);
+        }
     }
 
     GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
