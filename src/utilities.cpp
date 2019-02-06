@@ -362,6 +362,7 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
 
     for (int i = 0; i < max_iter; ++i)
     {
+        result *= -1.0;
         A.Mult(result, temp);
 
         rayleigh = mfem::InnerProduct(comm, temp, result) / mfem::InnerProduct(comm, result, result);
