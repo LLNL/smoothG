@@ -173,6 +173,9 @@ private:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
+    mfem::Vector MakeInitialGuess(const mfem::BlockVector& sol,
+                                  const mfem::BlockVector& rhs) const;
+
     mfem::SparseMatrix Agg_multiplier_;
     mfem::SparseMatrix Agg_vertexdof_;
     mfem::SparseMatrix Agg_edgedof_;
@@ -196,6 +199,9 @@ private:
     std::vector<mfem::DenseMatrix> AinvDMinvCT_;
     std::vector<mfem::DenseMatrix> Ainv_;
     std::vector<mfem::DenseMatrix> Minv_;
+    std::vector<mfem::SparseMatrix> C_;
+    std::vector<mfem::DenseMatrix> CM_;
+    std::vector<mfem::SparseMatrix> CDT_;
 
     mutable std::vector<mfem::Vector> Minv_g_;
     mutable std::vector<mfem::Vector> local_rhs_;
@@ -204,6 +210,7 @@ private:
     mfem::Array<int> multiplier_to_edof_;
     mfem::Array<int> ess_true_mult_to_edof_;
     mfem::Array<HYPRE_Int> multiplier_start_;
+    mfem::Array<bool> mult_on_bdr_;
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;

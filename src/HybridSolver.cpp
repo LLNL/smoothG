@@ -91,6 +91,9 @@ void HybridSolver::Init(
     Ainv_.resize(nAggs_);
     Minv_.resize(nAggs_);
     Hybrid_el_.resize(nAggs_);
+    C_.resize(nAggs_);
+    CM_.resize(nAggs_);
+    CDT_.resize(nAggs_);
     Minv_g_.resize(nAggs_);
     local_rhs_.resize(nAggs_);
 
@@ -249,6 +252,15 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         for (int i = 0; i < nlocal_edgedof; ++i)
             edof_global_to_local_map[local_edgedof[i]] = -1;
 
+        // for initial guess
+        {
+            C_[iAgg].Swap(Cloc);
+            MultSparseDense(C_[iAgg], M_el[iAgg], CM_[iAgg]);
+            auto DT = smoothg::Transpose(Dloc);
+            auto CDT = smoothg::Mult(C_[iAgg], DT);
+            CDT_[iAgg].Swap(CDT);
+        }
+
         Mloc_solver.SetOperator(M_el[iAgg]);
         Mloc_solver.GetInverseMatrix(Minv_[iAgg]);
 
@@ -265,7 +277,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         mfem::Mult(Minv_[iAgg], ClocT, MinvCT_i);
 
         // Compute CMinvCT = Cloc * MinvCT
-        MultSparseDense(Cloc, MinvCT_i, Hybrid_el_[iAgg]);
+        MultSparseDense(C_[iAgg], MinvCT_i, Hybrid_el_[iAgg]);
 
         // Compute Aloc = DMinvDT = Dloc * MinvDT
         MultSparseDense(Dloc, MinvDT_i, Aloc);
@@ -314,6 +326,9 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
 {
     rhs_ = Rhs;
+
+    trueMu_ = MakeInitialGuess(Sol, Rhs);
+
     // TODO: nonzero b.c.
     // correct right hand side due to boundary condition
     for (int m = 0; m < ess_true_multipliers_.Size(); ++m)
@@ -334,7 +349,10 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     }
 
     if (diagonal_scaling_.Size() > 0)
+    {
         RescaleVector(diagonal_scaling_, trueHrhs_);
+        InvRescaleVector(diagonal_scaling_, trueMu_);
+    }
 
     // solve the parallel global hybridized system
     mfem::StopWatch chrono;
@@ -467,11 +485,11 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
 
     mfem::Vector& RecoveredSol_block2(RecoveredSol.GetBlock(1));
 
+    mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
     mfem::Vector mu_loc, tmp;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         // Extracting the size and global numbering of local dof
-        mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
         GetTableRow(Agg_vertexdof_, iAgg, local_vertexdof);
         GetTableRow(Agg_edgedof_, iAgg, local_edgedof);
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
@@ -518,18 +536,21 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
 
 void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
 {
-    mfem::HypreSmoother prec_scale(const_cast<mfem::HypreParMatrix&>(H));
+    if (diagonal_scaling_.Size() == 0)
+    {
+        mfem::HypreSmoother prec_scale(const_cast<mfem::HypreParMatrix&>(H));
 
-    mfem::Vector zeros(H.Height());
-    zeros = 1e-8;
-    diagonal_scaling_.SetSize(H.Height());
-    diagonal_scaling_ = 1.0;
+        mfem::Vector zeros(H.Height());
+        zeros = 1e-8;
+        diagonal_scaling_.SetSize(H.Height());
+        diagonal_scaling_ = 1.0;
 
-    mfem::CGSolver cg_scale(comm_);
-    cg_scale.SetMaxIter(rescale_iter_);
-    cg_scale.SetPreconditioner(prec_scale);
-    cg_scale.SetOperator(H);
-    cg_scale.Mult(zeros, diagonal_scaling_);
+        mfem::CGSolver cg_scale(comm_);
+        cg_scale.SetMaxIter(rescale_iter_);
+        cg_scale.SetPreconditioner(prec_scale);
+        cg_scale.SetOperator(H);
+        cg_scale.Mult(zeros, diagonal_scaling_);
+    }
 
     auto Scale = VectorToMatrix(diagonal_scaling_);
     mfem::HypreParMatrix pScale(comm_, H.N(), H.GetColStarts(), &Scale);
@@ -652,16 +673,21 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
     // Note: there is a 1-1 map from multipliers to edge dofs on faces
     if (edof_bdrattr.Width())
     {
+        mult_on_bdr_.SetSize(num_multiplier_dofs_, false);
         ess_true_multipliers_.Reserve(edof_bdrattr.NumNonZeroElems());
         ess_true_mult_to_edof_.Reserve(edof_bdrattr.NumNonZeroElems());
         for (int i = 0; i < num_multiplier_dofs_; ++i)
         {
             // natural BC for H(div) dof <=> essential BC for multiplier dof
-            if (edof_bdrattr.RowSize(i) && !ess_edofs_[i])
+            if (edof_bdrattr.RowSize(i))
             {
-                GetTableRow(mult_truemult, i, true_multiplier);
-                ess_true_multipliers_.Append(true_multiplier);
-                ess_true_mult_to_edof_.Append(i);
+                mult_on_bdr_[i] = true;
+                if (ess_edofs_[i] == 0)
+                {
+                    GetTableRow(mult_truemult, i, true_multiplier);
+                    ess_true_multipliers_.Append(true_multiplier);
+                    ess_true_mult_to_edof_.Append(i);
+                }
             }
         }
     }
@@ -698,6 +724,51 @@ void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, H_el);
     }
     BuildParallelSystemAndSolver(H_proc);
+}
+
+mfem::Vector HybridSolver::MakeInitialGuess(const mfem::BlockVector& sol,
+                                            const mfem::BlockVector& rhs) const
+{
+    mfem::Vector mu(num_multiplier_dofs_);
+    mu = 0.0;
+
+    mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
+    mfem::Vector sigma_loc, u_loc, mu_loc, g_loc;
+    for (int i = 0; i < nAggs_; ++i)
+    {
+        // Extracting the size and global numbering of local dof
+        GetTableRow(Agg_vertexdof_, i, local_vertexdof);
+        GetTableRow(Agg_edgedof_, i, local_edgedof);
+        GetTableRow(Agg_multiplier_, i, local_multiplier);
+
+        rhs.GetSubVector(local_edgedof, g_loc);
+        for (int i = 0; i < local_edgedof.Size(); ++i)
+        {
+            if (edgedof_is_shared_[local_edgedof[i]])
+            {
+                g_loc[i] /= 2.0;
+            }
+        }
+        mu_loc.SetSize(local_multiplier.Size());
+        C_[i].Mult(g_loc, mu_loc);
+
+        sol.GetSubVector(local_edgedof, sigma_loc);
+        CM_[i].AddMult_a(-elem_scaling_[i], sigma_loc, mu_loc);
+
+        sol.GetBlock(1).GetSubVector(local_vertexdof, u_loc);
+        CDT_[i].AddMult(u_loc, mu_loc, -1.0);
+
+        for (int j = 0; j < mu_loc.Size(); ++j)
+        {
+            int local_mult = local_multiplier[j];
+            double CCT_i = mult_on_bdr_[local_mult] ? 1.0 : 2.0;
+            mu[local_mult] += mu_loc[j] / CCT_i;
+        }
+    }
+
+    mfem::Vector true_mu(H_->NumRows());
+    multiplier_td_d_->Mult(mu, true_mu);
+    return true_mu;
 }
 
 void HybridSolver::SetPrintLevel(int print_level)
