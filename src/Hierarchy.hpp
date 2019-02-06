@@ -187,7 +187,7 @@ private:
 
     const mfem::Array<int>* ess_attr_;
 
-    const UpscaleParameters& param_;
+    const UpscaleParameters param_;
 };
 
 } // namespace smoothg

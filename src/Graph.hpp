@@ -171,7 +171,10 @@ private:
     void SplitEdgeWeight(const mfem::Vector& edge_weight_local);
 
     /// For edges shared by two processes, multiply weight by 2
-    void FixSharedEdgeWeight(mfem::Vector& edge_weight_local);
+    void FixSharedEdgeWeight(const mfem::HypreParMatrix& edge_trueedge,
+                             mfem::Vector& edge_weight_local);
+
+    void ReorderEdges(const mfem::HypreParMatrix& edge_trueedge);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
