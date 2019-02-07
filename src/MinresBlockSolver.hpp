@@ -127,11 +127,16 @@ public:
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
 
+    /// this name doesn't make sense
+    void JacSolve(const mfem::SparseMatrix& dMdp,
+                  const mfem::BlockVector& rhs, mfem::BlockVector& sol);
+
     virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 private:
     const MixedMatrix& mixed_matrix_;
+    std::unique_ptr<mfem::HypreParMatrix> block_01;
 };
 
 } // namespace smoothg

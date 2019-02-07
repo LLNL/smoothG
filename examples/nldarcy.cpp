@@ -48,8 +48,11 @@ public:
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
 
 private:
+    void EvalCoef(const mfem::Vector& sol_block1);
+    void EvalCoefDerivative(const mfem::Vector& sol_block1);
     void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
+    mfem::SparseMatrix Build_dMdp(const mfem::BlockVector& iterate);
 
     virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
 
@@ -62,6 +65,7 @@ private:
     const mfem::Array<int>& offsets_;
     mfem::Vector p_;         // coefficient vector in piecewise 1 basis
     mfem::Vector kp_;        // kp_ = Kappa(p)
+    mfem::Vector dkinv_dp_;        // dkinv_dp_ = d ( Kappa(p)^{-1} ) / dp
 
     mfem::Vector Z_vector_;
 };
@@ -93,10 +97,14 @@ private:
     std::vector<SingleLevelSolver> solvers_;
 };
 
-void Kappa(const mfem::Vector& p, mfem::Vector& kp, const mfem::Vector& Z_vec);
-
+double alpha;
+// Kappa(p) = exp(-\alpha p)
 void Kappa(const mfem::Vector& p, mfem::Vector& kp);
-std::string problem;
+void dKinv_dp(const mfem::Vector& p, mfem::Vector& dkinv_dp);
+
+// Kappa(p) = K\alpha / (\alpha + |p(x, y, z) - z|^\beta)
+void Kappa(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& kp);
+void dKinv_dp(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& dkinv_dp);
 
 int main(int argc, char* argv[])
 {
@@ -132,6 +140,9 @@ int main(int argc, char* argv[])
     double correlation = 0.1;
     args.AddOption(&correlation, "-cl", "--correlation-length",
                    "Correlation length");
+    bool use_newton = false;
+    args.AddOption(&use_newton, "-newton", "--use-newton", "-picard",
+                   "--use-picard", "Use Newton or Picard iteration.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
@@ -153,7 +164,7 @@ int main(int argc, char* argv[])
     }
 
     // Setting up finite volume discretization problem
-    problem += problem_name;
+    std::string problem(problem_name);
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
     ess_attr = 0;
 
@@ -162,14 +173,17 @@ int main(int argc, char* argv[])
     if (problem == "spe10")
     {
         fv_problem.reset(new SPE10Problem(perm_file, dim, 5, slice, 0, ess_attr));
+        alpha = -7e-6;
     }
     else if (problem == "egg")
     {
         fv_problem.reset(new EggModel(num_sr, num_pr, ess_attr));
+        alpha = -5e-1;
     }
     else if (problem == "lognormal")
     {
         fv_problem.reset(new LognormalModel(dim, num_sr, num_pr, correlation, ess_attr));
+        alpha = -8e0;
     }
     else if (problem == "richard")
     {
@@ -203,16 +217,15 @@ int main(int argc, char* argv[])
 
     mfem::BlockVector sol_picard(rhs);
     sol_picard = 0.0;
-
-    SingleLevelSolver sls(hierarchy, 0, Z_fine, Picard);
+    SingleLevelSolver sls(hierarchy, 0, Z_fine, use_newton ? Newton : Picard);
     sls.SetPrintLevel(1);
     sls.SetMaxIter(2000);
-    sls.Solve(rhs, sol_picard);
+//    sls.Solve(rhs, sol_picard);
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
 
-    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, Picard);
+    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard);
     nlmg.SetPrintLevel(1);
 
     nlmg.SetMaxIter(2000);
@@ -247,10 +260,11 @@ int main(int argc, char* argv[])
 /// @todo take MixedMatrix only
 SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level,
                                      mfem::Vector Z_vector, SolveType solve_type)
-    : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2], "Picard"),
+    : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2],
+                      solve_type == Picard ? "Picard" : "Newton"),
       level_(level), hierarchy_(hierarchy), solve_type_(solve_type),
       offsets_(hierarchy_.BlockOffsets(level)), p_(hierarchy_.NumVertices(level)),
-      kp_(p_.Size()), Z_vector_(std::move(Z_vector))
+      kp_(p_.Size()), dkinv_dp_(p_.Size()), Z_vector_(std::move(Z_vector))
 { }
 
 void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
@@ -260,12 +274,7 @@ void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
     mfem::BlockVector block_x(x.GetData(), offsets_);
     mfem::BlockVector block_Ax(Ax.GetData(), offsets_);
 
-    p_ = hierarchy_.PWConstProject(level_, block_x.GetBlock(1));
-    if (Z_vector_.Size())
-        Kappa(p_, kp_, Z_vector_);
-    else
-        Kappa(p_, kp_);
-
+    EvalCoef(block_x.GetBlock(1));
     hierarchy_.GetMatrix(level_).Mult(kp_, block_x, block_Ax);
 }
 
@@ -289,22 +298,98 @@ void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
     }
 }
 
-void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
+void SingleLevelSolver::EvalCoef(const mfem::Vector& sol_block1)
 {
-    p_ = hierarchy_.PWConstProject(level_, x.GetBlock(1));
+    p_ = hierarchy_.PWConstProject(level_, sol_block1);
     if (Z_vector_.Size())
-        Kappa(p_, kp_, Z_vector_);
+        Kappa(p_, Z_vector_, kp_);
     else
         Kappa(p_, kp_);
+}
 
+void SingleLevelSolver::EvalCoefDerivative(const mfem::Vector& sol_block1)
+{
+    p_ = hierarchy_.PWConstProject(level_, sol_block1);
+    if (Z_vector_.Size())
+        dKinv_dp(p_, Z_vector_, dkinv_dp_);
+    else
+        dKinv_dp(p_, dkinv_dp_);
+}
+
+void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
+{
+    EvalCoef(x.GetBlock(1));
     hierarchy_.RescaleCoefficient(level_, kp_);
     hierarchy_.Solve(level_, rhs, x);
 }
 
 void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
-    // TBD...
+    Mult(x, residual_);
+    residual_ -= rhs;
+
+    mfem::SparseMatrix dMdp = Build_dMdp(x);
+    hierarchy_.RescaleCoefficient(level_, kp_);
+
+    mfem::BlockVector delta_x(offsets_);
+    mfem::BlockVector block_residual(residual_.GetData(), offsets_);
+    hierarchy_.JacSolve(level_, dMdp, block_residual, delta_x);
+    x -= delta_x;
 }
+
+mfem::SparseMatrix SingleLevelSolver::Build_dMdp(const mfem::BlockVector& iterate)
+{
+    auto& mixed_system = hierarchy_.GetMatrix(level_);
+    auto& vert_edof = mixed_system.GetGraphSpace().VertexToEDof();
+
+    auto& MB = dynamic_cast<const ElementMBuilder&>(mixed_system.GetMBuilder());
+    auto& M_el = MB.GetElementMatrices();
+
+    mfem::SparseMatrix dMdp_tmp(vert_edof.NumCols(), vert_edof.NumRows());
+    mfem::Array<int> local_edofs, vert(1);
+    mfem::Vector sigma_loc, Msigma_loc;
+
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        vert[0] = i;
+
+        iterate.GetBlock(0).GetSubVector(local_edofs, sigma_loc);
+        mfem::DenseMatrix M_el_i = M_el[i];
+        Msigma_loc.SetSize(local_edofs.Size());
+        M_el_i.Mult(sigma_loc, Msigma_loc);
+        mfem::DenseMatrix dMdp_loc(Msigma_loc.GetData(), local_edofs.Size(), 1);
+        dMdp_tmp.AddSubMatrix(local_edofs, vert, dMdp_loc);
+    }
+    dMdp_tmp.Finalize();
+
+    EvalCoef(iterate.GetBlock(1));
+    EvalCoefDerivative(iterate.GetBlock(1));
+
+    // verification check
+//    mfem::Vector kp_inv(kp_.Size());
+//    for (int i = 0; i < kp_.Size(); ++i)
+//        kp_inv[i] = 1.0 / kp_[i];
+
+//    mfem::Vector dMdp_kp_inv(mixed_system.NumEDofs());
+//    dMdp_tmp.Mult(kp_inv, dMdp_kp_inv);
+
+//    auto new_M = MB.BuildAssembledM(kp_);
+
+//    mfem::Vector new_M_v(mixed_system.NumEDofs());
+//    new_M.Mult(iterate.GetBlock(0), new_M_v);
+
+//    new_M_v -= dMdp_kp_inv;
+//    double norm = dMdp_kp_inv.Norml2();
+//    double rel_err = new_M_v.Norml2() / (norm==0?1:norm);
+//    std::cout<<"diff = "<<rel_err<<"\n";
+//    assert(rel_err<1e-14);
+
+    dMdp_tmp.ScaleColumns(dkinv_dp_);
+
+    return smoothg::Mult(dMdp_tmp, mixed_system.GetPWConstProj());
+}
+
 
 EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
                            Cycle cycle, SolveType solve_type)
@@ -395,20 +480,10 @@ int EllipticNLMG::LevelSize(int level) const
     return hierarchy_.GetMatrix(level).NumTotalDofs();
 }
 
-// Kappa(p) = exp(\alpha p)
 // SPE10: -7-6    Egg: -5e-1     Lognormal: -8e0 (cl = 0.1)
 void Kappa(const mfem::Vector& p, mfem::Vector& kp)
 {
     assert(kp.Size() == p.Size());
-
-    double alpha;
-    if (problem == "spe10")
-        alpha = -7e-6;
-    else if (problem == "egg")
-        alpha = -5e-1;
-    else if (problem == "lognormal")
-        alpha = -8e0;
-
     for (int i = 0; i < p.Size(); i++)
     {
         kp[i] = std::exp(alpha * p[i]);
@@ -416,26 +491,50 @@ void Kappa(const mfem::Vector& p, mfem::Vector& kp)
     }
 }
 
-// Kappa(p) = K\alpha / (\alpha + |p(x, y, z) - z|^\beta)
-void Kappa(const mfem::Vector& p, mfem::Vector& kp, const mfem::Vector& Z_vec)
+void dKinv_dp(const mfem::Vector& p, mfem::Vector& dkinv_dp)
 {
-    // Loam
-    double alpha = 124.6;
-    double beta = 1.54;
-    double K_s = 1.067;//* 0.01; // cm/day
+    assert(dkinv_dp.Size() == p.Size());
+    for (int i = 0; i < p.Size(); i++)
+    {
+        double exp_ap = std::exp(alpha * p[i]);
+        assert(exp_ap > 0.0);
+        dkinv_dp[i] = -alpha / exp_ap;
+    }
+}
 
-    // Sand
-    //    double alpha = 1.175e6;
-    //    double beta = 4.74;
-    //    double K_s = 816.0;// * 0.01; // cm/day
+// Loam
+double alpha1 = 124.6;
+double beta = 1.77;
+double K_s = 1.067;//* 0.01; // cm/day
 
-    double alpha_K_s = K_s * alpha;
+// Sand
+//    double alpha = 1.175e6;
+//    double beta = 4.74;
+//    double K_s = 816.0;// * 0.01; // cm/day
+
+void Kappa(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& kp)
+{
+    double alpha_K_s = K_s * alpha1;
 
     assert(kp.Size() == p.Size());
     assert(Z_vec.Size() == p.Size());
     for (int i = 0; i < p.Size(); i++)
     {
-        kp[i] = alpha_K_s / (alpha + std::pow(std::fabs(p[i] - Z_vec[i]), beta));
+        kp[i] = alpha_K_s / (alpha1 + std::pow(std::fabs(p[i] - Z_vec[i]), beta));
         assert(kp[i] > 0.0);
+    }
+}
+
+void dKinv_dp(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& dkinv_dp)
+{
+    double b_over_a_K_s = beta / (K_s * alpha1);
+
+    assert(dkinv_dp.Size() == p.Size());
+    assert(Z_vec.Size() == p.Size());
+    for (int i = 0; i < p.Size(); i++)
+    {
+        double p_head = p[i] - Z_vec[i];
+        double sign = p_head < 0.0 ? -1.0 : 1.0;
+        dkinv_dp[i] = sign * b_over_a_K_s * std::pow(std::fabs(p_head), beta - 1.0);
     }
 }

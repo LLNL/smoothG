@@ -234,6 +234,55 @@ void MinresBlockSolverFalse::Mult(const mfem::Vector& rhs, mfem::Vector& sol) co
     sol = sol_.GetBlock(1);
 }
 
+void MinresBlockSolverFalse::JacSolve(const mfem::SparseMatrix& dMdp,
+                                      const mfem::BlockVector& rhs,
+                                      mfem::BlockVector& sol)
+{
+    auto& space = mixed_matrix_.GetGraphSpace();
+
+    if (NNZ(dMdp) > 0)
+    {
+        block_01 = ParMult(space.TrueEDofToEDof(), dMdp, space.VDofStarts());
+        block_01.reset(ParAdd(*block_01, *hDt_));
+        operator_.SetBlock(0, 1, block_01.get());
+    }
+
+    mfem::FGMRESSolver gmres(comm_);
+    gmres.SetPrintLevel(print_level_);
+    gmres.SetMaxIter(max_num_iter_);
+    gmres.SetRelTol(rtol_);
+    gmres.SetAbsTol(atol_);
+    gmres.SetPreconditioner(prec_);
+    gmres.SetOperator(operator_);
+    gmres.iterative_mode = false;
+
+    space.TrueEDofToEDof().Mult(rhs.GetBlock(0), rhs_.GetBlock(0));
+    rhs_.GetBlock(1) = rhs.GetBlock(1);
+
+    mfem::StopWatch chrono;
+    chrono.Clear();
+    chrono.Start();
+
+    gmres.Mult(rhs_, sol_);
+
+    timing_ = chrono.RealTime();
+    num_iterations_ = gmres.GetNumIterations();
+
+    if (myid_ == 0 && print_level_ > 0)
+    {
+        std::cout << "  Timing GMRES: Solver done in " << timing_ << "s. \n";
+        if (gmres.GetConverged())
+            std::cout << "  GMRES converged in " << num_iterations_
+                      << " with a final residual norm " << gmres.GetFinalNorm() << "\n";
+        else
+            std::cout << "  GMRES did not converge in " << num_iterations_
+                      << ". Final residual norm is " << gmres.GetFinalNorm() << "\n";
+    }
+
+    space.EDofToTrueEDof().Mult(sol_.GetBlock(0), sol.GetBlock(0));
+    sol.GetBlock(1) = sol_.GetBlock(1);
+}
+
 void MinresBlockSolver::SetPrintLevel(int print_level)
 {
     MixedLaplacianSolver::SetPrintLevel(print_level);

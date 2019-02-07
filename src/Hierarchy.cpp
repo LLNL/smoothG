@@ -134,6 +134,14 @@ mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
     return y;
 }
 
+void Hierarchy::JacSolve(int level, const mfem::SparseMatrix& dMdp,
+                         const mfem::BlockVector& x, mfem::BlockVector& y)
+{
+    auto& solver = dynamic_cast<MinresBlockSolverFalse&>(*solvers_[level]);
+    solver.JacSolve(dMdp, x, y);
+}
+
+
 void Hierarchy::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(level >= 0 && level < NumLevels());

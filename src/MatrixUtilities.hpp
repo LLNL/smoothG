@@ -477,6 +477,8 @@ mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat);
 /// @return "off diagonal block" of a HypreParMatrix
 mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 
+int NNZ(const mfem::SparseMatrix& mat);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

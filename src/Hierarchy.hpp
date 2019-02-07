@@ -72,6 +72,10 @@ public:
     virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
 
+    /// At a given level, solve mixed Jacobian system for the given RHS (x)
+    void JacSolve(int level, const mfem::SparseMatrix& dMdp,
+                  const mfem::BlockVector& x, mfem::BlockVector& y);
+
     /// At a given level, solve primal system for the given RHS (x)
     virtual void Solve(int level, const mfem::Vector& x, mfem::Vector& y) const;
     mfem::Vector Solve(int level, const mfem::Vector& x) const;

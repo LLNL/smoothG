@@ -1281,4 +1281,9 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
     return offd;
 }
 
+int NNZ(const mfem::SparseMatrix& mat)
+{
+    return mat.NumNonZeroElems();
+}
+
 } // namespace smoothg

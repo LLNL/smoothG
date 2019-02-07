@@ -144,6 +144,7 @@ void NonlinearMG::FAS_Cycle(int level)
 
         // Compute correction x_l += P( x_{l+1} - pi x_l )
         coarse_sol -= sol_[level + 1];
+
         Interpolate(level + 1, coarse_sol, help_[level]);
         sol_[level] -= help_[level];
 
