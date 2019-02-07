@@ -410,6 +410,8 @@ public:
     /// Construct partitioning array for vertices
     void Partition(bool metis_parition, const mfem::Array<int>& coarsening_factors,
                    mfem::Array<int>& partitioning) const;
+
+    mfem::Vector GetZVector() const;
 protected:
     void BuildReservoirGraph();
     void InitGraph();
@@ -574,7 +576,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
-    vis_v << "window_size 500 800\n";
+    vis_v << "window_size 800 250\n";//500 800
     vis_v << "window_title 'vertex space unknown'\n";
     vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
     if (range_max > range_min)
@@ -593,7 +595,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
         vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
     }
 
-    vis_v << "keys c\n"; // colorbar
+    //    vis_v << "keys c\n"; // colorbar
 
     if (coef)
     {
@@ -695,6 +697,27 @@ void DarcyProblem::Partition(bool metis_parition,
     {
         CartPart(coarsening_factors, partitioning);
     }
+}
+
+mfem::Vector DarcyProblem::GetZVector() const
+{
+    mfem::Vector Z_vector(vertex_edge_.NumRows());
+    Z_vector = 0.0;
+
+    int z_index = pmesh_->SpaceDimension() - 1;
+
+    mfem::Array<int> vertices;
+    for (int i = 0; i < pmesh_->GetNE(); ++i)
+    {
+        pmesh_->GetElement(i)->GetVertices(vertices);
+        for (auto& vertex : vertices)
+        {
+            Z_vector[i] += pmesh_->GetVertex(vertex)[z_index];
+        }
+        Z_vector[i] /= vertices.Size();
+    }
+
+    return Z_vector;
 }
 
 /**
@@ -867,7 +890,7 @@ class LognormalModel : public DarcyProblem
 {
 public:
     LognormalModel(int nDimensions, int num_ser_ref, int num_par_ref,
-                     double correlation_length, const mfem::Array<int>& ess_attr);
+                   double correlation_length, const mfem::Array<int>& ess_attr);
 private:
     void SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref);
     void SetupCoeff(int nDimensions, double correlation_length, int more_ref);
@@ -922,7 +945,7 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length, int 
 
     double ddim = static_cast<double>(nDimensions);
     double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
-            std::sqrt( std::tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+                      std::sqrt( std::tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 
     mfem::Array<int> ess_attr(ess_attr_.Size(), 0);
 
@@ -952,8 +975,8 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length, int 
     }
     kinv_scalar_ = make_unique<mfem::GridFunctionCoefficient>(coeff_gf_.get());
 
-//    mfem::socketstream soc;
-//    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+    //    mfem::socketstream soc;
+    //    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
 }
 
 class EggModel : public DarcyProblem
@@ -1008,10 +1031,10 @@ void EggModel::SetupCoeff()
     kinv_vector_ = make_unique<IPC>(comm_, "egg_perm_27.txt", N, N, h);
 
     // visualize coefficient norm
-//    kinv_scalar_ = make_unique<mfem::FunctionCoefficient>(IPC::InvNorm2);
-//    coeff_gf_->ProjectCoefficient(*kinv_scalar_);
-//    mfem::socketstream soc;
-//    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+    //    kinv_scalar_ = make_unique<mfem::FunctionCoefficient>(IPC::InvNorm2);
+    //    coeff_gf_->ProjectCoefficient(*kinv_scalar_);
+    //    mfem::socketstream soc;
+    //    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
 }
 
 // domain = (0, 4000) x (0, 1000) cm
@@ -1049,11 +1072,11 @@ void Richards::SetupMeshCoeff(int num_ref)
     pmesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
 }
 
-void Velocity(const mfem::Vector & x, mfem::Vector & out)
+void Velocity(const mfem::Vector& x, mfem::Vector& out)
 {
     out.SetSize(x.Size());
     out[0] = 0.0;
-    out[0] = x[0] <= 2000.0 ? -10. / 365.0 : 0.0;
+    out[1] = x[0] <= 2000.0 ? -10. / 365.0 : 0.0;
 }
 
 void Richards::SetupRHS()
@@ -1066,30 +1089,10 @@ void Richards::SetupRHS()
     mfem::ParGridFunction flux_gf(sigma_fes_.get());
     flux_gf = 0.0;
 
-    mfem::Array<int> bdr_att(4);
-    bdr_att = 0; bdr_att[2] = 1;
     mfem::VectorFunctionCoefficient velocity_coeff(2, Velocity);
-    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, bdr_att);
+    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, ess_attr_);
 
-    bVarf.SpMat().Mult(flux_gf, rhs_u_);
-}
-
-mfem::Vector Richards::GetZVector() const
-{
-    mfem::Vector Z_vector(vertex_edge_.NumRows());
-    Z_vector = 0.0;
-    mfem::Array<int> vertices;
-    for (int i = 0; i < pmesh_->GetNE(); ++i)
-    {
-        pmesh_->GetElement(i)->GetVertices(vertices);
-        for (auto& vertex : vertices)
-        {
-            Z_vector[i] += pmesh_->GetVertex(vertex)[1];
-        }
-        Z_vector[i] /= vertices.Size();
-    }
-
-    return Z_vector;
+    bVarf.SpMat().AddMult(flux_gf, rhs_u_, 1.0);
 }
 
 } // namespace smoothg

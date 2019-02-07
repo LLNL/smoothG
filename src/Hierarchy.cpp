@@ -43,12 +43,17 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     mixed_systems_.reserve(param_.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
+    if (ess_attr)
+        mixed_systems_.back().SetEssDofs(*ess_attr);
     MakeSolver(0);
 
     for (int level = 0; level < param_.max_levels - 1; ++level)
     {
+        param_.coarse_factor = level ? 8 : param_.coarse_factor;
         Coarsen(level, level ? nullptr : partitioning);
         MakeSolver(level + 1);
+        if (ess_attr)
+            mixed_systems_.back().SetEssDofs(*ess_attr);
     }
 
     chrono.Stop();

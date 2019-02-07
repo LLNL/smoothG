@@ -41,7 +41,8 @@ public:
     /**
        @todo take Kappa(p) as input
     */
-    SingleLevelSolver(Hierarchy& hierarchy, int level, SolveType solve_type);
+    SingleLevelSolver(Hierarchy& hierarchy, int level,
+                      mfem::Vector Z_vector, SolveType solve_type);
 
     // Compute Ax = A(x).
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
@@ -62,14 +63,15 @@ private:
     mfem::Vector p_;         // coefficient vector in piecewise 1 basis
     mfem::Vector kp_;        // kp_ = Kappa(p)
 
-    mfem::Vector Z_vector_level_;
+    mfem::Vector Z_vector_;
 };
 
 // nonlinear elliptic hierarchy
 class EllipticNLMG : public NonlinearMG
 {
 public:
-    EllipticNLMG(Hierarchy& hierarchy_, Cycle cycle, SolveType solve_type);
+    EllipticNLMG(Hierarchy& hierarchy_, const mfem::Vector& Z_fine,
+                 Cycle cycle, SolveType solve_type);
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     {
         NonlinearSolver::Solve(rhs, sol);
@@ -90,6 +92,8 @@ private:
     Hierarchy& hierarchy_;
     std::vector<SingleLevelSolver> solvers_;
 };
+
+void Kappa(const mfem::Vector& p, mfem::Vector& kp, const mfem::Vector& Z_vec);
 
 void Kappa(const mfem::Vector& p, mfem::Vector& kp);
 std::string problem;
@@ -152,8 +156,9 @@ int main(int argc, char* argv[])
     problem += problem_name;
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
     ess_attr = 0;
-    unique_ptr<DarcyProblem> fv_problem;
 
+    mfem::Vector Z_fine;
+    unique_ptr<DarcyProblem> fv_problem;
     if (problem == "spe10")
     {
         fv_problem.reset(new SPE10Problem(perm_file, dim, 5, slice, 0, ess_attr));
@@ -171,6 +176,7 @@ int main(int argc, char* argv[])
         ess_attr = 1;
         ess_attr[0] = 0;
         fv_problem.reset(new Richards(num_sr, ess_attr));
+        Z_fine = fv_problem->GetZVector();
     }
     else
     {
@@ -184,7 +190,7 @@ int main(int argc, char* argv[])
     hierarchy.PrintInfo();
 
     mfem::BlockVector rhs(hierarchy.GetMatrix(0).BlockOffsets());
-    if (problem == "richard" )
+    if (problem == "richard")
     {
         rhs.GetBlock(0) = fv_problem->GetEdgeRHS();
         rhs.GetBlock(1) = fv_problem->GetVertexRHS();
@@ -198,15 +204,18 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol_picard(rhs);
     sol_picard = 0.0;
 
-    SingleLevelSolver sls(hierarchy, 0, Picard);
+    SingleLevelSolver sls(hierarchy, 0, Z_fine, Picard);
     sls.SetPrintLevel(1);
+    sls.SetMaxIter(2000);
     sls.Solve(rhs, sol_picard);
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
 
-    EllipticNLMG nlmg(hierarchy, V_CYCLE, Picard);
+    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, Picard);
     nlmg.SetPrintLevel(1);
+
+    nlmg.SetMaxIter(2000);
     nlmg.Solve(rhs, sol_nlmg);
 
     double p_err = CompareError(comm, sol_nlmg.GetBlock(1), sol_picard.GetBlock(1));
@@ -217,21 +226,31 @@ int main(int argc, char* argv[])
 
     if (visualization)
     {
+        if (problem == "richard")
+        {
+            sol_picard.GetBlock(1) -= Z_fine;
+            sol_nlmg.GetBlock(1) -= Z_fine;
+        }
+
         mfem::socketstream sout;
         fv_problem->VisSetup(sout, sol_picard.GetBlock(1), 0.0, 0.0, "");
+        if (problem == "richard")
+            sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
         fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "");
+        if (problem == "richard")
+            sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
     }
 
     return EXIT_SUCCESS;
 }
 
 /// @todo take MixedMatrix only
-SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level, SolveType solve_type)
+SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level,
+                                     mfem::Vector Z_vector, SolveType solve_type)
     : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2], "Picard"),
       level_(level), hierarchy_(hierarchy), solve_type_(solve_type),
-      offsets_(hierarchy_.BlockOffsets(level)),
-      p_(hierarchy_.GetMatrix(level).GetGraph().NumVertices()),
-      kp_(p_.Size())
+      offsets_(hierarchy_.BlockOffsets(level)), p_(hierarchy_.NumVertices(level)),
+      kp_(p_.Size()), Z_vector_(std::move(Z_vector))
 { }
 
 void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
@@ -242,7 +261,11 @@ void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
     mfem::BlockVector block_Ax(Ax.GetData(), offsets_);
 
     p_ = hierarchy_.PWConstProject(level_, block_x.GetBlock(1));
-    Kappa(p_, kp_);
+    if (Z_vector_.Size())
+        Kappa(p_, kp_, Z_vector_);
+    else
+        Kappa(p_, kp_);
+
     hierarchy_.GetMatrix(level_).Mult(kp_, block_x, block_Ax);
 }
 
@@ -255,6 +278,7 @@ void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
 {
     mfem::BlockVector block_sol(sol.GetData(), offsets_);
     mfem::BlockVector block_rhs(rhs.GetData(), offsets_);
+
     if (solve_type_ == Picard)
     {
         PicardStep(block_rhs, block_sol);
@@ -268,8 +292,10 @@ void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
 void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     p_ = hierarchy_.PWConstProject(level_, x.GetBlock(1));
-
-    Kappa(p_, kp_);
+    if (Z_vector_.Size())
+        Kappa(p_, kp_, Z_vector_);
+    else
+        Kappa(p_, kp_);
 
     hierarchy_.RescaleCoefficient(level_, kp_);
     hierarchy_.Solve(level_, rhs, x);
@@ -280,31 +306,33 @@ void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVect
     // TBD...
 }
 
-EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, Cycle cycle, SolveType solve_type)
+EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
+                           Cycle cycle, SolveType solve_type)
     : NonlinearMG(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2],
                   hierarchy.NumLevels(), cycle),
       hierarchy_(hierarchy)
 {
-    //    std::vector<Vector> Z_vectors_help(up_.NumLevels());
-    //    std::vector<Vector> Z_vectors(up_.NumLevels());
+    std::vector<mfem::Vector> help(hierarchy.NumLevels());
 
     hierarchy_.SetPrintLevel(-1);
-    hierarchy_.SetMaxIter(10);
+    hierarchy_.SetMaxIter(500);
 
     solvers_.reserve(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
-        //        if (i == 0)
-        //        {
-        //            Z_vectors[i] = Z_vector_glo;
-        //            Z_vectors_help[i] = Z_vector_glo;
-        //        }
-        //        else
-        //        {
-        //            Z_vectors_help[i] = up_.GetCoarsener(i-1).Restrict(Z_vectors_help[i-1]);
-        //            Z_vectors[i].SetSize(up_.GetMatrix(i).GetElemDof().Rows());
-        //            up_.Project_PW_One(i, Z_vectors_help[i], Z_vectors[i]);
-        //        }
+        mfem::Vector Z_vec;
+        if (Z_fine.Size())
+        {
+            if (level == 0)
+            {
+                help[level].SetDataAndSize(Z_fine.GetData(), Z_fine.Size());
+            }
+            else
+            {
+                help[level] = hierarchy.Project(level - 1, help[level - 1]);
+            }
+            Z_vec = hierarchy.PWConstProject(level, help[level]);
+        }
 
         rhs_[level].SetSize(LevelSize(level));
         sol_[level].SetSize(LevelSize(level));
@@ -313,7 +341,7 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, Cycle cycle, SolveType solve_ty
         sol_[level] = 0.0;
         help_[level] = 0.0;
 
-        solvers_.emplace_back(hierarchy_, level, solve_type);
+        solvers_.emplace_back(hierarchy_, level, std::move(Z_vec), solve_type);
         solvers_[level].SetPrintLevel(-1);
         solvers_[level].SetMaxIter(1);
     }
@@ -388,34 +416,26 @@ void Kappa(const mfem::Vector& p, mfem::Vector& kp)
     }
 }
 
-//// Kappa(p) = K\alpha / (\alpha + |p(x, y, z) - z|^\beta)
-//void Kappa(const mfem::Vector& p, std::vector<double>& kp,
-//           const mfem::Vector& Z_vector, bool help)
-//{
-//    // Loam
-//    double alpha = 124.6;
-//    double beta = 1.57;
-//    double K_s = 1.067;//* 0.01; // cm/day
+// Kappa(p) = K\alpha / (\alpha + |p(x, y, z) - z|^\beta)
+void Kappa(const mfem::Vector& p, mfem::Vector& kp, const mfem::Vector& Z_vec)
+{
+    // Loam
+    double alpha = 124.6;
+    double beta = 1.54;
+    double K_s = 1.067;//* 0.01; // cm/day
 
-//    // Sand
-////    double alpha = 1.175e6;
-////    double beta = 4.74;
-////    double K_s = 816.0;// * 0.01; // cm/day
+    // Sand
+    //    double alpha = 1.175e6;
+    //    double beta = 4.74;
+    //    double K_s = 816.0;// * 0.01; // cm/day
 
-//    double alpha_K_s = K_s * alpha;
+    double alpha_K_s = K_s * alpha;
 
-//    Vector p_copy(p);
-//    p_copy -= Z_vector;
-////    std::cout<<"max = "<<linalgcpp::AbsMax(p_copy)<<"\n";
-
-//    assert(kp.size() == p.size());
-//    for (int i = 0; i < p.size(); i++)
-//    {
-//        kp[i] = alpha_K_s / (alpha + std::pow(std::fabs(p[i] - Z_vector[i]), beta));
-//        if (help)
-//        {
-//            kp[i] = std::max(kp[i], 1e-4);
-//        }
-//        assert(kp[i] > 0.0);
-//    }
-//}
+    assert(kp.Size() == p.Size());
+    assert(Z_vec.Size() == p.Size());
+    for (int i = 0; i < p.Size(); i++)
+    {
+        kp[i] = alpha_K_s / (alpha + std::pow(std::fabs(p[i] - Z_vec[i]), beta));
+        assert(kp[i] > 0.0);
+    }
+}

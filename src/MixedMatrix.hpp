@@ -98,7 +98,7 @@ public:
     /// assemble a local vector into true vector
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
 
-    void Mult(const mfem::Vector& scale, const mfem::BlockVector &x, mfem::BlockVector &y) const;
+    void Mult(const mfem::Vector& scale, const mfem::BlockVector& x, mfem::BlockVector& y) const;
 
     /// Determine if W block is nonzero
     bool CheckW() const { return W_is_nonzero_; }
@@ -134,6 +134,8 @@ public:
        this returns number of fine level vertices contained in each aggregate
     */
     const mfem::Vector& GetVertexSizes() const { return vertex_sizes_; }
+
+    void SetEssDofs(const mfem::Array<int>& ess_attr);
 
 private:
     void Init();
@@ -176,6 +178,8 @@ private:
     mfem::SparseMatrix P_pwc_;
 
     bool W_is_nonzero_;
+
+    mfem::Array<int> ess_edofs_;
 }; // class MixedMatrix
 
 } // namespace smoothg

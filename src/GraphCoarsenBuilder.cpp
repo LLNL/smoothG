@@ -144,7 +144,7 @@ mfem::SparseMatrix ElementMBuilder::BuildAssembledM(
 }
 
 mfem::Vector ElementMBuilder::Mult(
-        const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
+    const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
 {
     mfem::Vector y(x.Size());
     y = 0.0;
@@ -154,7 +154,7 @@ mfem::Vector ElementMBuilder::Mult(
     mfem::Vector y_loc;
     for (int elem = 0; elem < elem_edgedof_.NumRows(); ++elem)
     {
-        GetTableRow(elem_edgedof_, elem , local_edofs);
+        GetTableRow(elem_edgedof_, elem, local_edofs);
 
         x.GetSubVector(local_edofs, x_loc);
 
@@ -416,7 +416,7 @@ mfem::SparseMatrix CoefficientMBuilder::BuildAssembledM(
 }
 
 mfem::Vector CoefficientMBuilder::Mult(
-        const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
+    const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
 {
     mfem::mfem_error("Not implemented yet!\n");
     return mfem::Vector();

@@ -160,7 +160,7 @@ void PrimalSolver::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) co
 
     if (!W_is_nonzero_ && remove_one_dof_ && myid_ == 0)
     {
-        rhs_.GetBlock(1)[0] = -sol.GetBlock(1)[0]; // only correct when == 0
+        rhs_.GetBlock(1)[0] = -sol.GetBlock(1)[0];
     }
 
     mfem::StopWatch chrono;
@@ -175,7 +175,10 @@ void PrimalSolver::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) co
     mixed_matrix_.GetGraphSpace().EDofToTrueEDof().Mult(sol_.GetBlock(0), sol.GetBlock(0));
 
     sol.GetBlock(1) *= -1.0;
-    Orthogonalize(sol.GetBlock(1));
+    if (!W_is_nonzero_ && remove_one_dof_)
+    {
+        Orthogonalize(sol.GetBlock(1));
+    }
 
     num_iterations_ = cg_.GetNumIterations();
 }

@@ -684,6 +684,7 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
 
             mfem::DenseMatrix sigma_f_prod(sigma_f.Width());
             mfem::MultAtB(sigma_f, sigma_f, sigma_f_prod);
+
             sigma_f_prod.Invert();
 
             mfem::DenseMatrix pi_f(sigma_f.Height(), sigma_f.Width());

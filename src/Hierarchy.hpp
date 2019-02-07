@@ -68,9 +68,6 @@ public:
     virtual void Mult(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Mult(int level, const mfem::BlockVector& x) const;
 
-//    virtual void Mult(int level, const mfem::Vector& x, mfem::Vector& y) const;
-//    mfem::Vector Mult(int level, const mfem::Vector& x) const;
-
     /// At a given level, solve mixed system for the given RHS (x)
     virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
@@ -187,7 +184,7 @@ private:
 
     const mfem::Array<int>* ess_attr_;
 
-    const UpscaleParameters param_;
+    UpscaleParameters param_;
 };
 
 } // namespace smoothg
