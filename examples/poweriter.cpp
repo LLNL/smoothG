@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
         const Upscale upscale(graph, param);
 
         // Wrapper for solving on the fine level, no upscaling
-        const UpscaleFineSolve fine_solver(upscale);
+        const UpscaleSolve fine_solver(upscale.GetHierarchy(), 0);
 
         upscale.PrintInfo();
 

@@ -64,10 +64,6 @@ public:
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr);
 
-    /// Multiply mixed system of a given level to the given vector
-    virtual void Mult(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
-    mfem::BlockVector Mult(int level, const mfem::BlockVector& x) const;
-
     /// At a given level, solve mixed system for the given RHS (x)
     virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;

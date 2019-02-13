@@ -181,19 +181,24 @@ mfem::Table MatrixToTable(const mfem::SparseMatrix& mat)
     return table;
 }
 
+mfem::HypreParMatrix* Mult(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& B,
+                           const mfem::HypreParMatrix& C)
+{
+    unique_ptr<mfem::HypreParMatrix> BC(mfem::ParMult(&B, &C));
+    mfem::HypreParMatrix* ABC = mfem::ParMult(&A, BC.get());
+    assert(ABC);
+
+    return ABC;
+}
+
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
                           const mfem::HypreParMatrix& P)
 {
     unique_ptr<mfem::HypreParMatrix> RT(R.Transpose());
     assert(RT);
-    unique_ptr<mfem::HypreParMatrix> AP(mfem::ParMult(&A, &P));
 
-    mfem::HypreParMatrix* rap = mfem::ParMult(RT.get(), AP.get());
-    assert(rap);
-
+    mfem::HypreParMatrix* rap = Mult(*RT, A, P);
     rap->CopyRowStarts();
-    //rap->CopyColStarts();
-    hypre_ParCSRMatrixSetNumNonzeros(*rap);
 
     return rap;
 }

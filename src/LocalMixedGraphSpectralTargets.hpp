@@ -271,8 +271,8 @@ private:
     mfem::SparseMatrix ExtAgg_edof_diag_;
     mfem::SparseMatrix ExtAgg_edof_offd_;
 
-    /// face to permuted edge dof relation table
-    std::unique_ptr<mfem::HypreParMatrix> face_perm_edof_;
+    /// face to extended edge dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> face_ext_edof_;
 
     mfem::Array<int> col_map_;
 };

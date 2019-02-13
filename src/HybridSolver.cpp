@@ -478,7 +478,7 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
 
     auto Scale = VectorToMatrix(diagonal_scaling_);
     mfem::HypreParMatrix pScale(comm_, H.N(), H.GetColStarts(), &Scale);
-    H_.reset(smoothg::RAP(H, pScale));
+    H_.reset(smoothg::Mult(pScale, H, pScale));
 }
 
 void HybridSolver::BuildSpectralAMGePreconditioner()

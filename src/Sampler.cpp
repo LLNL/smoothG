@@ -58,9 +58,8 @@ mfem::Vector& SimpleSampler::GetCoefficient(int level)
     return helper_[level];
 }
 
-PDESampler::PDESampler(Hierarchy hierarchy,
-                       int dimension, double cell_volume, double kappa,
-                       int seed)
+PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+                       Hierarchy hierarchy)
     :
     hierarchy_(std::move(hierarchy)),
     normal_distribution_(0.0, 1.0, seed),

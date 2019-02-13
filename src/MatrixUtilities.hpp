@@ -51,6 +51,10 @@ mfem::SparseMatrix TableToMatrix(const mfem::Table& table);
 */
 mfem::Table MatrixToTable(const mfem::SparseMatrix& mat);
 
+/// @return triple matrix product A * B * C
+mfem::HypreParMatrix* Mult(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& B,
+                           const mfem::HypreParMatrix& C);
+
 // Rap by hand that seems to be faster than the mfem rap but uses more memory
 // Use mfem::RAP if memory is more important than cycles
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,

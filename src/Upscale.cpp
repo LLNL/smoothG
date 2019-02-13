@@ -50,15 +50,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     }
 
     // solve
-    if (level > 0)
-    {
-        rhs_[level].GetBlock(1) *= -1.0;
-    }
     hierarchy_.Solve(level, rhs_[level].GetBlock(1), sol_[level].GetBlock(1));
-    if (level == 0)
-    {
-        sol_[level].GetBlock(1) *= -1.0;
-    }
 
     // interpolate solution
     for (int i = level; i > 0; --i)

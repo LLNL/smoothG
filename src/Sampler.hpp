@@ -100,9 +100,8 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(Hierarchy hierarchy,
-               int dimension, double cell_volume,
-               double kappa, int seed);
+    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+               Hierarchy hierarchy);
 
     /**
        Initialize the PDESampler based on its own, owned Upscale object.
