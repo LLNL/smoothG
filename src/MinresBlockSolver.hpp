@@ -136,7 +136,7 @@ public:
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 private:
     const MixedMatrix& mixed_matrix_;
-    std::unique_ptr<mfem::HypreParMatrix> block_01;
+    std::unique_ptr<mfem::HypreParMatrix> block_01_;
 };
 
 } // namespace smoothg

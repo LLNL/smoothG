@@ -243,12 +243,30 @@ void MinresBlockSolverFalse::JacSolve(const mfem::SparseMatrix& dMdp,
 
     if (NNZ(dMdp) > 0)
     {
-        block_01 = ParMult(space.TrueEDofToEDof(), dMdp, space.VDofStarts());
-        block_01.reset(ParAdd(*block_01, *hDt_));
-        operator_.SetBlock(0, 1, block_01.get());
+        mfem::SparseMatrix dMdp_copy(dMdp);
+        for (int i = 0; i < ess_edofs_.Size(); ++i)
+        {
+            if (ess_edofs_[i])
+            {
+                dMdp_copy.EliminateRow(i);
+            }
+        }
+
+        block_01_ = ParMult(space.TrueEDofToEDof(), dMdp_copy, space.VDofStarts());
+        block_01_.reset(ParAdd(*block_01_, *hDt_));
+        operator_.SetBlock(0, 1, block_01_.get());
+
+        mfem::Vector Md;
+        hM_->GetDiag(Md);
+        block_01_->InvScaleRows(Md);
+        schur_block_.reset(mfem::ParMult(hD_.get(), block_01_.get()));
+        block_01_->ScaleRows(Md);
+        Sprec_.reset(new mfem::HypreBoomerAMG(*schur_block_));
+        Sprec_->SetPrintLevel(0);
+        prec_.SetDiagonalBlock(1, Sprec_.get());
     }
 
-    mfem::FGMRESSolver gmres(comm_);
+    mfem::GMRESSolver gmres(comm_);
     gmres.SetPrintLevel(print_level_);
     gmres.SetMaxIter(max_num_iter_);
     gmres.SetRelTol(rtol_);
@@ -259,6 +277,8 @@ void MinresBlockSolverFalse::JacSolve(const mfem::SparseMatrix& dMdp,
 
     space.TrueEDofToEDof().Mult(rhs.GetBlock(0), rhs_.GetBlock(0));
     rhs_.GetBlock(1) = rhs.GetBlock(1);
+
+    sol_ = 0.0;
 
     mfem::StopWatch chrono;
     chrono.Clear();

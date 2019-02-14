@@ -124,7 +124,6 @@ void Hierarchy::JacSolve(int level, const mfem::SparseMatrix& dMdp,
     solver.JacSolve(dMdp, x, y);
 }
 
-
 void Hierarchy::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(level >= 0 && level < NumLevels());

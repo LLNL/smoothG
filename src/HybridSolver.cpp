@@ -38,7 +38,7 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
     D_(mgL.GetD()),
     W_(mgL.GetW()),
     cg_(comm_),
-    rescale_iter_(20),
+    rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
     MixedLaplacianSolver::Init(mgL, ess_attr);
