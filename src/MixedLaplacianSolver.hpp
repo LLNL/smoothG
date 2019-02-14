@@ -40,7 +40,7 @@ public:
     virtual ~MixedLaplacianSolver() = default;
 
     /**
-       Solve the graph Laplacian problem
+       Solve the mixed form of the graph Laplacian problem
 
        The BlockVectors here are in "dof" numbering, rather than "truedof" numbering.
        That is, dofs on processor boundaries are *repeated* in the vectors that
@@ -48,6 +48,8 @@ public:
     */
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
+
+    /// Solve the primal form of the graph Laplacian problem (DM^{-1}D^T) sol = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
     virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
