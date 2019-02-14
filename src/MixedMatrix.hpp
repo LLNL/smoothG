@@ -55,7 +55,7 @@ public:
        @param w_block the matrix W. If not provided, it is assumed to be zero
     */
     MixedMatrix(Graph graph,
-                const mfem::SparseMatrix& w_block = SparseIdentity(0));
+                const mfem::SparseMatrix& W = SparseIdentity(0));
 
     /**
        @brief Construct a mixed system directly from building blocks.

@@ -25,9 +25,9 @@
 namespace smoothg
 {
 
-Upscale::Upscale(Hierarchy hierarchy)
+Upscale::Upscale(Hierarchy&& hierarchy)
     : Operator(hierarchy.GetMatrix(0).NumVDofs()),
-      comm_(hierarchy.GetMatrix(0).GetComm()), hierarchy_(std::move(hierarchy))
+      comm_(hierarchy.GetComm()), hierarchy_(std::move(hierarchy))
 {
     MPI_Comm_rank(comm_, &myid_);
 
@@ -51,15 +51,7 @@ void Upscale::Mult(int level, const mfem::Vector& x, mfem::Vector& y) const
     }
 
     // solve
-    if (level > 0)
-    {
-        rhs_[level].GetBlock(1) *= -1.0;
-    }
     hierarchy_.Solve(level, rhs_[level].GetBlock(1), sol_[level].GetBlock(1));
-    if (level == 0)
-    {
-        sol_[level].GetBlock(1) *= -1.0;
-    }
 
     // interpolate solution
     for (int i = level; i > 0; --i)
@@ -97,7 +89,6 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
         hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
     }
 
-    // solve
     hierarchy_.Solve(level, rhs_[level], sol_[level]);
 
     // interpolate solution

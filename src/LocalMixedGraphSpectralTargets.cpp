@@ -417,12 +417,10 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     ParMatrix permute_eT( permute_e->Transpose() );
 
     ParMatrix pM(mgL_.MakeParallelM(mgL_.GetM()));
-    ParMatrix tmpM(mfem::ParMult(permute_e.get(), pM.get()) );
-    ParMatrix pM_ext(mfem::ParMult(tmpM.get(), permute_eT.get()) );
+    ParMatrix pM_ext(Mult(*permute_e, *pM, *permute_eT) );
 
     ParMatrix pD(mgL_.MakeParallelD(mgL_.GetD()));
-    ParMatrix tmpD(mfem::ParMult(permute_v.get(), pD.get()));
-    ParMatrix pD_ext(mfem::ParMult(tmpD.get(), permute_eT.get()) );
+    ParMatrix pD_ext(Mult(*permute_v, *pD, *permute_eT) );
 
     mfem::SparseMatrix M_ext = GetDiag(*pM_ext);
     mfem::SparseMatrix D_ext = GetDiag(*pD_ext);
@@ -433,18 +431,16 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     ParMatrix pW_ext(use_w ? RAP(*pW, *permute_v) : nullptr);
     mfem::SparseMatrix W_ext = use_w ? GetDiag(*pW_ext) : mfem::SparseMatrix();
 
-    // Compute face to permuted edge dofs relation table
+    // Compute face to extended edge dofs relation table
     mfem::SparseMatrix face_edof;
     face_edof.MakeRef(dof_agg_.face_edof_);
     face_edof.SetWidth(space.VertexToEDof().Width());
-    ParMatrix face_trueedof = ParMult(face_edof, space.EDofToTrueEDof(),
-                                      coarse_graph_.EdgeStarts());
-    face_perm_edof_.reset(mfem::ParMult(face_trueedof.get(), permute_eT.get()));
+
+    ParMatrix edof_ext_edof(mfem::ParMult(&space.EDofToTrueEDof(), permute_eT.get()));
+    face_ext_edof_ = ParMult(face_edof, *edof_ext_edof, coarse_graph_.EdgeStarts());
 
 #ifdef SMOOTHG_DEBUG
-    mfem::SparseMatrix face_perm_edof_diag;
-    face_perm_edof_->GetDiag(face_perm_edof_diag);
-    OrderingCheck(coarse_graph_.EdgeToTrueEdgeToEdge(), face_perm_edof_diag, *permute_e);
+    OrderingCheck(coarse_graph_.EdgeToTrueEdgeToEdge(), GetDiag(*face_ext_edof_), *permute_e);
     OrderingCheck(coarse_graph_.EdgeToTrueEdgeToEdge(), face_edof, space.EDofToTrueEDof());
 #endif
 
@@ -668,7 +664,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     mfem::Array<int> ext_loc_edofs, iface_edofs;
     mfem::DenseMatrix collected_sigma;
 
-    mfem::SparseMatrix face_perm_edof_diag = GetDiag(*face_perm_edof_);
+    mfem::SparseMatrix face_ext_edof_diag = GetDiag(*face_ext_edof_);
     mfem::SparseMatrix face_IsShared = GetOffd(coarse_graph_.EdgeToTrueEdgeToEdge());
 
     // Send and receive traces
@@ -677,8 +673,8 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     sec_trace.ReducePrepare();
     for (int iface = 0; iface < nfaces; ++iface)
     {
-        // extract the (permuted) dofs i.d. for the face
-        GetTableRow(face_perm_edof_diag, iface, iface_edofs);
+        // extract the (extended) dofs i.d. for the face
+        GetTableRow(face_ext_edof_diag, iface, iface_edofs);
 
         int num_iface_edofs = iface_edofs.Size();
         assert(1 <= num_iface_edofs);

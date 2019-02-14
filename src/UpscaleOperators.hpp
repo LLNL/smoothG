@@ -75,94 +75,37 @@ The user provides both \f$ f_c \f$ and \f$ g_c \f$ and is returned \f$ u_c \f$ a
 namespace smoothg
 {
 
-/// UpscaleBlockSolve performs the same thing as Upscale, but in mixed form.
-/** @note All vectors assumed to be block vectors with the same offsets as the Upscaler */
+/// Solves the problem in the primal form in a given level
+class UpscaleSolve : public mfem::Operator
+{
+public:
+    UpscaleSolve(const Hierarchy& h, int level = 1)
+        : mfem::Operator(h.GetMatrix(level).NumVDofs()), h_(h), level_(level) { }
+    void Mult(const mfem::Vector& x, mfem::Vector& y) const { h_.Solve(level_, x, y); }
+
+private:
+    const Hierarchy& h_;
+    int level_;
+};
+
+/// Solves the problem in the mixed form in a given level
+/// @note All vectors assumed to be block vectors with the same offsets as the Upscaler
 class UpscaleBlockSolve : public mfem::Operator
 {
 public:
-    UpscaleBlockSolve(const Upscale& A)
-        : mfem::Operator(A.BlockOffsets(0)[2]), A_(A), offsets_(A.BlockOffsets(0))
-    { }
+    UpscaleBlockSolve(const Hierarchy& h, int level = 1)
+        : mfem::Operator(h_.BlockOffsets(level)[2]), h_(h), level_(level) { }
 
     void Mult(const mfem::Vector& x, mfem::Vector& y) const
     {
-        mfem::BlockVector x_block(x.GetData(), offsets_);
-        mfem::BlockVector y_block(y.GetData(), offsets_);
-        A_.Solve(1, x_block, y_block);
+        mfem::BlockVector x_block(x.GetData(), h_.BlockOffsets(level_));
+        mfem::BlockVector y_block(y.GetData(), h_.BlockOffsets(level_));
+        h_.Solve(level_, x_block, y_block);
     }
-private:
-    const Upscale& A_;
-    const mfem::Array<int>& offsets_;
-};
-
-/// UpscaleFineSolve Solves the fine problem in primal form as its operation
-class UpscaleFineSolve : public mfem::Operator
-{
-public:
-    UpscaleFineSolve(const Upscale& A)
-        : mfem::Operator(A.BlockOffsets(0)[2] - A.BlockOffsets(0)[1]), A_(A)  { }
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(0, x, y); }
 
 private:
-    const Upscale& A_;
-};
-
-/// UpscaleFineSolve Solves the fine problem in the mixed form as its operation
-/** @note All vectors assumed to be block vectors with the same offsets as the Upscaler */
-class UpscaleFineBlockSolve : public mfem::Operator
-{
-public:
-    UpscaleFineBlockSolve(const Upscale& A)
-        : mfem::Operator(A.BlockOffsets(0)[2]), A_(A), offsets_(A_.BlockOffsets(0))
-    { }
-
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const
-    {
-        mfem::BlockVector x_block(x.GetData(), offsets_);
-        mfem::BlockVector y_block(y.GetData(), offsets_);
-        A_.Solve(0, x_block, y_block);
-    }
-private:
-    const Upscale& A_;
-    const mfem::Array<int>& offsets_;
-};
-
-/// UpscaleCoarseSolve Solves the coarse problem in the primal form as its operation
-/// @todo level argument for multilevel
-class UpscaleCoarseSolve : public mfem::Operator
-{
-public:
-    UpscaleCoarseSolve(const Upscale& A, int level = 1)
-        : mfem::Operator(A.GetHierarchy().GetMatrix(level).NumVDofs()),
-          A_(A), level_(level)  {}
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const { A_.Solve(level_, x, y); }
-
-private:
-    const Upscale& A_;
+    const Hierarchy& h_;
     int level_;
-};
-
-/// UpscaleCoarseBlockSolve Solves the coarse problem in the mixed form as its operation
-/** @note All vectors assumed to be block vectors with the same offsets as the Upscaler */
-class UpscaleCoarseBlockSolve : public mfem::Operator
-{
-public:
-    UpscaleCoarseBlockSolve(const Upscale& A, int level = 1)
-        : mfem::Operator(A.GetHierarchy().GetMatrix(level).NumTotalDofs()),
-          A_(A), level_(level), offsets_(A_.BlockOffsets(level_))
-    { }
-
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const
-    {
-        mfem::BlockVector x_block(x.GetData(), offsets_);
-        mfem::BlockVector y_block(y.GetData(), offsets_);
-        A_.Solve(level_, x_block, y_block);
-    }
-
-private:
-    const Upscale& A_;
-    int level_;
-    const mfem::Array<int>& offsets_;
 };
 
 

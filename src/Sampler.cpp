@@ -58,19 +58,11 @@ mfem::Vector& SimpleSampler::GetCoefficient(int level)
     return helper_[level];
 }
 
-PDESampler::PDESampler(Hierarchy hierarchy,
-                       int dimension, double cell_volume, double kappa,
-                       int seed)
-    :
-    hierarchy_(std::move(hierarchy)),
-    normal_distribution_(0.0, 1.0, seed),
-    num_aggs_(hierarchy_.NumLevels()),
-    cell_volume_(cell_volume),
-    sampled_(false),
-    rhs_(hierarchy_.NumLevels()),
-    coefficient_(hierarchy_.NumLevels())
+PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+                       Hierarchy&& hierarchy)
+    : hierarchy_(std::move(hierarchy))
 {
-    Initialize(dimension, kappa);
+    Initialize(dimension, cell_volume, kappa, seed);
 }
 
 PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
@@ -78,21 +70,22 @@ PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed
                        const UpscaleParameters& param,
                        const mfem::Array<int>* partitioning,
                        const mfem::Array<int>* ess_attr)
-    :
-    hierarchy_(graph, param, partitioning, ess_attr,
-               SparseIdentity(graph.NumVertices()) *= cell_volume * kappa * kappa),
-    normal_distribution_(0.0, 1.0, seed),
-    num_aggs_(param.max_levels),
-    cell_volume_(cell_volume),
-    sampled_(false),
-    rhs_(param.max_levels),
-    coefficient_(param.max_levels)
 {
-    Initialize(dimension, kappa);
+    auto W = SparseIdentity(graph.NumVertices()) *= cell_volume * kappa * kappa;
+    hierarchy_ = Hierarchy(graph, param, partitioning, ess_attr, W);
+
+    Initialize(dimension, cell_volume, kappa, seed);
 }
 
-void PDESampler::Initialize(int dimension, double kappa)
+void PDESampler::Initialize(int dimension, double cell_volume, double kappa, int seed)
 {
+    normal_distribution_ = NormalDistribution(0.0, 1.0, seed);
+    num_aggs_.resize(hierarchy_.NumLevels());
+    cell_volume_ = cell_volume;
+    sampled_ = false;
+    rhs_.resize(hierarchy_.NumLevels());
+    coefficient_.resize(hierarchy_.NumLevels());
+
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
         num_aggs_[level] = hierarchy_.NumVertices(level);

@@ -89,10 +89,10 @@ class PDESampler : public MultilevelSampler
 {
 public:
     /**
-       Initialize the PDESampler based on the given Upscale object.
+       Initialize the PDESampler based on the given Hierarchy object.
 
-       @param upscale object containing information about fine and coarse grids
-                      and how they are connected
+       @param hierarchy object containing information about fine and coarse
+                        grids and how they are connected
        @param dimension spatial dimension of the mesh
        @param cell_volume size of a typical cell
        @param kappa inverse correlation length for Matern covariance
@@ -100,9 +100,8 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(Hierarchy hierarchy,
-               int dimension, double cell_volume,
-               double kappa, int seed);
+    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+               Hierarchy&& hierarchy);
 
     /**
        Initialize the PDESampler based on its own, owned Upscale object.
@@ -159,7 +158,7 @@ private:
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> coefficient_;
 
-    void Initialize(int dimension, double kappa);
+    void Initialize(int dimension, double cell_volume, double kappa, int seed);
 };
 
 }

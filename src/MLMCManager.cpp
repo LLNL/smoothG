@@ -213,8 +213,7 @@ void MLMCManager::FixedLevelSample(int level, bool verbose)
     sampler_.NewSample();
     auto coefficient = sampler_.GetCoefficient(level);
     hierarchy_.RescaleCoefficient(level, coefficient);
-    mfem::BlockVector sol(rhs_[level]);
-    hierarchy_.Solve(level, rhs_[level], sol);
+    mfem::BlockVector sol = hierarchy_.Solve(level, rhs_[level]);
     double l_qoi = qoi_.Evaluate(coefficient, sol);
     double current_cost = hierarchy_.GetSolveTime(level);
     UpdateStatistics(level, l_qoi, current_cost);

@@ -46,6 +46,7 @@ void MixedLaplacianSolver::Mult(const mfem::Vector& rhs, mfem::Vector& sol) cons
 {
     rhs_.GetBlock(0) = 0.0;
     rhs_.GetBlock(1) = rhs;
+    rhs_.GetBlock(1) *= -1.0;
 
     Mult(rhs_, sol_);
 
