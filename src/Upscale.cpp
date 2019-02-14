@@ -25,9 +25,9 @@
 namespace smoothg
 {
 
-Upscale::Upscale(Hierarchy hierarchy)
+Upscale::Upscale(Hierarchy&& hierarchy)
     : Operator(hierarchy.GetMatrix(0).NumVDofs()),
-      comm_(hierarchy.GetMatrix(0).GetComm()), hierarchy_(std::move(hierarchy))
+      comm_(hierarchy.GetComm()), hierarchy_(std::move(hierarchy))
 {
     MPI_Comm_rank(comm_, &myid_);
 

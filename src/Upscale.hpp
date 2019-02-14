@@ -54,7 +54,7 @@ public:
             const mfem::SparseMatrix& w_block = SparseIdentity(0))
         : Upscale(Hierarchy(std::move(graph), param, partitioning, ess_attr, w_block)) {}
 
-    Upscale(Hierarchy hierarchy);
+    Upscale(Hierarchy&& hierarchy);
 
     /**
        @brief Apply the upscaling.

@@ -33,49 +33,49 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
     : comm_(mixed_system.GetComm()),
       solvers_(param.max_levels),
       setup_time_(0.0),
-      ess_attr_(ess_attr),
-      param_(param)
+      ess_attr_(ess_attr)
 {
     mfem::StopWatch chrono;
     chrono.Start();
 
     MPI_Comm_rank(comm_, &myid_);
 
-    mixed_systems_.reserve(param_.max_levels);
+    mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
-    MakeSolver(0);
+    MakeSolver(0, param);
 
-    for (int level = 0; level < param_.max_levels - 1; ++level)
+    for (int level = 0; level < param.max_levels - 1; ++level)
     {
-        Coarsen(level, level ? nullptr : partitioning);
-        MakeSolver(level + 1);
+        Coarsen(level, param, level ? nullptr : partitioning);
+        MakeSolver(level + 1, param);
     }
 
     chrono.Stop();
     setup_time_ = chrono.RealTime();
 }
 
-void Hierarchy::Coarsen(int level, const mfem::Array<int>* partitioning)
+void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
+                        const mfem::Array<int>* partitioning)
 {
     MixedMatrix& mgL = GetMatrix(level);
     mgL.BuildM();
 
     GraphTopology topology;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning)
-                         : topology.Coarsen(mgL.GetGraph(), param_.coarse_factor);
+                         : topology.Coarsen(mgL.GetGraph(), param.coarse_factor);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
     std::vector<mfem::DenseMatrix> edge_traces;
     std::vector<mfem::DenseMatrix> vertex_targets;
 
-    LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param_);
+    LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
     localtargets.Compute(edge_traces, vertex_targets);
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 
     Pu_.push_back(graph_coarsen.BuildPVertices());
-    Psigma_.push_back(graph_coarsen.BuildPEdges(param_.coarse_components));
+    Psigma_.push_back(graph_coarsen.BuildPEdges(param.coarse_components));
     Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
 
     mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_[level]));
@@ -85,19 +85,17 @@ void Hierarchy::Coarsen(int level, const mfem::Array<int>* partitioning)
 #endif
 }
 
-void Hierarchy::MakeSolver(int level)
+void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param_.hybridization) // Hybridization solver
+    if (param.hybridization) // Hybridization solver
     {
-        SAAMGeParam* saamge_param = level ? param_.saamge_param : nullptr;
-        solvers_[level] = make_unique<HybridSolver>(
-                              GetMatrix(level), ess_attr_, 0, saamge_param);
+        SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
+        solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_, 0, sa_param));
     }
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        solvers_[level] = make_unique<MinresBlockSolverFalse>(GetMatrix(level),
-                                                              ess_attr_);
+        solvers_[level].reset(new MinresBlockSolverFalse(GetMatrix(level), ess_attr_));
     }
 }
 

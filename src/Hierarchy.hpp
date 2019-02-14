@@ -64,6 +64,8 @@ public:
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr);
 
+    Hierarchy() = default;
+
     /// At a given level, solve mixed system for the given RHS (x)
     virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
@@ -145,7 +147,7 @@ public:
     const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
 
     /// Create solver on level
-    void MakeSolver(int level);
+    void MakeSolver(int level, const UpscaleParameters& param);
 
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
@@ -161,7 +163,8 @@ public:
     void DumpDebug(const std::string& prefix) const;
 
 private:
-    void Coarsen(int level, const mfem::Array<int>* partitioning);
+    void Coarsen(int level, const UpscaleParameters& param,
+                 const mfem::Array<int>* partitioning);
 
     /// Test if Proj_sigma_ * Psigma_ = identity
     void Debug_tests(int level) const;
@@ -179,8 +182,6 @@ private:
     double setup_time_;
 
     const mfem::Array<int>* ess_attr_;
-
-    const UpscaleParameters& param_;
 };
 
 } // namespace smoothg
