@@ -153,9 +153,13 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     }
 
     if (is_symmetric_)
+    {
         minres_.Mult(rhs, sol);
+    }
     else
+    {
         gmres_.Mult(rhs, sol);
+    }
 
     const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 
@@ -167,28 +171,32 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Stop();
     timing_ = chrono.RealTime();
 
+    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
+                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
+    num_iterations_ = solver->GetNumIterations();
+
     if (myid_ == 0 && print_level_ > 0)
     {
-        auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
-                                    : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
         std::string solver_name = is_symmetric_ ? "Minres" : "GMRES";
 
         std::cout << "  Timing " + solver_name + ": Solver done in "
                   << timing_ << "s. \n";
 
         if (solver->GetConverged())
+        {
             std::cout << "  " + solver_name + " converged in "
-                      << solver->GetNumIterations()
+                      << num_iterations_
                       << " with a final residual norm "
                       << solver->GetFinalNorm() << "\n";
+        }
         else
+        {
             std::cout << "  " + solver_name + " did not converge in "
-                      << solver->GetNumIterations()
+                      << num_iterations_
                       << ". Final residual norm is "
                       << solver->GetFinalNorm() << "\n";
+        }
     }
-
-    num_iterations_ = minres_.GetNumIterations();
 }
 
 void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)

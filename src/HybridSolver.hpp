@@ -201,9 +201,11 @@ private:
 
     std::vector<mfem::DenseMatrix> Hybrid_el_;
 
-    std::vector<mfem::DenseMatrix> MinvDT_;
+    std::vector<mfem::DenseMatrix> MinvN_;
+    std::vector<mfem::DenseMatrix> DMinv_;
     std::vector<mfem::DenseMatrix> MinvCT_;
     std::vector<mfem::DenseMatrix> AinvDMinvCT_;
+    std::vector<mfem::DenseMatrix> CMinvNAinv_;
     std::vector<mfem::DenseMatrix> Ainv_;
     std::vector<mfem::DenseMatrix> Minv_;
     std::vector<mfem::SparseMatrix> C_;
