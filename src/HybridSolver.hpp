@@ -118,10 +118,7 @@ public:
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 
     virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
-                                const std::vector<mfem::DenseMatrix>& N_el)
-    {
-        mfem::mfem_error("not implemented!\n");
-    }
+                                const std::vector<mfem::DenseMatrix>& N_el);
 
     ///@name Set solver parameters
     ///@{
@@ -236,6 +233,8 @@ private:
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
+
+    const ElementMBuilder* mbuilder_;
 
     const SAAMGeParam* saamge_param_;
 #if SMOOTHG_USE_SAAMGE

@@ -91,7 +91,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization && level) // Hybridization solver
+    if (param.hybridization) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_, 0, sa_param));
