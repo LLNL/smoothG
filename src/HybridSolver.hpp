@@ -117,6 +117,12 @@ public:
     */
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 
+    virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                const std::vector<mfem::DenseMatrix>& N_el)
+    {
+        mfem::mfem_error("not implemented!\n");
+    }
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) override;
@@ -136,6 +142,10 @@ private:
 
     mfem::SparseMatrix AssembleHybridSystem(
         const std::vector<mfem::DenseMatrix>& M_el);
+
+    mfem::SparseMatrix AssembleHybridSystem(
+        const std::vector<mfem::DenseMatrix>& M_el,
+        const std::vector<mfem::DenseMatrix>& N_el);
 
     // Compute scaling vector and the scaled hybridized system
     void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);

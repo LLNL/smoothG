@@ -52,7 +52,7 @@ private:
     void EvalCoefDerivative(const mfem::Vector& sol_block1);
     void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
-    mfem::SparseMatrix Build_dMdp(const mfem::BlockVector& iterate);
+    std::vector<mfem::DenseMatrix> Build_dMdp(const mfem::BlockVector& iterate);
 
     virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
 
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
     SingleLevelSolver sls(hierarchy, 0, Z_fine, use_newton ? Newton : Picard);
     sls.SetPrintLevel(1);
     sls.SetMaxIter(2000);
-    sls.Solve(rhs, sol_picard);
+//    sls.Solve(rhs, sol_picard);
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
@@ -311,7 +311,7 @@ void SingleLevelSolver::EvalCoef(const mfem::Vector& sol_block1)
 
 void SingleLevelSolver::EvalCoefDerivative(const mfem::Vector& sol_block1)
 {
-    p_ = hierarchy_.PWConstProject(level_, sol_block1);
+//    p_ = hierarchy_.PWConstProject(level_, sol_block1);
     if (Z_vector_.Size())
         dKinv_dp(p_, Z_vector_, dkinv_dp_);
     else
@@ -329,48 +329,73 @@ void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVect
 {
     Mult(x, residual_);
     residual_ -= rhs;
+    for (int i = 0; i < x.BlockSize(0); ++i)
+    {
+        if (hierarchy_.GetMatrix(level_).GetEssDofs()[i])
+            residual_[i] = 0.0;
+    }
 
-    hierarchy_.RescaleCoefficient(level_, kp_);
+//    hierarchy_.RescaleCoefficient(level_, kp_);
 
-    mfem::SparseMatrix dMdp = Build_dMdp(x);
+//    mfem::SparseMatrix dMdp = Build_dMdp(x);
+    auto dMdp = Build_dMdp(x);
+    hierarchy_.UpdateJacobian(level_, kp_, dMdp);
 
     mfem::BlockVector delta_x(offsets_);
     mfem::BlockVector block_residual(residual_.GetData(), offsets_);
-    hierarchy_.JacSolve(level_, dMdp, block_residual, delta_x);
+    hierarchy_.Solve(level_, block_residual, delta_x);
+//    hierarchy_.JacSolve(level_, dMdp, block_residual, delta_x);
     x -= delta_x;
 }
 
-mfem::SparseMatrix SingleLevelSolver::Build_dMdp(const mfem::BlockVector& iterate)
+std::vector<mfem::DenseMatrix> SingleLevelSolver::Build_dMdp(
+        const mfem::BlockVector& iterate)
 {
     auto& mixed_system = hierarchy_.GetMatrix(level_);
     auto& vert_edof = mixed_system.GetGraphSpace().VertexToEDof();
+    auto& vert_vdof = mixed_system.GetGraphSpace().VertexToVDof();
 
     auto& MB = dynamic_cast<const ElementMBuilder&>(mixed_system.GetMBuilder());
     auto& M_el = MB.GetElementMatrices();
 
-    mfem::SparseMatrix dMdp_tmp(vert_edof.NumCols(), vert_edof.NumRows());
-    mfem::Array<int> local_edofs, vert(1);
-    mfem::Vector sigma_loc, Msigma_loc;
+    auto& proj_pwc = const_cast<mfem::SparseMatrix&>(mixed_system.GetPWConstProj());
+
+//    mfem::SparseMatrix dMdp_tmp(vert_edof.NumCols(), vert_edof.NumRows());
+
+    std::vector<mfem::DenseMatrix> dMdp(M_el.size());
+    mfem::Array<int> local_edofs, local_vdofs, vert(1);
+    mfem::Vector sigma_loc, Msigma_vec;
+    mfem::DenseMatrix proj_pwc_loc;
+
+    EvalCoefDerivative(iterate.GetBlock(1)); // dkinv_dp_ is updated
 
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
         GetTableRow(vert_edof, i, local_edofs);
+        GetTableRow(vert_vdof, i, local_vdofs);
         vert[0] = i;
 
         iterate.GetBlock(0).GetSubVector(local_edofs, sigma_loc);
-        mfem::DenseMatrix M_el_i = M_el[i];
-        Msigma_loc.SetSize(local_edofs.Size());
-        M_el_i.Mult(sigma_loc, Msigma_loc);
-        mfem::DenseMatrix dMdp_loc(Msigma_loc.GetData(), local_edofs.Size(), 1);
-        dMdp_tmp.AddSubMatrix(local_edofs, vert, dMdp_loc);
+        Msigma_vec.SetSize(local_edofs.Size());
+        M_el[i].Mult(sigma_loc, Msigma_vec);
+        mfem::DenseMatrix Msigma_loc(Msigma_vec.GetData(), M_el[i].Size(), 1);
+
+        proj_pwc_loc.SetSize(1, local_vdofs.Size());
+        proj_pwc_loc = 0.0;
+        proj_pwc.GetSubMatrix(vert, local_vdofs, proj_pwc_loc);
+        proj_pwc_loc *= dkinv_dp_[i];
+
+        dMdp[i].SetSize(local_edofs.Size(), local_vdofs.Size());
+        mfem::Mult(Msigma_loc, proj_pwc_loc, dMdp[i]);
+
+//        dMdp_tmp.AddSubMatrix(local_edofs, vert, dMdp_loc);
     }
-    dMdp_tmp.Finalize();
+//    dMdp_tmp.Finalize();
 
-    EvalCoefDerivative(iterate.GetBlock(1));
+//    dMdp_tmp.ScaleColumns(dkinv_dp_);
 
-    dMdp_tmp.ScaleColumns(dkinv_dp_);
-
-    return smoothg::Mult(dMdp_tmp, mixed_system.GetPWConstProj());
+//    return smoothg::Mult(dMdp_tmp, mixed_system.GetPWConstProj());
+    return dMdp;
 }
 
 

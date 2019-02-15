@@ -56,6 +56,10 @@ public:
     /// Update solver based on new "element" scaling for M matrix
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse) = 0;
 
+    /// Update the Jacobian associated with the nonlinear graph Laplacian problem
+    virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                const std::vector<mfem::DenseMatrix>& N_el) = 0;
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) { print_level_ = print_level; }
@@ -98,6 +102,9 @@ protected:
 
     mfem::Array<int> ess_edofs_;
     const mfem::Vector* const_rep_;
+
+    mfem::GMRESSolver gmres_;
+    bool is_symmetric_;
 };
 
 class PrimalSolver : public MixedLaplacianSolver

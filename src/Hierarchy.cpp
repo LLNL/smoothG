@@ -91,7 +91,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization) // Hybridization solver
+    if (param.hybridization && level) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_, 0, sa_param));
@@ -122,6 +122,12 @@ void Hierarchy::JacSolve(int level, const mfem::SparseMatrix& dMdp,
 {
     auto& solver = dynamic_cast<MinresBlockSolverFalse&>(*solvers_[level]);
     solver.JacSolve(dMdp, x, y);
+}
+
+void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
+                               const std::vector<mfem::DenseMatrix>& dMdp)
+{
+    solvers_[level]->UpdateJacobian(elem_scaling_inverse, dMdp);
 }
 
 void Hierarchy::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const

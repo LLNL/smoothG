@@ -74,6 +74,9 @@ public:
     void JacSolve(int level, const mfem::SparseMatrix& dMdp,
                   const mfem::BlockVector& x, mfem::BlockVector& y);
 
+    void UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
+                        const std::vector<mfem::DenseMatrix>& dMdp);
+
     /// At a given level, solve primal system for the given RHS (x)
     virtual void Solve(int level, const mfem::Vector& x, mfem::Vector& y) const;
     mfem::Vector Solve(int level, const mfem::Vector& x) const;

@@ -321,6 +321,152 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     return H_proc;
 }
 
+mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
+    const std::vector<mfem::DenseMatrix>& M_el,
+    const std::vector<mfem::DenseMatrix>& N_el)
+{
+    mfem::SparseMatrix H_proc(num_multiplier_dofs_);
+
+    const int map_size = std::max(num_edge_dofs_, Agg_vertexdof_.Width());
+    mfem::Array<int> edof_global_to_local_map(map_size);
+    edof_global_to_local_map = -1;
+    mfem::Array<bool> edge_marker(num_edge_dofs_);
+    edge_marker = true;
+
+    mfem::SparseMatrix edof_IsOwned = GetDiag(*multiplier_d_td_);
+
+    mfem::DenseMatrix DlocT, ClocT, Aloc, CMinv, CMinvN, DMinvCT, CMDADMC;
+
+    mfem::DenseMatrixInverse Mloc_solver, Aloc_solver;
+    for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
+    {
+        // Extracting the size and global numbering of local dof
+        mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
+        GetTableRow(Agg_vertexdof_, iAgg, local_vertexdof);
+        GetTableRow(Agg_edgedof_, iAgg, local_edgedof);
+        GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
+
+        const int nlocal_vertexdof = local_vertexdof.Size();
+        const int nlocal_edgedof = local_edgedof.Size();
+        const int nlocal_multiplier = local_multiplier.Size();
+
+        // Build the edge dof global to local map which will be used
+        // later for mapping local multiplier dof to local edge dof
+        for (int i = 0; i < nlocal_edgedof; ++i)
+            edof_global_to_local_map[local_edgedof[i]] = i;
+
+        // Extract Dloc as a sparse submatrix of D_
+        auto Dloc = ExtractRowAndColumns(D_, local_vertexdof, local_edgedof,
+                                         edof_global_to_local_map, false);
+
+        // Fill DlocT as a dense matrix of Dloc^T
+        FullTranspose(Dloc, DlocT);
+        DlocT += N_el[iAgg];
+
+        // Construct the constraint matrix C which enforces the continuity of
+        // the broken edge space
+        ClocT.SetSize(nlocal_edgedof, nlocal_multiplier);
+        ClocT = 0.;
+
+        int* Cloc_i = new int[nlocal_multiplier + 1];
+        std::iota(Cloc_i, Cloc_i + nlocal_multiplier + 1, 0);
+        int* Cloc_j = new int[nlocal_multiplier];
+        double* Cloc_data = new double[nlocal_multiplier];
+        for (int i = 0; i < nlocal_multiplier; ++i)
+        {
+            const int edof_global_id = multiplier_to_edof_[local_multiplier[i]];
+            const int edof_local_id = edof_global_to_local_map[edof_global_id];
+            Cloc_j[i] = edof_local_id;
+            if (edof_IsOwned.RowSize(edof_global_id) && edge_marker[edof_global_id])
+            {
+                edge_marker[edof_global_id] = false;
+                ClocT(edof_local_id, i) = 1.;
+                Cloc_data[i] = 1.;
+            }
+            else
+            {
+                ClocT(edof_local_id, i) = -1.;
+                Cloc_data[i] = -1.;
+            }
+        }
+
+        mfem::SparseMatrix Cloc(Cloc_i, Cloc_j, Cloc_data,
+                                nlocal_multiplier, nlocal_edgedof);
+
+        for (int i = 0; i < nlocal_edgedof; ++i)
+            edof_global_to_local_map[local_edgedof[i]] = -1;
+
+        // for initial guess
+        {
+            C_[iAgg].Swap(Cloc);
+            MultSparseDense(C_[iAgg], M_el[iAgg], CM_[iAgg]);
+            auto DT = smoothg::Transpose(Dloc);
+            auto CDT = smoothg::Mult(C_[iAgg], DT);
+            CDT_[iAgg].Swap(CDT);
+        }
+
+        Mloc_solver.SetOperator(M_el[iAgg]);
+        Mloc_solver.GetInverseMatrix(Minv_[iAgg]);
+
+        mfem::DenseMatrix& MinvCT_i(MinvCT_[iAgg]);
+        mfem::DenseMatrix& MinvN_i(MinvDT_[iAgg]);
+        mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
+        mfem::DenseMatrix& Ainv_i(Ainv_[iAgg]);
+
+        MinvCT_i.SetSize(nlocal_edgedof, nlocal_multiplier);
+        MinvN_i.SetSize(nlocal_edgedof, nlocal_vertexdof);
+        AinvDMinvCT_i.SetSize(nlocal_vertexdof, nlocal_multiplier);
+
+        mfem::Mult(Minv_[iAgg], DlocT, MinvN_i);
+        mfem::Mult(Minv_[iAgg], ClocT, MinvCT_i);
+
+        // Compute CMinvCT = Cloc * MinvCT
+        MultSparseDense(C_[iAgg], MinvCT_i, Hybrid_el_[iAgg]);
+
+        // Compute Aloc = DMinvN = Dloc * Minv * N
+        MultSparseDense(Dloc, MinvN_i, Aloc);
+
+        if (W_.Width())
+        {
+            mfem::DenseMatrix Wloc(nlocal_vertexdof, nlocal_vertexdof);
+            auto& W_ref = const_cast<mfem::SparseMatrix&>(W_);
+            W_ref.GetSubMatrix(local_vertexdof, local_vertexdof, Wloc);
+            Aloc += Wloc;
+        }
+
+        // Compute DMinvCT Dloc * MinvCT
+        MultSparseDense(Dloc, MinvCT_i, DMinvCT);
+
+        // Compute the LU factorization of Aloc and Ainv_ * DMinvCT
+        Aloc_solver.SetOperator(Aloc);
+        Aloc_solver.GetInverseMatrix(Ainv_i);
+        mfem::Mult(Ainv_i, DMinvCT, AinvDMinvCT_i);
+
+        // Compute CMinvNAinvDMinvCT = CMinvN * AinvDMinvCT_
+        CMinv.Transpose(MinvCT_i);
+        CMinvN.SetSize(nlocal_multiplier, nlocal_vertexdof);
+        mfem::Mult(CMinv, DlocT, CMinvN);
+
+        CMDADMC.SetSize(nlocal_multiplier, nlocal_multiplier);
+
+        if (CMinvN.Height() > 0 && CMinvN.Width() > 0)
+        {
+            mfem::Mult(CMinvN, AinvDMinvCT_i, CMDADMC);
+        }
+        else
+        {
+            CMDADMC = 0.0;
+        }
+
+        // Hybrid_el_ = CMinvCT - CMinvDTAinvDMinvCT
+        Hybrid_el_[iAgg] -= CMDADMC;
+
+        // Add contribution of the element matrix to the global system
+        H_proc.AddSubMatrix(local_multiplier, local_multiplier, Hybrid_el_[iAgg]);
+    }
+
+    return H_proc;
+}
 
 /// @todo nonzero Neumann BC (edge unknown), solve on true dof (original system)
 void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const
@@ -409,7 +555,6 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
         std::cout << "  Timing: original solution recovered in "
                   << chrono.RealTime() << "s. \n";
     }
-
 }
 
 /// @todo impose nonzero boundary condition for u.n

@@ -152,7 +152,10 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
         const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = 0.0;
     }
 
-    minres_.Mult(rhs, sol);
+    if (is_symmetric_)
+        minres_.Mult(rhs, sol);
+    else
+        gmres_.Mult(rhs, sol);
 
     const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 
@@ -166,18 +169,23 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 
     if (myid_ == 0 && print_level_ > 0)
     {
-        std::cout << "  Timing MINRES: Solver done in "
+        auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
+                                    : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
+        std::string solver_name = is_symmetric_ ? "Minres" : "GMRES";
+
+        std::cout << "  Timing " + solver_name + ": Solver done in "
                   << timing_ << "s. \n";
-        if (minres_.GetConverged())
-            std::cout << "  Minres converged in "
-                      << minres_.GetNumIterations()
+
+        if (solver->GetConverged())
+            std::cout << "  " + solver_name + " converged in "
+                      << solver->GetNumIterations()
                       << " with a final residual norm "
-                      << minres_.GetFinalNorm() << "\n";
+                      << solver->GetFinalNorm() << "\n";
         else
-            std::cout << "  Minres did not converge in "
-                      << minres_.GetNumIterations()
+            std::cout << "  " + solver_name + " did not converge in "
+                      << solver->GetNumIterations()
                       << ". Final residual norm is "
-                      << minres_.GetFinalNorm() << "\n";
+                      << solver->GetFinalNorm() << "\n";
     }
 
     num_iterations_ = minres_.GetNumIterations();
@@ -303,6 +311,85 @@ void MinresBlockSolverFalse::JacSolve(const mfem::SparseMatrix& dMdp,
     space.EDofToTrueEDof().Mult(sol_.GetBlock(0), sol.GetBlock(0));
     sol.GetBlock(1) = sol_.GetBlock(1);
 }
+
+void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                            const std::vector<mfem::DenseMatrix>& N_el)
+{
+    // Update M and Mprec
+    auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
+    for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
+    {
+        if (ess_edofs_[mm])
+            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+    }
+    hM_.reset(mixed_matrix_.MakeParallelM(M_proc));
+    operator_.SetBlock(0, 0, hM_.get());
+
+    Mprec_.reset(new mfem::HypreDiagScale(*hM_));
+    prec_.SetDiagonalBlock(0, Mprec_.get());
+
+    // Update N and Sprec
+    auto& space = mixed_matrix_.GetGraphSpace();
+
+    mfem::Array<int> local_edofs, local_vdofs;
+    mfem::SparseMatrix dMdp(mixed_matrix_.NumEDofs(), mixed_matrix_.NumVDofs());
+    for (unsigned int i = 0; i < N_el.size(); ++i)
+    {
+        GetTableRow(space.VertexToEDof(), i, local_edofs);
+        GetTableRow(space.VertexToVDof(), i, local_vdofs);
+        dMdp.AddSubMatrix(local_edofs, local_vdofs, N_el[i]);
+    }
+    dMdp.Finalize();
+
+    if (NNZ(dMdp) > 0)
+    {
+        mfem::SparseMatrix dMdp_copy(dMdp);
+        for (int i = 0; i < ess_edofs_.Size(); ++i)
+        {
+            if (ess_edofs_[i])
+            {
+                dMdp_copy.EliminateRow(i);
+            }
+        }
+
+        block_01_ = ParMult(space.TrueEDofToEDof(), dMdp_copy, space.VDofStarts());
+        block_01_.reset(ParAdd(*block_01_, *hDt_));
+    }
+    else
+    {
+        block_01_.reset(hD_->Transpose());
+    }
+
+    operator_.SetBlock(0, 1, block_01_.get());
+
+    mfem::Vector Md;
+    hM_->GetDiag(Md);
+    block_01_->InvScaleRows(Md);
+    schur_block_.reset(mfem::ParMult(hD_.get(), block_01_.get()));
+
+    if (W_is_nonzero_)
+    {
+        mfem::HypreParMatrix pW(comm_, hD_->M(), hD_->RowPart(), W_.get());
+        nnz_ += pW.NNZ();
+        schur_block_.reset(ParAdd(pW, *schur_block_));
+    }
+
+    block_01_->ScaleRows(Md);
+    Sprec_.reset(new mfem::HypreBoomerAMG(*schur_block_));
+    Sprec_->SetPrintLevel(0);
+    prec_.SetDiagonalBlock(1, Sprec_.get());
+
+    gmres_.SetPrintLevel(print_level_);
+    gmres_.SetMaxIter(max_num_iter_);
+    gmres_.SetRelTol(rtol_);
+    gmres_.SetAbsTol(atol_);
+    gmres_.SetOperator(operator_);
+    gmres_.SetPreconditioner(prec_);
+    gmres_.iterative_mode = false;
+
+    is_symmetric_ = false;
+}
+
 
 void MinresBlockSolver::SetPrintLevel(int print_level)
 {
