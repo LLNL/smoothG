@@ -70,13 +70,6 @@ public:
     virtual void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
 
-    /// At a given level, solve mixed Jacobian system for the given RHS (x)
-    void JacSolve(int level, const mfem::SparseMatrix& dMdp,
-                  const mfem::BlockVector& x, mfem::BlockVector& y);
-
-    void UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
-                        const std::vector<mfem::DenseMatrix>& dMdp);
-
     /// At a given level, solve primal system for the given RHS (x)
     virtual void Solve(int level, const mfem::Vector& x, mfem::Vector& y) const;
     mfem::Vector Solve(int level, const mfem::Vector& x) const;
@@ -158,6 +151,10 @@ public:
 
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
+
+    /// At a given level, update mixed Jacobian system associated with the nonlinear problem
+    void UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
+                        const std::vector<mfem::DenseMatrix>& dMdp);
 
     int NumLevels() const { return mixed_systems_.size(); }
 

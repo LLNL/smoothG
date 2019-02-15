@@ -117,19 +117,6 @@ mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
     return y;
 }
 
-void Hierarchy::JacSolve(int level, const mfem::SparseMatrix& dMdp,
-                         const mfem::BlockVector& x, mfem::BlockVector& y)
-{
-    auto& solver = dynamic_cast<MinresBlockSolverFalse&>(*solvers_[level]);
-    solver.JacSolve(dMdp, x, y);
-}
-
-void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
-                               const std::vector<mfem::DenseMatrix>& dMdp)
-{
-    solvers_[level]->UpdateJacobian(elem_scaling_inverse, dMdp);
-}
-
 void Hierarchy::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
     assert(level >= 0 && level < NumLevels());
@@ -410,6 +397,12 @@ void Hierarchy::DumpDebug(const std::string& prefix) const
 void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coeff)
 {
     solvers_[level]->UpdateElemScaling(coeff);
+}
+
+void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
+                               const std::vector<mfem::DenseMatrix>& dMdp)
+{
+    solvers_[level]->UpdateJacobian(elem_scaling_inverse, dMdp);
 }
 
 int Hierarchy::NumVertices(int level) const
