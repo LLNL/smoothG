@@ -141,7 +141,7 @@ private:
         const std::vector<mfem::DenseMatrix>& M_el);
 
     mfem::SparseMatrix AssembleHybridSystem(
-        const std::vector<mfem::DenseMatrix>& M_el,
+        const mfem::Vector& elem_scaling_inverse,
         const std::vector<mfem::DenseMatrix>& N_el);
 
     // Compute scaling vector and the scaled hybridized system
@@ -208,6 +208,7 @@ private:
     std::vector<mfem::DenseMatrix> CMinvNAinv_;
     std::vector<mfem::DenseMatrix> Ainv_;
     std::vector<mfem::DenseMatrix> Minv_;
+    std::vector<mfem::DenseMatrix> Minv_ref_;
     std::vector<mfem::SparseMatrix> C_;
     std::vector<mfem::DenseMatrix> CM_;
     std::vector<mfem::SparseMatrix> CDT_;
@@ -235,8 +236,6 @@ private:
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
-
-    const ElementMBuilder* mbuilder_;
 
     const SAAMGeParam* saamge_param_;
 #if SMOOTHG_USE_SAAMGE

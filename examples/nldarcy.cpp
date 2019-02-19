@@ -205,6 +205,12 @@ int main(int argc, char* argv[])
     Hierarchy hierarchy(std::move(graph), upscale_param, nullptr, &ess_attr);
     hierarchy.PrintInfo();
 
+    if (upscale_param.hybridization)
+    {
+        hierarchy.SetRelTol(1e-12);
+        hierarchy.SetAbsTol(1e-15);
+    }
+
     mfem::BlockVector rhs(hierarchy.GetMatrix(0).BlockOffsets());
     if (problem == "richard")
     {
@@ -266,7 +272,7 @@ SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level,
       offsets_(hierarchy_.BlockOffsets(level)), p_(hierarchy_.NumVertices(level)),
       kp_(p_.Size()), dkinv_dp_(p_.Size()), Z_vector_(std::move(Z_vector))
 {
-    hierarchy_.SetPrintLevel(-1);
+    hierarchy_.SetPrintLevel(0);
 }
 
 void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
