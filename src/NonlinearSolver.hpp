@@ -29,6 +29,9 @@ namespace smoothg
 
 enum SolveType { Newton, Picard };
 
+/// Respectively modified from choice 1 and 2 in Eisenstat and Walker, SISC 1996
+enum EisenstatWalker { TaylorResidual, NonlinearResidual };
+
 /// Iterative solver for nonlinear problems
 class NonlinearSolver
 {
@@ -47,6 +50,10 @@ public:
     void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
     void SetRelTol(double rtol) { rtol_ = rtol; }
     void SetAbsTol(double atol) { atol_ = atol; }
+    void SetLinearTolCriterion(EisenstatWalker criterion)
+    {
+        linear_tol_criterion_ = criterion;
+    }
     ///@}
 
     ///@name Get results of iterative solve
@@ -61,6 +68,8 @@ protected:
     virtual void IterationStep(const mfem::Vector& x, mfem::Vector& y) = 0;
 
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
+
+    void UpdateLinearSolveTol();
 
     // default nonlinear solver options
     int print_level_ = 0;
@@ -78,6 +87,13 @@ protected:
     std::string tag_;
 
     mfem::Vector residual_;
+
+    double resid_norm_;
+    double prev_resid_norm_;
+
+    EisenstatWalker linear_tol_criterion_;
+    double linear_tol_;
+    double linear_resid_norm_;
 };
 
 enum Cycle { V_CYCLE, FMG };

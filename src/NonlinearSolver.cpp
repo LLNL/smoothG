@@ -24,7 +24,8 @@ namespace smoothg
 {
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, std::string tag)
-    : comm_(comm), size_(size), tag_(tag), residual_(size)
+    : comm_(comm), size_(size), tag_(tag), residual_(size),
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(0.5)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -54,27 +55,30 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
         mfem::Vector zero_vec(sol);
         zero_vec = 0.0;
-        double norm = ResidualNorm(zero_vec, rhs);
+        double norm = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
 
         converged_ = false;
         for (iter_ = 0; iter_ < max_num_iter_; iter_++)
         {
-            double resid = ResidualNorm(sol, rhs);
-            double rel_resid = resid / norm;
+            resid_norm_ = ResidualNorm(sol, rhs);
+            double rel_resid = resid_norm_ / norm;
 
             if (myid_ == 0 && print_level_ > 0)
             {
                 std::cout << tag_ << " iter " << iter_ << ":  rel resid = "
-                          << rel_resid << "  abs resid = " << resid << "\n";
+                          << rel_resid << "  abs resid = " << resid_norm_ << "\n";
             }
 
-            if (resid < atol_ || rel_resid < rtol_)
+            if (resid_norm_ < atol_ || rel_resid < rtol_)
             {
                 converged_ = true;
                 break;
             }
 
+            UpdateLinearSolveTol();
             IterationStep(rhs, sol);
+
+            prev_resid_norm_ = resid_norm_;
         }
 
         if (myid_ == 0 && !converged_ && print_level_ >= 0)
@@ -88,6 +92,21 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
                       << chrono.RealTime() << " seconds.\n\n";
         }
     }
+}
+
+void NonlinearSolver::UpdateLinearSolveTol()
+{
+    double tol;
+    if (linear_tol_criterion_ == TaylorResidual)
+    {
+        tol = std::fabs(resid_norm_ - linear_resid_norm_) / prev_resid_norm_;
+    }
+    else // NonlinearResidual
+    {
+        tol = std::pow(resid_norm_ / prev_resid_norm_, (1 + std::sqrt(5)) / 2.0);
+    }
+
+    linear_tol_ = std::min(std::min(tol, linear_tol_), 0.5);
 }
 
 NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle)

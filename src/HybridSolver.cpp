@@ -854,6 +854,9 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
 
 void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
 {
+    mfem::StopWatch chrono;
+    chrono.Start();
+
     // This is for consistency, could simply work with elem_scaling_inverse
     elem_scaling_.SetSize(elem_scaling_inverse.Size());
     for (int i = 0; i < elem_scaling_.Size(); ++i)
@@ -874,11 +877,20 @@ void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, H_el);
     }
     BuildParallelSystemAndSolver(H_proc);
+
+    if (myid_ == 0 && print_level_ > 0)
+    {
+        std::cout << "  HybridSolver: rescaled system assembled in "
+                  << chrono.RealTime() << "s. \n";
+    }
 }
 
 void HybridSolver::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
                                   const std::vector<mfem::DenseMatrix>& N_el)
 {
+    mfem::StopWatch chrono;
+    chrono.Start();
+
     is_symmetric_ = false;
 
     auto H_proc = AssembleHybridSystem(elem_scaling_inverse, N_el);
@@ -889,6 +901,12 @@ void HybridSolver::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
     gmres_.SetRelTol(rtol_);
     gmres_.SetAbsTol(atol_);
     gmres_.iterative_mode = false;
+
+    if (myid_ == 0 && print_level_ > 0)
+    {
+        std::cout << "  HybridSolver: rescaled system assembled in "
+                  << chrono.RealTime() << "s. \n";
+    }
 }
 
 mfem::Vector HybridSolver::MakeInitialGuess(const mfem::BlockVector& sol,

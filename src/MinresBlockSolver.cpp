@@ -201,6 +201,9 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
 
 void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
 {
+    mfem::StopWatch chrono;
+    chrono.Start();
+
     auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
 
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
@@ -212,6 +215,12 @@ void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_
     hM_.reset(mixed_matrix_.MakeParallelM(M_proc));
 
     Init(hM_.get(), hD_.get(), W_.get());
+
+    if (myid_ == 0 && print_level_ > 0)
+    {
+        std::cout << "  BlockSolver: rescaled system assembled in "
+                  << chrono.RealTime() << "s. \n";
+    }
 }
 
 
@@ -254,6 +263,9 @@ void MinresBlockSolverFalse::Mult(const mfem::Vector& rhs, mfem::Vector& sol) co
 void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
                                             const std::vector<mfem::DenseMatrix>& N_el)
 {
+    mfem::StopWatch chrono;
+    chrono.Start();
+
     // Update M and Mprec
     auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
@@ -327,6 +339,12 @@ void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inv
     gmres_.iterative_mode = false;
 
     is_symmetric_ = false;
+
+    if (myid_ == 0 && print_level_ > 0)
+    {
+        std::cout << "  BlockSolver: rescaled system assembled in "
+                  << chrono.RealTime() << "s. \n";
+    }
 }
 
 

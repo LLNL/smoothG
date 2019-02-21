@@ -35,14 +35,14 @@ using std::unique_ptr;
    find \f$p\f$ such that \f$-div(k_0k(p)\nabla p) = f\f$.
 */
 
-class SingleLevelSolver : public NonlinearSolver
+class LevelSolver : public NonlinearSolver
 {
 public:
     /**
        @todo take Kappa(p) as input
     */
-    SingleLevelSolver(Hierarchy& hierarchy, int level,
-                      mfem::Vector Z_vector, SolveType solve_type);
+    LevelSolver(Hierarchy& hierarchy, int level,
+                mfem::Vector Z_vector, SolveType solve_type);
 
     // Compute Ax = A(x).
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
@@ -52,11 +52,14 @@ private:
     void EvalCoefDerivative(const mfem::Vector& sol_block1);
     void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
-    std::vector<mfem::DenseMatrix> Build_dMdp(const mfem::BlockVector& iterate);
+    void Build_dMdp(const mfem::BlockVector& iterate);
 
     virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
 
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
+
+    double LinearResidualNorm(
+            const mfem::BlockVector&x, const mfem::BlockVector& y) const;
 
     int level_;
     Hierarchy& hierarchy_;
@@ -67,6 +70,7 @@ private:
     mfem::Vector kp_;        // kp_ = Kappa(p)
     mfem::Vector dkinv_dp_;  // dkinv_dp_ = d ( Kappa(p)^{-1} ) / dp
 
+    std::vector<mfem::DenseMatrix> dMdp_;
     mfem::Vector Z_vector_;
 };
 
@@ -94,7 +98,7 @@ private:
     const mfem::Array<int>& Offsets(int level) const;
 
     Hierarchy& hierarchy_;
-    std::vector<SingleLevelSolver> solvers_;
+    std::vector<LevelSolver> solvers_;
 };
 
 double alpha;
@@ -225,10 +229,10 @@ int main(int argc, char* argv[])
 
     mfem::BlockVector sol_picard(rhs);
     sol_picard = 0.0;
-    SingleLevelSolver sls(hierarchy, 0, Z_fine, use_newton ? Newton : Picard);
+    LevelSolver sls(hierarchy, 0, Z_fine, use_newton ? Newton : Picard);
     sls.SetPrintLevel(1);
     sls.SetMaxIter(2000);
-//    sls.Solve(rhs, sol_picard);
+    sls.Solve(rhs, sol_picard);
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
@@ -264,8 +268,8 @@ int main(int argc, char* argv[])
 }
 
 /// @todo take MixedMatrix only
-SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level,
-                                     mfem::Vector Z_vector, SolveType solve_type)
+LevelSolver::LevelSolver(Hierarchy& hierarchy, int level,
+                         mfem::Vector Z_vector, SolveType solve_type)
     : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2],
                       solve_type == Picard ? "Picard" : "Newton"),
       level_(level), hierarchy_(hierarchy), solve_type_(solve_type),
@@ -273,9 +277,11 @@ SingleLevelSolver::SingleLevelSolver(Hierarchy& hierarchy, int level,
       kp_(p_.Size()), dkinv_dp_(p_.Size()), Z_vector_(std::move(Z_vector))
 {
     hierarchy_.SetPrintLevel(0);
+    hierarchy_.SetAbsTol(0);
+    hierarchy_.SetMaxIter(100);
 }
 
-void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
+void LevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
 {
     assert(size_ == Ax.Size());
     assert(size_ == x.Size());
@@ -286,15 +292,20 @@ void SingleLevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
     hierarchy_.GetMatrix(level_).Mult(kp_, block_x, block_Ax);
 }
 
-mfem::Vector SingleLevelSolver::AssembleTrueVector(const mfem::Vector& vec) const
+mfem::Vector LevelSolver::AssembleTrueVector(const mfem::Vector& vec) const
 {
     return hierarchy_.GetMatrix(level_).AssembleTrueVector(vec);
 }
 
-void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+void LevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
     mfem::BlockVector block_sol(sol.GetData(), offsets_);
     mfem::BlockVector block_rhs(rhs.GetData(), offsets_);
+
+    if (max_num_iter_ > 1)
+    {
+        hierarchy_.SetRelTol(linear_tol_);
+    }
 
     if (solve_type_ == Picard)
     {
@@ -306,7 +317,7 @@ void SingleLevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
     }
 }
 
-void SingleLevelSolver::EvalCoef(const mfem::Vector& sol_block1)
+void LevelSolver::EvalCoef(const mfem::Vector& sol_block1)
 {
     p_ = hierarchy_.PWConstProject(level_, sol_block1);
     if (Z_vector_.Size())
@@ -315,7 +326,7 @@ void SingleLevelSolver::EvalCoef(const mfem::Vector& sol_block1)
         Kappa(p_, kp_);
 }
 
-void SingleLevelSolver::EvalCoefDerivative(const mfem::Vector& sol_block1)
+void LevelSolver::EvalCoefDerivative(const mfem::Vector& sol_block1)
 {
 //    p_ = hierarchy_.PWConstProject(level_, sol_block1);
     if (Z_vector_.Size())
@@ -324,33 +335,85 @@ void SingleLevelSolver::EvalCoefDerivative(const mfem::Vector& sol_block1)
         dKinv_dp(p_, dkinv_dp_);
 }
 
-void SingleLevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
+void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     EvalCoef(x.GetBlock(1));
     hierarchy_.RescaleCoefficient(level_, kp_);
+
     hierarchy_.Solve(level_, rhs, x);
+
+    if (linear_tol_criterion_ == TaylorResidual)
+    {
+        linear_resid_norm_ = LinearResidualNorm(x, rhs);
+    }
 }
 
-void SingleLevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
+void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     Mult(x, residual_);
     residual_ -= rhs;
-    for (int i = 0; i < x.BlockSize(0); ++i)
-    {
-        if (hierarchy_.GetMatrix(level_).GetEssDofs()[i])
-            residual_[i] = 0.0;
-    }
+//    for (int i = 0; i < x.BlockSize(0); ++i)
+//    {
+//        if (hierarchy_.GetMatrix(level_).GetEssDofs()[i])
+//            residual_[i] = 0.0;
+//    }
 
-    hierarchy_.UpdateJacobian(level_, kp_, Build_dMdp(x));
+    Build_dMdp(x);
+
+    hierarchy_.UpdateJacobian(level_, kp_, dMdp_);
 
     mfem::BlockVector delta_x(offsets_);
     mfem::BlockVector block_residual(residual_.GetData(), offsets_);
     hierarchy_.Solve(level_, block_residual, delta_x);
     x -= delta_x;
+
+    if (linear_tol_criterion_ == TaylorResidual)
+    {
+        linear_resid_norm_ = LinearResidualNorm(delta_x, block_residual);
+    }
 }
 
-std::vector<mfem::DenseMatrix> SingleLevelSolver::Build_dMdp(
-        const mfem::BlockVector& iterate)
+double LevelSolver::LinearResidualNorm(
+        const mfem::BlockVector& x, const mfem::BlockVector& y) const
+{
+    const MixedMatrix& mixed_system = hierarchy_.GetMatrix(level_);
+
+    mfem::BlockVector linear_resid(y);
+    mixed_system.Mult(kp_, x, linear_resid);
+    linear_resid -= y;
+
+
+    if (solve_type_ == Newton)
+    {
+        auto& vert_vdof = mixed_system.GetGraphSpace().VertexToVDof();
+        auto& vert_edof = mixed_system.GetGraphSpace().VertexToEDof();
+
+        mfem::Array<int> local_edofs, local_vdofs;
+        mfem::Vector x_loc;
+        mfem::Vector y_loc;
+        for (int i = 0; i < vert_vdof.NumRows(); ++i)
+        {
+            GetTableRow(vert_vdof, i, local_vdofs);
+            GetTableRow(vert_edof, i, local_edofs);
+
+            x.GetSubVector(local_vdofs, x_loc);
+
+            y_loc.SetSize(local_edofs.Size());
+            dMdp_[i].Mult(x_loc, y_loc);
+
+            for (int j = 0; j < local_edofs.Size(); ++j)
+            {
+                linear_resid[local_edofs[j]] += y_loc[j];
+            }
+        }
+    }
+
+    mfem::Vector true_linear_resid = AssembleTrueVector(linear_resid);
+
+    return mfem::ParNormlp(true_linear_resid, 2, comm_);
+}
+
+void LevelSolver::Build_dMdp(const mfem::BlockVector& iterate)
 {
     auto& mixed_system = hierarchy_.GetMatrix(level_);
     auto& vert_edof = mixed_system.GetGraphSpace().VertexToEDof();
@@ -361,7 +424,7 @@ std::vector<mfem::DenseMatrix> SingleLevelSolver::Build_dMdp(
 
     auto& proj_pwc = const_cast<mfem::SparseMatrix&>(mixed_system.GetPWConstProj());
 
-    std::vector<mfem::DenseMatrix> dMdp(M_el.size());
+    dMdp_.resize(M_el.size());
     mfem::Array<int> local_edofs, local_vdofs, vert(1);
     mfem::Vector sigma_loc, Msigma_vec;
     mfem::DenseMatrix proj_pwc_loc;
@@ -384,11 +447,9 @@ std::vector<mfem::DenseMatrix> SingleLevelSolver::Build_dMdp(
         proj_pwc.GetSubMatrix(vert, local_vdofs, proj_pwc_loc);
         proj_pwc_loc *= dkinv_dp_[i];
 
-        dMdp[i].SetSize(local_edofs.Size(), local_vdofs.Size());
-        mfem::Mult(Msigma_loc, proj_pwc_loc, dMdp[i]);
+        dMdp_[i].SetSize(local_edofs.Size(), local_vdofs.Size());
+        mfem::Mult(Msigma_loc, proj_pwc_loc, dMdp_[i]);
     }
-
-    return dMdp;
 }
 
 
@@ -399,8 +460,6 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
       hierarchy_(hierarchy)
 {
     std::vector<mfem::Vector> help(hierarchy.NumLevels());
-
-    hierarchy_.SetMaxIter(500);
 
     solvers_.reserve(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
@@ -439,6 +498,8 @@ void EllipticNLMG::Mult(int level, const mfem::Vector& x, mfem::Vector& Ax)
 
 void EllipticNLMG::Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol)
 {
+    hierarchy_.SetRelTol(level ? rtol_ : linear_tol_);
+
     solvers_[level].Solve(rhs, sol);
 }
 
@@ -462,6 +523,8 @@ void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& co
 
 void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
+    hierarchy_.SetRelTol(level ? rtol_ : linear_tol_);
+
     solvers_[level].Solve(in, out);
 }
 
@@ -503,7 +566,7 @@ void dKinv_dp(const mfem::Vector& p, mfem::Vector& dkinv_dp)
 }
 
 // Loam
-double beta = 1.54;
+double beta = 1.55;
 double K_s = 1.067;//* 0.01; // cm/day
 
 // Sand
