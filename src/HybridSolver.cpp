@@ -432,9 +432,13 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     rhs_ = Rhs;
 
     if (is_symmetric_)
+    {
         trueMu_ = MakeInitialGuess(Sol, Rhs);
+    }
     else
+    {
         trueMu_ = 0.0;
+    }
 
     // TODO: nonzero b.c.
     // correct right hand side due to boundary condition
@@ -461,25 +465,19 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
         InvRescaleVector(diagonal_scaling_, trueMu_);
     }
 
+    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&cg_)
+                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
+
     // solve the parallel global hybridized system
     mfem::StopWatch chrono;
     chrono.Clear();
     chrono.Start();
 
-    if (is_symmetric_)
-    {
-        cg_.Mult(trueHrhs_, trueMu_);
-    }
-    else
-    {
-        gmres_.Mult(trueHrhs_, trueMu_);
-    }
+    solver->Mult(trueHrhs_, trueMu_);
 
     chrono.Stop();
     timing_ = chrono.RealTime();
 
-    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&cg_)
-                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
     std::string solver_name = is_symmetric_ ? "CG" : "GMRES";
 
     if (myid_ == 0 && print_level_ > 0)

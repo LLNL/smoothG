@@ -152,14 +152,10 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
         const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = 0.0;
     }
 
-    if (is_symmetric_)
-    {
-        minres_.Mult(rhs, sol);
-    }
-    else
-    {
-        gmres_.Mult(rhs, sol);
-    }
+    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
+                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
+
+    solver->Mult(rhs, sol);
 
     const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 
@@ -171,8 +167,6 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Stop();
     timing_ = chrono.RealTime();
 
-    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
-                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
     num_iterations_ = solver->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)

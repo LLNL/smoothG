@@ -71,6 +71,8 @@ protected:
 
     void UpdateLinearSolveTol();
 
+    virtual const mfem::Array<int>& GetEssDofs() const = 0;
+
     // default nonlinear solver options
     int print_level_ = 0;
     int max_num_iter_ = 50;

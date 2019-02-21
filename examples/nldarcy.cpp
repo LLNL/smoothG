@@ -47,6 +47,7 @@ public:
     // Compute Ax = A(x).
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
 
+    double GetLinearResidualNorm() const { return linear_resid_norm_; }
 private:
     void EvalCoef(const mfem::Vector& sol_block1);
     void EvalCoefDerivative(const mfem::Vector& sol_block1);
@@ -58,8 +59,12 @@ private:
 
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
 
-    double LinearResidualNorm(
-            const mfem::BlockVector&x, const mfem::BlockVector& y) const;
+    double LinearResidualNorm(const mfem::Vector& x, const mfem::Vector& y) const;
+
+    virtual const mfem::Array<int>& GetEssDofs() const
+    {
+        return hierarchy_.GetMatrix(level_).GetEssDofs();
+    }
 
     int level_;
     Hierarchy& hierarchy_;
@@ -96,6 +101,11 @@ private:
     virtual int LevelSize(int level) const;
 
     const mfem::Array<int>& Offsets(int level) const;
+
+    virtual const mfem::Array<int>& GetEssDofs() const
+    {
+        return hierarchy_.GetMatrix(0).GetEssDofs();
+    }
 
     Hierarchy& hierarchy_;
     std::vector<LevelSolver> solvers_;
@@ -339,7 +349,6 @@ void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     EvalCoef(x.GetBlock(1));
     hierarchy_.RescaleCoefficient(level_, kp_);
-
     hierarchy_.Solve(level_, rhs, x);
 
     if (linear_tol_criterion_ == TaylorResidual)
@@ -352,19 +361,18 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     Mult(x, residual_);
     residual_ -= rhs;
-//    for (int i = 0; i < x.BlockSize(0); ++i)
-//    {
-//        if (hierarchy_.GetMatrix(level_).GetEssDofs()[i])
-//            residual_[i] = 0.0;
-//    }
+    for (int i = 0; i < x.BlockSize(0); ++i)
+    {
+        if (GetEssDofs()[i])
+            residual_[i] = 0.0;
+    }
 
     Build_dMdp(x);
 
     hierarchy_.UpdateJacobian(level_, kp_, dMdp_);
 
-    mfem::BlockVector delta_x(offsets_);
     mfem::BlockVector block_residual(residual_.GetData(), offsets_);
-    hierarchy_.Solve(level_, block_residual, delta_x);
+    mfem::BlockVector delta_x = hierarchy_.Solve(level_, block_residual);
     x -= delta_x;
 
     if (linear_tol_criterion_ == TaylorResidual)
@@ -373,15 +381,16 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
     }
 }
 
-double LevelSolver::LinearResidualNorm(
-        const mfem::BlockVector& x, const mfem::BlockVector& y) const
+double LevelSolver::LinearResidualNorm(const mfem::Vector& x, const mfem::Vector& y) const
 {
     const MixedMatrix& mixed_system = hierarchy_.GetMatrix(level_);
 
-    mfem::BlockVector linear_resid(y);
-    mixed_system.Mult(kp_, x, linear_resid);
-    linear_resid -= y;
+    mfem::BlockVector block_x(x.GetData(), offsets_);
+    mfem::BlockVector block_y(y.GetData(), offsets_);
 
+    mfem::BlockVector linear_resid(offsets_);
+    mixed_system.Mult(kp_, block_x, linear_resid);
+    linear_resid -= block_y;
 
     if (solve_type_ == Newton)
     {
@@ -396,7 +405,7 @@ double LevelSolver::LinearResidualNorm(
             GetTableRow(vert_vdof, i, local_vdofs);
             GetTableRow(vert_edof, i, local_edofs);
 
-            x.GetSubVector(local_vdofs, x_loc);
+            block_x.GetBlock(1).GetSubVector(local_vdofs, x_loc);
 
             y_loc.SetSize(local_edofs.Size());
             dMdp_[i].Mult(x_loc, y_loc);
@@ -452,7 +461,6 @@ void LevelSolver::Build_dMdp(const mfem::BlockVector& iterate)
     }
 }
 
-
 EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
                            Cycle cycle, SolveType solve_type)
     : NonlinearMG(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2],
@@ -478,11 +486,14 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
             Z_vec = hierarchy.PWConstProject(level, help[level]);
         }
 
-        rhs_[level].SetSize(LevelSize(level));
-        sol_[level].SetSize(LevelSize(level));
+        if (level > 0)
+        {
+            rhs_[level].SetSize(LevelSize(level));
+            sol_[level].SetSize(LevelSize(level));
+            rhs_[level] = 0.0;
+            sol_[level] = 0.0;
+        }
         help_[level].SetSize(LevelSize(level));
-        rhs_[level] = 0.0;
-        sol_[level] = 0.0;
         help_[level] = 0.0;
 
         solvers_.emplace_back(hierarchy_, level, std::move(Z_vec), solve_type);
@@ -498,9 +509,7 @@ void EllipticNLMG::Mult(int level, const mfem::Vector& x, mfem::Vector& Ax)
 
 void EllipticNLMG::Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    hierarchy_.SetRelTol(level ? rtol_ : linear_tol_);
-
-    solvers_[level].Solve(rhs, sol);
+    Smoothing(level, rhs, sol);
 }
 
 void EllipticNLMG::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
@@ -523,9 +532,14 @@ void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& co
 
 void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
-    hierarchy_.SetRelTol(level ? rtol_ : linear_tol_);
+    hierarchy_.SetRelTol((level ? 1e-2 : 1.0) * linear_tol_);
 
     solvers_[level].Solve(in, out);
+
+    if (level == 0)
+    {
+        linear_resid_norm_ = solvers_[0].GetLinearResidualNorm();
+    }
 }
 
 const mfem::Array<int>& EllipticNLMG::Offsets(int level) const

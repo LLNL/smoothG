@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, std::string tag)
     : comm_(comm), size_(size), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(0.5)
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(1.0)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -36,6 +36,12 @@ double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector
     Mult(sol, residual_);
 
     residual_ -= rhs;
+
+    for (int i = 0; i < GetEssDofs().Size(); ++i)
+    {
+        if (GetEssDofs()[i])
+            residual_[i] = 0.0;
+    }
 
     mfem::Vector true_resid = AssembleTrueVector(residual_);
 
@@ -103,10 +109,10 @@ void NonlinearSolver::UpdateLinearSolveTol()
     }
     else // NonlinearResidual
     {
-        tol = std::pow(resid_norm_ / prev_resid_norm_, (1 + std::sqrt(5)) / 2.0);
+        tol = resid_norm_ / prev_resid_norm_;
     }
 
-    linear_tol_ = std::min(std::min(tol, linear_tol_), 0.5);
+    linear_tol_ = std::max(std::min(std::min(tol, linear_tol_), 0.1), rtol_);
 }
 
 NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle)
@@ -121,12 +127,10 @@ void NonlinearMG::Mult(const mfem::Vector& x, mfem::Vector& Rx)
 
 void NonlinearMG::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    rhs_[0] = rhs;
-    sol_[0] = sol;
+    rhs_[0].SetDataAndSize(rhs.GetData(), rhs.Size());
+    sol_[0].SetDataAndSize(sol.GetData(), sol.Size());
 
     FAS_Cycle(0);
-
-    sol = sol_[0];
 }
 
 void NonlinearMG::FAS_Cycle(int level)
