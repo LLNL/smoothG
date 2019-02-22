@@ -536,7 +536,7 @@ void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& ou
 
     solvers_[level].Solve(in, out);
 
-    if (level == 0)
+    if (level == 0 && linear_tol_criterion_ == TaylorResidual)
     {
         linear_resid_norm_ = solvers_[0].GetLinearResidualNorm();
     }

@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, std::string tag)
     : comm_(comm), size_(size), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(1.0)
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(0.1)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -112,7 +112,7 @@ void NonlinearSolver::UpdateLinearSolveTol()
         tol = resid_norm_ / prev_resid_norm_;
     }
 
-    linear_tol_ = std::max(std::min(std::min(tol, linear_tol_), 0.1), rtol_);
+    linear_tol_ = std::max(std::min(tol, linear_tol_), rtol_);
 }
 
 NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle)
