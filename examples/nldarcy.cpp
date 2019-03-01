@@ -632,7 +632,7 @@ void dKinv_dp(const mfem::Vector& p, mfem::Vector& dkinv_dp)
 }
 
 // Loam
-double beta = 1.55;
+double beta = 1.77;
 double K_s = 1.067;//* 0.01; // cm/day
 
 // Sand
