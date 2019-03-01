@@ -36,7 +36,7 @@ enum EisenstatWalker { TaylorResidual, NonlinearResidual };
 class NonlinearSolver
 {
 public:
-    NonlinearSolver(MPI_Comm comm, int size, std::string tag = "");
+    NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag);
 
     // Solve R(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
@@ -86,10 +86,13 @@ protected:
     MPI_Comm comm_;
     int myid_;
     int size_;
+    SolveType solve_type_;
     std::string tag_;
 
     mfem::Vector residual_;
 
+    double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
+    double rhs_norm_;
     double resid_norm_;
     double prev_resid_norm_;
 
@@ -110,7 +113,7 @@ class NonlinearMG : public NonlinearSolver
 {
 public:
     // the time dependent operators gets updated during solving
-    NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle);
+    NonlinearMG(MPI_Comm comm, int size, int num_levels, SolveType solve_type, Cycle cycle);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
 protected:

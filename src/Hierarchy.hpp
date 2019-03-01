@@ -113,7 +113,7 @@ public:
     const MixedMatrix& GetMatrix(int level) const;
 
     /// Show Hierarchy Information
-    virtual void PrintInfo(std::ostream& out = std::cout) const;
+    void PrintInfo(std::ostream& out = std::cout) const;
 
     /// Compute total operator complexity up to a given level
     double OperatorComplexity(int level) const;
@@ -121,30 +121,17 @@ public:
     /// Compute operator complexity from level-1 to level
     double OperatorComplexityAtLevel(int level) const;
 
-    /// Set solver parameters
-    virtual void SetPrintLevel(int print_level);
-    virtual void SetMaxIter(int max_num_iter);
-    virtual void SetRelTol(double rtol);
-    virtual void SetAbsTol(double atol);
+    /// Set solver parameters at all levels
+    void SetPrintLevel(int print_level);
+    void SetMaxIter(int max_num_iter);
+    void SetRelTol(double rtol);
+    void SetAbsTol(double atol);
 
-    /// Show Total setup time
-    void ShowSetupTime(std::ostream& out = std::cout) const;
-
-    int GetSolveIters(int level) const { return solvers_[level]->GetNumIterations(); }
-
-    double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
-
-    MPI_Comm GetComm() const { return GetMatrix(0).GetComm(); }
-
-    /// Get block offsets for edge/vertex-based dofs in a given level
-    const mfem::Array<int>& BlockOffsets(int level) const
-    {
-        return GetMatrix(level).BlockOffsets();
-    }
-
-    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
-
-    const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
+    /// Set solver parameters at a given level
+    void SetPrintLevel(int level, int print_level);
+    void SetMaxIter(int level, int max_num_iter);
+    void SetRelTol(int level, double rtol);
+    void SetAbsTol(int level, double atol);
 
     /// Create solver on level
     void MakeSolver(int level, const UpscaleParameters& param);
@@ -156,7 +143,24 @@ public:
     void UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
                         const std::vector<mfem::DenseMatrix>& dMdp);
 
+    /// Show Total setup time
+    void ShowSetupTime(std::ostream& out = std::cout) const;
+
+    /// Getters
+    /// @{
+    int GetSolveIters(int level) const { return solvers_[level]->GetNumIterations(); }
+    double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
+    MPI_Comm GetComm() const { return GetMatrix(0).GetComm(); }
+    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
+    const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
     int NumLevels() const { return mixed_systems_.size(); }
+    ///@}
+
+    /// Get block offsets for edge/vertex-based dofs in a given level
+    const mfem::Array<int>& BlockOffsets(int level) const
+    {
+        return GetMatrix(level).BlockOffsets();
+    }
 
     /// returns the number of vertices at a given level
     int NumVertices(int level) const;

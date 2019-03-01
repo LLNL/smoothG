@@ -348,6 +348,26 @@ void Hierarchy::SetAbsTol(double atol)
     }
 }
 
+void Hierarchy::SetPrintLevel(int level, int print_level)
+{
+    solvers_[level]->SetPrintLevel(print_level);
+}
+
+void Hierarchy::SetMaxIter(int level, int max_num_iter)
+{
+    solvers_[level]->SetMaxIter(max_num_iter);
+}
+
+void Hierarchy::SetRelTol(int level, double rtol)
+{
+    solvers_[level]->SetRelTol(rtol);
+}
+
+void Hierarchy::SetAbsTol(int level, double atol)
+{
+    solvers_[level]->SetAbsTol(atol);
+}
+
 void Hierarchy::ShowSetupTime(std::ostream& out) const
 {
     if (myid_ == 0)

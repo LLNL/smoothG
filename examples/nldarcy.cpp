@@ -48,6 +48,7 @@ public:
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
 
     double GetLinearResidualNorm() const { return linear_resid_norm_; }
+
 private:
     void EvalCoef(const mfem::Vector& sol_block1);
     void EvalCoefDerivative(const mfem::Vector& sol_block1);
@@ -61,6 +62,9 @@ private:
 
     double LinearResidualNorm(const mfem::Vector& x, const mfem::Vector& y) const;
 
+    void BackTracking(const mfem::BlockVector &rhs,
+                      mfem::BlockVector& x, mfem::BlockVector& delta_x);
+
     virtual const mfem::Array<int>& GetEssDofs() const
     {
         return hierarchy_.GetMatrix(level_).GetEssDofs();
@@ -68,7 +72,6 @@ private:
 
     int level_;
     Hierarchy& hierarchy_;
-    SolveType solve_type_;
 
     const mfem::Array<int>& offsets_;
     mfem::Vector p_;         // coefficient vector in piecewise 1 basis
@@ -241,14 +244,14 @@ int main(int argc, char* argv[])
     sol_picard = 0.0;
     LevelSolver sls(hierarchy, 0, Z_fine, use_newton ? Newton : Picard);
     sls.SetPrintLevel(1);
-    sls.SetMaxIter(2000);
+    sls.SetMaxIter(500);
     sls.Solve(rhs, sol_picard);
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
     EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard);
     nlmg.SetPrintLevel(1);
-    nlmg.SetMaxIter(2000);
+    nlmg.SetMaxIter(500);
     nlmg.Solve(rhs, sol_nlmg);
 
     double p_err = CompareError(comm, sol_nlmg.GetBlock(1), sol_picard.GetBlock(1));
@@ -281,14 +284,14 @@ int main(int argc, char* argv[])
 LevelSolver::LevelSolver(Hierarchy& hierarchy, int level,
                          mfem::Vector Z_vector, SolveType solve_type)
     : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2],
-                      solve_type == Picard ? "Picard" : "Newton"),
-      level_(level), hierarchy_(hierarchy), solve_type_(solve_type),
-      offsets_(hierarchy_.BlockOffsets(level)), p_(hierarchy_.NumVertices(level)),
-      kp_(p_.Size()), dkinv_dp_(p_.Size()), Z_vector_(std::move(Z_vector))
+                      solve_type, solve_type == Picard ? "Picard" : "Newton"),
+      level_(level), hierarchy_(hierarchy), offsets_(hierarchy_.BlockOffsets(level)),
+      p_(hierarchy_.NumVertices(level)), kp_(p_.Size()), dkinv_dp_(p_.Size()),
+      Z_vector_(std::move(Z_vector))
 {
-    hierarchy_.SetPrintLevel(0);
-    hierarchy_.SetAbsTol(0);
-    hierarchy_.SetMaxIter(100);
+    hierarchy_.SetPrintLevel(level_, 0);
+    hierarchy_.SetAbsTol(level_, 0);
+    hierarchy_.SetMaxIter(level_, 100);
 }
 
 void LevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
@@ -349,7 +352,14 @@ void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
     EvalCoef(x.GetBlock(1));
     hierarchy_.RescaleCoefficient(level_, kp_);
+
+    mfem::BlockVector delta_x(x);
+    prev_resid_norm_ = ResidualNorm(x, rhs);
+
     hierarchy_.Solve(level_, rhs, x);
+
+    delta_x -= x;
+    BackTracking(rhs, x, delta_x);
 
     if (linear_tol_criterion_ == TaylorResidual)
     {
@@ -373,11 +383,54 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 
     mfem::BlockVector block_residual(residual_.GetData(), offsets_);
     mfem::BlockVector delta_x = hierarchy_.Solve(level_, block_residual);
+
+    mfem::Vector true_resid = AssembleTrueVector(block_residual);
+    prev_resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
+
     x -= delta_x;
+    BackTracking(rhs, x, delta_x);
 
     if (linear_tol_criterion_ == TaylorResidual)
     {
         linear_resid_norm_ = LinearResidualNorm(delta_x, block_residual);
+    }
+}
+
+void LevelSolver::BackTracking(const mfem::BlockVector& rhs,
+                               mfem::BlockVector& x, mfem::BlockVector& delta_x)
+{
+    int k = 0, k_max = 4;
+    resid_norm_ = ResidualNorm(x, rhs);
+
+    while (resid_norm_ > prev_resid_norm_ && k < k_max)
+    {
+        double backtracking_resid_norm = resid_norm_;
+
+        delta_x *= 0.5;
+        x += delta_x;
+
+        resid_norm_ = ResidualNorm(x, rhs);
+
+        if (resid_norm_ > 0.9 * backtracking_resid_norm)
+        {
+            x -= delta_x;
+            break;
+        }
+
+        if (myid_ == 0 && print_level_ > 1)
+        {
+            if (k == 0)
+            {
+                std::cout << "  Level " << level_ << " backtracking: || R(u) ||";
+            }
+            std::cout << " -> " <<backtracking_resid_norm;
+        }
+        k++;
+    }
+
+    if (k > 0 && myid_ == 0 && print_level_ > 1)
+    {
+        std::cout << "\n";
     }
 }
 
@@ -464,11 +517,10 @@ void LevelSolver::Build_dMdp(const mfem::BlockVector& iterate)
 EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
                            Cycle cycle, SolveType solve_type)
     : NonlinearMG(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2],
-                  hierarchy.NumLevels(), cycle),
+                  hierarchy.NumLevels(), solve_type, cycle),
       hierarchy_(hierarchy)
 {
     std::vector<mfem::Vector> help(hierarchy.NumLevels());
-
     solvers_.reserve(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
@@ -532,7 +584,7 @@ void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& co
 
 void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
-    hierarchy_.SetRelTol((level ? 1e-2 : 1.0) * linear_tol_);
+    hierarchy_.SetRelTol(level, std::max((level ? 1e-6 : 1.0) * linear_tol_, 1e-12));
 
     solvers_[level].Solve(in, out);
 

@@ -23,8 +23,8 @@
 namespace smoothg
 {
 
-NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, std::string tag)
-    : comm_(comm), size_(size), tag_(tag), residual_(size),
+NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag)
+    : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
       linear_tol_criterion_(NonlinearResidual), linear_tol_(0.1)
 {
     MPI_Comm_rank(comm_, &myid_);
@@ -61,30 +61,35 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
         mfem::Vector zero_vec(sol);
         zero_vec = 0.0;
-        double norm = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
+        rhs_norm_ = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
+
+        adjusted_tol_ = std::max(atol_, rtol_ * rhs_norm_);
 
         converged_ = false;
         for (iter_ = 0; iter_ < max_num_iter_; iter_++)
         {
-            resid_norm_ = ResidualNorm(sol, rhs);
-            double rel_resid = resid_norm_ / norm;
+            if (converged_ == false)
+            {
+                resid_norm_ = ResidualNorm(sol, rhs);
+            }
 
             if (myid_ == 0 && print_level_ > 0)
             {
-                std::cout << tag_ << " iter " << iter_ << ":  rel resid = "
-                          << rel_resid << "  abs resid = " << resid_norm_ << "\n";
+                double rel_resid = resid_norm_ / rhs_norm_;
+                std::cout << tag_ << " iter " << iter_ << ": rel resid = "
+                          << rel_resid << ", abs resid = " << resid_norm_ << ".\n";
             }
 
-            if (resid_norm_ < atol_ || rel_resid < rtol_)
+            if (resid_norm_ < adjusted_tol_)
             {
                 converged_ = true;
                 break;
             }
 
             UpdateLinearSolveTol();
-            IterationStep(rhs, sol);
-
             prev_resid_norm_ = resid_norm_;
+
+            IterationStep(rhs, sol);
         }
 
         if (myid_ == 0 && !converged_ && print_level_ >= 0)
@@ -109,14 +114,16 @@ void NonlinearSolver::UpdateLinearSolveTol()
     }
     else // NonlinearResidual
     {
-        tol = resid_norm_ / prev_resid_norm_;
+//        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
+        double ref_norm = solve_type_ == Newton ? prev_resid_norm_ : rhs_norm_;
+        tol = std::pow(resid_norm_ / ref_norm, 1.0);
     }
 
     linear_tol_ = std::max(std::min(tol, linear_tol_), rtol_);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, Cycle cycle)
-    : NonlinearSolver(comm, size, "Nonlinear MG"), cycle_(cycle),
+NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, SolveType solve_type, Cycle cycle)
+    : NonlinearSolver(comm, size, solve_type, "Nonlinear MG"), cycle_(cycle),
       num_levels_(num_levels), rhs_(num_levels_), sol_(num_levels_), help_(num_levels_)
 { }
 
@@ -151,6 +158,27 @@ void NonlinearMG::FAS_Cycle(int level)
         // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
         Mult(level, sol_[level], help_[level]);
         help_[level] -= rhs_[level];
+
+        if (level == 0)
+        {
+            for (int i = 0; i < GetEssDofs().Size(); ++i)
+            {
+                if (GetEssDofs()[i])
+                    help_[level][i] = 0.0;
+            }
+
+            mfem::Vector true_resid = AssembleTrueVector(help_[level]);
+            resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
+
+            UpdateLinearSolveTol();
+            prev_resid_norm_ = resid_norm_;
+
+            if (resid_norm_ < adjusted_tol_)
+            {
+                converged_ = true;
+                return;
+            }
+        }
 
         Restrict(level, help_[level], help_[level + 1]);
 
