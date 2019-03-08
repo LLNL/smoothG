@@ -21,7 +21,6 @@
 #ifndef __GRAPHSPACE_HPP__
 #define __GRAPHSPACE_HPP__
 
-#include "mfem.hpp"
 #include "Graph.hpp"
 
 namespace smoothg

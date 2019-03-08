@@ -39,7 +39,6 @@
 #define __GRAPHCOARSEN_HPP
 
 #include "smoothG_config.h"
-#include "mfem.hpp"
 
 #include "LocalMixedGraphSpectralTargets.hpp"
 #include "utilities.hpp"

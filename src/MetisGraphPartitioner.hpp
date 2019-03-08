@@ -24,7 +24,6 @@
 #include <functional>
 #include <numeric>
 #include <metis.h>
-#include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 
 namespace smoothg

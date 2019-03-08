@@ -21,7 +21,6 @@
 #ifndef __MIXEDMATRIX_HPP__
 #define __MIXEDMATRIX_HPP__
 
-#include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
 #include "GraphSpace.hpp"
