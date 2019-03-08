@@ -25,7 +25,6 @@
 #include "HybridSolver.hpp"
 #include "MetisGraphPartitioner.hpp"
 #include "MixedMatrix.hpp"
-#include "mfem.hpp"
 
 namespace smoothg
 {
