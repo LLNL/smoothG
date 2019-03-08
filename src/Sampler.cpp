@@ -58,23 +58,11 @@ mfem::Vector& SimpleSampler::GetCoefficient(int level)
     return helper_[level];
 }
 
-PDESampler::PDESampler(std::shared_ptr<Upscale> fvupscale,
-                       int dimension, double cell_volume, double kappa,
-                       int seed)
-    :
-    fvupscale_(fvupscale),
-    normal_distribution_(0.0, 1.0, seed),
-    num_aggs_(fvupscale->GetNumLevels()),
-    cell_volume_(cell_volume),
-    sampled_(false),
-    rhs_(fvupscale->GetNumLevels()),
-    coefficient_(fvupscale->GetNumLevels())
+PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+                       Hierarchy&& hierarchy)
+    : hierarchy_(std::move(hierarchy))
 {
-    for (int level = 0; level < fvupscale->GetNumLevels(); ++level)
-    {
-        num_aggs_[level] = fvupscale->GetNumVertices(level);
-    }
-    Initialize(dimension, kappa);
+    Initialize(dimension, cell_volume, kappa, seed);
 }
 
 PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
@@ -82,33 +70,26 @@ PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed
                        const UpscaleParameters& param,
                        const mfem::Array<int>* partitioning,
                        const mfem::Array<int>* ess_attr)
-    :
-    normal_distribution_(0.0, 1.0, seed),
-    num_aggs_(param.max_levels),
-    cell_volume_(cell_volume),
-    sampled_(false),
-    rhs_(param.max_levels),
-    coefficient_(param.max_levels)
 {
-    mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
-    W_block *= cell_volume_ * kappa * kappa;
+    auto W = SparseIdentity(graph.NumVertices()) *= cell_volume * kappa * kappa;
+    hierarchy_ = Hierarchy(graph, param, partitioning, ess_attr, W);
 
-    fvupscale_ = std::make_shared<Upscale>(graph, param, partitioning,
-                                           ess_attr, W_block);
-
-    for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
-    {
-        num_aggs_[level] = fvupscale_->GetNumVertices(level);
-    }
-    Initialize(dimension, kappa);
+    Initialize(dimension, cell_volume, kappa, seed);
 }
 
-void PDESampler::Initialize(int dimension, double kappa)
+void PDESampler::Initialize(int dimension, double cell_volume, double kappa, int seed)
 {
-    for (int level = 0; level < fvupscale_->GetNumLevels(); ++level)
+    normal_distribution_ = NormalDistribution(0.0, 1.0, seed);
+    num_aggs_.resize(hierarchy_.NumLevels());
+    cell_volume_ = cell_volume;
+    sampled_ = false;
+    rhs_.resize(hierarchy_.NumLevels());
+    coefficient_.resize(hierarchy_.NumLevels());
+
+    for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
-        rhs_[level] = fvupscale_->GetVector(level);
-        // rhs_[level].SetSize(num_aggs_[level]);
+        num_aggs_[level] = hierarchy_.NumVertices(level);
+        rhs_[level].SetSize(hierarchy_.GetMatrix(level).NumVDofs());
         coefficient_[level].SetSize(num_aggs_[level]);
     }
 
@@ -151,6 +132,11 @@ void PDESampler::SetSample(const mfem::Vector& state)
     {
         rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
     }
+
+    for (int level = 0; level < hierarchy_.NumLevels() - 1; ++level)
+    {
+        hierarchy_.Restrict(level, rhs_[level], rhs_[level + 1]);
+    }
 }
 
 /**
@@ -174,17 +160,12 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
     MFEM_ASSERT(sampled_,
                 "PDESampler object in wrong state (call NewSample() first)!");
 
-    for (int k = 0; k < level; ++k)
-    {
-        fvupscale_->Restrict(k + 1, rhs_[k], rhs_[k + 1]);
-    }
-    mfem::Vector coarse_sol = fvupscale_->GetVector(level);
-    fvupscale_->SolveAtLevel(level, rhs_[level], coarse_sol);
+    mfem::Vector coarse_sol = hierarchy_.Solve(level, rhs_[level]);
 
     // coarse solution projected to piece-wise constant on aggregates
-    mfem::Vector pw1_coarse_sol = fvupscale_->PWConstProject(level, coarse_sol);
+    mfem::Vector pw1_coarse_sol = hierarchy_.PWConstProject(level, coarse_sol);
 
-    for (int i = 0; i < coefficient_[level].Size(); ++i)
+    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
     {
         coefficient_[level](i) = std::exp(pw1_coarse_sol(i));
     }
@@ -192,15 +173,13 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
     return coefficient_[level];
 }
 
-mfem::Vector& PDESampler::GetCoefficientForVisualization(int level)
+mfem::Vector PDESampler::GetCoefficientForVisualization(int level)
 {
     // coarse solution projected to piece-wise constant on aggregates
     mfem::Vector pw1_coarse_sol = GetCoefficient(level);
 
     // interpolate piece-wise constant function to vertex space
-    coefficient_[level] = fvupscale_->PWConstInterpolate(level, pw1_coarse_sol);
-
-    return coefficient_[level];
+    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;
 }
 
 }

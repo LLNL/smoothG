@@ -111,9 +111,9 @@ int main(int argc, char* argv[])
     std::cout << "Finished constructing Upscale." << std::endl;
     upscale.PrintInfo();
 
-    upscale.DumpDebug("debug/");
+    upscale.GetHierarchy().DumpDebug("debug/");
 
-    mfem::BlockVector fine_rhs(upscale.GetBlockVector(0));
+    mfem::BlockVector fine_rhs(upscale.BlockOffsets(0));
     fine_rhs.GetBlock(0) = 0.0;
 
     // setup average zero right hand side (block 1).

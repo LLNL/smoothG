@@ -21,7 +21,6 @@
 #ifndef __MIXEDLAPLACIANSOLVER_HPP__
 #define __MIXEDLAPLACIANSOLVER_HPP__
 
-#include "mfem.hpp"
 #include "utilities.hpp"
 
 namespace smoothg
@@ -34,13 +33,13 @@ class MixedLaplacianSolver : public mfem::Operator
 {
 public:
     MixedLaplacianSolver(MPI_Comm comm, const mfem::Array<int>& block_offsets,
-                         const mfem::Array<int>* ess_attr, bool W_is_nonzero);
+                         bool W_is_nonzero);
     MixedLaplacianSolver() = delete;
 
     virtual ~MixedLaplacianSolver() = default;
 
     /**
-       Solve the graph Laplacian problem
+       Solve the mixed form of the graph Laplacian problem
 
        The BlockVectors here are in "dof" numbering, rather than "truedof" numbering.
        That is, dofs on processor boundaries are *repeated* in the vectors that
@@ -48,8 +47,13 @@ public:
     */
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
+
+    /// Solve the primal form of the graph Laplacian problem (DM^{-1}D^T) sol = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol) const;
-    void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+
+    /// Update solver based on new "element" scaling for M matrix
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse) = 0;
 
     ///@name Set solver parameters
     ///@{
@@ -67,6 +71,7 @@ public:
     ///@}
 
 protected:
+    void Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
     void Orthogonalize(mfem::Vector& vec) const;
 
     MPI_Comm comm_;
@@ -74,6 +79,8 @@ protected:
 
     mutable mfem::BlockVector rhs_;
     mutable mfem::BlockVector sol_;
+
+    mfem::Vector elem_scaling_;
 
     // default linear solver options
     int print_level_ = 0;

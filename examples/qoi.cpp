@@ -151,19 +151,17 @@ int main(int argc, char* argv[])
     DarcyProblem fvproblem(*pmesh, ess_attr);
     double cell_volume = fvproblem.CellVolume();
     Graph graph = fvproblem.GetFVGraph();
-    Upscale upscale(graph, upscale_param, nullptr, &ess_attr);
+    Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
 
-    upscale.PrintInfo();
-    upscale.ShowSetupTime();
-    upscale.MakeSolver(0);
+    hierarchy.PrintInfo();
 
-    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
+    mfem::BlockVector rhs_fine(hierarchy.BlockOffsets(0));
     rhs_fine = 0.0;
     // it may make sense to have a more general, not hard-coded, right-hand side
     int index = 0.5 * problem_size * problem_size + 0.1 * problem_size;
-    rhs_fine.GetBlock(1)(index) = 1.0;
-    index = 0.6 * problem_size * problem_size + 0.75 * problem_size;
     rhs_fine.GetBlock(1)(index) = -1.0;
+    index = 0.6 * problem_size * problem_size + 0.75 * problem_size;
+    rhs_fine.GetBlock(1)(index) = 1.0;
 
     const int seed = argseed + myid;
     PDESampler sampler(dimension, cell_volume, kappa, seed,
@@ -177,9 +175,9 @@ int main(int argc, char* argv[])
     {
         functional(i) = dscale;
     }
-    PressureFunctionalQoI qoi(upscale, functional);
+    PressureFunctionalQoI qoi(hierarchy, functional);
 
-    MLMCManager mlmc(sampler, qoi, upscale, rhs_fine, dump_number);
+    MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine, dump_number);
     const bool verbose = (myid == 0);
 
     const int num_levels = upscale_param.max_levels;

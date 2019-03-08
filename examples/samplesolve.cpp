@@ -119,12 +119,10 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
-    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
-
+    Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
     upscale.PrintInfo();
-    upscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
+    mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
     rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
     rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
@@ -132,7 +130,7 @@ int main(int argc, char* argv[])
     unique_ptr<MultilevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {
-        std::vector<int> vertex_sizes = upscale.GetVertexSizes();
+        auto vertex_sizes = upscale.GetHierarchy().GetVertexSizes();
         sampler = make_unique<SimpleSampler>(vertex_sizes);
     }
     else if (std::string(sampler_type) == "pde")
@@ -140,7 +138,8 @@ int main(int argc, char* argv[])
         const int seed = argseed + myid;
         sampler = make_unique<PDESampler>(
                       nDimensions, spe10problem.CellVolume(), kappa, seed,
-                      graph, upscale_param, &partitioning, &ess_attr);
+                      upscale.GetHierarchy().GetMatrix(0).GetGraph(),
+                      upscale_param, &partitioning, &ess_attr);
     }
     else
     {

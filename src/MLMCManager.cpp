@@ -18,17 +18,17 @@
 namespace smoothg
 {
 
-PressureFunctionalQoI::PressureFunctionalQoI(const Upscale& upscale,
+PressureFunctionalQoI::PressureFunctionalQoI(const Hierarchy& hierarchy,
                                              const mfem::Vector& functional)
     :
-    comm_(upscale.GetComm())
+    comm_(hierarchy.GetComm())
 {
     functional_.push_back(functional);
-    for (int i = 0; i < upscale.GetNumLevels() - 1; ++i)
+    for (int i = 0; i < hierarchy.NumLevels() - 1; ++i)
     {
         mfem::Vector temp;
-        // level-1 to level
-        temp = upscale.Restrict(i + 1, functional_[i]);
+        // level to level+1
+        temp = hierarchy.Restrict(i, functional_[i]);
         functional_.push_back(temp);
     }
 }
@@ -48,17 +48,17 @@ double PressureFunctionalQoI::Evaluate(const mfem::Vector& coefficient,
     return 0.0;
 }
 
-FunctionalQoI::FunctionalQoI(const Upscale& upscale,
+FunctionalQoI::FunctionalQoI(const Hierarchy& hierarchy,
                              const mfem::BlockVector& functional)
     :
-    comm_(upscale.GetComm())
+    comm_(hierarchy.GetComm())
 {
     functional_.push_back(functional);
-    for (int i = 0; i < upscale.GetNumLevels() - 1; ++i)
+    for (int i = 0; i < hierarchy.NumLevels() - 1; ++i)
     {
-        mfem::BlockVector temp = upscale.GetBlockVector(i + 1);
-        // level-1 to level
-        upscale.Restrict(i + 1, functional_[i], temp);
+        mfem::BlockVector temp(hierarchy.BlockOffsets(i + 1));
+        // level to level+1
+        hierarchy.Restrict(i, functional_[i], temp);
         functional_.push_back(temp); // is this an unnecessary deep copy?
     }
 }
@@ -102,18 +102,18 @@ double LogLikelihood::Evaluate(const mfem::Vector& coefficient,
 
 MLMCManager::MLMCManager(MultilevelSampler& sampler,
                          const QuantityOfInterest& qoi,
-                         Upscale& fvupscale,
+                         Hierarchy& hierarchy,
                          const mfem::BlockVector& rhs_fine,
                          int dump_number,
                          int num_levels)
     :
     sampler_(sampler),
     qoi_(qoi),
-    fvupscale_(fvupscale),
+    hierarchy_(hierarchy),
     dump_number_(dump_number),
     choose_samples_(0)
 {
-    num_levels_ = (num_levels < 0) ? fvupscale.GetNumLevels() : num_levels;
+    num_levels_ = (num_levels < 0) ? hierarchy.NumLevels() : num_levels;
 
     sample_count_.resize(num_levels_);
     mean_.resize(num_levels_);
@@ -124,7 +124,7 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     rhs_.push_back(rhs_fine);
     for (int k = 0; k < num_levels_ - 1; ++k)
     {
-        rhs_.push_back(fvupscale.Restrict(k + 1, rhs_[k]));
+        rhs_.push_back(hierarchy.Restrict(k, rhs_[k]));
     }
 }
 
@@ -171,25 +171,23 @@ double MLMCManager::GetEstimate() const
    exist for BlockVector, so we wrap Vector in temporary BlockVector
    objects that share the data with Vector.
 */
-mfem::BlockVector InterpolateToFine(const Upscale& upscale, int level,
+mfem::BlockVector InterpolateToFine(const Hierarchy& hierarchy, int level,
                                     const mfem::BlockVector& in)
 {
     mfem::Vector vec1, vec2;
     vec1 = in;
     for (int k = level; k > 0; k--)
     {
-        MFEM_ASSERT(vec1.Size() == upscale.GetMatrix(k).GetBlockOffsets().Last(),
+        MFEM_ASSERT(vec1.Size() == hierarchy.BlockOffsets(k).Last(),
                     "Sizes do not work!");
-        mfem::BlockVector block_vec1(vec1.GetData(),
-                                     upscale.GetMatrix(k).GetBlockOffsets());
-        vec2.SetSize(upscale.GetMatrix(k - 1).GetBlockOffsets().Last());
-        mfem::BlockVector block_vec2(vec2.GetData(),
-                                     upscale.GetMatrix(k - 1).GetBlockOffsets());
+        mfem::BlockVector block_vec1(vec1.GetData(), hierarchy.BlockOffsets(k));
+        vec2.SetSize(hierarchy.BlockOffsets(k - 1).Last());
+        mfem::BlockVector block_vec2(vec2.GetData(), hierarchy.BlockOffsets(k - 1));
         /// Interpolate from k to the finer k-1
-        upscale.Interpolate(k, block_vec1, block_vec2);
+        hierarchy.Interpolate(k, block_vec1, block_vec2);
         vec2.Swap(vec1);
     }
-    mfem::BlockVector out(upscale.GetMatrix(0).GetBlockOffsets());
+    mfem::BlockVector out(hierarchy.GetMatrix(0).BlockOffsets());
     MFEM_ASSERT(out.Size() == vec1.Size(), "Sizes do not work!");
     // ((mfem::Vector) out) = vec1; // doesn't work for some reason (valgrind doesn't like it)
     for (int i = 0; i < out.Size(); ++i)
@@ -214,11 +212,10 @@ void MLMCManager::FixedLevelSample(int level, bool verbose)
 
     sampler_.NewSample();
     auto coefficient = sampler_.GetCoefficient(level);
-    fvupscale_.RescaleCoefficient(level, coefficient);
-    mfem::BlockVector sol(rhs_[level]);
-    fvupscale_.SolveAtLevel(level, rhs_[level], sol);
+    hierarchy_.RescaleCoefficient(level, coefficient);
+    mfem::BlockVector sol = hierarchy_.Solve(level, rhs_[level]);
     double l_qoi = qoi_.Evaluate(coefficient, sol);
-    double current_cost = fvupscale_.GetSolveTime(level);
+    double current_cost = hierarchy_.GetSolveTime(level);
     UpdateStatistics(level, l_qoi, current_cost);
 
     if (verbose)
@@ -261,19 +258,19 @@ void MLMCManager::CorrectionSample(int level,
 
     sampler_.NewSample();
     auto fine_coefficient = sampler_.GetCoefficient(fine_level);
-    fvupscale_.RescaleCoefficient(fine_level, fine_coefficient);
+    hierarchy_.RescaleCoefficient(fine_level, fine_coefficient);
     auto coarse_coefficient = sampler_.GetCoefficient(coarse_level);
-    fvupscale_.RescaleCoefficient(coarse_level, coarse_coefficient);
+    hierarchy_.RescaleCoefficient(coarse_level, coarse_coefficient);
 
     mfem::BlockVector sol_coarse(rhs_[coarse_level]);
-    fvupscale_.SolveAtLevel(coarse_level, rhs_[coarse_level], sol_coarse);
+    hierarchy_.Solve(coarse_level, rhs_[coarse_level], sol_coarse);
     double upscaledq = qoi_.Evaluate(coarse_coefficient, sol_coarse);
-    double temp_cost = fvupscale_.GetSolveTime(coarse_level);
+    double temp_cost = hierarchy_.GetSolveTime(coarse_level);
 
     mfem::BlockVector sol_fine(rhs_[fine_level]);
-    fvupscale_.SolveAtLevel(fine_level, rhs_[fine_level], sol_fine);
+    hierarchy_.Solve(fine_level, rhs_[fine_level], sol_fine);
     double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
-    temp_cost += fvupscale_.GetSolveTime(fine_level);
+    temp_cost += hierarchy_.GetSolveTime(fine_level);
 
     UpdateStatistics(fine_level, fineq - upscaledq, temp_cost);
 
@@ -300,10 +297,10 @@ void MLMCManager::CorrectionSample(int level,
         std::stringstream ss1, ss2, ss3;
         ss1 << "s_upscaled" << sample_count_[fine_level] << ".vector";
         std::ofstream out1(ss1.str().c_str());
-        InterpolateToFine(fvupscale_, coarse_level, sol_coarse).GetBlock(pressure_block).Print(out1, 1);
+        InterpolateToFine(hierarchy_, coarse_level, sol_coarse).GetBlock(pressure_block).Print(out1, 1);
         ss2 << "s_fine" << sample_count_[fine_level] << ".vector";
         std::ofstream out2(ss2.str().c_str());
-        InterpolateToFine(fvupscale_, fine_level, sol_fine).GetBlock(pressure_block).Print(out2, 1);
+        InterpolateToFine(hierarchy_, fine_level, sol_fine).GetBlock(pressure_block).Print(out2, 1);
         ss3 << "s_coefficient" << sample_count_[fine_level] << ".vector";
         std::ofstream out3(ss3.str().c_str());
         fine_coefficient.Print(out3, 1);

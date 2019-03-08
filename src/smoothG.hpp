@@ -23,8 +23,6 @@
 #include "HybridSolver.hpp"
 #include "MixedMatrix.hpp"
 #include "GraphTopology.hpp"
-#include "Mixed_GL_Coarsener.hpp"
-#include "SpectralAMG_MGL_Coarsener.hpp"
 #include "MinresBlockSolver.hpp"
 #include "MetisGraphPartitioner.hpp"
 #include "MatrixUtilities.hpp"
@@ -35,3 +33,4 @@
 #include "Sampler.hpp"
 #include "GraphSpace.hpp"
 #include "MLMCManager.hpp"
+#include "Hierarchy.hpp"

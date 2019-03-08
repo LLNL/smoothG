@@ -116,19 +116,18 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
-    Upscale upscale(graph, upscale_param, &partitioning, &ess_attr);
+    Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
 
     upscale.PrintInfo();
-    upscale.ShowSetupTime();
 
-    mfem::BlockVector rhs_fine(upscale.GetBlockVector(0));
+    mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
     rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
     rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
     /// [Solve]
     std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
     std::vector<double> QoI(upscale_param.max_levels);
-    FunctionalQoI qoi_evaluator(upscale, rhs_fine);
+    FunctionalQoI qoi_evaluator(upscale.GetHierarchy(), rhs_fine);
     for (int level = 0; level < upscale_param.max_levels; ++level)
     {
         upscale.Solve(level, rhs_fine, sol[level]);

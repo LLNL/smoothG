@@ -54,7 +54,7 @@ class PressureFunctionalQoI : public QuantityOfInterest
 {
 public:
     /// functional must be given on *finest* level
-    PressureFunctionalQoI(const Upscale& upscale,
+    PressureFunctionalQoI(const Hierarchy& hierarchy,
                           const mfem::Vector& functional);
 
     ~PressureFunctionalQoI() {}
@@ -74,7 +74,7 @@ class FunctionalQoI : public QuantityOfInterest
 {
 public:
     /// functional must be given on *finest* level
-    FunctionalQoI(const Upscale& upscale,
+    FunctionalQoI(const Hierarchy& hierarchy,
                   const mfem::BlockVector& functional);
 
     ~FunctionalQoI() {}
@@ -197,7 +197,7 @@ class MLMCManager
 public:
     MLMCManager(MultilevelSampler& sampler,
                 const QuantityOfInterest& qoi,
-                Upscale& fvupscale,
+                Hierarchy& hierarchy,
                 const mfem::BlockVector& rhs_fine,
                 int dump_number = 0,
                 int num_levels = -1);
@@ -263,7 +263,7 @@ private:
 
     MultilevelSampler& sampler_;
     const QuantityOfInterest& qoi_;
-    Upscale& fvupscale_;
+    Hierarchy& hierarchy_;
 
     int num_levels_;
     int dump_number_;

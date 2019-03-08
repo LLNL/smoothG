@@ -37,9 +37,9 @@ void Print(const mfem::SparseMatrix& mat, const std::string& label = "",
            std::ostream& out = std::cout);
 
 /**
-    @brief Remove small entries from a matrix
+    @brief Remove small entries (absolute value < tol) from a matrix
 */
-mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol = 1e-8);
+mfem::SparseMatrix DropSmall(const mfem::SparseMatrix& mat, double tol = 1e-8);
 
 /**
     @brief Creates a sparse matrix from a table
@@ -50,6 +50,10 @@ mfem::SparseMatrix TableToMatrix(const mfem::Table& table);
     @brief Creates a table from a sparse matrix's graph
 */
 mfem::Table MatrixToTable(const mfem::SparseMatrix& mat);
+
+/// @return triple matrix product A * B * C
+mfem::HypreParMatrix* Mult(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& B,
+                           const mfem::HypreParMatrix& C);
 
 // Rap by hand that seems to be faster than the mfem rap but uses more memory
 // Use mfem::RAP if memory is more important than cycles
@@ -470,6 +474,12 @@ void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
 
 /// Make a copy of mfem::HypreParMatrix
 std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
+
+/// @return "diagonal block" of a HypreParMatrix
+mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat);
+
+/// @return "off diagonal block" of a HypreParMatrix
+mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 
 } // namespace smoothg
 

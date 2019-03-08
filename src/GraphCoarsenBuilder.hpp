@@ -24,7 +24,6 @@
 #include "smoothG_config.h"
 #include "utilities.hpp"
 #include "GraphSpace.hpp"
-#include "mfem.hpp"
 
 namespace smoothg
 {
@@ -43,7 +42,7 @@ public:
     /**
        @brief Build the assembled M for the local processor
      */
-    std::unique_ptr<mfem::SparseMatrix> BuildAssembledM() const;
+    mfem::SparseMatrix BuildAssembledM() const;
 
     /**
        @brief Assemble the rescaled M for the local processor
@@ -58,7 +57,7 @@ public:
 
        @note In the fine level, an agg is just a vertex.
     */
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+    virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const = 0;
 protected:
     unsigned int num_aggs_;
@@ -104,7 +103,7 @@ public:
     virtual void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                                      const mfem::SparseMatrix& Agg_cdof_edge) {}
 
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+    virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
@@ -149,7 +148,7 @@ public:
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+    virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
 
     bool NeedsCoarseVertexDofs() { return true; }
@@ -202,7 +201,7 @@ public:
                          const mfem::SparseMatrix& face_coarse_edof,
                          const mfem::SparseMatrix& agg_edof);
 
-    virtual std::unique_ptr<mfem::SparseMatrix> BuildAssembledM(
+    virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
 
 private:

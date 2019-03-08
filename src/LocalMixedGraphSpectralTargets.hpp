@@ -28,7 +28,6 @@
 #include <memory>
 #include <assert.h>
 
-#include "mfem.hpp"
 #include "GraphTopology.hpp"
 #include "GraphSpace.hpp"
 #include "LocalEigenSolver.hpp"
@@ -132,21 +131,16 @@ public:
 struct DofAggregate
 {
     mfem::SparseMatrix agg_vdof_;
-    mfem::SparseMatrix agg_edof_;  // the edofs here belong to one and only one agg
     mfem::SparseMatrix face_edof_;
+    mfem::SparseMatrix agg_edof_;  // the edofs here belong to one and only one agg
     const GraphTopology* topology_;
 
     DofAggregate(const GraphTopology& topology, const GraphSpace& space)
-        : topology_(&topology)
+        : agg_vdof_(smoothg::Mult(topology.Agg_vertex_, space.VertexToVDof())),
+          face_edof_(smoothg::Mult(topology.face_edge_, space.EdgeToEDof())),
+          agg_edof_(DropSmall(smoothg::Mult(topology.Agg_vertex_, space.VertexToEDof()), 1.5)),
+          topology_(&topology)
     {
-        auto agg_vdof = smoothg::Mult(topology.Agg_vertex_, space.VertexToVDof());
-        agg_vdof_.Swap(agg_vdof);
-
-        auto face_edof = smoothg::Mult(topology.face_edge_, space.EdgeToEDof());
-        face_edof_.Swap(face_edof);
-
-        auto agg_edof = smoothg::Mult(topology.Agg_vertex_, space.VertexToEDof());
-        GraphTopology::AggregateEdge2AggregateEdgeInt(agg_edof, agg_edof_);
     }
 };
 
@@ -174,6 +168,7 @@ public:
     */
     LocalMixedGraphSpectralTargets(
         const MixedMatrix& mixed_graph_laplacian,
+        const Graph& coarse_graph,
         const DofAggregate& dof_agg,
         const UpscaleParameters& param);
 
@@ -259,12 +254,9 @@ private:
     const bool energy_dual_;
 
     const MixedMatrix& mgL_;
-    const mfem::SparseMatrix& M_local_;
-    const mfem::SparseMatrix& D_local_;
-    const mfem::SparseMatrix* W_local_;
     const mfem::Vector& constant_rep_;
 
-    const GraphTopology& topology_;
+    const Graph& coarse_graph_;
     const DofAggregate& dof_agg_;
     const double zero_eigenvalue_threshold_;
 
@@ -278,8 +270,8 @@ private:
     mfem::SparseMatrix ExtAgg_edof_diag_;
     mfem::SparseMatrix ExtAgg_edof_offd_;
 
-    /// face to permuted edge dof relation table
-    std::unique_ptr<mfem::HypreParMatrix> face_perm_edof_;
+    /// face to extended edge dof relation table
+    std::unique_ptr<mfem::HypreParMatrix> face_ext_edof_;
 
     mfem::Array<int> col_map_;
 };

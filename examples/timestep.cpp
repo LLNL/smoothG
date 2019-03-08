@@ -124,50 +124,26 @@ int main(int argc, char* argv[])
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     mfem::SparseMatrix W_block = SparseIdentity(graph.VertexToEdge().Height());
-    const double cell_volume = spe10problem.CellVolume();
-    W_block *= cell_volume / delta_t;     // W_block = Mass matrix / delta_t
-
-    //W_block *= 1.0 / delta_t;
+    W_block *= spe10problem.CellVolume() / delta_t;     // Mass matrix / delta_t
 
     // Time Stepping
     {
-        Upscale fvupscale(graph, upscale_param, &partitioning,
-                          &ess_attr, W_block);
-
-        fvupscale.PrintInfo();
-
-        // Input Vectors
-        std::vector<mfem::Array<int>> offsets(2);
-        fvupscale.BlockOffsets(0, offsets[0]);
-        fvupscale.BlockOffsets(1, offsets[1]);
-
-        mfem::BlockVector fine_rhs(offsets[0]);
-        fine_rhs = 0.0;
+        Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
+        hierarchy.PrintInfo();
 
         // Set some pressure initial condition
-        mfem::BlockVector fine_u(offsets[0]);
+        mfem::BlockVector fine_u(hierarchy.BlockOffsets(0));
         fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace
-        mfem::BlockVector tmp(offsets[k]);
-        tmp = 0.0;
+        mfem::BlockVector work_rhs(hierarchy.BlockOffsets(k));
+        work_rhs = 0.0;
 
-        mfem::BlockVector work_rhs(offsets[k]);
-        mfem::BlockVector work_u(offsets[k]);
+        mfem::BlockVector work_u = k == 0 ? fine_u : hierarchy.Restrict(0, fine_u);
 
-        if (k == 0)
-        {
-            work_rhs = fine_rhs;
-            work_u = fine_u;
-        }
-        else
-        {
-            fvupscale.Restrict(1, fine_u, work_u);
-            fvupscale.Restrict(1, fine_rhs, work_rhs);
-        }
+        assert(hierarchy.GetMatrix(k).CheckW());
+        const mfem::SparseMatrix& W = hierarchy.GetMatrix(k).GetW();
 
-        const mfem::SparseMatrix* W = fvupscale.GetMatrix(k).GetW();
-        assert(W);
 
         // Setup visualization
         mfem::socketstream vis_v;
@@ -178,8 +154,6 @@ int main(int argc, char* argv[])
                                   std::fabs(initial_val), caption);
         }
 
-        fvupscale.ShowSetupTime();
-
         double time = 0.0;
         int count = 0;
 
@@ -188,19 +162,12 @@ int main(int argc, char* argv[])
 
         while (time < total_time)
         {
-            W->Mult(work_u.GetBlock(1), tmp.GetBlock(1));
+            W.Mult(work_u.GetBlock(1), work_rhs.GetBlock(1));
 
             //tmp += work_rhs; // RHS is zero for now
-            tmp *= -1.0;
+            work_rhs *= -1.0;
 
-            if (k == 0)
-            {
-                fvupscale.Solve(0, tmp, work_u);
-            }
-            else
-            {
-                fvupscale.SolveAtLevel(1, tmp, work_u);
-            }
+            hierarchy.Solve(k, work_rhs, work_u);
 
             if (myid == 0)
             {
@@ -218,7 +185,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    fvupscale.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
+                    hierarchy.Interpolate(1, work_u.GetBlock(1), fine_u.GetBlock(1));
                 }
 
                 spe10problem.VisUpdate(vis_v, fine_u.GetBlock(1));
@@ -226,8 +193,6 @@ int main(int argc, char* argv[])
         }
 
         chrono.Stop();
-
-        fvupscale.ShowSolveInfo(1);
 
         if (myid == 0)
         {

@@ -80,11 +80,8 @@ public:
     LinearPartition(const LinearGraph& graph, int partitions);
 
     int n_;
-
     GraphTopology graph_topology_;
-
-    shared_ptr<Graph> coarse_graph_;
-
+    Graph coarse_graph_;
     mfem::SparseMatrix face_identity_;
 };
 
@@ -95,7 +92,7 @@ public:
 LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     :
     n_(graph.GetN()),
-    graph_topology_(graph.GetGraph()),
+    graph_topology_(),
     face_identity_(SparseIdentity(partitions - 1))
 {
     mfem::SparseMatrix face_edge(partitions - 1, n_ - 1);
@@ -122,7 +119,6 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     Agg_vertex.Finalize();
     face_edge.Finalize();
     Agg_face.Finalize();
-    mfem::SparseMatrix face_Agg = smoothg::Transpose(Agg_face);
 
     mfem::Array<HYPRE_Int> agg_start(3);
     mfem::Array<HYPRE_Int> face_start(3);
@@ -134,20 +130,13 @@ LinearPartition::LinearPartition(const LinearGraph& graph, int partitions)
     vertex_start[1] = vertex_start[2] = n_;
     edge_start[1] = n_ - 1; edge_start[2] = n_ - 1;
 
-    agg_start.Copy(graph_topology_.GetAggregateStarts());
-    face_start.Copy(graph_topology_.GetFaceStarts());
-
-    mfem::HypreParMatrix face_trueface(graph.GetGraph().GetComm(), partitions - 1,
-                                       graph_topology_.GetFaceStarts(), &face_identity_);
-
-    coarse_graph_ = make_unique<Graph>(Agg_face, face_trueface);
-    graph_topology_.SetCoarseGraph(coarse_graph_);
-
-    graph_topology_.face_trueface_face_ = smoothg::AAt(face_trueface);
-
     graph_topology_.Agg_vertex_.Swap(Agg_vertex);
     graph_topology_.face_edge_.Swap(face_edge);
-    graph_topology_.face_Agg_.Swap(face_Agg);
+
+    mfem::HypreParMatrix face_trueface(graph.GetGraph().GetComm(), partitions - 1,
+                                       face_start, &face_identity_);
+
+    coarse_graph_ = Graph(Agg_face, face_trueface);
 }
 
 int main(int argc, char* argv[])
@@ -184,7 +173,8 @@ int main(int argc, char* argv[])
     std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
 
     DofAggregate dof_agg(partition.graph_topology_, mgL.GetGraphSpace());
-    LocalMixedGraphSpectralTargets localtargets(mgL, dof_agg, param);
+    const Graph& coarse_graph = partition.coarse_graph_;
+    LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
     localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
@@ -218,16 +208,11 @@ int main(int argc, char* argv[])
         std::cout << "Constant function in range of interpolation." << std::endl;
     result += thisresult;
 
-    mfem::SparseMatrix Pu;
-    mfem::SparseMatrix Pp;
-
-    GraphCoarsen graph_coarsen(mgL, dof_agg);
-    GraphSpace coarse_graph_space = graph_coarsen.BuildCoarseSpace(
-                                        local_edge_traces, local_spectral_vertex_targets,
-                                        std::move(*partition.coarse_graph_));
+    GraphCoarsen graph_coarsen(mgL, dof_agg, local_edge_traces,
+                               local_spectral_vertex_targets, coarse_graph);
     bool build_coarse_components = false;
-    graph_coarsen.BuildInterpolation(local_edge_traces, local_spectral_vertex_targets,
-                                     coarse_graph_space, build_coarse_components, Pp, Pu);
+    auto Pp = graph_coarsen.BuildPVertices();
+    auto Pu = graph_coarsen.BuildPEdges(build_coarse_components);
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;
