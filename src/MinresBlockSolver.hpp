@@ -26,7 +26,6 @@
 #include <memory>
 #include <assert.h>
 
-#include "mfem.hpp"
 #include "utilities.hpp"
 #include "MixedMatrix.hpp"
 #include "MixedLaplacianSolver.hpp"

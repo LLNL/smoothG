@@ -28,7 +28,6 @@
 #include <memory>
 #include <assert.h>
 
-#include "mfem.hpp"
 #include "GraphTopology.hpp"
 #include "GraphSpace.hpp"
 #include "LocalEigenSolver.hpp"

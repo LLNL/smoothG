@@ -31,45 +31,28 @@ u
 =
 \begin{bmatrix}
 g  \\
--f
+f
 \end{bmatrix}
 \f]
 
-## Upscale
+## UpscaleSolve
 
-The Upscaler usually solves for \f$ u \f$ by restricting to
-the coarse level, solving, and interpolating back to the fine level.
+Solves for \f$ u \f$ by restricting \f$ f \f$ to
+a given level, solving, and interpolating back to the fine level.
 The user only provides \f$ f \f$ and is returned \f$ u \f$.
 The value of \f$ \sigma \f$ is discarded and \f$ g \f$ is always zero.
 
 ## Wrappers
 
 ### UpscaleBlockSolve
-Solves for \f$ u \f$ and \f$ \sigma \f$ by restricting both to
-the coarse level, solving, and interpolating both back to the fine level.
+Solves for \f$ u \f$ and \f$ \sigma \f$ by restricting both \f$ g \f$ and \f$ f \f$ to
+a given level, solving, and interpolating both back to the fine level.
 The user provides both \f$ g \f$ and \f$ f \f$ and is returned both \f$ \sigma \f$ and \f$ u \f$.
-
-### UpscaleFineSolve
-Solves for \f$ u \f$ on the fine level by the provided fine solver.
-The user provides \f$ f \f$  and is returned \f$ u \f$.
-
-### UpscaleFineBlockSolve
-Solves for \f$ u \f$ and \f$ \sigma \f$ on the fine level by the provided fine solver.
-The user provides both \f$ f \f$ and \f$ g \f$ and is returned \f$ u \f$ and \f$ \sigma \f$.
-
-### UpscaleCoarseSolve
-Solves for \f$ u_c \f$ on the coarse level by the provided coarse solver.
-The user provides \f$ f_c \f$ and is returned \f$ u_c \f$;
-
-### UpscaleCoarseBlockSolve
-Solves for \f$ u_c \f$ and \f$ sigma_c \f$ on the coarse level by the provided coarse solver.
-The user provides both \f$ f_c \f$ and \f$ g_c \f$ and is returned \f$ u_c \f$ and \f$ sigma_c \f$;
 */
 
 #ifndef __UPSCALE_OPERATORS_HPP__
 #define __UPSCALE_OPERATORS_HPP__
 
-#include "mfem.hpp"
 #include "Upscale.hpp"
 
 namespace smoothg

@@ -24,7 +24,6 @@
 #include "Upscale.hpp"
 
 #include <random>
-#include "mfem.hpp"
 
 namespace smoothg
 {

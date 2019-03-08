@@ -15,7 +15,7 @@
 
 /** @file
 
-    @brief Contains Upscale class
+    @brief Contains Hierarchy class
 */
 
 #ifndef __HIERARCHY_HPP__
@@ -25,7 +25,6 @@
 #include "HybridSolver.hpp"
 #include "MetisGraphPartitioner.hpp"
 #include "MixedMatrix.hpp"
-#include "mfem.hpp"
 
 namespace smoothg
 {

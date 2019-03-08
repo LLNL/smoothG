@@ -15,7 +15,7 @@
 
 /** @file
 
-    @brief Implements Upscale class
+    @brief Implements Hierarchy class
 */
 
 #include "Hierarchy.hpp"

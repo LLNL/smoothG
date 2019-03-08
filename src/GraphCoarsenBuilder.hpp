@@ -24,7 +24,6 @@
 #include "smoothG_config.h"
 #include "utilities.hpp"
 #include "GraphSpace.hpp"
-#include "mfem.hpp"
 
 namespace smoothg
 {

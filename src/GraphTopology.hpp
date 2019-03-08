@@ -24,7 +24,6 @@
 #include <memory>
 #include <assert.h>
 
-#include "mfem.hpp"
 #include "Graph.hpp"
 
 namespace smoothg

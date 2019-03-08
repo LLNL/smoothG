@@ -21,7 +21,6 @@
 #ifndef __MIXEDLAPLACIANSOLVER_HPP__
 #define __MIXEDLAPLACIANSOLVER_HPP__
 
-#include "mfem.hpp"
 #include "utilities.hpp"
 
 namespace smoothg
