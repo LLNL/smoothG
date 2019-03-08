@@ -47,6 +47,14 @@ ElementMBuilder::ElementMBuilder(const std::vector<mfem::Vector>& local_edge_wei
     }
 }
 
+ElementMBuilder::ElementMBuilder(std::vector<mfem::DenseMatrix> M_el,
+                                 mfem::SparseMatrix elem_edgedof)
+    : M_el_(std::move(M_el)), elem_edgedof_(std::move(elem_edgedof))
+{
+    num_aggs_ = M_el_.size();
+}
+
+
 void ElementMBuilder::Setup(const GraphSpace& coarse_space)
 {
     elem_edgedof_.MakeRef(coarse_space.VertexToEDof());

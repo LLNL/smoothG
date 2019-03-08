@@ -127,6 +127,9 @@ public:
     ElementMBuilder(const std::vector<mfem::Vector>& local_edge_weight,
                     const mfem::SparseMatrix& elem_edgedof);
 
+    ElementMBuilder(std::vector<mfem::DenseMatrix> M_el,
+                    mfem::SparseMatrix elem_edgedof);
+
     /// Setting up coarse level element M builder
     void Setup(const GraphSpace& coarse_space);
 
