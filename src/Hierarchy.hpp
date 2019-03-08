@@ -15,7 +15,7 @@
 
 /** @file
 
-    @brief Contains Upscale class
+    @brief Contains Hierarchy class
 */
 
 #ifndef __HIERARCHY_HPP__
