@@ -949,6 +949,9 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 solver.Mult(OneNegOne, PV_sigma);
 
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
+
+                if (face_Agg.RowSize(iface) == 1)
+                    PV_sigma_on_face = 1.0;
             }
 
             // add PV vector to other vectors and orthogonalize

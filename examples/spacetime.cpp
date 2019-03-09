@@ -50,11 +50,9 @@ void bbT_ex(const Vector& xt, DenseMatrix& bbT);
 
 int main(int argc, char *argv[])
 {
-   StopWatch chrono;
-
-   // 1. Initialize MPI.
+    // 1. Initialize MPI
+   mpi_session session(argc, argv);
    int num_procs, myid;
-   MPI_Init(&argc, &argv);
    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
    bool verbose = (myid == 0);
@@ -64,6 +62,7 @@ int main(int argc, char *argv[])
    bool visualization = 1;
    int par_ref_levels = 0;
 
+   UpscaleParameters upscale_param;
    OptionsParser args(argc, argv);
    args.AddOption(&order, "-o", "--order",
                   "Finite element order (polynomial degree).");
@@ -72,6 +71,7 @@ int main(int argc, char *argv[])
                   "Enable or disable GLVis visualization.");
    args.AddOption(&par_ref_levels, "-r", "--ref",
                      "Number of parallel refinement steps.");
+   upscale_param.RegisterInOptionsParser(args);
    args.Parse();
    if (!args.Good())
    {
@@ -90,7 +90,8 @@ int main(int argc, char *argv[])
    // 3. Read the (serial) mesh from the given mesh file on all processors.  We
    //    can handle triangular, quadrilateral, tetrahedral, hexahedral, surface
    //    and volume meshes with the same code.
-   Mesh *mesh = new Mesh(2, 2, 2, mfem::Element::HEXAHEDRON, 1);
+   int nx = pow(2, par_ref_levels + 1);
+   Mesh *mesh = new Mesh(nx, nx, nx, mfem::Element::HEXAHEDRON, 1);
 //   std::ifstream imesh("/Users/lee1029/Codes/meshes/cylinder_mfem.mesh3d");
 //   Mesh *mesh = new Mesh(imesh, 1, 1);
 //   imesh.close();
@@ -105,14 +106,14 @@ int main(int argc, char *argv[])
    //    this mesh further in parallel to increase the resolution. Once the
    //    parallel mesh is defined, the serial mesh can be deleted.
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
-   {
-       for (int l = 0; l < par_ref_levels; l++)
-           pmesh->UniformRefinement();
-   }
+//   {
+//       for (int l = 0; l < par_ref_levels; l++)
+//           pmesh->UniformRefinement();
+//   }
    delete mesh;
 
    Array<int> ess_bdr(pmesh->bdr_attributes.Max());
-   ess_bdr = 0;
+   ess_bdr = 1;
    ess_bdr[0] = 1;
    //   ess_bdr.Last() = 0;
 
@@ -188,73 +189,89 @@ int main(int argc, char *argv[])
 
    bVarf->AddDomainIntegrator(new VectorFEDivergenceIntegrator);
    bVarf->Assemble();
-   bVarf->EliminateTrialDofs(ess_bdr, x.GetBlock(0), *fform);
    bVarf->Finalize();
+   mfem::SparseMatrix D(bVarf->SpMat());
+   bVarf->EliminateTrialDofs(ess_bdr, x.GetBlock(0), *fform);
 
    // Wrap the space-time CFOSLS problem as a MixedMatrix
+   auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh);
+   auto vertex_edge = TableToMatrix(pmesh->ElementToFaceTable());
+   auto& edge_trueedge = *(R_space->Dof_TrueDof_Matrix());
+   Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
+
+   GraphSpace graph_space(graph);
+
+   std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
+   mfem::Array<int> vdofs;
+   for (int i = 0; i < pmesh->GetNE(); ++i)
    {
-       auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh);
-       auto vertex_edge = TableToMatrix(pmesh->ElementToFaceTable());
-       auto& edge_trueedge = *(R_space->Dof_TrueDof_Matrix());
-       Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
+       mVarf->ComputeElementMatrix(i, M_el[i]);
 
-       GraphSpace graph_space(graph);
-
-       std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
-       mfem::Array<int> vdofs;
-       for (int i = 0; i < pmesh->GetNE(); ++i)
+       DenseMatrix sign_fix(M_el[i].NumRows());
+       R_space->GetElementVDofs(i, vdofs);
+       for (int j = 0; j < sign_fix.NumRows(); ++j)
        {
-           mVarf->ComputeElementMatrix(i, M_el[i]);
-
-           DenseMatrix sign_fix(M_el[i].NumRows());
-           R_space->GetElementVDofs(i, vdofs);
-           for (int j = 0; j < sign_fix.NumRows(); ++j)
-           {
-               sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
-           }
-
-           mfem::DenseMatrix help(sign_fix);
-           mfem::Mult(M_el[i], sign_fix, help);
-           mfem::Mult(sign_fix, help, M_el[i]);
+           sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
        }
 
-       auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), std::move(vertex_edge));
-       SparseMatrix W;
-       mfem::Vector const_rep(graph.NumVertices());
-       const_rep = 1.0;
-       mfem::Vector vertex_sizes(const_rep);
-       SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
+       mfem::DenseMatrix help(sign_fix);
+       mfem::Mult(M_el[i], sign_fix, help);
+       mfem::Mult(sign_fix, help, M_el[i]);
+   }
 
-       MixedMatrix mixed_system(std::move(graph_space), std::move(mbuilder),
-                                bVarf->SpMat(), std::move(W), std::move(const_rep),
-                                std::move(vertex_sizes), std::move(P_pwc));
+   auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), std::move(vertex_edge));
+   SparseMatrix W;
+   mfem::Vector const_rep(graph.NumVertices());
+   const_rep = 1.0;
+   mfem::Vector vertex_sizes(const_rep);
+   SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
 
-       // Solve mixed system
+   MixedMatrix mixed_system(std::move(graph_space), std::move(mbuilder),
+                            std::move(D), std::move(W), std::move(const_rep),
+                            std::move(vertex_sizes), std::move(P_pwc));
+
+   Hierarchy hierarchy(std::move(mixed_system), upscale_param, nullptr, &ess_bdr);
+   hierarchy.PrintInfo();
+   Upscale upscale(std::move(hierarchy));
+
+   ParGridFunction u, sigma;
+
+   std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs);
+   for (int level = 0; level < upscale_param.max_levels; ++level)
+   {
+       upscale.Solve(level, rhs, sol[level]);
+       upscale.ShowSolveInfo(level);
+
+       if (level > 0)
        {
-           mixed_system.BuildM();
+           upscale.ShowErrors(sol[level], sol[0], level);
+       }
 
-           chrono.Clear();
-           chrono.Start();
-           MinresBlockSolverFalse solver(mixed_system, &ess_bdr);
-           x = 0.0;
-           solver.Mult(rhs, x);
+       u.MakeRef(W_space, sol[level].GetBlock(1), 0);
+       sigma.MakeRef(R_space, sol[level].GetBlock(0), 0);
 
-           if (verbose)
-           {
-               std::cout << "MINRES converged in " << solver.GetNumIterations() << ".\n";
-               std::cout << "MINRES solver took " << chrono.RealTime() << "s. \n";
-           }
+       if (visualization)
+       {
+          char vishost[] = "localhost";
+          int  visport   = 19916;
+          socketstream u_sock(vishost, visport);
+          u_sock << "parallel " << num_procs << " " << myid << "\n";
+          u_sock.precision(8);
+          u_sock << "solution\n" << *pmesh << u << "window_title 'Primal variable S'"
+                 << endl;
+
+          MPI_Barrier(pmesh->GetComm());
+          socketstream sigma_sock(vishost, visport);
+          sigma_sock << "parallel " << num_procs << " " << myid << "\n";
+          sigma_sock.precision(8);
+          sigma_sock << "solution\n" << *pmesh << sigma << "window_title 'Flux sigma'"
+                     << endl;
        }
    }
 
    // 13. Extract the parallel grid function corresponding to the finite element
    //     approximation X. This is the local solution on each processor. Compute
    //     L2 error norms.
-   ParGridFunction *u(new ParGridFunction);
-   u->MakeRef(W_space, x.GetBlock(1), 0);
-
-   ParGridFunction *sigma(new ParGridFunction);
-   sigma->MakeRef(R_space, x.GetBlock(0), 0);
 
    int order_quad = max(2, 2*order+1);
    const IntegrationRule *irs[Geometry::NumGeom];
@@ -263,9 +280,9 @@ int main(int argc, char *argv[])
       irs[i] = &(IntRules.Get(i, order_quad));
    }
 
-   double err_u  = u->ComputeL2Error(ucoeff, irs);
+   double err_u  = u.ComputeL2Error(ucoeff, irs);
    double norm_u = ComputeGlobalLpNorm(2, ucoeff, *pmesh, irs);
-   double err_sigma  = sigma->ComputeL2Error(sigmacoeff, irs);
+   double err_sigma  = sigma.ComputeL2Error(sigmacoeff, irs);
    double norm_sigma = ComputeGlobalLpNorm(2, sigmacoeff, *pmesh, irs);
 
    if (verbose)
@@ -275,58 +292,9 @@ int main(int argc, char *argv[])
                 << err_sigma / norm_sigma << "\n";
    }
 
-   // 14. Save the refined mesh and the solution in parallel. This output can be
-   //     viewed later using GLVis: "glvis -np <np> -m mesh -g sol_*".
-   {
-      ostringstream mesh_name, u_name, sigma_name;
-      mesh_name << "mesh." << setfill('0') << setw(6) << myid;
-      u_name << "sol_u." << setfill('0') << setw(6) << myid;
-      sigma_name << "sol_sigma." << setfill('0') << setw(6) << myid;
-
-      ofstream mesh_ofs(mesh_name.str().c_str());
-      mesh_ofs.precision(8);
-      pmesh->Print(mesh_ofs);
-
-      ofstream u_ofs(u_name.str().c_str());
-      u_ofs.precision(8);
-      u->Save(u_ofs);
-
-      ofstream sigma_ofs(sigma_name.str().c_str());
-      sigma_ofs.precision(8);
-      sigma->Save(sigma_ofs);
-   }
-
-   // 15. Save data in the VisIt format
-   VisItDataCollection visit_dc("Example5-Parallel", pmesh);
-   visit_dc.RegisterField("Primal variable S", u);
-   visit_dc.RegisterField("Flux sigma", sigma);
-   visit_dc.Save();
-
-   // 16. Send the solution by socket to a GLVis server.
-   if (visualization)
-   {
-      char vishost[] = "localhost";
-      int  visport   = 19916;
-      socketstream u_sock(vishost, visport);
-      u_sock << "parallel " << num_procs << " " << myid << "\n";
-      u_sock.precision(8);
-      u_sock << "solution\n" << *pmesh << *u << "window_title 'Primal variable S'"
-             << endl;
-      // Make sure all ranks have sent their 'u' solution before initiating
-      // another set of GLVis connections (one from each rank):
-      MPI_Barrier(pmesh->GetComm());
-      socketstream sigma_sock(vishost, visport);
-      sigma_sock << "parallel " << num_procs << " " << myid << "\n";
-      sigma_sock.precision(8);
-      sigma_sock << "solution\n" << *pmesh << *sigma << "window_title 'Flux sigma'"
-                 << endl;
-   }
-
    // 17. Free the used memory.
    delete fform;
    delete gform;
-   delete u;
-   delete sigma;
    delete mVarf;
    delete bVarf;
    delete W_space;
@@ -335,9 +303,7 @@ int main(int argc, char *argv[])
    delete hdiv_coll;
    delete pmesh;
 
-   MPI_Finalize();
-
-   return 0;
+   return EXIT_SUCCESS;
 }
 
 // This is actually the function for imposing boundary (or initial) condition

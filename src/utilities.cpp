@@ -342,8 +342,8 @@ std::vector<double> ComputeErrors(MPI_Comm comm, const mfem::SparseMatrix& M,
 
     std::vector<double> info(3);
 
-    info[0] = CompareError(comm, M_scaled_up_sol.GetBlock(1), M_scaled_fine_sol.GetBlock(1));  // vertex
-    info[1] = CompareError(comm, M_scaled_up_sol.GetBlock(0), M_scaled_fine_sol.GetBlock(0));  // edge
+    info[0] = CompareError(comm, upscaled_sol.GetBlock(1), fine_sol.GetBlock(1));  // vertex
+    info[1] = CompareError(comm, upscaled_sol.GetBlock(0), fine_sol.GetBlock(0));  // edge
     info[2] = DivError(comm, D, upscaled_sol.GetBlock(0), fine_sol.GetBlock(0));   // div
 
     return info;
