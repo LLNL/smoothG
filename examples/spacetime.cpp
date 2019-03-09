@@ -48,138 +48,6 @@ void bFun_ex (const Vector& xt, Vector& b);
 void Ktilda_ex(const Vector& xt, DenseMatrix& Ktilda);
 void bbT_ex(const Vector& xt, DenseMatrix& bbT);
 
-//// Geometric Multigrid
-class Multigrid : public Solver
-{
-public:
-    Multigrid(HypreParMatrix &Operator,
-              const Array<HypreParMatrix*> &P,
-              Solver *CoarsePrec=NULL)
-        :
-          Solver(Operator.GetNumRows()),
-          P_(P),
-          Operators_(P.Size()+1),
-          Smoothers_(Operators_.Size()),
-          current_level(Operators_.Size()-1),
-          correction(Operators_.Size()),
-          residual(Operators_.Size()),
-          CoarseSolver(NULL),
-          CoarsePrec_(CoarsePrec)
-    {
-        if (CoarsePrec)
-        {
-            CoarseSolver = new CGSolver(Operators_[0]->GetComm());
-            CoarseSolver->SetRelTol(1e-8);
-            CoarseSolver->SetMaxIter(50);
-            CoarseSolver->SetPrintLevel(0);
-            CoarseSolver->SetOperator(*Operators_[0]);
-            CoarseSolver->SetPreconditioner(*CoarsePrec);
-        }
-
-        Operators_.Last() = &Operator;
-        for (int l = Operators_.Size()-1; l > 0; l--)
-        {
-            // Two steps RAP
-            unique_ptr<HypreParMatrix> PT( P[l-1]->Transpose() );
-            unique_ptr<HypreParMatrix> AP( ParMult(Operators_[l], P[l-1]) );
-            Operators_[l-1] = ParMult(PT.get(), AP.get());
-            Operators_[l-1]->CopyRowStarts();
-        }
-
-        for (int l = 0; l < Operators_.Size(); l++)
-        {
-            Smoothers_[l] = new HypreSmoother(*Operators_[l]);
-            correction[l] = new Vector(Operators_[l]->GetNumRows());
-            residual[l] = new Vector(Operators_[l]->GetNumRows());
-        }
-    }
-
-    virtual void Mult(const Vector & x, Vector & y) const;
-
-    virtual void SetOperator(const Operator &op) { }
-
-    ~Multigrid()
-    {
-        for (int l = 0; l < Operators_.Size(); l++)
-        {
-            delete Smoothers_[l];
-            delete correction[l];
-            delete residual[l];
-        }
-    }
-
-private:
-    void MG_Cycle() const;
-
-    const Array<HypreParMatrix*> &P_;
-
-    Array<HypreParMatrix*> Operators_;
-    Array<HypreSmoother*> Smoothers_;
-
-    mutable int current_level;
-
-    mutable Array<Vector*> correction;
-    mutable Array<Vector*> residual;
-
-    mutable Vector res_aux;
-    mutable Vector cor_cor;
-    mutable Vector cor_aux;
-
-    CGSolver *CoarseSolver;
-    Solver *CoarsePrec_;
-};
-
-void Multigrid::Mult(const Vector & x, Vector & y) const
-{
-    *residual.Last() = x;
-    correction.Last()->SetDataAndSize(y.GetData(), y.Size());
-    MG_Cycle();
-}
-
-void Multigrid::MG_Cycle() const
-{
-    // PreSmoothing
-    const HypreParMatrix& Operator_l = *Operators_[current_level];
-    const HypreSmoother& Smoother_l = *Smoothers_[current_level];
-
-    Vector& residual_l = *residual[current_level];
-    Vector& correction_l = *correction[current_level];
-
-    Smoother_l.Mult(residual_l, correction_l);
-    Operator_l.Mult(-1.0, correction_l, 1.0, residual_l);
-
-    // Coarse grid correction
-    if (current_level > 0)
-    {
-        const HypreParMatrix& P_l = *P_[current_level-1];
-
-        P_l.MultTranspose(residual_l, *residual[current_level-1]);
-
-        current_level--;
-        MG_Cycle();
-        current_level++;
-
-        cor_cor.SetSize(residual_l.Size());
-        P_l.Mult(*correction[current_level-1], cor_cor);
-        correction_l += cor_cor;
-        Operator_l.Mult(-1.0, cor_cor, 1.0, residual_l);
-    }
-    else
-    {
-        cor_cor.SetSize(residual_l.Size());
-        if (CoarseSolver)
-        {
-            CoarseSolver->Mult(residual_l, cor_cor);
-            correction_l += cor_cor;
-            Operator_l.Mult(-1.0, cor_cor, 1.0, residual_l);
-        }
-    }
-
-    // PostSmoothing
-    Smoother_l.Mult(residual_l, cor_cor);
-    correction_l += cor_cor;
-}
-
 int main(int argc, char *argv[])
 {
    StopWatch chrono;
@@ -194,8 +62,6 @@ int main(int argc, char *argv[])
    // 2. Parse command-line options.
    int order = 0;
    bool visualization = 1;
-   bool divfree = 0;
-   bool GMG = 0;
    int par_ref_levels = 0;
 
    OptionsParser args(argc, argv);
@@ -204,12 +70,6 @@ int main(int argc, char *argv[])
    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                   "--no-visualization",
                   "Enable or disable GLVis visualization.");
-   args.AddOption(&divfree, "-df", "--divfree", "-no-df",
-                  "--no-divfree",
-                  "whether to use the divergence free solver or not.");
-   args.AddOption(&GMG, "-GMG", "--GeometricMG", "-AMG",
-                  "--AlgebraicMG",
-                  "whether to use goemetric or algebraic multigrid solver.");
    args.AddOption(&par_ref_levels, "-r", "--ref",
                      "Number of parallel refinement steps.");
    args.Parse();
@@ -245,91 +105,16 @@ int main(int argc, char *argv[])
    //    this mesh further in parallel to increase the resolution. Once the
    //    parallel mesh is defined, the serial mesh can be deleted.
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+   {
+       for (int l = 0; l < par_ref_levels; l++)
+           pmesh->UniformRefinement();
+   }
    delete mesh;
 
    Array<int> ess_bdr(pmesh->bdr_attributes.Max());
    ess_bdr = 0;
    ess_bdr[0] = 1;
    //   ess_bdr.Last() = 0;
-
-   // Constructing multigrid hierarchy while refining the mesh (if GMG is true)
-   auto *hcurl_coll = new ND_FECollection(order+1, dim);
-   auto *h1_coll = new H1_FECollection(order+1, dim);
-   ParFiniteElementSpace *N_space, *H_space;
-   Array<HypreParMatrix*> P(par_ref_levels);
-   Array<HypreParMatrix*> DiscreteGrads(par_ref_levels+1);
-   if (divfree)
-   {
-       chrono.Clear();
-       chrono.Start();
-
-       if (GMG)
-       {
-           N_space = new ParFiniteElementSpace(pmesh, hcurl_coll);
-           H_space = new ParFiniteElementSpace(pmesh, h1_coll, dim);
-
-           ParDiscreteLinearOperator DiscreteGradForm(H_space, N_space);
-           DiscreteGradForm.AddDomainInterpolator(new IdentityInterpolator);
-           DiscreteGradForm.Assemble();
-           Vector vec1(H_space->GetVSize());
-           Vector vec2(N_space->GetVSize());
-           DiscreteGradForm.EliminateTrialDofs(ess_bdr, vec1, vec2);
-           DiscreteGradForm.Finalize();
-           DiscreteGrads[0] = DiscreteGradForm.ParallelAssemble();
-           DiscreteGrads[0]->CopyColStarts();
-           DiscreteGrads[0]->CopyRowStarts();
-
-           auto coarse_N_space = new ParFiniteElementSpace(pmesh, hcurl_coll);
-           const SparseMatrix *P_local;
-
-           for (int l = 0; l < par_ref_levels; l++)
-           {
-               coarse_N_space->Update();
-
-               pmesh->UniformRefinement();
-               P_local = ((const SparseMatrix*)N_space->GetUpdateOperator());
-
-               H_space->Update();
-               DiscreteGradForm.Update();
-               DiscreteGradForm.Assemble();
-               if (l < par_ref_levels)
-               {
-                   vec1.SetSize(H_space->GetVSize());
-                   vec2.SetSize(N_space->GetVSize());
-                   DiscreteGradForm.EliminateTrialDofs(ess_bdr, vec1, vec2);
-               }
-               DiscreteGradForm.Finalize();
-               DiscreteGrads[l+1] = DiscreteGradForm.ParallelAssemble();
-               DiscreteGrads[l+1]->CopyColStarts();
-               DiscreteGrads[l+1]->CopyRowStarts();
-
-               auto P_local_copy = DropSmall(*P_local, 1e-8);
-
-               auto d_td_coarse = coarse_N_space->Dof_TrueDof_Matrix();
-               auto RP_local = smoothg::Mult(*N_space->GetRestrictionMatrix(), P_local_copy);
-
-               P[l] = d_td_coarse->LeftDiagMult(RP_local, N_space->GetTrueDofOffsets());
-               P[l]->CopyColStarts();
-               P[l]->CopyRowStarts();
-           }
-
-           delete coarse_N_space;
-       }
-       else
-       {
-           for (int l = 0; l < par_ref_levels; l++)
-               pmesh->UniformRefinement();
-           N_space = new ParFiniteElementSpace(pmesh, hcurl_coll);
-       }
-       if (verbose)
-           cout << "Divergence free hierarchy constructed in "
-                << chrono.RealTime() << endl;
-   }
-   else
-   {
-       for (int l = 0; l < par_ref_levels; l++)
-           pmesh->UniformRefinement();
-   }
 
    // 6. Define a parallel finite element space on the parallel mesh. Here we
    //    use the Raviart-Thomas finite elements of the specified order.
@@ -341,7 +126,6 @@ int main(int argc, char *argv[])
 
    HYPRE_Int dimR = R_space->GlobalTrueVSize();
    HYPRE_Int dimW = W_space->GlobalTrueVSize();
-   HYPRE_Int dimN = divfree ? N_space->GlobalTrueVSize() : 0;
 
    if (verbose)
    {
@@ -349,8 +133,6 @@ int main(int argc, char *argv[])
       std::cout << "dim(R) = " << dimR << "\n";
       std::cout << "dim(W) = " << dimW << "\n";
       std::cout << "dim(R+W) = " << dimR + dimW << "\n";
-      if (divfree)
-          std::cout << "dim(N) = " << dimN << "\n";
       std::cout << "***********************************************************\n";
    }
 
@@ -431,139 +213,6 @@ int main(int argc, char *argv[])
 
    Operator *darcyOp;
    Solver *darcyPr;
-   if (divfree)
-   {
-       chrono.Clear();
-       chrono.Start();
-
-       StopWatch chrono_local;
-       chrono_local.Clear();
-       chrono_local.Start();
-
-       // Find a particular solution for div sigma = f
-       auto BBT = ParMult(B, BT);
-       trueX.GetBlock(1) = 0.0;
-       auto prec_particular = new HypreBoomerAMG(*BBT);
-       prec_particular->SetPrintLevel(0);
-
-       CGSolver solver_particular(MPI_COMM_WORLD);
-       solver_particular.SetAbsTol(atol);
-       solver_particular.SetRelTol(rtol);
-       solver_particular.SetMaxIter(maxIter);
-       solver_particular.SetOperator(*BBT);
-       solver_particular.SetPreconditioner(*prec_particular);
-       solver_particular.SetPrintLevel(0);
-       solver_particular.Mult(trueRhs.GetBlock(1), trueX.GetBlock(1));
-       Vector sol_particular(BT->GetNumRows());
-       sol_particular = 0.0;
-       BT->Mult(trueX.GetBlock(1), sol_particular);
-
-       //correct essential bc
-       R_space->GetRestrictionMatrix()->Mult(x.GetBlock(0), trueX.GetBlock(0));
-       sol_particular += trueX.GetBlock(0);
-
-       chrono_local.Stop();
-
-       if (verbose)
-       {
-          if (solver_particular.GetConverged())
-             cout << "CG converged in " << solver_particular.GetNumIterations()
-                       << " iterations with a residual norm of " << solver_particular.GetFinalNorm() << ".\n";
-          else
-             cout << "CG did not converge in " << solver_particular.GetNumIterations()
-                       << " iterations. Residual norm is " << solver_particular.GetFinalNorm() << ".\n";
-          cout << "Particular solution found in " << chrono_local.RealTime() << "s. \n";
-       }
-
-       chrono_local.Clear();
-       chrono_local.Start();
-       ParDiscreteLinearOperator DiscreteCurl(N_space, R_space);
-       DiscreteCurl.AddDomainInterpolator(new CurlInterpolator);
-       DiscreteCurl.Assemble();
-       DiscreteCurl.Finalize();
-       auto C = DiscreteCurl.ParallelAssemble();
-       auto MC = ParMult(M, C);
-       auto CT = C->Transpose();
-       darcyOp = ParMult(CT, MC);
-       if (GMG)
-           darcyPr = new Multigrid(((HypreParMatrix&)*darcyOp), P);
-       else
-       {
-           darcyPr = new HypreAMS(((HypreParMatrix&)*darcyOp), N_space);
-           ((HypreAMS*)darcyPr)->SetSingularProblem();
-       }
-
-       // Compute the right hand side for the divergence free solver problem
-       Vector rhs_divfree(MC->GetNumCols());
-       rhs_divfree = 0.0;
-       M->Mult(-1.0, sol_particular, 1.0, trueRhs.GetBlock(0));
-       CT->Mult(trueRhs.GetBlock(0), rhs_divfree);
-
-       Array<int> bc_dofs;
-       N_space->GetEssentialTrueDofs(ess_bdr, bc_dofs);
-       ((HypreParMatrix*)darcyOp)->EliminateRowsCols(bc_dofs);
-       for (auto i : bc_dofs)
-           rhs_divfree(i) = 0.0;
-
-       // Solve the divergence free solution
-       CGSolver solver(MPI_COMM_WORLD);
-       solver.SetAbsTol(atol);
-       solver.SetRelTol(rtol);
-       solver.SetMaxIter(maxIter);
-       solver.SetOperator(*darcyOp);
-       solver.SetPreconditioner(*darcyPr);
-       solver.SetPrintLevel(0);
-
-       Vector sol_potential(darcyOp->Width());
-       sol_potential = 0.0;
-       solver.Mult(rhs_divfree, sol_potential);
-
-       Vector sol_divfree(C->GetNumRows());
-       C->Mult(sol_potential, sol_divfree);
-
-       // Combining the particular solution and the divergence free solution
-
-       trueX.GetBlock(0) = sol_particular;
-       trueX.GetBlock(0) += sol_divfree;
-
-       chrono_local.Stop();
-       if (verbose)
-       {
-          if (solver.GetConverged())
-             cout << "CG converged in " << solver.GetNumIterations()
-                       << " iterations with a residual norm of " << solver.GetFinalNorm() << ".\n";
-          else
-             cout << "CG did not converge in " << solver.GetNumIterations()
-                       << " iterations. Residual norm is " << solver.GetFinalNorm() << ".\n";
-          cout << "Divergence free solution found in " << chrono_local.RealTime() << "s. \n";
-       }
-
-       // Compute the right hand side for the pressure problem BB^T p = rhs_p
-       chrono_local.Clear();
-       chrono_local.Start();
-
-       M->Mult(-1.0, sol_divfree, 1.0, trueRhs.GetBlock(0));
-       Vector rhs_p(B->GetNumRows());
-       B->Mult(trueRhs.GetBlock(0), rhs_p);
-       trueX.GetBlock(1) = 0.0;
-       solver_particular.Mult(rhs_p, trueX.GetBlock(1));
-
-       chrono_local.Stop();
-       if (verbose)
-       {
-          if (solver_particular.GetConverged())
-             cout << "CG converged in " << solver_particular.GetNumIterations()
-                       << " iterations with a residual norm of " << solver_particular.GetFinalNorm() << ".\n";
-          else
-             cout << "CG did not converge in " << solver_particular.GetNumIterations()
-                       << " iterations. Residual norm is " << solver_particular.GetFinalNorm() << ".\n";
-          cout << "Pressure solution found in " << chrono_local.RealTime() << "s. \n";
-       }
-       chrono.Stop();
-       if (verbose)
-           cout << "Divergence free solver overall took " << chrono.RealTime() << "s. \n";
-   }
-   else
    {
        chrono.Clear();
        chrono.Start();
@@ -720,11 +369,8 @@ int main(int argc, char *argv[])
    delete bVarf;
    delete W_space;
    delete R_space;
-   if (divfree)
-       delete N_space;
    delete l2_coll;
    delete hdiv_coll;
-   delete hcurl_coll;
    delete pmesh;
 
    MPI_Finalize();
