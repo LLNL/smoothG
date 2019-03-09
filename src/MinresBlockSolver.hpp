@@ -111,7 +111,7 @@ protected:
     std::unique_ptr<mfem::HypreParMatrix> hD_;
     std::unique_ptr<mfem::HypreParMatrix> hDt_;
 
-    std::unique_ptr<mfem::HypreDiagScale> Mprec_;
+    std::unique_ptr<mfem::HypreSmoother> Mprec_;
     std::unique_ptr<mfem::HypreBoomerAMG> Sprec_;
 };
 

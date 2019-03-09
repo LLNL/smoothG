@@ -77,7 +77,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
         nnz_ += 1;
     }
 
-    Mprec_.reset(new mfem::HypreDiagScale(*M));
+    Mprec_.reset(new mfem::HypreSmoother(*M));
     Sprec_.reset(new mfem::HypreBoomerAMG(*schur_block_));
     Sprec_->SetPrintLevel(0);
 

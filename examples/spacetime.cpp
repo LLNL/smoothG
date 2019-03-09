@@ -25,7 +25,7 @@
 //
 //               We recommend viewing examples 1-4 before viewing this example.
 
-#include "mfem.hpp"
+#include "pde.hpp"
 #include "../src/smoothG.hpp"
 
 #include <fstream>
@@ -147,26 +147,16 @@ int main(int argc, char *argv[])
    block_offsets[2] = W_space->GetVSize();
    block_offsets.PartialSum();
 
-   Array<int> block_trueOffsets(3); // number of variables + 1
-   block_trueOffsets[0] = 0;
-   block_trueOffsets[1] = R_space->TrueVSize();
-   block_trueOffsets[2] = W_space->TrueVSize();
-   block_trueOffsets.PartialSum();
-
    // 8. Define the coefficients, analytical solution, and rhs of the PDE.
    MatrixFunctionCoefficient Ktilde(dim, Ktilda_ex);
-
    FunctionCoefficient fcoeff(fFun);
    FunctionCoefficient ucoeff(uFun_ex);
-
    VectorFunctionCoefficient sigmacoeff(dim, sigmaFun_ex);
 
    // 9. Define the parallel grid function and parallel linear forms, solution
    //    vector and rhs.
    BlockVector x(block_offsets), rhs(block_offsets);
    x = 0.0; rhs = 0.0;
-   BlockVector trueX(block_trueOffsets), trueRhs(block_trueOffsets);
-   trueX = 0.0; trueRhs = 0.0;
 
    ParGridFunction sigma_gf(R_space, x.GetBlock(0).GetData());
    sigma_gf.ProjectBdrCoefficientNormal(sigmacoeff, ess_bdr);
@@ -192,90 +182,69 @@ int main(int argc, char *argv[])
    ParMixedBilinearForm *bVarf(new ParMixedBilinearForm(R_space, W_space));
 
    mVarf->AddDomainIntegrator(new VectorFEMassIntegrator(Ktilde));
+   mVarf->ComputeElementMatrices();
    mVarf->Assemble();
    mVarf->EliminateEssentialBC(ess_bdr, x.GetBlock(0), *gform);
-   mVarf->Finalize();
-   HypreParMatrix *M = mVarf->ParallelAssemble();
 
    bVarf->AddDomainIntegrator(new VectorFEDivergenceIntegrator);
    bVarf->Assemble();
    bVarf->EliminateTrialDofs(ess_bdr, x.GetBlock(0), *fform);
    bVarf->Finalize();
-   HypreParMatrix *B = bVarf->ParallelAssemble();
-   HypreParMatrix *BT = B->Transpose();
 
-   gform->ParallelAssemble(trueRhs.GetBlock(0));
-   fform->ParallelAssemble(trueRhs.GetBlock(1));
-
-   int maxIter(50000);
-   double rtol(1.e-9);
-   double atol(1.e-12);
-
-   Operator *darcyOp;
-   Solver *darcyPr;
+   // Wrap the space-time CFOSLS problem as a MixedMatrix
    {
-       chrono.Clear();
-       chrono.Start();
+       auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh);
+       auto vertex_edge = TableToMatrix(pmesh->ElementToFaceTable());
+       auto& edge_trueedge = *(R_space->Dof_TrueDof_Matrix());
+       Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
 
-       darcyOp = new BlockOperator(block_trueOffsets);
-       ((BlockOperator*)darcyOp)->SetBlock(0,0, M);
-       ((BlockOperator*)darcyOp)->SetBlock(0,1, BT);
-       ((BlockOperator*)darcyOp)->SetBlock(1,0, B);
+       GraphSpace graph_space(graph);
 
-       // 11. Construct the operators for preconditioner
-       //
-       //                 P = [ diag(M)         0         ]
-       //                     [  0       B diag(M)^-1 B^T ]
-       //
-       //     Here we use Symmetric Gauss-Seidel to approximate the inverse of the
-       //     pressure Schur Complement.
-       HypreParMatrix *MinvBt = B->Transpose();
-       Vector Md(M->GetNumRows());
-       M->GetDiag(Md);
-       MinvBt->InvScaleRows(Md);
-       HypreParMatrix *S = ParMult(B, MinvBt);
-
-       HypreSolver *invS;
-       auto invM = new HypreSmoother(*M);
-       invS = new HypreBoomerAMG(*S);
-       static_cast<HypreBoomerAMG*>(invS)->SetPrintLevel(0);
-
-       invM->iterative_mode = false;
-       invS->iterative_mode = false;
-
-       darcyPr = new BlockDiagonalPreconditioner(
-                   block_trueOffsets);
-       ((BlockDiagonalPreconditioner*)darcyPr)->SetDiagonalBlock(0, invM);
-       ((BlockDiagonalPreconditioner*)darcyPr)->SetDiagonalBlock(1, invS);
-
-       // 12. Solve the linear system with MINRES.
-       //     Check the norm of the unpreconditioned residual.
-
-       MINRESSolver solver(MPI_COMM_WORLD);
-       solver.SetAbsTol(atol);
-       solver.SetRelTol(rtol);
-       solver.SetMaxIter(maxIter);
-       solver.SetOperator(*darcyOp);
-       solver.SetPreconditioner(*darcyPr);
-       solver.SetPrintLevel(0);
-       trueX = 0.0;
-       solver.Mult(trueRhs, trueX);
-       chrono.Stop();
-
-       if (verbose)
+       std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
+       mfem::Array<int> vdofs;
+       for (int i = 0; i < pmesh->GetNE(); ++i)
        {
-          if (solver.GetConverged())
-             std::cout << "MINRES converged in " << solver.GetNumIterations()
-                       << " iterations with a residual norm of " << solver.GetFinalNorm() << ".\n";
-          else
-             std::cout << "MINRES did not converge in " << solver.GetNumIterations()
-                       << " iterations. Residual norm is " << solver.GetFinalNorm() << ".\n";
-          std::cout << "MINRES solver took " << chrono.RealTime() << "s. \n";
+           mVarf->ComputeElementMatrix(i, M_el[i]);
+
+           DenseMatrix sign_fix(M_el[i].NumRows());
+           R_space->GetElementVDofs(i, vdofs);
+           for (int j = 0; j < sign_fix.NumRows(); ++j)
+           {
+               sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
+           }
+
+           mfem::DenseMatrix help(sign_fix);
+           mfem::Mult(M_el[i], sign_fix, help);
+           mfem::Mult(sign_fix, help, M_el[i]);
        }
-       delete invM;
-       delete invS;
-       delete S;
-       delete MinvBt;
+
+       auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), std::move(vertex_edge));
+       SparseMatrix W;
+       mfem::Vector const_rep(graph.NumVertices());
+       const_rep = 1.0;
+       mfem::Vector vertex_sizes(const_rep);
+       SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
+
+       MixedMatrix mixed_system(std::move(graph_space), std::move(mbuilder),
+                                bVarf->SpMat(), std::move(W), std::move(const_rep),
+                                std::move(vertex_sizes), std::move(P_pwc));
+
+       // Solve mixed system
+       {
+           mixed_system.BuildM();
+
+           chrono.Clear();
+           chrono.Start();
+           MinresBlockSolverFalse solver(mixed_system, &ess_bdr);
+           x = 0.0;
+           solver.Mult(rhs, x);
+
+           if (verbose)
+           {
+               std::cout << "MINRES converged in " << solver.GetNumIterations() << ".\n";
+               std::cout << "MINRES solver took " << chrono.RealTime() << "s. \n";
+           }
+       }
    }
 
    // 13. Extract the parallel grid function corresponding to the finite element
@@ -283,11 +252,9 @@ int main(int argc, char *argv[])
    //     L2 error norms.
    ParGridFunction *u(new ParGridFunction);
    u->MakeRef(W_space, x.GetBlock(1), 0);
-   u->Distribute(&(trueX.GetBlock(1)));
 
    ParGridFunction *sigma(new ParGridFunction);
    sigma->MakeRef(R_space, x.GetBlock(0), 0);
-   sigma->Distribute(&(trueX.GetBlock(0)));
 
    int order_quad = max(2, 2*order+1);
    const IntegrationRule *irs[Geometry::NumGeom];
@@ -360,11 +327,6 @@ int main(int argc, char *argv[])
    delete gform;
    delete u;
    delete sigma;
-   delete darcyOp;
-   delete darcyPr;
-   delete BT;
-   delete B;
-   delete M;
    delete mVarf;
    delete bVarf;
    delete W_space;
