@@ -90,11 +90,11 @@ int main(int argc, char *argv[])
    // 3. Read the (serial) mesh from the given mesh file on all processors.  We
    //    can handle triangular, quadrilateral, tetrahedral, hexahedral, surface
    //    and volume meshes with the same code.
-   int nx = pow(2, par_ref_levels + 1);
-   Mesh *mesh = new Mesh(nx, nx, nx, mfem::Element::HEXAHEDRON, 1);
-//   std::ifstream imesh("/Users/lee1029/Codes/meshes/cylinder_mfem.mesh3d");
-//   Mesh *mesh = new Mesh(imesh, 1, 1);
-//   imesh.close();
+//   int nx = pow(2, par_ref_levels + 1);
+//   Mesh *mesh = new Mesh(nx, nx, nx, mfem::Element::HEXAHEDRON, 1);
+   std::ifstream imesh("/Users/lee1029/Codes/meshes/cylinder_mfem.mesh3d");
+   Mesh *mesh = new Mesh(imesh, 1, 1);
+   imesh.close();
    int dim = mesh->Dimension();
 
    // 4. Refine the serial mesh on all processors to increase the resolution. In
@@ -106,14 +106,14 @@ int main(int argc, char *argv[])
    //    this mesh further in parallel to increase the resolution. Once the
    //    parallel mesh is defined, the serial mesh can be deleted.
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
-//   {
-//       for (int l = 0; l < par_ref_levels; l++)
-//           pmesh->UniformRefinement();
-//   }
+   {
+       for (int l = 0; l < par_ref_levels; l++)
+           pmesh->UniformRefinement();
+   }
    delete mesh;
 
    Array<int> ess_bdr(pmesh->bdr_attributes.Max());
-   ess_bdr = 1;
+   ess_bdr = 0;
    ess_bdr[0] = 1;
    //   ess_bdr.Last() = 0;
 
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
    bVarf->AddDomainIntegrator(new VectorFEDivergenceIntegrator);
    bVarf->Assemble();
    bVarf->Finalize();
-   mfem::SparseMatrix D(bVarf->SpMat());
+   mfem::SparseMatrix D_tmp(bVarf->SpMat());
    bVarf->EliminateTrialDofs(ess_bdr, x.GetBlock(0), *fform);
 
    // Wrap the space-time CFOSLS problem as a MixedMatrix
@@ -199,10 +199,8 @@ int main(int argc, char *argv[])
    auto& edge_trueedge = *(R_space->Dof_TrueDof_Matrix());
    Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
 
-   GraphSpace graph_space(graph);
-
    std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
-   mfem::Array<int> vdofs;
+   mfem::Array<int> vdofs, reordered_edges, original_edges;
    for (int i = 0; i < pmesh->GetNE(); ++i)
    {
        mVarf->ComputeElementMatrix(i, M_el[i]);
@@ -217,14 +215,35 @@ int main(int argc, char *argv[])
        mfem::DenseMatrix help(sign_fix);
        mfem::Mult(M_el[i], sign_fix, help);
        mfem::Mult(sign_fix, help, M_el[i]);
-   }
 
-   auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), std::move(vertex_edge));
-   SparseMatrix W;
+       GetTableRow(graph.VertexToEdge(), i, reordered_edges);
+       GetTableRow(vertex_edge, i, original_edges);
+       mfem::DenseMatrix local_reorder_map(reordered_edges.Size());
+       for (int j = 0; j < reordered_edges.Size(); ++j)
+       {
+           int reordered_edge = reordered_edges[j];
+           int original_edge = graph.EdgeReorderMap().GetRowColumns(reordered_edge)[0];
+           int original_local = original_edges.Find(original_edge);
+           assert(original_local != -1);
+           local_reorder_map(original_local, j) = 1;
+       }
+
+       mfem::Mult(M_el[i], local_reorder_map, help);
+       local_reorder_map.Transpose();
+       mfem::Mult(local_reorder_map, help, M_el[i]);
+   }
+   auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), graph.VertexToEdge());
+
+   auto edge_reoder_mapT = smoothg::Transpose(graph.EdgeReorderMap());
+   mfem::SparseMatrix D = smoothg::Mult(D_tmp, edge_reoder_mapT);
+
+   mfem::SparseMatrix W;
    mfem::Vector const_rep(graph.NumVertices());
    const_rep = 1.0;
    mfem::Vector vertex_sizes(const_rep);
-   SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
+   mfem::SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
+
+   GraphSpace graph_space(std::move(graph));
 
    MixedMatrix mixed_system(std::move(graph_space), std::move(mbuilder),
                             std::move(D), std::move(W), std::move(const_rep),
@@ -234,7 +253,7 @@ int main(int argc, char *argv[])
    hierarchy.PrintInfo();
    Upscale upscale(std::move(hierarchy));
 
-   ParGridFunction u, sigma;
+   ParGridFunction u, sigma(R_space);
 
    std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs);
    for (int level = 0; level < upscale_param.max_levels; ++level)
@@ -248,7 +267,8 @@ int main(int argc, char *argv[])
        }
 
        u.MakeRef(W_space, sol[level].GetBlock(1), 0);
-       sigma.MakeRef(R_space, sol[level].GetBlock(0), 0);
+//       sigma.MakeRef(R_space, sol[level].GetBlock(0), 0);
+       edge_reoder_mapT.Mult(sol[level].GetBlock(0), sigma);
 
        if (visualization)
        {
@@ -307,69 +327,69 @@ int main(int argc, char *argv[])
 }
 
 // This is actually the function for imposing boundary (or initial) condition
-//double GaussianHill(const Vector& xt)
+double GaussianHill(const Vector& xt)
+{
+    return std::exp(-100.0 * (std::pow(xt(0) - 0.5, 2.0) + xt(1) * xt(1)));
+}
+
+//double GaussianHill(const Vector&xvec)
 //{
-//    return std::exp(-100.0 * (std::pow(xt(0) - 0.5, 2.0) + xt(1) * xt(1)));
+//    double x = xvec(0);
+//    double y = xvec(1);
+//    return exp(-100.0 * ((x - 0.5) * (x - 0.5) + y * y));
 //}
 
-////double GaussianHill(const Vector&xvec)
-////{
-////    double x = xvec(0);
-////    double y = xvec(1);
-////    return exp(-100.0 * ((x - 0.5) * (x - 0.5) + y * y));
-////}
+double uFun_ex(const Vector& xt)
+{
+    double x = xt(0);
+    double y = xt(1);
+    double r = sqrt(x*x + y*y);
+    double teta = atan2(y,x);
+    /*
+    if (fabs(x) < MYZEROTOL && y > 0)
+        teta = M_PI / 2.0;
+    else if (fabs(x) < MYZEROTOL && y < 0)
+        teta = - M_PI / 2.0;
+    else
+        teta = atan(y,x);
+    */
+    double t = xt(xt.Size()-1);
+    Vector xvec(2);
+    xvec(0) = r * cos (teta - t);
+    xvec(1) = r * sin (teta - t);
+    return GaussianHill(xvec);
+}
 
-//double uFun_ex(const Vector& xt)
-//{
-//    double x = xt(0);
-//    double y = xt(1);
-//    double r = sqrt(x*x + y*y);
-//    double teta = atan2(y,x);
-//    /*
-//    if (fabs(x) < MYZEROTOL && y > 0)
-//        teta = M_PI / 2.0;
-//    else if (fabs(x) < MYZEROTOL && y < 0)
-//        teta = - M_PI / 2.0;
-//    else
-//        teta = atan(y,x);
-//    */
-//    double t = xt(xt.Size()-1);
-//    Vector xvec(2);
-//    xvec(0) = r * cos (teta - t);
-//    xvec(1) = r * sin (teta - t);
-//    return GaussianHill(xvec);
-//}
+double fFun(const Vector& xt)
+{
+    return 0.0;
+}
 
-//double fFun(const Vector& xt)
-//{
-//    return 0.0;
-//}
+void bFun_ex(const Vector& xt, Vector& b )
+{
+    b.SetSize(xt.Size());
 
-//void bFun_ex(const Vector& xt, Vector& b )
-//{
-//    b.SetSize(xt.Size());
+    if (xt.Size() == 3)
+    {
+        b(0) = -xt(1);
+        b(1) = xt(0);
+    }
+    else
+    {
+        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
+        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
+        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
+    }
 
-//    if (xt.Size() == 3)
-//    {
-//        b(0) = -xt(1);
-//        b(1) = xt(0);
-//    }
-//    else
-//    {
-//        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
-//        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
-//        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
-//    }
+    b(xt.Size()-1) = 1.;
+}
 
-//    b(xt.Size()-1) = 1.;
-//}
-
-//void bfFun_ex(const Vector& xt, Vector& bf)
-//{
-//    bf.SetSize(xt.Size());
-//    bFun_ex(xt, bf);
-//    bf *= fFun(xt);
-//}
+void bfFun_ex(const Vector& xt, Vector& bf)
+{
+    bf.SetSize(xt.Size());
+    bFun_ex(xt, bf);
+    bf *= fFun(xt);
+}
 
 void sigmaFun_ex(const Vector& xt, Vector& sigma)
 {
@@ -406,42 +426,42 @@ void bbT_ex(const Vector& xt, DenseMatrix& bbT)
     MultVVt(b, bbT);
 }
 
-double uFun_ex(const Vector& xt)
-{
-    double t = xt(xt.Size()-1);
-//    return t;
-    return sin(t)*exp(t)*xt(0)*xt(1);
-}
+//double uFun_ex(const Vector& xt)
+//{
+//    double t = xt(xt.Size()-1);
+////    return t;
+//    return sin(t)*exp(t)*xt(0)*xt(1);
+//}
 
-double fFun(const Vector& xt)
-{
-//    double tmp = 0.;
-//    for (int i = 0; i < xt.Size()-1; i++)
-//        tmp += xt(i);
-//    return 1.;//+ (xt.Size()-1-2*tmp) * uFun_ex(xt);
-    double t = xt(xt.Size()-1);
-    Vector b;
-    bFun_ex(xt, b);
-    return (cos(t)*exp(t)+sin(t)*exp(t))*xt(0)*xt(1)+
-            b(0)*sin(t)*exp(t)*xt(1) + b(1)*sin(t)*exp(t)*xt(0);
-}
+//double fFun(const Vector& xt)
+//{
+////    double tmp = 0.;
+////    for (int i = 0; i < xt.Size()-1; i++)
+////        tmp += xt(i);
+////    return 1.;//+ (xt.Size()-1-2*tmp) * uFun_ex(xt);
+//    double t = xt(xt.Size()-1);
+//    Vector b;
+//    bFun_ex(xt, b);
+//    return (cos(t)*exp(t)+sin(t)*exp(t))*xt(0)*xt(1)+
+//            b(0)*sin(t)*exp(t)*xt(1) + b(1)*sin(t)*exp(t)*xt(0);
+//}
 
-void bFun_ex(const Vector& xt, Vector& b)
-{
-    b.SetSize(xt.Size());
-    b = 0.;
+//void bFun_ex(const Vector& xt, Vector& b)
+//{
+//    b.SetSize(xt.Size());
+//    b = 0.;
 
-    b(xt.Size()-1) = 1.;
+//    b(xt.Size()-1) = 1.;
 
-    if (xt.Size() == 3)
-    {
-        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI);
-        b(1) = -sin(xt(1)*M_PI)*cos(xt(0)*M_PI);
-    }
-    else
-    {
-        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
-        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
-        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
-    }
-}
+//    if (xt.Size() == 3)
+//    {
+//        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI);
+//        b(1) = -sin(xt(1)*M_PI)*cos(xt(0)*M_PI);
+//    }
+//    else
+//    {
+//        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
+//        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
+//        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
+//    }
+//}

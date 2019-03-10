@@ -108,6 +108,33 @@ mfem::HypreParMatrix* MixedMatrix::MakeParallelW(const mfem::SparseMatrix& W) co
     return new mfem::HypreParMatrix(GetComm(), vdof_starts.Last(), vdof_starts, W_ptr);
 }
 
+mfem::Vector MixedMatrix::AssembleTrueVector(const mfem::Vector& vec) const
+{
+    assert(vec.Size() == block_offsets_[2]);
+    mfem::BlockVector block_vec(vec.GetData(), block_offsets_);
+    mfem::BlockVector block_true_vec(block_true_offsets_);
+
+    graph_space_.TrueEDofToEDof().Mult(
+        block_vec.GetBlock(0), block_true_vec.GetBlock(0));
+    block_true_vec.GetBlock(1) = block_vec.GetBlock(1);
+    return block_true_vec;
+}
+
+void MixedMatrix::Mult(const mfem::Vector& scale,
+                       const mfem::BlockVector& x,
+                       mfem::BlockVector& y) const
+{
+    y.GetBlock(0) = mbuilder_->Mult(scale, x.GetBlock(0));
+    D_.AddMultTranspose(x.GetBlock(1), y.GetBlock(0));
+    for (int i = 0; i < ess_edofs_.Size(); ++i)
+    {
+        if (ess_edofs_[i])
+            y[i] = x[i];
+    }
+
+    D_.Mult(x.GetBlock(0), y.GetBlock(1));
+}
+
 mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
 {
     const mfem::SparseMatrix& vertex_edge = graph.VertexToEdge();
@@ -144,6 +171,13 @@ mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
     }
 
     return smoothg::Transpose(graphDT);
+}
+
+void MixedMatrix::SetEssDofs(const mfem::Array<int>& ess_attr)
+{
+    ess_edofs_.SetSize(NumEDofs(), 0);
+    BooleanMult(graph_space_.EDofToBdrAtt(), ess_attr, ess_edofs_);
+    ess_edofs_.SetSize(NumEDofs());
 }
 
 } // namespace smoothg

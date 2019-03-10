@@ -59,6 +59,10 @@ public:
     */
     virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const = 0;
+
+    /// @return scaled M times x
+    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x) const = 0;
 protected:
     unsigned int num_aggs_;
 };
@@ -107,6 +111,9 @@ public:
         const mfem::Vector& agg_weights_inverse) const = 0;
 
     virtual bool NeedsCoarseVertexDofs() { return false; }
+
+    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x) const = 0;
 
 protected:
     int total_num_traces_;
@@ -160,6 +167,10 @@ public:
 
     const mfem::SparseMatrix& GetElemEdgeDofTable() const { return elem_edgedof_; }
 
+    /// @return scaled M times x
+    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x) const;
+
 private:
     std::vector<mfem::DenseMatrix> M_el_;
     mfem::SparseMatrix elem_edgedof_;
@@ -207,6 +218,8 @@ public:
     virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
 
+    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x) const;
 private:
     /// @todo remove this (GetTableRowCopy is the same thing?)
     void GetCoarseFaceDofs(

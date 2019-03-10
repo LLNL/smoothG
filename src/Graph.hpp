@@ -147,12 +147,14 @@ public:
     const int NumVertices() const { return vertex_edge_local_.NumRows(); }
     const int NumEdges() const { return vertex_edge_local_.NumCols(); }
     MPI_Comm GetComm() const { return edge_trueedge_->GetComm(); }
+    const mfem::SparseMatrix& EdgeReorderMap() const { return edge_reorder_map_; }
     ///@}
 
     /// Indicate if the graph has "boundary"
     bool HasBoundary() const { return edge_bdratt_.Width() > 0; }
 private:
-    void Init(const mfem::SparseMatrix* edge_bdratt);
+    void Init(const mfem::HypreParMatrix& edge_trueedge,
+              const mfem::SparseMatrix* edge_bdratt);
 
     void Distribute(MPI_Comm comm,
                     const mfem::SparseMatrix& vertex_edge_global,
@@ -170,7 +172,10 @@ private:
     void SplitEdgeWeight(const mfem::Vector& edge_weight_local);
 
     /// For edges shared by two processes, multiply weight by 2
-    void FixSharedEdgeWeight(mfem::Vector& edge_weight_local);
+    void FixSharedEdgeWeight(const mfem::HypreParMatrix& edge_trueedge,
+                             mfem::Vector& edge_weight_local);
+
+    void ReorderEdges(const mfem::HypreParMatrix& edge_trueedge);
 
     mfem::Vector ReadVector(const std::string& filename, int global_size,
                             const mfem::Array<int>& local_to_global) const;
@@ -190,6 +195,8 @@ private:
     mfem::Array<int> edge_loc_to_glo_;
     mfem::Array<HYPRE_Int> vertex_starts_;
     mfem::Array<HYPRE_Int> edge_starts_;
+
+    mfem::SparseMatrix edge_reorder_map_;
 }; // class Graph
 
 } // namespace smoothg

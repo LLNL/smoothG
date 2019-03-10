@@ -55,6 +55,10 @@ public:
     /// Update solver based on new "element" scaling for M matrix
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse) = 0;
 
+    /// Update the Jacobian associated with the nonlinear graph Laplacian problem
+    virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                const std::vector<mfem::DenseMatrix>& N_el) = 0;
+
     ///@name Set solver parameters
     ///@{
     virtual void SetPrintLevel(int print_level) { print_level_ = print_level; }
@@ -97,6 +101,52 @@ protected:
 
     mfem::Array<int> ess_edofs_;
     const mfem::Vector* const_rep_;
+
+    mfem::GMRESSolver gmres_;
+    bool is_symmetric_;
+};
+
+class PrimalSolver : public MixedLaplacianSolver
+{
+public:
+    /**
+       @brief Constructor from individual M and D matrices.
+
+       @param mgL containing information of mixed system
+       @param ess_attr marker for essential boundary attributes
+    */
+    PrimalSolver(const MixedMatrix& mgL,
+                 const mfem::Array<int>* ess_attr = nullptr);
+
+    /**
+       @brief Use CG preconditioned by BoomerAMG to solve the primal problem.
+    */
+    virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
+
+    ///@name Set solver parameters
+    ///@{
+    virtual void SetPrintLevel(int print_level) override;
+    virtual void SetMaxIter(int max_num_iter) override;
+    virtual void SetRelTol(double rtol) override;
+    virtual void SetAbsTol(double atol) override;
+    ///@}
+
+protected:
+    void Init(mfem::SparseMatrix M_proc);
+
+    mfem::CGSolver cg_;
+
+    mfem::Vector M_diag_;
+    std::unique_ptr<mfem::HypreParMatrix> D_;
+    std::unique_ptr<mfem::HypreParMatrix> Dt_;
+    std::unique_ptr<mfem::SparseMatrix> W_;
+
+    std::unique_ptr<mfem::HypreParMatrix> operator_;
+    std::unique_ptr<mfem::HypreBoomerAMG> prec_;
+
+    const MixedMatrix& mixed_matrix_;
 };
 
 } // namespace smoothg

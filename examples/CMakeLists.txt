@@ -43,6 +43,9 @@ target_link_libraries(samplesolve smoothg ${TPL_LIBRARIES})
 add_executable(qoi qoi.cpp)
 target_link_libraries(qoi smoothg ${TPL_LIBRARIES})
 
+add_executable(nldarcy nldarcy.cpp)
+target_link_libraries(nldarcy smoothg ${TPL_LIBRARIES})
+
 add_executable(spacetime spacetime.cpp)
 target_link_libraries(spacetime smoothg ${TPL_LIBRARIES})
 

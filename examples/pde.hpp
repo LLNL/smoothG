@@ -410,6 +410,8 @@ public:
     /// Construct partitioning array for vertices
     void Partition(bool metis_parition, const mfem::Array<int>& coarsening_factors,
                    mfem::Array<int>& partitioning) const;
+
+    mfem::Vector GetZVector() const;
 protected:
     void BuildReservoirGraph();
     void InitGraph();
@@ -574,7 +576,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
-    vis_v << "window_size 500 800\n";
+    vis_v << "window_size 800 250\n";//500 800
     vis_v << "window_title 'vertex space unknown'\n";
     vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
     if (range_max > range_min)
@@ -593,7 +595,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
         vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
     }
 
-    vis_v << "keys c\n"; // colorbar
+    //    vis_v << "keys c\n"; // colorbar
 
     if (coef)
     {
@@ -695,6 +697,27 @@ void DarcyProblem::Partition(bool metis_parition,
     {
         CartPart(coarsening_factors, partitioning);
     }
+}
+
+mfem::Vector DarcyProblem::GetZVector() const
+{
+    mfem::Vector Z_vector(vertex_edge_.NumRows());
+    Z_vector = 0.0;
+
+    int z_index = pmesh_->SpaceDimension() - 1;
+
+    mfem::Array<int> vertices;
+    for (int i = 0; i < pmesh_->GetNE(); ++i)
+    {
+        pmesh_->GetElement(i)->GetVertices(vertices);
+        for (auto& vertex : vertices)
+        {
+            Z_vector[i] += pmesh_->GetVertex(vertex)[z_index];
+        }
+        Z_vector[i] /= vertices.Size();
+    }
+
+    return Z_vector;
 }
 
 /**
@@ -826,17 +849,7 @@ unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis
 
 void SPE10Problem::MakeRHS()
 {
-    bool no_flow_bc = true;
-    for (auto attr : ess_attr_)
-    {
-        if (attr == 0)
-        {
-            no_flow_bc = false;
-            break;
-        }
-    }
-
-    if (no_flow_bc)
+    if (ess_attr_.Find(0) == -1) // Neumann condition on whole boundary
     {
         rhs_sigma_ = 0.0;
 
@@ -871,6 +884,215 @@ mfem::Vector SPE10Problem::InitialCondition(double initial_val) const
     init.ProjectCoefficient(half);
 
     return init;
+}
+
+class LognormalModel : public DarcyProblem
+{
+public:
+    LognormalModel(int nDimensions, int num_ser_ref, int num_par_ref,
+                   double correlation_length, const mfem::Array<int>& ess_attr);
+private:
+    void SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref);
+    void SetupCoeff(int nDimensions, double correlation_length, int more_ref);
+
+    unique_ptr<mfem::ParMesh> pmesh_c_;
+};
+
+LognormalModel::LognormalModel(int nDimensions, int num_ser_ref,
+                               int num_par_ref, double correlation_length,
+                               const mfem::Array<int>& ess_attr)
+    : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
+{
+    SetupMesh(nDimensions, num_ser_ref, num_par_ref);
+    InitGraph();
+
+    int more_ref = num_par_ref ;
+    SetupCoeff(nDimensions, correlation_length, more_ref);
+    ComputeGraphWeight();
+
+    rhs_u_ = -1.0 * CellVolume();
+}
+
+void LognormalModel::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref)
+{
+    const int N = std::pow(2, num_ser_ref);
+    unique_ptr<mfem::Mesh> mesh;
+    if (nDimensions == 2)
+    {
+        mesh = make_unique<mfem::Mesh>(N, N, mfem::Element::QUADRILATERAL, 1);
+    }
+    else
+    {
+        mesh = make_unique<mfem::Mesh>(N, N, N, mfem::Element::HEXAHEDRON, 1);
+    }
+
+    pmesh_ = make_unique<mfem::ParMesh>(comm_, *mesh);
+    for (int i = 0; i < 0; i++)
+    {
+        pmesh_->UniformRefinement();
+    }
+    pmesh_c_ = make_unique<mfem::ParMesh>(*pmesh_);
+    for (int i = 0; i < num_par_ref ; i++)
+    {
+        pmesh_->UniformRefinement();
+    }
+}
+
+void LognormalModel::SetupCoeff(int nDimensions, double correlation_length, int more_ref)
+{
+    double nu_parameter = nDimensions == 2 ? 1.0 : 0.5;
+    double kappa = std::sqrt(2.0 * nu_parameter) / correlation_length;
+
+    double ddim = static_cast<double>(nDimensions);
+    double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
+                      std::sqrt( std::tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+
+    mfem::Array<int> ess_attr(ess_attr_.Size(), 0);
+
+    DarcyProblem darcy_problem(*pmesh_, ess_attr);
+    mfem::SparseMatrix W_block = SparseIdentity(pmesh_->GetNE());
+    double cell_vol = CellVolume();
+    W_block = cell_vol * kappa * kappa;
+    MixedMatrix mgL(darcy_problem.GetFVGraph(), W_block);
+    mgL.BuildM();
+
+    NormalDistribution normal_dist(0.0, 1.0, 22 + myid_);
+    mfem::Vector rhs(mgL.GetD().NumRows());
+
+    for (int i = 0; i < rhs.Size(); ++i)
+    {
+        rhs[i] = scalar_g * std::sqrt(cell_vol) * normal_dist.Sample();
+    }
+
+    MinresBlockSolverFalse solver(mgL, &ess_attr);
+    mfem::Vector sol;
+    sol = 0.0;
+    solver.Solve(rhs, sol);
+
+    for (int i = 0; i < coeff_gf_->Size(); ++i)
+    {
+        coeff_gf_->Elem(i) = std::exp(sol[i]);
+    }
+    kinv_scalar_ = make_unique<mfem::GridFunctionCoefficient>(coeff_gf_.get());
+
+    //    mfem::socketstream soc;
+    //    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+}
+
+class EggModel : public DarcyProblem
+{
+public:
+    EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess_attr);
+private:
+    void SetupMesh(int num_ser_ref, int num_par_ref);
+    void SetupCoeff();
+};
+
+EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess_attr)
+    : DarcyProblem(MPI_COMM_WORLD, 3, ess_attr)
+{
+    SetupMesh(num_ser_ref, num_par_ref);
+    InitGraph();
+
+    SetupCoeff();
+    ComputeGraphWeight();
+
+    rhs_u_ = -1.0 * CellVolume();
+}
+
+void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
+{
+    std::ifstream imesh("egg_model.mesh");
+    mfem::Mesh mesh(imesh, 1, 1);
+
+    for (int i = 0; i < num_ser_ref; i++)
+    {
+        mesh.UniformRefinement();
+    }
+
+    pmesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
+    for (int i = 0; i < num_par_ref; i++)
+    {
+        pmesh_->UniformRefinement();
+    }
+}
+
+void EggModel::SetupCoeff()
+{
+    mfem::Array<int> N(3);
+    N = 60;
+    N[2] = 7;
+
+    mfem::Vector h(3);
+    h = 8.0;
+    h(2) = 4.0;
+
+    using IPC = InversePermeabilityCoefficient;
+    kinv_vector_ = make_unique<IPC>(comm_, "egg_perm_27.txt", N, N, h);
+
+    // visualize coefficient norm
+    //    kinv_scalar_ = make_unique<mfem::FunctionCoefficient>(IPC::InvNorm2);
+    //    coeff_gf_->ProjectCoefficient(*kinv_scalar_);
+    //    mfem::socketstream soc;
+    //    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+}
+
+// domain = (0, 4000) x (0, 1000) cm
+// BC 10 cm/year = (10 / 365) cm/day on (0, 2000) x {1000} cm
+class Richards : public DarcyProblem
+{
+public:
+    Richards(int num_ref, const mfem::Array<int>& ess_attr);
+    mfem::Vector GetZVector() const;
+private:
+    void SetupMeshCoeff(int num_ref);
+    void SetupRHS();
+};
+
+Richards::Richards(int num_ref, const mfem::Array<int>& ess_attr)
+    : DarcyProblem(MPI_COMM_WORLD, 2, ess_attr)
+{
+    SetupMeshCoeff(num_ref);
+    InitGraph();
+
+    kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
+    ComputeGraphWeight();
+
+    SetupRHS();
+}
+
+void Richards::SetupMeshCoeff(int num_ref)
+{
+    mfem::Mesh mesh(40, 10, mfem::Element::QUADRILATERAL, 1, 4000.0, 1000.0);
+    for (int i = 0; i < num_ref; i++)
+    {
+        mesh.UniformRefinement();
+    }
+
+    pmesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
+}
+
+void Velocity(const mfem::Vector& x, mfem::Vector& out)
+{
+    out.SetSize(x.Size());
+    out[0] = 0.0;
+    out[1] = x[0] <= 2000.0 ? -10. / 365.0 : 0.0;
+}
+
+void Richards::SetupRHS()
+{
+    mfem::ParMixedBilinearForm bVarf(sigma_fes_.get(), u_fes_.get());
+    bVarf.AddDomainIntegrator(new mfem::VectorFEDivergenceIntegrator);
+    bVarf.Assemble();
+    bVarf.Finalize();
+
+    mfem::ParGridFunction flux_gf(sigma_fes_.get());
+    flux_gf = 0.0;
+
+    mfem::VectorFunctionCoefficient velocity_coeff(2, Velocity);
+    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, ess_attr_);
+
+    bVarf.SpMat().AddMult(flux_gf, rhs_u_, 1.0);
 }
 
 } // namespace smoothg

@@ -616,6 +616,7 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
     }
 
     /* hypre_ParCSRMatrixSetNumNonzeros(A); */
+    hypre_ParCSRMatrixSetNumNonzeros(C);
 
     /* Make sure that the first entry in each row is the diagonal one. */
     hypre_CSRMatrixReorder(hypre_ParCSRMatrixDiag(C));
@@ -1283,6 +1284,11 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
     mfem::SparseMatrix offd;
     mat.GetOffd(offd, col_map);
     return offd;
+}
+
+int NNZ(const mfem::SparseMatrix& mat)
+{
+    return mat.NumNonZeroElems();
 }
 
 } // namespace smoothg

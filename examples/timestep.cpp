@@ -144,7 +144,6 @@ int main(int argc, char* argv[])
         assert(hierarchy.GetMatrix(k).CheckW());
         const mfem::SparseMatrix& W = hierarchy.GetMatrix(k).GetW();
 
-
         // Setup visualization
         mfem::socketstream vis_v;
 
