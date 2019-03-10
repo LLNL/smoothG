@@ -104,15 +104,20 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     MixedLaplacianSolver::Init(mgL, ess_attr);
 
     mfem::SparseMatrix M_proc(mgL.GetM());
+    mfem::SparseMatrix M_elim(M_proc.NumRows());
+
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+            M_proc.EliminateRowCol(mm, M_elim);
     }
+
+    M_elim_.Swap(M_elim);
 
     hM_.reset(mgL.MakeParallelM(M_proc));
 
     mfem::SparseMatrix D_proc(mgL.GetD());
+    mfem::SparseMatrix D_elim(D_proc);
     if (ess_edofs_.Size())
     {
         D_proc.EliminateCols(ess_edofs_);
@@ -122,6 +127,9 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     {
         D_proc.EliminateRow(0);
     }
+
+    D_elim.Add(-1.0, D_proc);
+    D_elim_.Swap(D_elim);
 
     hD_.reset(mgL.MakeParallelD(D_proc));
 
@@ -229,9 +237,20 @@ MinresBlockSolverFalse::MinresBlockSolverFalse(const MixedMatrix& mgL,
 void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
                                   mfem::BlockVector& sol) const
 {
+    mfem::Vector rhs_sigma(rhs.GetBlock(0));
+    M_elim_.AddMult(sol.GetBlock(0), rhs_sigma, -1);
+
+    for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
+    {
+        if (ess_edofs_[mm])
+            rhs_sigma[mm] = sol[mm];
+    }
+
     const auto& edof_trueedof = mixed_matrix_.GetGraphSpace().EDofToTrueEDof();
-    edof_trueedof.MultTranspose(rhs.GetBlock(0), rhs_.GetBlock(0));
+    edof_trueedof.MultTranspose(rhs_sigma, rhs_.GetBlock(0));
+
     rhs_.GetBlock(1) = rhs.GetBlock(1);
+    D_elim_.AddMult(sol.GetBlock(0), rhs_.GetBlock(1), -1);
 
     mfem::SparseMatrix edof_trueedof_diag = GetDiag(edof_trueedof);
     edof_trueedof_diag.MultTranspose(sol.GetBlock(0), sol_.GetBlock(0));

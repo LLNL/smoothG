@@ -84,9 +84,16 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
 {
     // restrict right-hand-side x
     rhs_[0] = x;
+    sol_[0] = y;
+
     for (int i = 0; i < level; ++i)
     {
         hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
+    }
+
+    for (int i = 0; i < level; ++i)
+    {
+        hierarchy_.Project(i, sol_[i], sol_[i + 1]);
     }
 
     hierarchy_.Solve(level, rhs_[level], sol_[level]);

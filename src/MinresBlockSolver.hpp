@@ -119,6 +119,9 @@ protected:
 
     std::unique_ptr<mfem::HypreSmoother> Mprec_;
     std::unique_ptr<mfem::HypreBoomerAMG> Sprec_;
+
+    mfem::SparseMatrix M_elim_;
+    mfem::SparseMatrix D_elim_;
 };
 
 /**

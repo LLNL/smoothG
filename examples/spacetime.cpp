@@ -184,14 +184,11 @@ int main(int argc, char *argv[])
 
    mVarf->AddDomainIntegrator(new VectorFEMassIntegrator(Ktilde));
    mVarf->ComputeElementMatrices();
-   mVarf->Assemble();
-   mVarf->EliminateEssentialBC(ess_bdr, x.GetBlock(0), *gform);
 
    bVarf->AddDomainIntegrator(new VectorFEDivergenceIntegrator);
    bVarf->Assemble();
    bVarf->Finalize();
    mfem::SparseMatrix D_tmp(bVarf->SpMat());
-   bVarf->EliminateTrialDofs(ess_bdr, x.GetBlock(0), *fform);
 
    // Wrap the space-time CFOSLS problem as a MixedMatrix
    auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh);
@@ -255,7 +252,7 @@ int main(int argc, char *argv[])
 
    ParGridFunction u, sigma(R_space);
 
-   std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs);
+   std::vector<mfem::BlockVector> sol(upscale_param.max_levels, x);
    for (int level = 0; level < upscale_param.max_levels; ++level)
    {
        upscale.Solve(level, rhs, sol[level]);
@@ -267,7 +264,6 @@ int main(int argc, char *argv[])
        }
 
        u.MakeRef(W_space, sol[level].GetBlock(1), 0);
-//       sigma.MakeRef(R_space, sol[level].GetBlock(0), 0);
        edge_reoder_mapT.Mult(sol[level].GetBlock(0), sigma);
 
        if (visualization)
@@ -310,6 +306,7 @@ int main(int argc, char *argv[])
       std::cout << "|| u_h - u_ex || / || u_ex || = " << err_u / norm_u << "\n";
       std::cout << "|| sigma_h - sigma_ex || / || sigma_ex || = "
                 << err_sigma / norm_sigma << "\n";
+      std::cout << "|| sigma_h - sigma_ex || = " << err_sigma << "\n";
    }
 
    // 17. Free the used memory.
