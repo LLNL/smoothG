@@ -343,6 +343,137 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 }
 
 /**
+ @brief compute transmissibility based on two-point flux approximation
+
+ The implementation is based on (Sec. 4.4.1 of) the preliminary version of
+
+ K.-A. Lie. An introduction to reservoir simulation using MATLAB/GNU Octave
+ **/
+class LocalTPFA
+{
+    mfem::Coefficient* Q_;
+    mfem::VectorCoefficient* VQ_;
+    const mfem::ParMesh& mesh_;
+    const mfem::SparseMatrix& vert_edge_;
+
+public:
+    LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge)
+        : Q_(NULL), VQ_(NULL), mesh_(mesh), vert_edge_(vert_edge) { }
+
+    LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge,
+              mfem::Coefficient& q)
+        : Q_(&q), VQ_(NULL), mesh_(mesh), vert_edge_(vert_edge) { }
+
+    LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge,
+              mfem::VectorCoefficient& q)
+        : Q_(NULL), VQ_(&q), mesh_(mesh), vert_edge_(vert_edge) { }
+
+    mfem::Vector ComputeLocalWeight(int i);
+    std::vector<mfem::Vector> ComputeLocalWeights()
+    {
+        std::vector<mfem::Vector> local_weights(mesh_.GetNE());
+        for (int i = 0; i < mesh_.GetNE(); ++i)
+        {
+            local_weights[i] = ComputeLocalWeight(i);
+        }
+        return local_weights;
+    }
+};
+
+mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
+{
+    const int dim = mesh_.Dimension();
+    const mfem::Element& el = *(mesh_.GetElement(i));
+
+    const int num_facets = vert_edge_.RowSize(i);
+    const int num_verts = el.GetNVertices();
+
+    mfem::Vector cell_center(dim);
+    cell_center = 0.0;
+
+    for (int v = 0; v < num_verts; ++v)
+    {
+        const double* vert_coord = mesh_.GetVertex(el.GetVertices()[v]);
+        for (int d = 0; d < dim; ++d)
+        {
+            cell_center[d] += vert_coord[d];
+        }
+    }
+    cell_center /= num_verts;
+
+    auto Trans = const_cast<mfem::ParMesh&>(mesh_).GetElementTransformation(i);
+    const auto& ip = mfem::IntRules.Get(el.GetType(), 1).IntPoint(0);
+
+    // Note that Q is k^{-1}
+    mfem::DenseMatrix kappa(dim);
+    if (VQ_)
+    {
+        mfem::Vector vq(dim);
+        VQ_->Eval(vq, *Trans, ip);
+        for (int d = 0; d < dim; ++d)
+            kappa(d, d) = 1.0 / vq(d);
+    }
+    else if (Q_)
+    {
+        double sq = Q_->Eval(*Trans, ip);
+        for (int d = 0; d < dim; ++d)
+            kappa(d, d) = 1.0 / sq;
+    }
+    else
+    {
+        for (int d = 0; d < dim; ++d)
+            kappa(d, d) = 1.0;
+    }
+
+    mfem::Vector local_weight(num_facets);
+
+    mfem::Array<int> verts, edges;
+    mfem::Vector normal, c_vector;
+
+    GetTableRow(vert_edge_, i, edges);
+
+    for (int e = 0; e < num_facets; ++e)
+    {
+        double facet_measure;
+        if (dim == 2)
+        {
+            mesh_.GetEdgeVertices(edges[e], verts);
+
+            const double* v0_coord = mesh_.GetVertex(verts[0]);
+            const double* v1_coord = mesh_.GetVertex(verts[1]);
+
+            normal.SetSize(2);
+            normal[0] = -1.0 * (v1_coord[1] - v0_coord[1]);
+            normal[1] = v1_coord[0] - v0_coord[0];
+
+            facet_measure = normal.Norml2();
+
+            normal /= facet_measure;
+
+            mfem::Vector facet_ceter(2);
+            facet_ceter[0] = (v0_coord[0] + v1_coord[0]) * 0.5;
+            facet_ceter[1] = (v0_coord[1] + v1_coord[1]) * 0.5;
+
+            c_vector.SetSize(2);
+            c_vector[0] = facet_ceter[0] - cell_center[0];
+            c_vector[1] = facet_ceter[1] - cell_center[1];
+        }
+        else
+        {
+            assert(dim == 3);
+            // TODO
+        }
+
+        // Note that edge weight is inverse of M
+        double delta_x = c_vector.Norml2();
+        double nkc = std::fabs(kappa.InnerProduct(normal, c_vector));
+        local_weight(e) = (facet_measure * nkc) / (delta_x * delta_x);
+    }
+
+    return local_weight;
+}
+
+/**
    @brief Darcy's flow problem discretized in finite volume (TPFA)
 
    Abstract class serves as interface between graph and finite volume problem.
@@ -511,45 +642,29 @@ void DarcyProblem::ComputeGraphWeight(bool unit_weight)
         return;
     }
 
-    // Construct "finite volume mass" matrix
-    mfem::ParBilinearForm a(sigma_fes_.get());
-    if (kinv_vector_)
-    {
-        assert(kinv_scalar_ == nullptr);
-        a.AddDomainIntegrator(new FiniteVolumeMassIntegrator(*kinv_vector_));
-    }
-    else
-    {
-        assert(kinv_scalar_);
-        a.AddDomainIntegrator(new FiniteVolumeMassIntegrator(*kinv_scalar_));
-    }
+    // Compute local edge weights
+    LocalTPFA local_TPFA(*pmesh_, vertex_edge_, *kinv_vector_);
+    local_weight_ = local_TPFA.ComputeLocalWeights();
 
-    // Compute element mass matrices, assemble mass matrix and edge weight
-    a.ComputeElementMatrices();
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight_);
+    // Assemble edge weights w_ij = (w_{ij,i}^{-1} + w_{ij,j}^{-1})^{-1}
+    mfem::Array<int> edges;
+
+    weight_.SetSize(vertex_edge_.NumCols());
+    weight_ = 0.0;
+
+    for (int i = 0; i < vertex_edge_.NumRows(); ++i)
+    {
+        GetTableRow(vertex_edge_, i, edges);
+        for (int j = 0; j < edges.Size(); ++j)
+        {
+            weight_[edges[j]] += 1.0 / local_weight_[i][j];
+        }
+    }
 
     for (int i = 0; i < weight_.Size(); ++i)
     {
         assert(mfem::IsFinite(weight_[i]) && weight_[i] != 0.0);
         weight_[i] = 1.0 / weight_[i];
-    }
-
-    // Store element mass matrices and local edge weights
-    local_weight_.resize(vertex_edge_.NumRows());
-    mfem::DenseMatrix M_el_i;
-    for (int i = 0; i < pmesh_->GetNE(); i++)
-    {
-        a.ComputeElementMatrix(i, M_el_i);
-
-        mfem::Vector& local_weight_i = local_weight_[i];
-        local_weight_i.SetSize(M_el_i.Height());
-
-        for (int j = 0; j < M_el_i.Height(); j++)
-        {
-            local_weight_i[j] = 1.0 / M_el_i(j, j);
-        }
     }
 }
 
