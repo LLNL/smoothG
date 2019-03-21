@@ -356,10 +356,14 @@ class LocalTPFA
     const mfem::ParMesh& mesh_;
     const mfem::SparseMatrix& vert_edge_;
 
+    mfem::DenseMatrix EvalKappa(int i);
+    mfem::Vector ComputeShapeCenter(const mfem::Element& el);
+    mfem::Vector ComputeLocalWeight(int i);
 public:
     LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge)
         : Q_(NULL), VQ_(NULL), mesh_(mesh), vert_edge_(vert_edge) { }
 
+    /// @param q inverse of permeability \f$ kappa^{-1} \f$ in Darcy's law
     LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge,
               mfem::Coefficient& q)
         : Q_(&q), VQ_(NULL), mesh_(mesh), vert_edge_(vert_edge) { }
@@ -368,7 +372,7 @@ public:
               mfem::VectorCoefficient& q)
         : Q_(NULL), VQ_(&q), mesh_(mesh), vert_edge_(vert_edge) { }
 
-    mfem::Vector ComputeLocalWeight(int i);
+    /// Compute local edge weights for the corresponding graph Laplacian
     std::vector<mfem::Vector> ComputeLocalWeights()
     {
         std::vector<mfem::Vector> local_weights(mesh_.GetNE());
@@ -380,42 +384,26 @@ public:
     }
 };
 
-mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
+mfem::DenseMatrix LocalTPFA::EvalKappa(int i)
 {
     const int dim = mesh_.Dimension();
     const mfem::Element& el = *(mesh_.GetElement(i));
-
-    const int num_facets = vert_edge_.RowSize(i);
-    const int num_verts = el.GetNVertices();
-
-    mfem::Vector cell_center(dim);
-    cell_center = 0.0;
-
-    for (int v = 0; v < num_verts; ++v)
-    {
-        const double* vert_coord = mesh_.GetVertex(el.GetVertices()[v]);
-        for (int d = 0; d < dim; ++d)
-        {
-            cell_center[d] += vert_coord[d];
-        }
-    }
-    cell_center /= num_verts;
-
-    auto Trans = const_cast<mfem::ParMesh&>(mesh_).GetElementTransformation(i);
+    auto trans = const_cast<mfem::ParMesh&>(mesh_).GetElementTransformation(i);
     const auto& ip = mfem::IntRules.Get(el.GetType(), 1).IntPoint(0);
 
-    // Note that Q is k^{-1}
     mfem::DenseMatrix kappa(dim);
+
+    // Note that Q is kappa^{-1}
     if (VQ_)
     {
         mfem::Vector vq(dim);
-        VQ_->Eval(vq, *Trans, ip);
+        VQ_->Eval(vq, *trans, ip);
         for (int d = 0; d < dim; ++d)
             kappa(d, d) = 1.0 / vq(d);
     }
     else if (Q_)
     {
-        double sq = Q_->Eval(*Trans, ip);
+        double sq = Q_->Eval(*trans, ip);
         for (int d = 0; d < dim; ++d)
             kappa(d, d) = 1.0 / sq;
     }
@@ -425,43 +413,59 @@ mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
             kappa(d, d) = 1.0;
     }
 
-    mfem::Vector local_weight(num_facets);
+    return kappa;
+}
 
-    mfem::Array<int> verts, edges;
-    mfem::Vector normal, c_vector;
+mfem::Vector LocalTPFA::ComputeShapeCenter(const mfem::Element& el)
+{
+    const int dim = mesh_.Dimension();
+    const int num_verts = el.GetNVertices();
 
+    mfem::Vector center(dim);
+    center = 0.0;
+
+    for (int v = 0; v < num_verts; ++v)
+    {
+        const double* vert_coord = mesh_.GetVertex(el.GetVertices()[v]);
+        for (int d = 0; d < dim; ++d)
+        {
+            center[d] += vert_coord[d];
+        }
+    }
+    return center /= num_verts;
+}
+
+mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
+{
+    const int dim = mesh_.Dimension();
+    const int num_facets = vert_edge_.RowSize(i);
+    const mfem::DenseMatrix kappa = EvalKappa(i);
+    const mfem::Vector cell_center = ComputeShapeCenter(*(mesh_.GetElement(i)));
+
+    mfem::Array<int> edges;
     GetTableRow(vert_edge_, i, edges);
+
+    mfem::ParMesh& non_const_mesh = const_cast<mfem::ParMesh&>(mesh_);
+    mfem::Vector normal(dim), c_vector(dim);
+    mfem::Vector local_weight(num_facets);
 
     for (int e = 0; e < num_facets; ++e)
     {
-        double facet_measure;
-        if (dim == 2)
+        auto trans = non_const_mesh.GetFaceTransformation(edges[e]);
+        auto& ip = mfem::IntRules.Get(trans->GetGeometryType(), 1).IntPoint(0);
+        trans->SetIntPoint(&ip);
+
+        double facet_measure = ip.weight * trans->Weight();
+        assert(facet_measure > 0);
+
+        mfem::CalcOrtho(trans->Jacobian(), normal);
+        normal /= normal.Norml2();   // make it unit normal
+
+        auto facet_ceter = ComputeShapeCenter(*(mesh_.GetFace(edges[e])));
+
+        for (int d = 0; d < dim; ++d)
         {
-            mesh_.GetEdgeVertices(edges[e], verts);
-
-            const double* v0_coord = mesh_.GetVertex(verts[0]);
-            const double* v1_coord = mesh_.GetVertex(verts[1]);
-
-            normal.SetSize(2);
-            normal[0] = -1.0 * (v1_coord[1] - v0_coord[1]);
-            normal[1] = v1_coord[0] - v0_coord[0];
-
-            facet_measure = normal.Norml2();
-
-            normal /= facet_measure;
-
-            mfem::Vector facet_ceter(2);
-            facet_ceter[0] = (v0_coord[0] + v1_coord[0]) * 0.5;
-            facet_ceter[1] = (v0_coord[1] + v1_coord[1]) * 0.5;
-
-            c_vector.SetSize(2);
-            c_vector[0] = facet_ceter[0] - cell_center[0];
-            c_vector[1] = facet_ceter[1] - cell_center[1];
-        }
-        else
-        {
-            assert(dim == 3);
-            // TODO
+            c_vector[d] = facet_ceter[d] - cell_center[d];
         }
 
         // Note that edge weight is inverse of M
