@@ -354,23 +354,20 @@ class LocalTPFA
     mfem::Coefficient* Q_;
     mfem::VectorCoefficient* VQ_;
     const mfem::ParMesh& mesh_;
-    const mfem::SparseMatrix& vert_edge_;
 
     mfem::DenseMatrix EvalKappa(int i);
     mfem::Vector ComputeShapeCenter(const mfem::Element& el);
     mfem::Vector ComputeLocalWeight(int i);
 public:
-    LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge)
-        : Q_(NULL), VQ_(NULL), mesh_(mesh), vert_edge_(vert_edge) { }
+    LocalTPFA(const mfem::ParMesh& mesh)
+        : Q_(NULL), VQ_(NULL), mesh_(mesh) { }
 
     /// @param q inverse of permeability \f$ kappa^{-1} \f$ in Darcy's law
-    LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge,
-              mfem::Coefficient& q)
-        : Q_(&q), VQ_(NULL), mesh_(mesh), vert_edge_(vert_edge) { }
+    LocalTPFA(const mfem::ParMesh& mesh, mfem::Coefficient& q)
+        : Q_(&q), VQ_(NULL), mesh_(mesh) { }
 
-    LocalTPFA(const mfem::ParMesh& mesh, const mfem::SparseMatrix& vert_edge,
-              mfem::VectorCoefficient& q)
-        : Q_(NULL), VQ_(&q), mesh_(mesh), vert_edge_(vert_edge) { }
+    LocalTPFA(const mfem::ParMesh& mesh, mfem::VectorCoefficient& q)
+        : Q_(NULL), VQ_(&q), mesh_(mesh) { }
 
     /// Compute local edge weights for the corresponding graph Laplacian
     std::vector<mfem::Vector> ComputeLocalWeights()
@@ -438,30 +435,29 @@ mfem::Vector LocalTPFA::ComputeShapeCenter(const mfem::Element& el)
 mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
 {
     const int dim = mesh_.Dimension();
-    const int num_facets = vert_edge_.RowSize(i);
+    auto& elem_face = dim > 2 ? mesh_.ElementToFaceTable() : mesh_.ElementToEdgeTable();
+    const int num_faces = elem_face.RowSize(i);
     const mfem::DenseMatrix kappa = EvalKappa(i);
     const mfem::Vector cell_center = ComputeShapeCenter(*(mesh_.GetElement(i)));
-
-    mfem::Array<int> edges;
-    GetTableRow(vert_edge_, i, edges);
+    const int* faces = elem_face.GetRow(i);
 
     mfem::ParMesh& non_const_mesh = const_cast<mfem::ParMesh&>(mesh_);
     mfem::Vector normal(dim), c_vector(dim);
-    mfem::Vector local_weight(num_facets);
+    mfem::Vector local_weight(num_faces);
 
-    for (int e = 0; e < num_facets; ++e)
+    for (int f = 0; f < num_faces; ++f)
     {
-        auto trans = non_const_mesh.GetFaceTransformation(edges[e]);
+        auto trans = non_const_mesh.GetFaceTransformation(faces[f]);
         auto& ip = mfem::IntRules.Get(trans->GetGeometryType(), 1).IntPoint(0);
         trans->SetIntPoint(&ip);
 
-        double facet_measure = ip.weight * trans->Weight();
-        assert(facet_measure > 0);
+        double face_measure = ip.weight * trans->Weight();
+        assert(face_measure > 0);
 
         mfem::CalcOrtho(trans->Jacobian(), normal);
         normal /= normal.Norml2();   // make it unit normal
 
-        auto facet_ceter = ComputeShapeCenter(*(mesh_.GetFace(edges[e])));
+        auto facet_ceter = ComputeShapeCenter(*(mesh_.GetFace(faces[f])));
 
         for (int d = 0; d < dim; ++d)
         {
@@ -471,7 +467,7 @@ mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
         // Note that edge weight is inverse of M
         double delta_x = c_vector.Norml2();
         double nkc = std::fabs(kappa.InnerProduct(normal, c_vector));
-        local_weight(e) = (facet_measure * nkc) / (delta_x * delta_x);
+        local_weight(f) = (face_measure * nkc) / (delta_x * delta_x);
     }
 
     return local_weight;
@@ -649,7 +645,7 @@ void DarcyProblem::ComputeGraphWeight(bool unit_weight)
     }
 
     // Compute local edge weights
-    LocalTPFA local_TPFA(*pmesh_, vertex_edge_, *kinv_vector_);
+    LocalTPFA local_TPFA(*pmesh_, *kinv_vector_);
     local_weight_ = local_TPFA.ComputeLocalWeights();
 
     // Assemble edge weights w_ij = (w_{ij,i}^{-1} + w_{ij,j}^{-1})^{-1}
