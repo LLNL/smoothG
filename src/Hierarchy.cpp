@@ -27,6 +27,7 @@ namespace smoothg
 {
 
 Hierarchy::Hierarchy(MixedMatrix mixed_system,
+                     const mfem::Vector& edge_bc,
                      const UpscaleParameters& param,
                      const mfem::Array<int>* partitioning,
                      const mfem::Array<int>* ess_attr)
@@ -46,9 +47,23 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
         mixed_systems_.back().SetEssDofs(*ess_attr);
     MakeSolver(0, param);
 
+
+    mfem::Vector edge_bc_level;
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
-        Coarsen(level, param, level ? nullptr : partitioning);
+        if (level == 0)
+        {
+            edge_bc_level = edge_bc;
+        }
+        else
+        {
+            mfem::Vector edge_bc_coarse(Proj_sigma_[level].NumRows());
+            edge_bc_coarse = 0.0;
+            Proj_sigma_[level].Mult(edge_bc_level, edge_bc_coarse);
+            edge_bc_level = edge_bc_coarse;
+        }
+
+        Coarsen(level, param, level ? nullptr : partitioning, edge_bc);
         MakeSolver(level + 1, param);
         if (ess_attr)
             mixed_systems_.back().SetEssDofs(*ess_attr);
@@ -59,7 +74,8 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 }
 
 void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
-                        const mfem::Array<int>* partitioning)
+                        const mfem::Array<int>* partitioning,
+                        const mfem::Vector& edge_bc)
 {
     MixedMatrix& mgL = GetMatrix(level);
     mgL.BuildM();
@@ -74,7 +90,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     std::vector<mfem::DenseMatrix> vertex_targets;
 
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    localtargets.Compute(edge_traces, vertex_targets);
+    localtargets.Compute(edge_traces, vertex_targets, edge_bc);
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 

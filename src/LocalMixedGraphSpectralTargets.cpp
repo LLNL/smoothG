@@ -508,6 +508,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
+        evects_restricted = 1.0;
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[agg]);
 
         // Compute edge trace samples (before restriction and SVD)
@@ -648,7 +649,8 @@ mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
 
 void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
-    std::vector<mfem::DenseMatrix>& local_edge_trace_targets)
+    std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+    const mfem::Vector& edge_bc)
 {
     const mfem::SparseMatrix& face_Agg = coarse_graph_.EdgeToVertex();
     const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
@@ -689,7 +691,9 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         if (face_IsShared.RowSize(iface) == 0 && num_neighbor_aggs == 1)
         {
             // Nothing for boundary face because AggExt_sigma is not in boundary
-            face_sigma_tmp.SetSize(num_iface_edofs, 0);
+            GetTableRow(face_edof, iface, iface_edofs);
+            face_sigma_tmp.SetSize(iface_edofs.Size() ,1);
+            edge_bc.GetSubVector(iface_edofs, face_sigma_tmp.Data());
         }
         else if (num_iface_edofs > 1)
         {
@@ -928,7 +932,12 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 solver.Mult(OneNegOne, PV_sigma);
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
-            else
+            else if (face_Agg.RowSize(iface) == 1) // boundary face
+            {
+                PV_sigma_on_face.SetSize(num_iface_edofs);
+                PV_sigma_on_face = 1.0;
+            }
+            else // interior face
             {
                 // This face is not shared between processors
                 mfem::SparseMatrix& Mloc_0 = shared_Mloc_f[0];
@@ -945,9 +954,6 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 solver.Mult(OneNegOne, PV_sigma);
 
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
-
-                if (face_Agg.RowSize(iface) == 1)
-                    PV_sigma_on_face = 1.0;
             }
 
             // add PV vector to other vectors and orthogonalize
@@ -982,11 +988,15 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
 void LocalMixedGraphSpectralTargets::Compute(
     std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-    std::vector<mfem::DenseMatrix>& local_vertex_targets)
+    std::vector<mfem::DenseMatrix>& local_vertex_targets,
+    const mfem::Vector& edge_bc)
 {
     std::vector<mfem::DenseMatrix> ExtAgg_sigmaT;
+    mfem::StopWatch ch;ch.Start();
     ComputeVertexTargets(ExtAgg_sigmaT, local_vertex_targets);
-    ComputeEdgeTargets(ExtAgg_sigmaT, local_edge_trace_targets);
+    std::cout<<"vert targets : "<<ch.RealTime()<<"\n";ch.Clear();ch.Start();
+    ComputeEdgeTargets(ExtAgg_sigmaT, local_edge_trace_targets, edge_bc);
+    std::cout<<"edge targets : "<<ch.RealTime()<<"\n";
 }
 
 } // namespace smoothg

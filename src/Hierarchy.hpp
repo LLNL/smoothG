@@ -55,10 +55,11 @@ public:
               const UpscaleParameters& param = UpscaleParameters(),
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr,
-              const mfem::SparseMatrix& w_block = SparseIdentity(0))
-        : Hierarchy(MixedMatrix(std::move(graph), w_block), param, partitioning, ess_attr) {}
+              const mfem::SparseMatrix& w_block = SparseIdentity(0),
+              const mfem::Vector& edge_bc = mfem::Vector())
+        : Hierarchy(MixedMatrix(std::move(graph), w_block), edge_bc, param, partitioning, ess_attr) {}
 
-    Hierarchy(MixedMatrix mixed_system,
+    Hierarchy(MixedMatrix mixed_system, const mfem::Vector& edge_bc,
               const UpscaleParameters& param = UpscaleParameters(),
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr);
@@ -171,7 +172,8 @@ public:
 
 private:
     void Coarsen(int level, const UpscaleParameters& param,
-                 const mfem::Array<int>* partitioning);
+                 const mfem::Array<int>* partitioning,
+                 const mfem::Vector& edge_bc);
 
     /// Test if Proj_sigma_ * Psigma_ = identity
     void Debug_tests(int level) const;

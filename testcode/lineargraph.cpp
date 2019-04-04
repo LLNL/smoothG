@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
     DofAggregate dof_agg(partition.graph_topology_, mgL.GetGraphSpace());
     const Graph& coarse_graph = partition.coarse_graph_;
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
+    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets, mfem::Vector());
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
         throw std::logic_error(

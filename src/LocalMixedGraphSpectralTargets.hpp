@@ -184,7 +184,8 @@ public:
                            space
     */
     void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
+                 std::vector<mfem::DenseMatrix>& local_vertex_targets,
+                 const mfem::Vector& edge_bc);
 private:
     enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
 
@@ -215,7 +216,8 @@ private:
        @param local_edge_trace_targets (OUT)
     */
     void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
-                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
+                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
+                            const mfem::Vector& edge_bc);
 
     /// Build extended aggregates to vertex-based and edge-based dofs relation
     void BuildExtendedAggregates(const GraphSpace& space);

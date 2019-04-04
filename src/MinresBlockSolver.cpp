@@ -243,7 +243,9 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
+        {
             rhs_sigma[mm] = sol[mm];
+        }
     }
 
     const auto& edof_trueedof = mixed_matrix_.GetGraphSpace().EDofToTrueEDof();
