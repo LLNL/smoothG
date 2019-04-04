@@ -69,98 +69,9 @@ struct mpi_session
 };
 
 class MixedMatrix;
-class Mixed_GL_Coarsener;
 class MixedLaplacianSolver;
 
-/**
-   @brief Collect information about upscaling process for systematic output.
-
-   This class is convenience code shared between generalgraph.cpp and
-   finitevolume.cpp, to keep track of error metrics, timings, and some other
-   information and to output it in a machine-readable way that
-   facilitates automated testing.
-
-   @todo Actually populate ndofs
-   @todo make the enum { TOPOLOGY = 0, COARSENING, SOLVER } a public typedef
-*/
-class UpscalingStatistics
-{
-public:
-    UpscalingStatistics(int nLevels);
-    ~UpscalingStatistics();
-
-    /// given vector of solutions on various levels, calculate upscaling errors
-    void ComputeErrorSquare(int k,
-                            const std::vector<MixedMatrix>& mgL,
-                            const Mixed_GL_Coarsener& mgLc,
-                            const std::vector<std::unique_ptr<mfem::BlockVector> >& sol);
-
-    /// Output upscaling information on master processor's stdout
-    void PrintStatistics(MPI_Comm comm,
-                         picojson::object& serialize);
-
-    /// Record iterations, norms, etc from linear solver in this object
-    void RegisterSolve(const MixedLaplacianSolver& solver, int level);
-
-    /**
-       Return the solution on a coarse level, interpolated to the
-       finest level, often for visualization purposes.
-
-       This interpolation is done in ComputeErrorSquare(), so whatever
-       solution is calculated then is what is returned here.
-    */
-    const mfem::BlockVector& GetInterpolatedSolution();
-
-    ///@name Routines to handle timing of different stages of example codes
-    ///@{
-    void BeginTiming();
-    void EndTiming(int level, int stage);
-    double GetTiming(int level, int stage);
-    ///@}
-private:
-    const int NSTAGES = 3;
-    mfem::DenseMatrix timings_;
-    mfem::DenseMatrix sigma_weighted_l2_error_square_;
-    mfem::DenseMatrix u_l2_error_square_;
-    mfem::DenseMatrix Dsigma_l2_error_square_;
-    std::vector<std::unique_ptr<mfem::BlockVector> > help_;
-
-    mfem::Array<int> iter_;
-    mfem::Array<int> ndofs_;
-    mfem::Array<int> nnzs_;
-
-    mfem::StopWatch chrono_; // should probably have one for each STAGE?
-};
-
-/// Use GLVis to visualize finite volume solution
-void VisualizeSolution(int k,
-                       mfem::ParFiniteElementSpace* sigmafespace,
-                       mfem::ParFiniteElementSpace* ufespace,
-                       const mfem::SparseMatrix& D,
-                       const mfem::BlockVector& sol);
-
 class GraphTopology;
-void PostProcess(mfem::SparseMatrix& M_global,
-                 mfem::SparseMatrix& D_global,
-                 GraphTopology& graph_topology_,
-                 mfem::Vector& sol,
-                 mfem::Vector& solp,
-                 const mfem::Vector& rhs);
-
-/**
-   @brief Build boundary attribute table from mesh.
-
-   Copied from parelag::AgglomeratedTopology::generateFacetBdrAttributeTable
-
-   Given a mesh and a boundary operator B[0], with height number of elements,
-   width number of faces, this computes a table with a row for every face and a
-   column for every boundary attribute, with a 1 if the face has that boundary
-   attribute.
-
-   This only works for the fine level, because of the mfem::Mesh. To get
-   this table on a coarser mesh, premultiply by AEntity_entity.
-*/
-mfem::SparseMatrix GenerateBoundaryAttributeTable(const mfem::Mesh* mesh);
 
 /**
    Given a face_boundaryatrribute matrix, bndrAttributesMarker, and face_dof,
@@ -173,72 +84,6 @@ int MarkDofsOnBoundary(
     const mfem::SparseMatrix& face_boundaryatt,
     const mfem::SparseMatrix& face_dof,
     const mfem::Array<int>& bndrAttributesMarker, mfem::Array<int>& dofMarker);
-
-/**
-    @brief Manage topological information for the coarsening
-
-    Extract the local submatrix of the global vertex to edge relation table
-    Each vertex belongs to one and only one processor, while some edges are
-    shared by two processors, indicated by the edge to true edge
-    HypreParMatrix edge_e_te
-*/
-class ParGraph
-{
-public:
-    /**
-       @brief Distribute a graph to the communicator.
-
-       Generally we read a global graph on one processor, and then distribute
-       it. This constructor handles that process.
-
-       @param comm the communicator over which to distribute the graph
-       @param vertex_edge_global describes the entire global graph, unsigned
-       @param partition_global for each vertex, indicates which processor it
-              goes to. Can be obtained from MetisGraphPartitioner.
-    */
-    ParGraph(MPI_Comm comm,
-             const mfem::SparseMatrix& vertex_edge_global,
-             const mfem::Array<int>& partition_global);
-
-    ///@name Getters for tables that describe parallel graph
-    ///@{
-    mfem::SparseMatrix& GetLocalVertexToEdge()
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::SparseMatrix& GetLocalVertexToEdge() const
-    {
-        return vertex_edge_local_;
-    }
-
-    const mfem::Array<int>& GetLocalPartition() const
-    {
-        return partition_local_;
-    }
-
-    const mfem::HypreParMatrix& GetEdgeToTrueEdge() const
-    {
-        return *edge_e_te_;
-    }
-
-    const mfem::Array<int>& GetVertexLocalToGlobalMap() const
-    {
-        return vert_local2global_;
-    }
-
-    const mfem::Array<int>& GetEdgeLocalToGlobalMap() const
-    {
-        return edge_local2global_;
-    }
-    ///@}
-private:
-    mfem::SparseMatrix vertex_edge_local_;
-    mfem::Array<int> partition_local_;
-    std::unique_ptr<mfem::HypreParMatrix> edge_e_te_;
-    mfem::Array<int> vert_local2global_;
-    mfem::Array<int> edge_local2global_;
-};
 
 /**
    @brief Treat a SparseMatrix as a (boolean) table, and return the column
@@ -260,6 +105,8 @@ void GetTableRowCopy(
    This is the integrator for the artificial mass matrix in a finite
    volume discretization, tricking MFEM into doing finite volumes instead
    of finite elements.
+
+   @deprecated this is replaced by LocalTPFA, which is more direct and general
 */
 class FiniteVolumeMassIntegrator: public mfem::BilinearFormIntegrator
 {
@@ -347,45 +194,6 @@ void ReadCoordinate(std::ifstream& graphFile, mfem::SparseMatrix& out);
 
 mfem::SparseMatrix ReadVertexEdge(const std::string& filename);
 
-/**
-   @brief A utility class for working with the SPE10 data set.
-
-   The SPE10 data set can be found at: http://www.spe.org/web/csp/datasets/set02.htm
-*/
-class InversePermeabilityFunction
-{
-public:
-
-    enum SliceOrientation {NONE, XY, XZ, YZ};
-
-    static void SetNumberCells(int Nx_, int Ny_, int Nz_);
-    static void SetMeshSizes(double hx, double hy, double hz);
-    static void Set2DSlice(SliceOrientation o, int npos );
-
-    static void BlankPermeability();
-    static void ReadPermeabilityFile(const std::string& fileName);
-    static void ReadPermeabilityFile(const std::string& fileName, MPI_Comm comm);
-
-    static void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
-
-    static double InvNorm2(const mfem::Vector& x);
-
-    static void ClearMemory();
-
-private:
-    static int Nx;
-    static int Ny;
-    static int Nz;
-    static double hx;
-    static double hy;
-    static double hz;
-    static double* inversePermeability;
-
-    static SliceOrientation orientation;
-    static int npos;
-};
-
-
 // Compute D(sigma_h - sigma_H) / D(sigma_h)
 double DivError(MPI_Comm comm, const mfem::SparseMatrix& D, const mfem::Vector& numer,
                 const mfem::Vector& denom);
@@ -422,9 +230,7 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
-void FVMeshCartesianPartition(
-    mfem::Array<int>& partitioning, const std::vector<int>& num_procs_xyz,
-    mfem::ParMesh& pmesh, const mfem::Array<int>& coarsening_factor);
+std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 
 } // namespace smoothg
 

@@ -19,6 +19,9 @@
 add_executable(lineargraph lineargraph.cpp)
 target_link_libraries(lineargraph smoothg ${TPL_LIBRARIES})
 
+add_executable(lineargraphthree lineargraphthree.cpp)
+target_link_libraries(lineargraphthree smoothg ${TPL_LIBRARIES})
+
 add_executable(tinygraphsolver tinygraphsolver.cpp)
 target_link_libraries(tinygraphsolver smoothg ${TPL_LIBRARIES})
 
@@ -39,6 +42,9 @@ target_link_libraries(wattsstrogatz smoothg ${TPL_LIBRARIES})
 
 add_executable(rescaling rescaling.cpp)
 target_link_libraries(rescaling smoothg ${TPL_LIBRARIES})
+
+add_executable(coarse_assembling coarse_assembling.cpp)
+target_link_libraries(coarse_assembling smoothg ${TPL_LIBRARIES})
 
 # add tests
 add_test(lineargraph lineargraph)
@@ -74,6 +80,11 @@ add_valgrind_test(vwattsstrogatz wattsstrogatz)
 add_test(rescaling rescaling)
 add_test(parrescaling mpirun -np 2 ./rescaling)
 add_valgrind_test(vrescaling rescaling)
+
+add_test(coarse_assembling coarse_assembling -m 3 -t 1 --perm ${SPE10_PERM})
+add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 3 -t 1 --perm ${SPE10_PERM})
+
+add_test(lineargraphthree lineargraphthree --size 64 --partitions 32 --max-evects 1 --coarse-factor 2)
 
 add_test(NAME style
   COMMAND ${ASTYLE_COMMAND} --options=smoothg.astylerc --dry-run src/*.?pp examples/*.?pp testcode/*.?pp

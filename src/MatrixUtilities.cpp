@@ -84,10 +84,51 @@ mfem::SparseMatrix Mult(const mfem::SparseMatrix& A, const mfem::SparseMatrix& B
     return C;
 }
 
-mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
+mfem::SparseMatrix AAt(const mfem::SparseMatrix& A)
 {
-    // TODO(gelever1): Perform this more better
+    mfem::SparseMatrix At = smoothg::Transpose(A);
+    return smoothg::Mult(A, At);
+}
 
+std::unique_ptr<mfem::HypreParMatrix> AAt(const mfem::HypreParMatrix& A)
+{
+    unique_ptr<mfem::HypreParMatrix> At(A.Transpose());
+    assert(At);
+
+    mfem::HypreParMatrix* AAt = mfem::ParMult(&A, At.get());
+    assert(AAt);
+
+    AAt->CopyColStarts();
+
+    return std::unique_ptr<mfem::HypreParMatrix>(AAt);
+}
+
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
+                                              const mfem::SparseMatrix& B,
+                                              const mfem::Array<int>& B_colpart)
+{
+    assert(A.NumCols() == B.NumRows());
+    int* B_rowpart = const_cast<int*>(A.ColPart());
+    mfem::SparseMatrix* B_ptr = const_cast<mfem::SparseMatrix*>(&B);
+    mfem::HypreParMatrix pB(A.GetComm(), A.N(), B_colpart.Last(), B_rowpart,
+                            const_cast<mfem::Array<int>&>(B_colpart), B_ptr);
+    return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&A, &pB));
+}
+
+std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
+                                              const mfem::HypreParMatrix& B,
+                                              const mfem::Array<int>& A_rowpart)
+{
+    assert(A.NumCols() == B.NumRows());
+    mfem::Array<int>& rowpart = const_cast<mfem::Array<int>&>(A_rowpart);
+    mfem::SparseMatrix* A_ptr = const_cast<mfem::SparseMatrix*>(&A);
+    mfem::HypreParMatrix pA(B.GetComm(), A_rowpart.Last(), B.M(), rowpart,
+                            const_cast<int*>(B.RowPart()), A_ptr);
+    return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&pA, &B));
+}
+
+mfem::SparseMatrix DropSmall(const mfem::SparseMatrix& mat, double tol)
+{
     mfem::SparseMatrix out(mat.Height(), mat.Width());
 
     for (int i = 0; i < mat.Height(); ++i)
@@ -95,9 +136,7 @@ mfem::SparseMatrix Threshold(const mfem::SparseMatrix& mat, double tol)
         for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; ++j)
         {
             const double val = mat.GetData()[j];
-            // if (std::fabs(val) > tol)
-            // Keep diagonal always??
-            if (std::fabs(val) > tol || i == mat.GetJ()[j])
+            if (std::fabs(val) >= tol)
             {
                 out.Add(i, mat.GetJ()[j], val);
             }
@@ -142,21 +181,24 @@ mfem::Table MatrixToTable(const mfem::SparseMatrix& mat)
     return table;
 }
 
+mfem::HypreParMatrix* Mult(const mfem::HypreParMatrix& A, const mfem::HypreParMatrix& B,
+                           const mfem::HypreParMatrix& C)
+{
+    unique_ptr<mfem::HypreParMatrix> BC(mfem::ParMult(&B, &C));
+    mfem::HypreParMatrix* ABC = mfem::ParMult(&A, BC.get());
+    assert(ABC);
+
+    return ABC;
+}
+
 mfem::HypreParMatrix* RAP(const mfem::HypreParMatrix& R, const mfem::HypreParMatrix& A,
                           const mfem::HypreParMatrix& P)
 {
-    // TODO(gelever1): Remove const cast once mfem version update
-    unique_ptr<mfem::HypreParMatrix> RT(const_cast<mfem::HypreParMatrix&>(R).Transpose());
+    unique_ptr<mfem::HypreParMatrix> RT(R.Transpose());
     assert(RT);
-    unique_ptr<mfem::HypreParMatrix> AP(mfem::ParMult(const_cast<mfem::HypreParMatrix*>(&A),
-                                                      const_cast<mfem::HypreParMatrix*>(&P)));
 
-    mfem::HypreParMatrix* rap = mfem::ParMult(RT.get(), AP.get());
-    assert(rap);
-
+    mfem::HypreParMatrix* rap = Mult(*RT, A, P);
     rap->CopyRowStarts();
-    //rap->CopyColStarts();
-    hypre_ParCSRMatrixSetNumNonzeros(*rap);
 
     return rap;
 }
@@ -208,27 +250,26 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
     }
 }
 
-
-void MultSparseDense(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDense(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                      mfem::DenseMatrix& C)
 {
-    C.SetSize(A.Height(), B.Width());
     MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
+    C.SetSize(A.Height(), B.Width());
 
     mfem::Vector column_in, column_out;
     for (int j = 0; j < B.Width(); ++j)
     {
-        B.GetColumnReference(j, column_in);
+        const_cast<mfem::DenseMatrix&>(B).GetColumnReference(j, column_in);
         C.GetColumnReference(j, column_out);
         A.Mult(column_in, column_out);
     }
 }
 
-void MultSparseDenseTranspose(const mfem::SparseMatrix& A, mfem::DenseMatrix& B,
+void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                               mfem::DenseMatrix& C)
 {
-    MFEM_ASSERT(C.Width() == A.Height() && C.Height() == B.Width() &&
-                A.Width() == B.Height(), "incompatible dimensions");
+    MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
+    C.SetSize(B.Width(), A.Height());
 
     const double* A_data = A.GetData();
     const int* A_i = A.GetI();
@@ -409,8 +450,10 @@ void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,
 {
     int i, j, gi, gj, s, t;
     double a;
+#ifdef MFEM_DEBUG
     const int height = mat.Height();
     const int width = mat.Width();
+#endif
 
     for (i = 0; i < rows.Size(); i++)
     {
@@ -588,12 +631,8 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
 
 double MaxNorm(const mfem::HypreParMatrix& A)
 {
-    mfem::SparseMatrix diag;
-    mfem::SparseMatrix offd;
-
-    HYPRE_Int* junk_map;
-    A.GetDiag(diag);
-    A.GetOffd(offd, junk_map);
+    mfem::SparseMatrix diag = GetDiag(A);
+    mfem::SparseMatrix offd = GetOffd(A);
 
     double local_max = std::max(diag.MaxNorm(), offd.MaxNorm());
 
@@ -601,6 +640,15 @@ double MaxNorm(const mfem::HypreParMatrix& A)
     MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, A.GetComm());
 
     return global_max;
+}
+
+mfem::SparseMatrix ExtractRowAndColumns(
+    const mfem::SparseMatrix& A, const mfem::Array<int>& rows,
+    const mfem::Array<int>& cols)
+{
+    mfem::Array<int> col_map(A.Width());
+    col_map = -1;
+    return ExtractRowAndColumns(A, rows, cols, col_map);
 }
 
 mfem::SparseMatrix ExtractRowAndColumns(
@@ -714,9 +762,9 @@ void ExtractSubMatrix(
 }
 
 void ExtractColumns(
-    const mfem::DenseMatrix& A, const mfem::Array<int>& ref_to_col,
-    const mfem::Array<int>& subcol_to_ref, mfem::DenseMatrix& A_sub,
-    const int row_offset)
+    const mfem::DenseMatrix& A, const mfem::Array<int>& col_to_ref,
+    const mfem::Array<int>& subcol_to_ref, mfem::Array<int>& ref_workspace,
+    mfem::DenseMatrix& A_sub, int row_offset)
 {
     const int A_width = A.Width();
     const int A_height = A.Height();
@@ -724,14 +772,21 @@ void ExtractColumns(
 
     assert((A_height + row_offset) <= A_sub_height);
 
+    for (int j = 0; j < col_to_ref.Size(); ++j)
+        ref_workspace[col_to_ref[j]] = j;
+
     for (int j = 0; j < subcol_to_ref.Size(); ++j)
     {
-        int A_col = ref_to_col[subcol_to_ref[j]];
+        int A_col = ref_workspace[subcol_to_ref[j]];
         assert(A_col >= 0);
         assert(A_col < A_width);
         std::copy_n(A.Data() + A_col * A_height, A_height,
                     A_sub.Data() + j * A_sub_height + row_offset);
     }
+
+    // reset reference workspace so that it can be reused
+    for (int j = 0; j < col_to_ref.Size(); ++j)
+        ref_workspace[col_to_ref[j]] = -1;
 }
 
 void Full(const mfem::SparseMatrix& Asparse, mfem::DenseMatrix& Adense)
@@ -822,9 +877,10 @@ void Deflate(mfem::DenseMatrix& a, const mfem::Vector& v)
     }
 }
 
-void orthogonalize_from_constant(mfem::Vector& vec)
+void orthogonalize_from_vector(mfem::Vector& vec, const mfem::Vector& wrt)
 {
-    vec -= vec.Sum() / vec.Size();
+    double dot = (vec * wrt) / (wrt * wrt);
+    vec.Add(-dot, wrt);
 }
 
 /// @todo MPI_COMM_WORLD should be more generic
@@ -956,85 +1012,167 @@ void GenerateOffsets(MPI_Comm comm, int local_size, mfem::Array<HYPRE_Int>& offs
     GenerateOffsets(comm, N, &local_size, start);
 }
 
-// This constructor assumes M to be diagonal
-LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
-                                           const mfem::SparseMatrix& D)
+bool IsDiag(const mfem::SparseMatrix& A)
 {
-    double* M_data = M.GetData();
-    Init(M_data, D);
-}
-
-// This constructor takes the diagonal of M (as a Vector) as input
-LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::Vector& M,
-                                           const mfem::SparseMatrix& D)
-{
-    double* M_data = M.GetData();
-    Init(M_data, D);
-}
-
-void LocalGraphEdgeSolver::Init(double* M_data, const mfem::SparseMatrix& D)
-{
-    mfem::SparseMatrix DT(smoothg::Transpose(D));
-    MinvDT_.Swap(DT);
-
-    // Compute M^{-1}D^T (assuming M is diagonal)
-    int* DT_i = MinvDT_.GetI();
-    double* DT_data = MinvDT_.GetData();
-
-    for (int i = 0; i < MinvDT_.Height(); i++)
+    if (A.Height() != A.Width() || A.Height() < A.NumNonZeroElems())
     {
-        const double scale = M_data[i];
-        for (int j = DT_i[i]; j < DT_i[i + 1]; j++)
-            DT_data[j] /= scale;
+        return false;
     }
 
+    for (int i = 0; i < A.Height(); ++i)
+    {
+        if (A.RowSize(i) > 1)
+        {
+            return false;
+        }
+        else if (A.RowSize(i) == 1 && A.GetRowColumns(i)[0] != i)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
+                                           const mfem::SparseMatrix& D,
+                                           const mfem::Vector& const_rep)
+{
+    M_is_diag_ = IsDiag(M);
+    if (M_is_diag_)
+    {
+        const mfem::Vector M_diag(M.GetData(), M.Height());
+        Init(M_diag, D);
+    }
+    else
+    {
+        Init(M, D);
+    }
+
+    const_rep_.SetDataAndSize(const_rep.GetData(), const_rep.Size());
+}
+
+void LocalGraphEdgeSolver::Init(const mfem::Vector& M_diag, const mfem::SparseMatrix& D)
+{
+    assert(M_is_diag_);
+
+    mfem::SparseMatrix DT = smoothg::Transpose(D);
+    MinvDT_.Swap(DT);
+
+    // Compute M^{-1}D^T
+    Minv_.SetSize(M_diag.Size());
+    for (int i = 0; i < M_diag.Size(); ++i)
+    {
+        Minv_[i] = 1.0 / M_diag[i];
+    }
+    MinvDT_.ScaleRows(Minv_);
+
     // TODO(gelever1): change all the swaps once mfem version > PR #352
-    unique_ptr<mfem::SparseMatrix> tmp(mfem::Mult(D, MinvDT_));
-    A_.Swap(*tmp);
+    mfem::SparseMatrix DMinvDT = smoothg::Mult(D, MinvDT_);
+    A_.Swap(DMinvDT);
 
     // Eliminate the first unknown so that A_ is invertible
     A_.EliminateRowCol(0);
-    solver_ = make_unique<mfem::UMFPackSolver>(A_);
+    solver_.SetOperator(A_);
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
-                                mfem::Vector& sol_sigma)
+void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseMatrix& D)
 {
-    // Set rhs(0)=0 so that the modified system after
-    // the elimination is consistent with the original one
-    mfem::Vector& rhs_copy = const_cast<mfem::Vector&>(rhs);
-    double rhs_0 = rhs_copy(0);
-    rhs_copy(0) = 0.;
+    offsets_.SetSize(3);
+    offsets_[0] = 0;
+    offsets_[1] = M.Height();
+    offsets_[2] = M.Height() + D.Height();
 
-    mfem::Vector sol_u_tmp(A_.Size());
-    sol_u_tmp = 0.;
-    solver_->Mult(rhs_copy, sol_u_tmp);
+    mfem::SparseMatrix D_copy(D, false);
+    D_copy.EliminateRow(0);
+    mfem::SparseMatrix DT = smoothg::Transpose(D_copy);
 
-    // Set rhs(0) back to its original vale (rhs is const Vector)
-    rhs_copy(0) = rhs_0;
+    mfem::SparseMatrix W(D.Height(), D.Height());
+    W.Add(0, 0, 1.0);
+    W.Finalize();
 
-    // SparseMatrix::Mult asserts that sol.Size() should equal MinvDT_->Height()
-    MinvDT_.Mult(sol_u_tmp, sol_sigma);
+    mfem::BlockMatrix block_A(offsets_);
+    block_A.SetBlock(0, 0, const_cast<mfem::SparseMatrix*>(&M));
+    block_A.SetBlock(1, 0, &D_copy);
+    block_A.SetBlock(0, 1, &DT);
+    block_A.SetBlock(1, 1, &W);
+
+    unique_ptr<mfem::SparseMatrix> tmp_A(block_A.CreateMonolithic());
+    A_.Swap(*tmp_A);
+
+    solver_.SetOperator(A_);
+
+    rhs_ = make_unique<mfem::BlockVector>(offsets_);
+    sol_ = make_unique<mfem::BlockVector>(offsets_);
+    rhs_->GetBlock(0) = 0.0;
 }
 
-void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs,
-                                mfem::Vector& sol_sigma, mfem::Vector& sol_u)
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sigma) const
 {
-    // Set rhs(0)=0 so that the modified system after
+    // Set rhs_u(0) = 0 so that the modified system after
     // the elimination is consistent with the original one
-    mfem::Vector& rhs_copy = const_cast<mfem::Vector&>(rhs);
-    double rhs_0 = rhs_copy(0);
-    rhs_copy(0) = 0.;
+    mfem::Vector& rhs_u_copy = const_cast<mfem::Vector&>(rhs_u);
+    double rhs_u_0 = rhs_u_copy(0);
+    rhs_u_copy(0) = 0.;
 
-    sol_u = 0.;
-    solver_->Mult(rhs_copy, sol_u);
-    orthogonalize_from_constant(sol_u);
+    if (M_is_diag_)
+    {
+        mfem::Vector sol_u(rhs_u.Size());
+        solver_.Mult(rhs_u_copy, sol_u);
+        MinvDT_.Mult(sol_u, sol_sigma);
+    }
+    else
+    {
+        rhs_->GetBlock(1) = rhs_u_copy;
+        solver_.Mult(*rhs_, *sol_);
+        sol_sigma = sol_->GetBlock(0);
+    }
 
-    // Set rhs(0) back to its original vale (rhs is const Vector)
-    rhs_copy(0) = rhs_0;
+    // Set rhs_u(0) back to its original vale (rhs is const BlockVector)
+    rhs_u_copy(0) = rhs_u_0;
+}
 
-    // SparseMatrix::Mult asserts that sol.Size() should equal MinvDT_->Height()
-    MinvDT_.Mult(sol_u, sol_sigma);
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vector& rhs_u,
+                                mfem::Vector& sol_sigma, mfem::Vector& sol_u) const
+{
+    if (M_is_diag_)
+    {
+        mfem::Vector rhs(rhs_u.Size());
+        MinvDT_.MultTranspose(rhs_sigma, rhs);
+        add(-1.0, rhs, 1.0, rhs_u, rhs);
+        rhs(0) = 0.0;
+
+        solver_.Mult(rhs, sol_u);
+
+        MinvDT_.Mult(sol_u, sol_sigma);
+        mfem::Vector Minv_rhs_sigma(rhs_sigma);
+        RescaleVector(Minv_, Minv_rhs_sigma);
+        sol_sigma += Minv_rhs_sigma;
+    }
+    else
+    {
+        rhs_->GetBlock(0) = rhs_sigma;
+        rhs_->GetBlock(1) = rhs_u;
+        rhs_->GetBlock(1)[0] = 0.0;
+
+        solver_.Mult(*rhs_, *sol_);
+
+        sol_sigma = sol_->GetBlock(0);
+        sol_u = sol_->GetBlock(1);
+        sol_u *= -1.0;
+    }
+
+    if (const_rep_.Size() > 0)
+    {
+        orthogonalize_from_vector(sol_u, const_rep_);
+    }
+}
+
+void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_u,
+                                mfem::Vector& sol_sigma, mfem::Vector& sol_u) const
+{
+    mfem::Vector rhs_sigma(sol_sigma);
+    rhs_sigma = 0.0;
+    Mult(rhs_sigma, rhs_u, sol_sigma, sol_u);
 }
 
 double InnerProduct(const mfem::Vector& weight, const mfem::Vector& u,
@@ -1122,5 +1260,29 @@ void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
     }
 }
 
+unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat)
+{
+    // temporary work-around suggested by Veselin
+    // TODO: make a direct copy function for HypreParMatrix
+    unique_ptr<mfem::HypreParMatrix> copy(mfem::Add(1.0, mat, 0.0, mat));
+    copy->CopyRowStarts();
+    copy->CopyColStarts();
+    return copy;
+}
+
+mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat)
+{
+    mfem::SparseMatrix diag;
+    mat.GetDiag(diag);
+    return diag;
+}
+
+mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
+{
+    HYPRE_Int* col_map;
+    mfem::SparseMatrix offd;
+    mat.GetOffd(offd, col_map);
+    return offd;
+}
 
 } // namespace smoothg

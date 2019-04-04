@@ -27,9 +27,12 @@
 
    I like the following runs:
 
-   examples/sampler --visualization --kappa 0.001 --coarsening-factor 3
-   examples/sampler --visualization --kappa 0.001 --coarsening-factor 2
+   examples/sampler --visualization --kappa 0.001 --cartesian-factor 3
+   examples/sampler --visualization --kappa 0.001 --cartesian-factor 2
 */
+
+// previously used command line here for multilevel (vary kappa to see nice pictures)
+// ./sampler --visualization --kappa 0.001 --max-levels 3
 
 #include <fstream>
 #include <sstream>
@@ -37,66 +40,24 @@
 #include <cmath>
 #include <mpi.h>
 
-#include "mfem.hpp"
-#include "spe10.hpp"
+#include "pde.hpp"
 
 #include "../src/picojson.h"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
 
-void SaveFigure(const mfem::Vector& sol,
-                mfem::ParFiniteElementSpace& fespace,
-                const std::string& name)
+mfem::Vector InterpolateToFine(const PDESampler& pdesampler, int level, const mfem::Vector& in)
 {
-    mfem::ParGridFunction field(&fespace);
-    mfem::ParMesh* pmesh = fespace.GetParMesh();
-    field = sol;
+    mfem::Vector vec1, vec2;
+    vec1 = in;
+    for (int k = level; k > 0; k--)
     {
-        std::stringstream filename;
-        filename << name << ".mesh";
-        std::ofstream out(filename.str().c_str());
-        pmesh->Print(out);
+        vec2 = pdesampler.GetHierarchy().Interpolate(k, vec1);
+        vec2.Swap(vec1);
     }
-    {
-        std::stringstream filename;
-        filename << name << ".gridfunction";
-        std::ofstream out(filename.str().c_str());
-        field.Save(out);
-    }
+    return vec1;
 }
-
-void Visualize(const mfem::Vector& sol,
-               mfem::ParFiniteElementSpace& fespace,
-               int tag)
-{
-    char vishost[] = "localhost";
-    int  visport   = 19916;
-
-    mfem::socketstream vis_v;
-    vis_v.open(vishost, visport);
-    vis_v.precision(8);
-
-    mfem::ParGridFunction field(&fespace);
-    mfem::ParMesh* pmesh = fespace.GetParMesh();
-    field = sol;
-
-    vis_v << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
-    vis_v << "solution\n" << *pmesh << field;
-    vis_v << "window_size 500 800\n";
-    vis_v << "window_title 'pressure" << tag << "'\n";
-    vis_v << "autoscale values\n";
-
-    if (pmesh->Dimension() == 2)
-    {
-        vis_v << "view 0 0\n"; // view from top
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-    }
-
-    vis_v << "keys cjl\n";
-
-    MPI_Barrier(pmesh->GetComm());
-};
 
 int main(int argc, char* argv[])
 {
@@ -110,6 +71,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
+    UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
@@ -117,12 +79,6 @@ int main(int argc, char* argv[])
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.e-3;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -130,18 +86,6 @@ int main(int argc, char* argv[])
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
-    bool dual_target = false;
-    args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = false;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = false;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
@@ -149,7 +93,7 @@ int main(int argc, char* argv[])
     args.AddOption(&kappa, "--kappa", "--kappa",
                    "Correlation length for Gaussian samples.");
     int coarsening_factor = 2;
-    args.AddOption(&coarsening_factor, "--coarsening-factor", "--coarsening-factor",
+    args.AddOption(&coarsening_factor, "--cartesian-factor", "--cartesian-factor",
                    "Coarsening factor for Cartesian agglomeration");
     int seed = 0;
     args.AddOption(&seed, "--seed", "--seed",
@@ -165,7 +109,8 @@ int main(int argc, char* argv[])
     args.AddOption(&save_statistics, "--save-statistics", "--save-statistics",
                    "--no-save-statistics", "--no-save-statistics",
                    "Save images of mean and variance.");
-
+    // Read upscaling options from command line into upscale_param object
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
@@ -180,213 +125,179 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    mfem::Array<int> coarseningFactor(nDimensions);
-    coarseningFactor[0] = coarsening_factor * 2;
-    coarseningFactor[1] = coarsening_factor * 2;
-    if (nDimensions == 3)
-        coarseningFactor[2] = coarsening_factor;
+    mfem::Array<int> coarsening_factors(nDimensions);
+    coarsening_factors = coarsening_factor * 2;
+    coarsening_factors.Last() = nDimensions == 3 ? coarsening_factor : coarsening_factor * 2;
 
-    mfem::Vector weight;
-
-    // Setting up finite volume discretization problem
-    SPE10Problem spe10problem("", nDimensions, spe10_scale, 0,
-                              metis_agglomeration, 2.0, coarseningFactor);
-
-    mfem::ParMesh* pmesh = spe10problem.GetParMesh();
-
-    if (myid == 0)
-    {
-        std::cout << pmesh->GetNEdges() << " fine edges, " <<
-                  pmesh->GetNFaces() << " fine faces, " <<
-                  pmesh->GetNE() << " fine elements\n";
-    }
-
-    mfem::Array<int> ess_attr;
-    int nbdr;
-    if (nDimensions == 3)
-        nbdr = 6;
-    else
-        nbdr = 4;
-    ess_attr.SetSize(nbdr);
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
     ess_attr = 0;
 
-    // Construct "finite volume mass" matrix using mfem instead of parelag
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh, &sigmafec);
-
-    mfem::ParBilinearForm a(&sigmafespace);
-    a.AddDomainIntegrator(
-        new FiniteVolumeMassIntegrator(*spe10problem.GetKInv()) );
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight);
-
-    for (int i = 0; i < weight.Size(); ++i)
-    {
-        // weight[i] = 1.0 / weight[i];
-        weight[i] = 1.0;
-    }
-
-    mfem::L2_FECollection ufec(0, nDimensions);
-    mfem::ParFiniteElementSpace ufespace(pmesh, &ufec);
-
-    // Construct vertex_edge table in mfem::SparseMatrix format
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
+    // Setting up finite volume discretization problem
+    bool unit_edge_weight = true;
+    SPE10Problem spe10problem("", nDimensions, spe10_scale, slice,
+                              metis_agglomeration, ess_attr, unit_edge_weight);
+    Graph graph = spe10problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
-    if (metis_agglomeration)
-    {
-        FESpaceMetisPartition(partitioning, sigmafespace, ufespace, coarseningFactor);
-    }
-    else
-    {
-        auto num_procs_xyz = spe10problem.GetNumProcsXYZ();
-        FVMeshCartesianPartition(partitioning, num_procs_xyz, *pmesh, coarseningFactor);
-    }
+    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-
-    auto edge_boundary_att = GenerateBoundaryAttributeTable(pmesh);
-
-    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
-
-    const double cell_volume = spe10problem.CellVolume(nDimensions);
+    mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
+    const double cell_volume = spe10problem.CellVolume();
     W_block *= cell_volume * kappa * kappa;
 
-    mfem::Vector mean_fine(ufespace.GetVSize());
-    mean_fine = 0.0;
-    mfem::Vector mean_upscaled(ufespace.GetVSize());
-    mean_upscaled = 0.0;
-    mfem::Vector m2_fine(ufespace.GetVSize());
-    m2_fine = 0.0;
-    mfem::Vector m2_upscaled(ufespace.GetVSize());
-    m2_upscaled = 0.0;
+    const int num_levels = upscale_param.max_levels;
+    std::vector<mfem::Vector> mean(num_levels);
+    std::vector<mfem::Vector> m2(num_levels);
+    std::vector<int> total_iterations(num_levels);
+    std::vector<double> total_time(num_levels);
+    std::vector<double> p_error(num_levels);
+    for (int level = 0; level < num_levels; ++level)
+    {
+        mean[level].SetSize(graph.NumVertices());
+        mean[level] = 0.0;
+        m2[level].SetSize(graph.NumVertices());
+        m2[level] = 0.0;
+        total_iterations[level] = 0;
+        total_time[level] = 0.0;
+    }
 
-    int total_coarse_iterations = 0;
-    int total_fine_iterations = 0;
-    double total_coarse_time = 0.0;
-    double total_fine_time = 0.0;
+    // Create Hierarchy
+    upscale_param.coarse_factor = 4;
+    Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
+    hierarchy.PrintInfo();
 
-    // Create Upscaler
-    auto fvupscale = std::make_shared<FiniteVolumeUpscale>(
-                         comm, vertex_edge, weight, W_block, partitioning, *edge_d_td,
-                         edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target, scaled_dual,
-                         energy_dual, hybridization);
-
-    fvupscale->MakeFineSolver();
-    fvupscale->PrintInfo();
-    fvupscale->ShowSetupTime();
-
-    const int num_aggs = partitioning.Max() + 1;
-    if (myid == 0)
-        std::cout << "Number of aggregates: " << num_aggs << std::endl;
-    PDESampler pdesampler(fvupscale, ufespace.GetVSize(), num_aggs, nDimensions,
-                          cell_volume, kappa, seed + myid);
+    PDESampler pdesampler(nDimensions, cell_volume, kappa, seed + myid, std::move(hierarchy));
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)
     {
-        double count = static_cast<double>(sample) + 1.0;
-        pdesampler.NewSample();
-
-        auto sol_coarse = pdesampler.GetCoarseCoefficientForVisualization();
-        auto sol_upscaled = fvupscale->Interpolate(sol_coarse);
-        for (int i = 0; i < sol_upscaled.Size(); ++i)
-            sol_upscaled(i) = std::log(sol_upscaled(i));
-        fvupscale->Orthogonalize(sol_upscaled);
-        int coarse_iterations = fvupscale->GetCoarseSolveIters();
-        total_coarse_iterations += coarse_iterations;
-        double coarse_time = fvupscale->GetCoarseSolveTime();
-        total_coarse_time += coarse_time;
-        for (int i = 0; i < mean_upscaled.Size(); ++i)
-        {
-            const double delta = (sol_upscaled(i) - mean_upscaled(i));
-            mean_upscaled(i) += delta / count;
-            const double delta2 = (sol_upscaled(i) - mean_upscaled(i));
-            m2_upscaled(i) += delta * delta2;
-        }
-
-        auto sol_fine = pdesampler.GetFineCoefficient();
-        for (int i = 0; i < sol_fine.Size(); ++i)
-            sol_fine(i) = std::log(sol_fine(i));
-        int fine_iterations = fvupscale->GetFineSolveIters();
-        total_fine_iterations += fine_iterations;
-        double fine_time = fvupscale->GetFineSolveTime();
-        total_fine_time += fine_time;
-        for (int i = 0; i < mean_fine.Size(); ++i)
-        {
-            const double delta = (sol_fine(i) - mean_fine(i));
-            mean_fine(i) += delta / count;
-            const double delta2 = (sol_fine(i) - mean_fine(i));
-            m2_fine(i) += delta * delta2;
-        }
-
-        double finest_p_error = CompareError(comm, sol_upscaled, sol_fine);
-        max_p_error = (max_p_error > finest_p_error) ? max_p_error : finest_p_error;
-
-        if (save_samples)
-        {
-            std::stringstream coarsename;
-            coarsename << "coarse_" << sample;
-            SaveFigure(sol_upscaled, ufespace, coarsename.str());
-            std::stringstream finename;
-            finename << "fine_" << sample;
-            SaveFigure(sol_fine, ufespace, finename.str());
-        }
-
         if (myid == 0)
         {
             std::cout << "  Sample " << sample << ":" << std::endl;
-            std::cout << "    fine: iterations: " << fine_iterations
-                      << ", time: " << fine_time << std::endl;
-            std::cout << "    coarse: iterations: " << coarse_iterations
-                      << ", time: " << coarse_time << std::endl;
-            std::cout << "    p_error: " << finest_p_error << std::endl;
+        }
+        double count = static_cast<double>(sample) + 1.0;
+        pdesampler.NewSample();
+
+        auto sol_fine = pdesampler.GetCoefficient(0);
+        for (int i = 0; i < sol_fine.Size(); ++i)
+            sol_fine(i) = std::log(sol_fine(i));
+        par_orthogonalize_from_constant(sol_fine, graph.VertexStarts().Last());
+        int iterations = pdesampler.GetHierarchy().GetSolveIters(0);
+        total_iterations[0] += iterations;
+        double time = pdesampler.GetHierarchy().GetSolveTime(0);
+        total_time[0] += time;
+        for (int i = 0; i < mean[0].Size(); ++i)
+        {
+            const double delta = (sol_fine(i) - mean[0](i));
+            mean[0](i) += delta / count;
+            const double delta2 = (sol_fine(i) - mean[0](i));
+            m2[0](i) += delta * delta2;
+        }
+        p_error[0] = 0.0;
+
+        for (int level = 1; level < num_levels; ++level)
+        {
+            auto sol_coarse = pdesampler.GetCoefficientForVisualization(level);
+            auto sol_upscaled = InterpolateToFine(pdesampler, level, sol_coarse);
+            for (int i = 0; i < sol_upscaled.Size(); ++i)
+                sol_upscaled(i) = std::log(sol_upscaled(i));
+            par_orthogonalize_from_constant(sol_upscaled, graph.VertexStarts().Last());
+            iterations = pdesampler.GetHierarchy().GetSolveIters(level);
+            total_iterations[level] += iterations;
+            time = pdesampler.GetHierarchy().GetSolveTime(level);
+            total_time[level] += time;
+            for (int i = 0; i < mean[level].Size(); ++i)
+            {
+                const double delta = (sol_upscaled(i) - mean[level](i));
+                mean[level](i) += delta / count;
+                const double delta2 = (sol_upscaled(i) - mean[level](i));
+                m2[level](i) += delta * delta2;
+            }
+            p_error[level] = CompareError(comm, sol_upscaled, sol_fine);
+            if (myid == 0)
+            {
+                std::cout << "    p_error_level_" << level << ": " << p_error[level] << std::endl;
+            }
+
+            if (level == 1)
+            {
+                max_p_error = (max_p_error > p_error[level]) ? max_p_error : p_error[level];
+            }
+
+            if (save_samples)
+            {
+                std::stringstream name;
+                name << "sample_l" << level << "_s" << sample;
+                if (level == 0)
+                {
+                    spe10problem.SaveFigure(sol_fine, name.str());
+                }
+                else
+                {
+                    spe10problem.SaveFigure(sol_upscaled, name.str());
+                }
+            }
         }
     }
 
     double count = static_cast<double>(num_samples);
     if (count > 1.1)
     {
-        m2_upscaled *= (1.0 / (count - 1.0));
-        m2_fine *= (1.0 / (count - 1.0));
+        for (int level = 0; level < num_levels; ++level)
+            m2[level] *= (1.0 / (count - 1.0));
     }
 
-    serialize["total-coarse-iterations"] = picojson::value((double) total_coarse_iterations);
-    serialize["total-fine-iterations"] = picojson::value((double) total_fine_iterations);
+    serialize["total-coarse-iterations"] = picojson::value((double) total_iterations[1]);
+    serialize["total-fine-iterations"] = picojson::value((double) total_iterations[0]);
     serialize["fine-mean-typical"] = picojson::value(
-                                         mean_fine[mean_fine.Size() / 2]);
+                                         mean[0][mean[0].Size() / 2]);
     serialize["fine-mean-l1"] = picojson::value(
-                                    mean_fine.Norml1() / static_cast<double>(mean_fine.Size()));
+                                    mean[0].Norml1() / static_cast<double>(mean[0].Size()));
     serialize["coarse-mean-l1"] = picojson::value(
-                                      mean_upscaled.Norml1() / static_cast<double>(mean_upscaled.Size()));
+                                      mean[1].Norml1() / static_cast<double>(mean[1].Size()));
     serialize["coarse-mean-typical"] = picojson::value(
-                                           mean_upscaled[mean_upscaled.Size() / 2]);
+                                           mean[1][mean[1].Size() / 2]);
     serialize["fine-variance-mean"] = picojson::value(
-                                          m2_fine.Sum() / static_cast<double>(m2_fine.Size()));
+                                          m2[0].Sum() / static_cast<double>(m2[0].Size()));
     serialize["coarse-variance-mean"] = picojson::value(
-                                            m2_upscaled.Sum() / static_cast<double>(m2_upscaled.Size()));
+                                            m2[1].Sum() / static_cast<double>(m2[1].Size()));
     serialize["max-p-error"] = picojson::value(max_p_error);
+    for (int i = 0; i < num_levels; ++i)
+    {
+        std::stringstream s;
+        s << "p-error-level-" << i;
+        serialize[s.str()] = picojson::value(p_error[i]);
+    }
 
     if (visualization)
     {
-        Visualize(mean_upscaled, ufespace, 1);
-        Visualize(mean_fine, ufespace, 0);
-        if (count > 1.1)
+        for (int level = 0; level < num_levels; ++level)
         {
-            Visualize(m2_upscaled, ufespace, 11);
-            Visualize(m2_fine, ufespace, 10);
+            mfem::socketstream vis_v;
+            std::stringstream filename;
+            filename << "pressure " << level;
+            spe10problem.VisSetup(vis_v, mean[level], 0.0, 0.0, filename.str());
+            if (count > 1.1)
+            {
+                mfem::socketstream vis_v;
+                std::stringstream filename;
+                filename << "pressure " << 10 + level;
+                spe10problem.VisSetup(vis_v, m2[level], 0.0, 0.0, filename.str());
+            }
         }
     }
     if (save_statistics)
     {
-        SaveFigure(mean_upscaled, ufespace, "coarse_mean");
-        SaveFigure(mean_fine, ufespace, "fine_mean");
-        SaveFigure(m2_upscaled, ufespace, "coarse_variance");
-        SaveFigure(m2_fine, ufespace, "fine_variance");
+        for (int level = 0; level < num_levels; ++level)
+        {
+            std::stringstream filename;
+            filename << "level_" << level << "_mean";
+            spe10problem.SaveFigure(mean[level], filename.str());
+            filename.str("");
+            filename << "level_" << level << "_variance";
+            spe10problem.SaveFigure(m2[level], filename.str());
+        }
     }
 
     if (myid == 0)

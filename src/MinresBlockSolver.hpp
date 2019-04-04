@@ -26,7 +26,6 @@
 #include <memory>
 #include <assert.h>
 
-#include "mfem.hpp"
 #include "utilities.hpp"
 #include "MixedMatrix.hpp"
 #include "MixedLaplacianSolver.hpp"
@@ -68,31 +67,24 @@ public:
        @param block_true_offsets describes parallel partitioning (@todo can this be inferred from the matrices?)
        @param use_W use the W block
     */
-    MinresBlockSolver(
-        MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::HypreParMatrix* W,
-        const mfem::Array<int>& block_true_offsets, bool use_W = false);
-
-    MinresBlockSolver(
-        MPI_Comm comm, mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-        const mfem::Array<int>& block_true_offsets);
+    MinresBlockSolver(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::SparseMatrix* W,
+                      const mfem::Array<int>& block_true_offsets);
 
     /**
        @brief Constructor from a single MixedMatrix
     */
-    MinresBlockSolver(MPI_Comm comm, const MixedMatrix& mgL);
-
-    ~MinresBlockSolver();
+    MinresBlockSolver(const MixedMatrix& mgL,
+                      const mfem::Array<int>* ess_attr = nullptr);
 
     /**
        @brief Use block-preconditioned MINRES to solve the problem.
     */
-    void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
-    {
-        Mult(rhs, sol);
-    }
-
-    /// Same as Solve()
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
+    {
+        mfem::mfem_error("This is currently not supported!\n");
+    }
 
     ///@name Set solver parameters
     ///@{
@@ -104,29 +96,23 @@ public:
 
 protected:
     mfem::MINRESSolver minres_;
-    MPI_Comm comm_;
-    int myid_;
 
-    bool use_W_;
-
-private:
     void Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-              mfem::HypreParMatrix* W);
+              mfem::SparseMatrix* W);
 
     mfem::BlockOperator operator_;
     mfem::BlockDiagonalPreconditioner prec_;
 
     std::unique_ptr<mfem::HypreParMatrix> schur_block_;
 
-    // Solvers' copy of potentially modified data
-    mfem::SparseMatrix M_;
-    mfem::SparseMatrix D_;
-    mfem::SparseMatrix W_;
+    std::unique_ptr<mfem::SparseMatrix> W_;
 
     std::unique_ptr<mfem::HypreParMatrix> hM_;
     std::unique_ptr<mfem::HypreParMatrix> hD_;
     std::unique_ptr<mfem::HypreParMatrix> hDt_;
-    std::unique_ptr<mfem::HypreParMatrix> hW_;
+
+    std::unique_ptr<mfem::HypreDiagScale> Mprec_;
+    std::unique_ptr<mfem::HypreBoomerAMG> Sprec_;
 };
 
 /**
@@ -135,16 +121,16 @@ private:
 class MinresBlockSolverFalse : public MinresBlockSolver
 {
 public:
-    MinresBlockSolverFalse(MPI_Comm comm, const MixedMatrix& mgL);
-    ~MinresBlockSolverFalse();
+    MinresBlockSolverFalse(const MixedMatrix& mgL,
+                           const mfem::Array<int>* ess_attr = nullptr);
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
 
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
 private:
     const MixedMatrix& mixed_matrix_;
-
-    mutable mfem::BlockVector true_rhs_;
-    mutable mfem::BlockVector true_sol_;
 };
 
 } // namespace smoothg

@@ -21,10 +21,9 @@
 #ifndef __SAMPLER_HPP__
 #define __SAMPLER_HPP__
 
-#include "FiniteVolumeUpscale.hpp"
+#include "Upscale.hpp"
 
 #include <random>
-#include "mfem.hpp"
 
 namespace smoothg
 {
@@ -43,10 +42,10 @@ private:
 /**
    Abstract class for drawing permeability samples.
 */
-class TwoLevelSampler
+class MultilevelSampler
 {
 public:
-    virtual ~TwoLevelSampler() {}
+    virtual ~MultilevelSampler() {}
 
     /**
        Pick a new sample; after calling this, GetFineCoefficient()
@@ -55,36 +54,27 @@ public:
     */
     virtual void NewSample() {}
 
-    /// return current sample realized on fine mesh
-    virtual const mfem::Vector& GetFineCoefficient() = 0;
-
     /// return current sample realized on coarse mesh
-    virtual mfem::Vector& GetCoarseCoefficient() = 0;
+    virtual mfem::Vector& GetCoefficient(int level) = 0;
 };
 
 /**
    Simply returns a constant coefficient, for testing some
    sampling and Monte Carlo stuff.
 */
-class SimpleSampler : public TwoLevelSampler
+class SimpleSampler : public MultilevelSampler
 {
 public:
-    SimpleSampler(int fine_size, int coarse_size);
+    SimpleSampler(std::vector<int>& size);
 
     void NewSample();
 
-    const mfem::Vector& GetFineCoefficient();
-
-    mfem::Vector& GetCoarseCoefficient();
+    mfem::Vector& GetCoefficient(int level);
 
 private:
-    int fine_size_;
-    int coarse_size_;
-
     int sample_;
 
-    mfem::Vector fine_;
-    mfem::Vector coarse_;
+    std::vector<mfem::Vector> helper_;
 };
 
 /**
@@ -94,20 +84,14 @@ private:
    hierarchical sampling technique for spatially correlated random fields,
    SISC 39 (2017) pp. S543-S562.
 */
-class PDESampler : public TwoLevelSampler
+class PDESampler : public MultilevelSampler
 {
 public:
     /**
-       Initialize the PDESampler based on the Upscale object (probably
-       FiniteVolumeUpscale).
+       Initialize the PDESampler based on the given Hierarchy object.
 
-       @param upscale object containing information about fine and coarse grids
-                      and how they are connected
-       @param fine_vector_size number of vertices on the fine graph
-       @param coarse_aggs number of aggregates on coarse graph - note well this
-                          is *not* the number of degrees of freedom - we only
-                          sample coefficient on the *constant* component, not
-                          the spectral components
+       @param hierarchy object containing information about fine and coarse
+                        grids and how they are connected
        @param dimension spatial dimension of the mesh
        @param cell_volume size of a typical cell
        @param kappa inverse correlation length for Matern covariance
@@ -115,81 +99,65 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(std::shared_ptr<const Upscale> upscale,
-               int fine_vector_size, int coarse_aggs,
-               int dimension, double cell_volume,
-               double kappa, int seed);
+    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+               Hierarchy&& hierarchy);
 
     /**
-       Initialize the PDESampler based on its own, owned FiniteVolumeUpscale object.
+       Initialize the PDESampler based on its own, owned Upscale object.
 
-       Many of these parameters are simply passed to the FiniteVolumeUpscale constructor.
+       Many of these parameters are simply passed to the Upscale constructor.
 
-       The underlying FiniteVolumeUpscale object represents the problem
+       The underlying Upscale object represents the problem
        \f[
          \kappa^2 u - \Delta u = w
        \f]
        which is used to generate samples on both fine and coarse grids, where w
        is a white noise right-hand side.
 
-       @param vertex_edge the fine graph structure
-       @param weight edge weights on fine graph
+       @param dimension spatial dimension of the mesh
+       @param cell_volume size of a typical cell
+       @param kappa inverse correlation length for Matern covariance
+       @param seed seed for random number generator used here
+       @param graph the (distributed and weighted) fine graph
        @param partitioning pre-calculated agglomerate partitioning
-       @param edge_d_td parallel dof-truedof relation for fine edges
     */
-    PDESampler(MPI_Comm comm, int dimension,
-               double cell_volume, double kappa, int seed,
-               const mfem::SparseMatrix& vertex_edge,
-               const mfem::Vector& weight,
-               const mfem::Array<int>& partitioning,
-               const mfem::HypreParMatrix& edge_d_td,
-               const mfem::SparseMatrix& edge_boundary_att,
-               const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
-               bool dual_target, bool scaled_dual, bool energy_dual,
-               bool hybridization);
+    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+               const Graph& graph,
+               const UpscaleParameters& param = UpscaleParameters(),
+               const mfem::Array<int>* partitioning = nullptr,
+               const mfem::Array<int>* ess_attr = nullptr);
 
     ~PDESampler();
 
     /// Draw white noise on fine level
     void NewSample();
 
-    /// Draw white noise on coarse level
-    void NewCoarseSample();
+    /// Set state (if you draw new white noise into state before
+    /// calling this, this is equivalent to NewSample())
+    void SetSample(const mfem::Vector& state);
 
-    /// Solve PDE with current white-noise RHS to find fine coefficient
-    const mfem::Vector& GetFineCoefficient();
+    /// Solve PDE with current white-noise RHS to find coeffiicent
+    /// on coarser level, the result is on *aggregates*
+    mfem::Vector& GetCoefficient(int level);
 
-    /// Solve PDE with current white-noise RHS to find coarse coeffiicent
-    /// this should be on *aggregates*
-    mfem::Vector& GetCoarseCoefficient();
+    /// Only for debugging/visualization, most users should use GetCoefficient
+    mfem::Vector GetCoefficientForVisualization(int level);
 
-    /// Only for debugging/visualization, most users should use GetCoarseCoefficient
-    mfem::Vector& GetCoarseCoefficientForVisualization();
+    const Hierarchy& GetHierarchy() const { return hierarchy_; }
 
 private:
-    enum State
-    {
-        NO_SAMPLE,
-        FINE_SAMPLE,
-        COARSE_SAMPLE
-    };
-
-    // const Upscale& fvupscale_;
-    std::shared_ptr<const Upscale> fvupscale_;
+    Hierarchy hierarchy_;
     NormalDistribution normal_distribution_;
-    int fine_vector_size_;
-    int num_coarse_aggs_;
+    std::vector<int> num_aggs_;
     double cell_volume_;
     double scalar_g_;
-    State current_state_;
+    bool sampled_;
 
     /// all these vectors live in the pressure / vertex space
-    mfem::Vector rhs_fine_;
-    mfem::Vector rhs_coarse_;
-    mfem::Vector coefficient_fine_;
-    mfem::Vector coefficient_coarse_;
+    std::vector<mfem::Vector> rhs_;
+    std::vector<mfem::Vector> coefficient_;
 
-    void Initialize(int dimension, double kappa);
+    void Initialize(int dimension, double cell_volume, double kappa, int seed);
 };
 
 }

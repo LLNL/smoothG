@@ -25,7 +25,6 @@
 #include <random>
 #include <assert.h>
 
-#include "mfem.hpp"
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
 

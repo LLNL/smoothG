@@ -25,12 +25,14 @@
 
 #include <mpi.h>
 
-#include "mfem.hpp"
+#include "pde.hpp"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
 
-void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh);
+void ShowAggregates(const std::vector<Graph>& graphs,
+                    const std::vector<GraphTopology>& topos,
+                    mfem::ParMesh* pmesh);
 
 int main(int argc, char* argv[])
 {
@@ -66,6 +68,7 @@ int main(int argc, char* argv[])
 
     constexpr auto num_levels = 4;
     const int coarsening_factor = nDimensions == 2 ? 8 : 32;
+    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
 
     // Setting up a mesh (2D or 3D SPE10 model)
     std::unique_ptr<mfem::ParMesh> pmesh;
@@ -80,52 +83,53 @@ int main(int argc, char* argv[])
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
 
-    // Construct vertex_edge, edge_trueedge, edge_boundaryattr tables from mesh
-    auto& vertex_edge_table = nDimensions == 2 ? pmesh->ElementToEdgeTable()
-                              : pmesh->ElementToFaceTable();
-    mfem::SparseMatrix vertex_edge = TableToMatrix(vertex_edge_table);
-
-    mfem::RT_FECollection sigmafec(0, nDimensions);
-    mfem::ParFiniteElementSpace sigmafespace(pmesh.get(), &sigmafec);
-    const auto& edge_d_td(sigmafespace.Dof_TrueDof_Matrix());
-    auto edge_boundaryattr = GenerateBoundaryAttributeTable(pmesh.get());
+    // Construct a graph from a finite volume problem defined on the mesh
+    DarcyProblem spe10problem(*pmesh, ess_attr);
 
     // Build multilevel graph topology
-    auto graph_topos = MultilevelGraphTopology(vertex_edge, *edge_d_td, &edge_boundaryattr,
-                                               num_levels, coarsening_factor);
+    std::vector<GraphTopology> topologies(num_levels - 1);
+
+    std::vector<Graph> graphs;
+    graphs.reserve(num_levels);
+    graphs.push_back(spe10problem.GetFVGraph());
+
+    for (int i = 0; i < num_levels - 1; i++)
+    {
+        graphs.push_back(topologies[i].Coarsen(graphs[i], coarsening_factor));
+    }
 
     // Visualize aggregates in all levels
     if (visualization)
     {
-        ShowAggregates(graph_topos, pmesh.get());
+        ShowAggregates(graphs, topologies, pmesh.get());
     }
 
     return EXIT_SUCCESS;
 }
 
-void ShowAggregates(std::vector<GraphTopology>& graph_topos, mfem::ParMesh* pmesh)
+void ShowAggregates(const std::vector<Graph>& graphs,
+                    const std::vector<GraphTopology>& topos,
+                    mfem::ParMesh* pmesh)
 {
     mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
     mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
     mfem::ParGridFunction attr(&attr_fespace);
 
     mfem::socketstream sol_sock;
-    for (unsigned int i = 0; i < graph_topos.size(); i++)
+    for (unsigned int i = 0; i < topos.size(); i++)
     {
         // Compute partitioning vector on level i+1
-        mfem::SparseMatrix Agg_vertex = graph_topos[0].Agg_vertex_;
+        mfem::SparseMatrix Agg_vertex = topos[0].Agg_vertex_;
         for (unsigned int j = 1; j < i + 1; j++)
         {
-            auto tmp = smoothg::Mult(graph_topos[j].Agg_vertex_, Agg_vertex);
+            auto tmp = smoothg::Mult(topos[j].Agg_vertex_, Agg_vertex);
             Agg_vertex.Swap(tmp);
         }
         auto vertex_Agg = smoothg::Transpose(Agg_vertex);
         int* partitioning = vertex_Agg.GetJ();
 
         // Make better coloring (better with serial run)
-        const auto& Agg_face = graph_topos[i].Agg_face_;
-        auto face_Agg = smoothg::Transpose(Agg_face);
-        auto Agg_Agg = smoothg::Mult(Agg_face, face_Agg);
+        mfem::SparseMatrix Agg_Agg = AAt(graphs[i + 1].VertexToEdge());
         mfem::Array<int> colors;
         GetElementColoring(colors, Agg_Agg);
         const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());

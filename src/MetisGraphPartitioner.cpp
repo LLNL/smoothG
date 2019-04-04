@@ -232,11 +232,7 @@ void MetisGraphPartitioner::IsolatePreProcess(const mfem::SparseMatrix& wtable,
     mfem::Array<int> indices_m(indices.data(), indices.size());
     indices_m.Copy(sub_to_global);
 
-    mfem::Array<int> col_map(wtable.Height());
-    col_map = -1;
-
-    mfem::SparseMatrix sub_mat = ExtractRowAndColumns(wtable, indices_m,
-                                                      indices_m, col_map);
+    mfem::SparseMatrix sub_mat = ExtractRowAndColumns(wtable, indices_m, indices_m);
     sub_table.Swap(sub_mat);
 }
 
@@ -338,30 +334,14 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
                   mfem::Array<int>& partitioning, int coarsening_factor)
 {
-    const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge);
-    const mfem::SparseMatrix vert_vert = smoothg::Mult(vertex_edge, edge_vert);
+    MFEM_ASSERT(coarsening_factor > 1,
+                "coarsening_factor does not make sense!");
 
+    const mfem::SparseMatrix vert_vert = smoothg::AAt(vertex_edge);
     const int nvertices = vert_vert.Height();
     int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
     num_partitions = std::max(1, num_partitions);
     Partition(vert_vert, partitioning, num_partitions);
-}
-
-void FESpaceMetisPartition(mfem::Array<int>& partitioning,
-                           mfem::ParFiniteElementSpace& sigmafespace,
-                           mfem::ParFiniteElementSpace& ufespace,
-                           mfem::Array<int>& coarsening_factor)
-{
-    mfem::DiscreteLinearOperator DivOp(&sigmafespace, &ufespace);
-    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
-    DivOp.Assemble();
-    DivOp.Finalize();
-
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
-
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
 }
 
 } // namespace smoothg

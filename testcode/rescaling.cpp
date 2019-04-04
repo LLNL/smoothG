@@ -19,10 +19,7 @@
           coefficient. This test requires the notion of finite volume and MFEM.
 */
 
-#include "mfem.hpp"
-
-#include "../src/SpectralAMG_MGL_Coarsener.hpp"
-#include "../src/MetisGraphPartitioner.hpp"
+#include "../examples/pde.hpp"
 
 using namespace smoothg;
 using std::unique_ptr;
@@ -47,9 +44,10 @@ mfem::PWConstCoefficient InvElemScaleCoefficient(const mfem::Vector& elem_scale)
     return mfem::PWConstCoefficient(inverse_elem_scale);
 }
 
-MixedMatrix OriginalScaledFineMatrix(mfem::ParFiniteElementSpace& sigmafespace,
-                                     const mfem::SparseMatrix& vertex_edge,
-                                     const mfem::Vector& elem_scale)
+Graph SetupFVGraph(mfem::ParFiniteElementSpace& sigmafespace,
+                   const mfem::SparseMatrix& vertex_edge,
+                   const mfem::Vector& elem_scale,
+                   const mfem::SparseMatrix& edge_bdratt)
 {
     auto inv_scale_coef = InvElemScaleCoefficient(elem_scale);
     mfem::BilinearForm a2(&sigmafespace);
@@ -68,7 +66,7 @@ MixedMatrix OriginalScaledFineMatrix(mfem::ParFiniteElementSpace& sigmafespace,
         }
     }
     auto edge_trueedge = sigmafespace.Dof_TrueDof_Matrix();
-    return MixedMatrix(vertex_edge, local_weight, *edge_trueedge);
+    return Graph(vertex_edge, *edge_trueedge, local_weight, &edge_bdratt);
 }
 
 mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,
@@ -86,22 +84,6 @@ mfem::SparseMatrix RescaledFineM(mfem::FiniteElementSpace& sigmafespace,
     a1.Assemble();
     a1.Finalize();
     return mfem::SparseMatrix(a1.SpMat());
-}
-
-unique_ptr<SpectralAMG_MGL_Coarsener> BuildCoarsener(mfem::SparseMatrix& v_e,
-                                                     const MixedMatrix& mgL,
-                                                     const mfem::Array<int>& partition,
-                                                     const mfem::SparseMatrix* edge_bdratt)
-{
-    auto gt = make_unique<GraphTopology>(v_e, mgL.GetEdgeDofToTrueDof(), partition, edge_bdratt);
-    double spect_tol = 1.0;
-    int max_evects = 3;
-    bool dual_target = false, scaled_dual = false, energy_dual = false, coarse_components = false;
-    auto coarsener = make_unique<SpectralAMG_MGL_Coarsener>(
-                         mgL, std::move(gt), spect_tol, max_evects, dual_target,
-                         scaled_dual, energy_dual, coarse_components);
-    coarsener->construct_coarse_subspace();
-    return coarsener;
 }
 
 double FrobeniusNorm(MPI_Comm comm, const mfem::SparseMatrix& mat)
@@ -153,11 +135,16 @@ int main(int argc, char* argv[])
     mfem::Vector elem_scale = SimpleAscendingScaling(pmesh->GetNE());
     mfem::Vector agg_scale = SimpleAscendingScaling(partitioning.Max() + 1);
 
-    // Create a fine level MixedMatrix corresponding to piecewise constant coefficient
-    auto fine_mgL = OriginalScaledFineMatrix(sigmafespace, vertex_edge, elem_scale);
+    Graph graph = SetupFVGraph(sigmafespace, vertex_edge, elem_scale, edge_bdratt);
 
-    // Create a coarsener to build interpolation matrices and coarse M builder
-    auto coarsener = BuildCoarsener(vertex_edge, fine_mgL, partitioning, &edge_bdratt);
+    // Create Hierarchy to build interpolation matrices and coarse M builder
+    UpscaleParameters param;
+    param.spect_tol = 1.0;
+    param.max_evects = 3;
+    Hierarchy hierarchy(graph, param, &partitioning);
+
+    MixedMatrix& fine_mgL = hierarchy.GetMatrix(0);
+    MixedMatrix& coarse_mgL = hierarchy.GetMatrix(1);
 
     // Interpolate agg scaling (coarse level) to elements (fine level)
     mfem::Vector interp_agg_scale(pmesh->GetNE());
@@ -165,15 +152,12 @@ int main(int argc, char* argv[])
     part_mat.MultTranspose(agg_scale, interp_agg_scale);
 
     // Assemble rescaled fine and coarse M through MixedMatrix
-    fine_mgL.UpdateM(interp_agg_scale);
-    auto& fine_M1 = fine_mgL.GetM();
-    auto coarse_mgL = coarsener->GetCoarse();
-    coarse_mgL.UpdateM(agg_scale);
-    auto& coarse_M1 = coarse_mgL.GetM();
+    auto fine_M1 = fine_mgL.GetMBuilder().BuildAssembledM(interp_agg_scale);
+    auto coarse_M1 = coarse_mgL.GetMBuilder().BuildAssembledM(agg_scale);
 
     // Assembled rescaled fine and coarse M through direct assembling and RAP
     auto fine_M2 = RescaledFineM(sigmafespace, elem_scale, interp_agg_scale);
-    auto& Psigma = coarsener->get_Psigma();
+    auto& Psigma = hierarchy.GetPsigma(0);
     unique_ptr<mfem::SparseMatrix> coarse_M2(mfem::RAP(Psigma, fine_M2, Psigma));
 
     // Check relative differences measured in Frobenius norm

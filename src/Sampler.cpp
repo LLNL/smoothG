@@ -36,12 +36,14 @@ double NormalDistribution::Sample()
     return out;
 }
 
-SimpleSampler::SimpleSampler(int fine_size, int coarse_size)
+SimpleSampler::SimpleSampler(std::vector<int>& size)
     :
-    fine_size_(fine_size), coarse_size_(coarse_size), sample_(-1)
+    sample_(-1), helper_(size.size())
 {
-    fine_.SetSize(fine_size_);
-    coarse_.SetSize(coarse_size_);
+    for (unsigned int level = 0; level < size.size(); ++level)
+    {
+        helper_[level].SetSize(size[level]);
+    }
 }
 
 void SimpleSampler::NewSample()
@@ -49,69 +51,47 @@ void SimpleSampler::NewSample()
     sample_++;
 }
 
-const mfem::Vector& SimpleSampler::GetFineCoefficient()
+mfem::Vector& SimpleSampler::GetCoefficient(int level)
 {
     MFEM_ASSERT(sample_ >= 0, "SimpleSampler in wrong state (call NewSample() first)!");
-    fine_ = (1.0 + sample_);
-    return fine_;
+    helper_[level] = (1.0 + sample_);
+    return helper_[level];
 }
 
-mfem::Vector& SimpleSampler::GetCoarseCoefficient()
+PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+                       Hierarchy&& hierarchy)
+    : hierarchy_(std::move(hierarchy))
 {
-    MFEM_ASSERT(sample_ >= 0, "SimpleSampler in wrong state (call NewSample() first)!");
-    coarse_ = (1.0 + sample_);
-    return coarse_;
+    Initialize(dimension, cell_volume, kappa, seed);
 }
 
-PDESampler::PDESampler(std::shared_ptr<const Upscale> fvupscale, int fine_vector_size,
-                       int coarse_aggs, int dimension, double cell_volume, double kappa,
-                       int seed)
-    :
-    fvupscale_(fvupscale),
-    normal_distribution_(0.0, 1.0, seed),
-    fine_vector_size_(fine_vector_size),
-    num_coarse_aggs_(coarse_aggs),
-    cell_volume_(cell_volume),
-    current_state_(NO_SAMPLE)
+PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+                       const Graph& graph,
+                       const UpscaleParameters& param,
+                       const mfem::Array<int>* partitioning,
+                       const mfem::Array<int>* ess_attr)
 {
-    Initialize(dimension, kappa);
+    auto W = SparseIdentity(graph.NumVertices()) *= cell_volume * kappa * kappa;
+    hierarchy_ = Hierarchy(graph, param, partitioning, ess_attr, W);
+
+    Initialize(dimension, cell_volume, kappa, seed);
 }
 
-PDESampler::PDESampler(MPI_Comm comm, int dimension,
-                       double cell_volume, double kappa, int seed,
-                       const mfem::SparseMatrix& vertex_edge,
-                       const mfem::Vector& weight,
-                       const mfem::Array<int>& partitioning,
-                       const mfem::HypreParMatrix& edge_d_td,
-                       const mfem::SparseMatrix& edge_boundary_att,
-                       const mfem::Array<int>& ess_attr, double spect_tol, int max_evects,
-                       bool dual_target, bool scaled_dual, bool energy_dual,
-                       bool hybridization)
-    :
-    normal_distribution_(0.0, 1.0, seed),
-    fine_vector_size_(vertex_edge.Height()),
-    num_coarse_aggs_(partitioning.Max() + 1),
-    cell_volume_(cell_volume),
-    current_state_(NO_SAMPLE)
+void PDESampler::Initialize(int dimension, double cell_volume, double kappa, int seed)
 {
-    mfem::SparseMatrix W_block = SparseIdentity(vertex_edge.Height());
-    W_block *= cell_volume_ * kappa * kappa;
-    auto fvupscale_temp = std::make_shared<FiniteVolumeUpscale>(
-                              comm, vertex_edge, weight, W_block, partitioning, edge_d_td,
-                              edge_boundary_att, ess_attr, spect_tol, max_evects, dual_target,
-                              scaled_dual, energy_dual, hybridization);
-    fvupscale_temp->MakeFineSolver();
-    fvupscale_ = fvupscale_temp;
+    normal_distribution_ = NormalDistribution(0.0, 1.0, seed);
+    num_aggs_.resize(hierarchy_.NumLevels());
+    cell_volume_ = cell_volume;
+    sampled_ = false;
+    rhs_.resize(hierarchy_.NumLevels());
+    coefficient_.resize(hierarchy_.NumLevels());
 
-    Initialize(dimension, kappa);
-}
-
-void PDESampler::Initialize(int dimension, double kappa)
-{
-    rhs_fine_.SetSize(fine_vector_size_);
-    coefficient_fine_.SetSize(fine_vector_size_);
-    rhs_coarse_ = fvupscale_->GetCoarseVector();
-    coefficient_coarse_.SetSize(num_coarse_aggs_);
+    for (int level = 0; level < hierarchy_.NumLevels(); ++level)
+    {
+        num_aggs_[level] = hierarchy_.NumVertices(level);
+        rhs_[level].SetSize(hierarchy_.GetMatrix(level).NumVDofs());
+        coefficient_[level].SetSize(num_aggs_[level]);
+    }
 
     double nu_parameter;
     MFEM_ASSERT(dimension == 2 || dimension == 3, "Invalid dimension!");
@@ -128,37 +108,35 @@ PDESampler::~PDESampler()
 {
 }
 
-/// @todo cell_volume should be variable rather than constant
 void PDESampler::NewSample()
 {
-    current_state_ = FINE_SAMPLE;
+    mfem::Vector state(num_aggs_[0]);
+    for (int i = 0; i < num_aggs_[0]; ++i)
+    {
+        state(i) = normal_distribution_.Sample();
+    }
 
-    // construct white noise right-hand side
+    SetSample(state);
+}
+
+/// @todo cell_volume should be variable rather than constant
+void PDESampler::SetSample(const mfem::Vector& state)
+{
+    MFEM_ASSERT(state.Size() == num_aggs_[0],
+                "state vector is the wrong size!");
+    sampled_ = true;
+
+    // build right-hand side for PDE-sampler based on white noise in state
     // (cell_volume is supposed to represent fine-grid W_h)
-    for (int i = 0; i < fine_vector_size_; ++i)
+    for (int i = 0; i < num_aggs_[0]; ++i)
     {
-        rhs_fine_(i) = scalar_g_ * std::sqrt(cell_volume_) *
-                       normal_distribution_.Sample();
+        rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
     }
-}
 
-void PDESampler::NewCoarseSample()
-{
-    current_state_ = COARSE_SAMPLE;
-    MFEM_ASSERT(false, "Not implemented!");
-}
-
-const mfem::Vector& PDESampler::GetFineCoefficient()
-{
-    MFEM_ASSERT(current_state_ == FINE_SAMPLE,
-                "PDESampler object in wrong state (call NewSample() first)!");
-
-    fvupscale_->SolveFine(rhs_fine_, coefficient_fine_);
-    for (int i = 0; i < coefficient_fine_.Size(); ++i)
+    for (int level = 0; level < hierarchy_.NumLevels() - 1; ++level)
     {
-        coefficient_fine_(i) = std::exp(coefficient_fine_(i));
+        hierarchy_.Restrict(level, rhs_[level], rhs_[level + 1]);
     }
-    return coefficient_fine_;
 }
 
 /**
@@ -174,64 +152,34 @@ const mfem::Vector& PDESampler::GetFineCoefficient()
 
    indexing: the indexing above is wrong if there is more than one dof / aggregate,
              we consider only the coefficient for the *constant* component i
+
+   @todo: not working multilevel unless restricted to one eigenvector / agg (which maybe is the only sensible case for sampling anyway?)
 */
-mfem::Vector& PDESampler::GetCoarseCoefficient()
+mfem::Vector& PDESampler::GetCoefficient(int level)
 {
-    MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
-                current_state_ == COARSE_SAMPLE,
+    MFEM_ASSERT(sampled_,
                 "PDESampler object in wrong state (call NewSample() first)!");
 
-    if (current_state_ == FINE_SAMPLE)
-        fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
-    mfem::Vector coarse_sol = fvupscale_->GetCoarseVector();
-    fvupscale_->SolveCoarse(rhs_coarse_, coarse_sol);
+    mfem::Vector coarse_sol = hierarchy_.Solve(level, rhs_[level]);
 
-    coefficient_coarse_ = 0.0;
-    mfem::Vector coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
-    MFEM_ASSERT(coarse_constant_rep.Size() == coarse_sol.Size(),
-                "PDESampler::GetCoarseCoefficient : Sizes do not match!");
-    int agg_index = 0;
-    for (int i = 0; i < coarse_sol.Size(); ++i)
+    // coarse solution projected to piece-wise constant on aggregates
+    mfem::Vector pw1_coarse_sol = hierarchy_.PWConstProject(level, coarse_sol);
+
+    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
     {
-        if (std::fabs(coarse_constant_rep(i)) > 1.e-8)
-        {
-            coefficient_coarse_(agg_index++) =
-                std::exp(coarse_sol(i) / coarse_constant_rep(i));
-        }
+        coefficient_[level](i) = std::exp(pw1_coarse_sol(i));
     }
-    MFEM_ASSERT(agg_index == num_coarse_aggs_, "Something wrong in coarse_constant_rep!");
 
-    return coefficient_coarse_;
+    return coefficient_[level];
 }
 
-mfem::Vector& PDESampler::GetCoarseCoefficientForVisualization()
+mfem::Vector PDESampler::GetCoefficientForVisualization(int level)
 {
-    MFEM_ASSERT(current_state_ == FINE_SAMPLE ||
-                current_state_ == COARSE_SAMPLE,
-                "PDESampler object in wrong state (call NewSample() first)!");
+    // coarse solution projected to piece-wise constant on aggregates
+    mfem::Vector pw1_coarse_sol = GetCoefficient(level);
 
-    if (current_state_ == FINE_SAMPLE)
-        fvupscale_->Restrict(rhs_fine_, rhs_coarse_);
-    coefficient_coarse_.SetSize(rhs_coarse_.Size());
-    fvupscale_->SolveCoarse(rhs_coarse_, coefficient_coarse_);
-
-    const mfem::Vector& coarse_constant_rep = fvupscale_->GetCoarseConstantRep();
-    MFEM_ASSERT(coarse_constant_rep.Size() == coefficient_coarse_.Size(),
-                "PDESampler::GetCoarseCoefficient : Sizes do not match!");
-    for (int i = 0; i < coefficient_coarse_.Size(); ++i)
-    {
-        if (std::fabs(coarse_constant_rep(i)) > 1.e-8)
-        {
-            coefficient_coarse_(i) =
-                std::exp(coefficient_coarse_(i) / coarse_constant_rep(i)) * coarse_constant_rep(i);
-        }
-        else
-        {
-            coefficient_coarse_(i) = 0.0;
-        }
-    }
-
-    return coefficient_coarse_;
+    // interpolate piece-wise constant function to vertex space
+    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;
 }
 
 }
