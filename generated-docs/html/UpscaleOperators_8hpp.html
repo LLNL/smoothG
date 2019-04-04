@@ -72,7 +72,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -97,25 +97,14 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <p>Useful wrappers for the upscale class.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &quot;mfem.hpp&quot;</code><br/>
-<code>#include &quot;<a class="el" href="Upscale_8hpp.html">Upscale.hpp</a>&quot;</code><br/>
+<div class="textblock"><code>#include &quot;<a class="el" href="Upscale_8hpp.html">Upscale.hpp</a>&quot;</code><br/>
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleSolve.html">smoothg::UpscaleSolve</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves the problem in the primal form in a given level.  <a href="classsmoothg_1_1UpscaleSolve.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleBlockSolve.html">smoothg::UpscaleBlockSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleBlockSolve.html" title="UpscaleBlockSolve performs the same thing as Upscale, but in mixed form. ">UpscaleBlockSolve</a> performs the same thing as <a class="el" href="classsmoothg_1_1Upscale.html" title="Use upscaling as operator. ">Upscale</a>, but in mixed form.  <a href="classsmoothg_1_1UpscaleBlockSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleFineSolve.html">smoothg::UpscaleFineSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleFineSolve.html" title="UpscaleFineSolve Solves the fine problem in primal form as its operation. ">UpscaleFineSolve</a> Solves the fine problem in primal form as its operation.  <a href="classsmoothg_1_1UpscaleFineSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleFineBlockSolve.html">smoothg::UpscaleFineBlockSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleFineSolve.html" title="UpscaleFineSolve Solves the fine problem in primal form as its operation. ">UpscaleFineSolve</a> Solves the fine problem in the mixed form as its operation.  <a href="classsmoothg_1_1UpscaleFineBlockSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleCoarseSolve.html">smoothg::UpscaleCoarseSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleCoarseSolve.html" title="UpscaleCoarseSolve Solves the coarse problem in the primal form as its operation. ...">UpscaleCoarseSolve</a> Solves the coarse problem in the primal form as its operation.  <a href="classsmoothg_1_1UpscaleCoarseSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleCoarseBlockSolve.html">smoothg::UpscaleCoarseBlockSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleCoarseBlockSolve.html" title="UpscaleCoarseBlockSolve Solves the coarse problem in the mixed form as its operation. ">UpscaleCoarseBlockSolve</a> Solves the coarse problem in the mixed form as its operation.  <a href="classsmoothg_1_1UpscaleCoarseBlockSolve.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
@@ -128,21 +117,13 @@ Namespaces</h2></td></tr>
 <div class="textblock"><p>Useful wrappers for the upscale class. </p>
 <p>Each wrapper changes the operation performed by the Upscaler object. This is useful when you need an operation other than just upscale. Consider the mixed system: </p>
 <p class="formulaDsp">
-<img class="formulaDsp" alt="\[ \begin{bmatrix} M &amp; D^T \\ D &amp; 0 \end{bmatrix} \begin{bmatrix} \sigma \\ u \end{bmatrix} = \begin{bmatrix} g \\ -f \end{bmatrix} \]" src="form_31.png"/>
+<img class="formulaDsp" alt="\[ \begin{bmatrix} M &amp; D^T \\ D &amp; 0 \end{bmatrix} \begin{bmatrix} \sigma \\ u \end{bmatrix} = \begin{bmatrix} g \\ f \end{bmatrix} \]" src="form_62.png"/>
 </p>
-<h2>Upscale</h2>
-<p>The Upscaler usually solves for <img class="formulaInl" alt="$ u $" src="form_26.png"/> by restricting to the coarse level, solving, and interpolating back to the fine level. The user only provides <img class="formulaInl" alt="$ f $" src="form_32.png"/> and is returned <img class="formulaInl" alt="$ u $" src="form_26.png"/>. The value of <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> is discarded and <img class="formulaInl" alt="$ g $" src="form_24.png"/> is always zero.</p>
+<h2>UpscaleSolve</h2>
+<p>Solves for <img class="formulaInl" alt="$ u $" src="form_26.png"/> by restricting <img class="formulaInl" alt="$ f $" src="form_32.png"/> to a given level, solving, and interpolating back to the fine level. The user only provides <img class="formulaInl" alt="$ f $" src="form_32.png"/> and is returned <img class="formulaInl" alt="$ u $" src="form_26.png"/>. The value of <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> is discarded and <img class="formulaInl" alt="$ g $" src="form_24.png"/> is always zero.</p>
 <h2>Wrappers</h2>
 <h3>UpscaleBlockSolve</h3>
-<p>Solves for <img class="formulaInl" alt="$ u $" src="form_26.png"/> and <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> by restricting both to the coarse level, solving, and interpolating both back to the fine level. The user provides both <img class="formulaInl" alt="$ g $" src="form_24.png"/> and <img class="formulaInl" alt="$ f $" src="form_32.png"/> and is returned both <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> and <img class="formulaInl" alt="$ u $" src="form_26.png"/>.</p>
-<h3>UpscaleFineSolve</h3>
-<p>Solves for <img class="formulaInl" alt="$ u $" src="form_26.png"/> on the fine level by the provided fine solver. The user provides <img class="formulaInl" alt="$ f $" src="form_32.png"/> and is returned <img class="formulaInl" alt="$ u $" src="form_26.png"/>.</p>
-<h3>UpscaleFineBlockSolve</h3>
-<p>Solves for <img class="formulaInl" alt="$ u $" src="form_26.png"/> and <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> on the fine level by the provided fine solver. The user provides both <img class="formulaInl" alt="$ f $" src="form_32.png"/> and <img class="formulaInl" alt="$ g $" src="form_24.png"/> and is returned <img class="formulaInl" alt="$ u $" src="form_26.png"/> and <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/>.</p>
-<h3>UpscaleCoarseSolve</h3>
-<p>Solves for <img class="formulaInl" alt="$ u_c $" src="form_33.png"/> on the coarse level by the provided coarse solver. The user provides <img class="formulaInl" alt="$ f_c $" src="form_34.png"/> and is returned <img class="formulaInl" alt="$ u_c $" src="form_33.png"/>;</p>
-<h3>UpscaleCoarseBlockSolve</h3>
-<p>Solves for <img class="formulaInl" alt="$ u_c $" src="form_33.png"/> and <img class="formulaInl" alt="$ sigma_c $" src="form_35.png"/> on the coarse level by the provided coarse solver. The user provides both <img class="formulaInl" alt="$ f_c $" src="form_34.png"/> and <img class="formulaInl" alt="$ g_c $" src="form_36.png"/> and is returned <img class="formulaInl" alt="$ u_c $" src="form_33.png"/> and <img class="formulaInl" alt="$ sigma_c $" src="form_35.png"/>; </p>
+<p>Solves for <img class="formulaInl" alt="$ u $" src="form_26.png"/> and <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> by restricting both <img class="formulaInl" alt="$ g $" src="form_24.png"/> and <img class="formulaInl" alt="$ f $" src="form_32.png"/> to a given level, solving, and interpolating both back to the fine level. The user provides both <img class="formulaInl" alt="$ g $" src="form_24.png"/> and <img class="formulaInl" alt="$ f $" src="form_32.png"/> and is returned both <img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> and <img class="formulaInl" alt="$ u $" src="form_26.png"/>. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

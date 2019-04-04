@@ -72,7 +72,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -88,7 +88,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#namespaces">Namespaces</a>  </div>
+<a href="#namespaces">Namespaces</a> &#124;
+<a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
 <div class="title">LocalMixedGraphSpectralTargets.cpp File Reference</div>  </div>
 </div><!--header-->
@@ -99,14 +100,21 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="textblock"><code>#include &quot;<a class="el" href="GraphCoarsen_8hpp.html">GraphCoarsen.hpp</a>&quot;</code><br/>
 <code>#include &quot;<a class="el" href="utilities_8hpp.html">utilities.hpp</a>&quot;</code><br/>
 <code>#include &quot;<a class="el" href="sharedentitycommunication_8hpp.html">sharedentitycommunication.hpp</a>&quot;</code><br/>
-<code>#include &quot;<a class="el" href="arpackeig_8hpp.html">arpackeig.hpp</a>&quot;</code><br/>
-<code>#include &quot;<a class="el" href="MatrixUtilities_8hpp.html">MatrixUtilities.hpp</a>&quot;</code><br/>
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespacesmoothg"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html">smoothg</a></td></tr>
 <tr class="memdesc:namespacesmoothg"><td class="mdescLeft">&#160;</td><td class="mdescRight">The overall namespace for the smoothG project. <br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
+Functions</h2></td></tr>
+<tr class="memitem:a4ecc5d36236b3b0da95f9ad01eb83d51"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4ecc5d36236b3b0da95f9ad01eb83d51"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>smoothg::OrderingCheck</b> (const mfem::HypreParMatrix &amp;face_trueface_face, const mfem::SparseMatrix &amp;face_entity, const mfem::HypreParMatrix &amp;entity_trueentity)</td></tr>
+<tr class="separator:a4ecc5d36236b3b0da95f9ad01eb83d51"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a26c26cc2161982aaabec6307900b74d4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a26c26cc2161982aaabec6307900b74d4"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><b>smoothg::CombineM</b> (const mfem::SparseMatrix &amp;M0, const mfem::SparseMatrix &amp;M1, int num_face_edofs)</td></tr>
+<tr class="separator:a26c26cc2161982aaabec6307900b74d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Implements LocalMixedGraphSpectralTargets. </p>

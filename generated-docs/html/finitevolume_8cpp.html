@@ -72,7 +72,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -100,27 +100,51 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;sstream&gt;</code><br/>
 <code>#include &lt;mpi.h&gt;</code><br/>
 <code>#include &quot;mfem.hpp&quot;</code><br/>
-<code>#include &quot;<a class="el" href="spe10_8hpp.html">spe10.hpp</a>&quot;</code><br/>
+<code>#include &quot;<a class="el" href="pde_8hpp.html">pde.hpp</a>&quot;</code><br/>
 <code>#include &quot;../src/picojson.h&quot;</code><br/>
 <code>#include &quot;<a class="el" href="smoothG_8hpp.html">../src/smoothG.hpp</a>&quot;</code><br/>
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:af6d4bbe546781754ec17cc864b6e50f2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af6d4bbe546781754ec17cc864b6e50f2"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>MetisPart</b> (mfem::Array&lt; int &gt; &amp;partitioning, mfem::ParFiniteElementSpace &amp;sigmafespace, mfem::ParFiniteElementSpace &amp;ufespace, mfem::Array&lt; int &gt; &amp;coarsening_factor)</td></tr>
-<tr class="separator:af6d4bbe546781754ec17cc864b6e50f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a49b923ca5cc96c8cb3d7639de474f642"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a49b923ca5cc96c8cb3d7639de474f642"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>CartPart</b> (mfem::Array&lt; int &gt; &amp;partitioning, std::vector&lt; int &gt; &amp;num_procs_xyz, mfem::ParMesh &amp;pmesh, mfem::Array&lt; int &gt; &amp;coarsening_factor)</td></tr>
-<tr class="separator:a49b923ca5cc96c8cb3d7639de474f642"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0ddf1224851353fc92bfbff6f499fa97"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0ddf1224851353fc92bfbff6f499fa97"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>main</b> (int argc, char *argv[])</td></tr>
+<tr class="memitem:a0ddf1224851353fc92bfbff6f499fa97"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="finitevolume_8cpp.html#a0ddf1224851353fc92bfbff6f499fa97">main</a> (int argc, char *argv[])</td></tr>
 <tr class="separator:a0ddf1224851353fc92bfbff6f499fa97"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>This is an example for upscaling a graph Laplacian coming from a finite volume discretization of a simple reservior model in parallel. </p>
+<p>If lateral_pressure == true, Dirichlet pressure boundary condition will be imposed on left (p = -1) and right (p = 0) side of the domain boundary. No flow boundary condition (v.n = 0) is imposed on the rest of the boundary. In this case, the quantity of interest (QoI) is the total out flux <img class="formulaInl" alt="$ \int v \cdot n dS $" src="form_49.png"/> on the left boundary.</p>
 <p>A simple way to run the example:</p>
 <p>mpirun -n 4 ./finitevolume </p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="a0ddf1224851353fc92bfbff6f499fa97"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int main </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>argc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char *&#160;</td>
+          <td class="paramname"><em>argv</em>[]&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>[Solve]</p>
+<p>[Solve] </p>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#a1">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
+</dl>
+</div>
+</div>
+</div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
 Generated by &#160;<a href="http://www.doxygen.org/index.html">

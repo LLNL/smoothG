@@ -73,7 +73,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -91,6 +91,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div class="summary">
 <a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
+<a href="#pub-static-methods">Static Public Member Functions</a> &#124;
 <a href="classsmoothg_1_1MetisGraphPartitioner-members.html">List of all members</a>  </div>
   <div class="headertitle">
 <div class="title">smoothg::MetisGraphPartitioner Class Reference</div>  </div>
@@ -133,9 +134,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="clas
 void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MetisGraphPartitioner.html#a13be7d670c36c9869044b05584c27040">setUnbalanceTol</a> (double utol)</td></tr>
 <tr class="memdesc:a13be7d670c36c9869044b05584c27040"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allow some imbalance in the size of the partitions. <br/></td></tr>
 <tr class="separator:a13be7d670c36c9869044b05584c27040"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae268ade5ed5447303f2fa36bea098039"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MetisGraphPartitioner.html#ae268ade5ed5447303f2fa36bea098039">doPartition</a> (const mfem::SparseMatrix &amp;wtable, int &amp;num_partitions, mfem::Array&lt; int &gt; &amp;partitioning)</td></tr>
-<tr class="memdesc:ae268ade5ed5447303f2fa36bea098039"><td class="mdescLeft">&#160;</td><td class="mdescRight">Partition a graph with weighted edges in num_partitions.  <a href="#ae268ade5ed5447303f2fa36bea098039">More...</a><br/></td></tr>
-<tr class="separator:ae268ade5ed5447303f2fa36bea098039"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa893e23c9324abcb28f437c004e227b5"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MetisGraphPartitioner.html#aa893e23c9324abcb28f437c004e227b5">doPartition</a> (const mfem::SparseMatrix &amp;wtable, int &amp;num_partitions, mfem::Array&lt; int &gt; &amp;partitioning, bool use_edge_weight=false)</td></tr>
+<tr class="memdesc:aa893e23c9324abcb28f437c004e227b5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Partition a graph with weighted edges in num_partitions.  <a href="#aa893e23c9324abcb28f437c004e227b5">More...</a><br/></td></tr>
+<tr class="separator:aa893e23c9324abcb28f437c004e227b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adeaab45db1eda3a37647acf43a83665b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MetisGraphPartitioner.html#adeaab45db1eda3a37647acf43a83665b">SetPreIsolateVertices</a> (int index)</td></tr>
 <tr class="separator:adeaab45db1eda3a37647acf43a83665b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6cb3aed509d6a10bf9f120121a633c64"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6cb3aed509d6a10bf9f120121a633c64"></a>
@@ -147,12 +148,18 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>SetPostIsolateVertice
 <tr class="memitem:aac78caf10aae998d0bb975c0ee56bf7a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aac78caf10aae998d0bb975c0ee56bf7a"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>SetPostIsolateVertices</b> (const mfem::Array&lt; int &gt; &amp;indices)</td></tr>
 <tr class="separator:aac78caf10aae998d0bb975c0ee56bf7a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
+Static Public Member Functions</h2></td></tr>
+<tr class="memitem:a1cd28df7edbcb61df186fb15ca878e2b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1cd28df7edbcb61df186fb15ca878e2b"></a>
+static mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><b>getAdjacency</b> (const mfem::SparseMatrix &amp;wtable)</td></tr>
+<tr class="separator:a1cd28df7edbcb61df186fb15ca878e2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Wrap Metis in a C++ class for partitioning a graph. </p>
-<dl><dt><b>Examples: </b></dt><dd><a class="el" href="examples_2generalgraph_8cpp-example.html#_a5">examples/generalgraph.cpp</a>.</dd>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#_a13">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
 </dl></div><h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="ae268ade5ed5447303f2fa36bea098039"></a>
+<a class="anchor" id="aa893e23c9324abcb28f437c004e227b5"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -172,7 +179,13 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>SetPostIsolateVertice
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">mfem::Array&lt; int &gt; &amp;&#160;</td>
-          <td class="paramname"><em>partitioning</em>&#160;</td>
+          <td class="paramname"><em>partitioning</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>use_edge_weight</em> = <code>false</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -191,7 +204,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>SetPostIsolateVertice
   </table>
   </dd>
 </dl>
-<dl><dt><b>Examples: </b></dt><dd><a class="el" href="examples_2generalgraph_8cpp-example.html#a10">examples/generalgraph.cpp</a>.</dd>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#a18">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
 </dl>
 </div>
 </div>

@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['localgraphedgesolver',['LocalGraphEdgeSolver',['../classsmoothg_1_1LocalGraphEdgeSolver.html#a684214247ee8fbce461af3c2a0bc27ba',1,'smoothg::LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix &amp;M, const mfem::SparseMatrix &amp;D)'],['../classsmoothg_1_1LocalGraphEdgeSolver.html#aabb2e62681277f97edc9c92cbe1ce9ae',1,'smoothg::LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::Vector &amp;M, const mfem::SparseMatrix &amp;D)']]],
-  ['localmixedgraphspectraltargets',['LocalMixedGraphSpectralTargets',['../classsmoothg_1_1LocalMixedGraphSpectralTargets.html#a7bc3b98f9bcd2716eacac59fe91377d9',1,'smoothg::LocalMixedGraphSpectralTargets']]]
+  ['localeigensolver',['LocalEigenSolver',['../classsmoothg_1_1LocalEigenSolver.html#ab5f67199291b90127c81c68986fd6ed6',1,'smoothg::LocalEigenSolver']]],
+  ['localgraphedgesolver',['LocalGraphEdgeSolver',['../classsmoothg_1_1LocalGraphEdgeSolver.html#a72d4963a28b04c873cd4b985ff65b6a5',1,'smoothg::LocalGraphEdgeSolver']]],
+  ['localmixedgraphspectraltargets',['LocalMixedGraphSpectralTargets',['../classsmoothg_1_1LocalMixedGraphSpectralTargets.html#a3e883b3a0feb9d28e839802fedcf6213',1,'smoothg::LocalMixedGraphSpectralTargets']]],
+  ['localtpfa',['LocalTPFA',['../classsmoothg_1_1LocalTPFA.html#af5795cc80c8a5949f106403da40bcc23',1,'smoothg::LocalTPFA']]]
 ];

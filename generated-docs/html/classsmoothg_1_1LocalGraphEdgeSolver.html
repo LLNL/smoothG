@@ -73,7 +73,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -103,29 +103,28 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a684214247ee8fbce461af3c2a0bc27ba"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#a684214247ee8fbce461af3c2a0bc27ba">LocalGraphEdgeSolver</a> (const mfem::SparseMatrix &amp;M, const mfem::SparseMatrix &amp;D)</td></tr>
-<tr class="memdesc:a684214247ee8fbce461af3c2a0bc27ba"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor of the local saddle point solver.  <a href="#a684214247ee8fbce461af3c2a0bc27ba">More...</a><br/></td></tr>
-<tr class="separator:a684214247ee8fbce461af3c2a0bc27ba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aabb2e62681277f97edc9c92cbe1ce9ae"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aabb2e62681277f97edc9c92cbe1ce9ae"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#aabb2e62681277f97edc9c92cbe1ce9ae">LocalGraphEdgeSolver</a> (const mfem::Vector &amp;M, const mfem::SparseMatrix &amp;D)</td></tr>
-<tr class="memdesc:aabb2e62681277f97edc9c92cbe1ce9ae"><td class="mdescLeft">&#160;</td><td class="mdescRight">M is the diagonal of the matrix <img class="formulaInl" alt="$ M $" src="form_19.png"/> in the formula above. <br/></td></tr>
-<tr class="separator:aabb2e62681277f97edc9c92cbe1ce9ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0888a65715204a2f1c83d39a63e55356"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#a0888a65715204a2f1c83d39a63e55356">Mult</a> (const mfem::Vector &amp;rhs, mfem::Vector &amp;sol_sigma)</td></tr>
-<tr class="memdesc:a0888a65715204a2f1c83d39a63e55356"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = g$" src="form_22.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>.  <a href="#a0888a65715204a2f1c83d39a63e55356">More...</a><br/></td></tr>
-<tr class="separator:a0888a65715204a2f1c83d39a63e55356"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a17fa9c10cfc9b7a5d72e992b5f4e2ed1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#a17fa9c10cfc9b7a5d72e992b5f4e2ed1">Mult</a> (const mfem::Vector &amp;rhs, mfem::Vector &amp;sol_sigma, mfem::Vector &amp;sol_u)</td></tr>
-<tr class="memdesc:a17fa9c10cfc9b7a5d72e992b5f4e2ed1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = g$" src="form_22.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>.  <a href="#a17fa9c10cfc9b7a5d72e992b5f4e2ed1">More...</a><br/></td></tr>
-<tr class="separator:a17fa9c10cfc9b7a5d72e992b5f4e2ed1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a72d4963a28b04c873cd4b985ff65b6a5"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#a72d4963a28b04c873cd4b985ff65b6a5">LocalGraphEdgeSolver</a> (const mfem::SparseMatrix &amp;M, const mfem::SparseMatrix &amp;D, const mfem::Vector &amp;const_rep=mfem::Vector())</td></tr>
+<tr class="memdesc:a72d4963a28b04c873cd4b985ff65b6a5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor of the local saddle point solver.  <a href="#a72d4963a28b04c873cd4b985ff65b6a5">More...</a><br/></td></tr>
+<tr class="separator:a72d4963a28b04c873cd4b985ff65b6a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afd299a3ebb5d92b2ffa9fb9f025cb53a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#afd299a3ebb5d92b2ffa9fb9f025cb53a">Mult</a> (const mfem::Vector &amp;rhs_u, mfem::Vector &amp;sol_sigma) const </td></tr>
+<tr class="memdesc:afd299a3ebb5d92b2ffa9fb9f025cb53a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = f$" src="form_57.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>.  <a href="#afd299a3ebb5d92b2ffa9fb9f025cb53a">More...</a><br/></td></tr>
+<tr class="separator:afd299a3ebb5d92b2ffa9fb9f025cb53a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4efe5b2673d17b5eaa8e026eadee72d7"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#a4efe5b2673d17b5eaa8e026eadee72d7">Mult</a> (const mfem::Vector &amp;rhs_sigma, const mfem::Vector &amp;rhs_u, mfem::Vector &amp;sol_sigma, mfem::Vector &amp;sol_u) const </td></tr>
+<tr class="memdesc:a4efe5b2673d17b5eaa8e026eadee72d7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = f - D M^{-1} g $" src="form_58.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} (D^T u + g) $" src="form_59.png"/>.  <a href="#a4efe5b2673d17b5eaa8e026eadee72d7">More...</a><br/></td></tr>
+<tr class="separator:a4efe5b2673d17b5eaa8e026eadee72d7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7ae382cd98dbf20ef346c5f2a98b8376"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalGraphEdgeSolver.html#a7ae382cd98dbf20ef346c5f2a98b8376">Mult</a> (const mfem::Vector &amp;rhs_u, mfem::Vector &amp;sol_sigma, mfem::Vector &amp;sol_u) const </td></tr>
+<tr class="memdesc:a7ae382cd98dbf20ef346c5f2a98b8376"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = f$" src="form_57.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>.  <a href="#a7ae382cd98dbf20ef346c5f2a98b8376">More...</a><br/></td></tr>
+<tr class="separator:a7ae382cd98dbf20ef346c5f2a98b8376"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Solver for local saddle point problems, see the formula below. </p>
 <p>This routine solves local saddle point problems of the form </p>
 <p class="formulaDsp">
-<img class="formulaDsp" alt="\[ \left( \begin{array}{cc} M&amp; D^T \\ D&amp; \end{array} \right) \left( \begin{array}{c} \sigma \\ u \end{array} \right) = \left( \begin{array}{c} 0 \\ -g \end{array} \right) \]" src="form_18.png"/>
+<img class="formulaDsp" alt="\[ \left( \begin{array}{cc} M&amp; D^T \\ D&amp; \end{array} \right) \left( \begin{array}{c} \sigma \\ u \end{array} \right) = \left( \begin{array}{c} -g \\ -f \end{array} \right) \]" src="form_56.png"/>
 </p>
 <p>This local solver is called when computing PV vectors, bubbles, and trace extensions. </p>
 </div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a class="anchor" id="a684214247ee8fbce461af3c2a0bc27ba"></a>
+<a class="anchor" id="a72d4963a28b04c873cd4b985ff65b6a5"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -139,7 +138,13 @@ Public Member Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
-          <td class="paramname"><em>D</em>&#160;</td>
+          <td class="paramname"><em>D</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>const_rep</em> = <code>mfem::Vector()</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -153,16 +158,17 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">M</td><td>matrix <img class="formulaInl" alt="$ M $" src="form_19.png"/> in the formula in the class description </td></tr>
-    <tr><td class="paramname">D</td><td>matrix <img class="formulaInl" alt="$ D $" src="form_20.png"/> in the formula in the class description</td></tr>
+    <tr><td class="paramname">D</td><td>matrix <img class="formulaInl" alt="$ D $" src="form_20.png"/> in the formula in the class description </td></tr>
+    <tr><td class="paramname">const_rep</td><td>a vector which solution u is set to be orthogonal to. If not provided, there will be NO orthogonalization step in solving stage</td></tr>
   </table>
   </dd>
 </dl>
-<p>M is assumed to be diagonal (TODO: should assert?) We construct the matrix <img class="formulaInl" alt="$ A = D M^{-1} D^T $" src="form_21.png"/>, eliminate the zeroth degree of freedom to ensure it is solvable. LU factorization of <img class="formulaInl" alt="$ A $" src="form_0.png"/> is computed and stored (until the object is deleted) for potential multiple solves. </p>
+<p>We construct the matrix <img class="formulaInl" alt="$ A = D M^{-1} D^T $" src="form_21.png"/>, eliminate the zeroth degree of freedom to ensure it is solvable. LU factorization of <img class="formulaInl" alt="$ A $" src="form_0.png"/> is computed and stored (until the object is deleted) for potential multiple solves. </p>
 
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="a0888a65715204a2f1c83d39a63e55356"></a>
+<a class="anchor" id="afd299a3ebb5d92b2ffa9fb9f025cb53a"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -170,7 +176,7 @@ Public Member Functions</h2></td></tr>
           <td class="memname">void smoothg::LocalGraphEdgeSolver::Mult </td>
           <td>(</td>
           <td class="paramtype">const mfem::Vector &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
+          <td class="paramname"><em>rhs_u</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -181,15 +187,15 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td></td>
           <td>)</td>
-          <td></td><td></td>
+          <td></td><td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = g$" src="form_22.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>. </p>
+<p>Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = f$" src="form_57.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">rhs</td><td><img class="formulaInl" alt="$ g $" src="form_24.png"/> in the formula above </td></tr>
+    <tr><td class="paramname">rhs_u</td><td><img class="formulaInl" alt="$ f $" src="form_32.png"/> in the formula above </td></tr>
     <tr><td class="paramname">sol_sigma</td><td><img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> in the formula above </td></tr>
   </table>
   </dd>
@@ -197,7 +203,7 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="a17fa9c10cfc9b7a5d72e992b5f4e2ed1"></a>
+<a class="anchor" id="a4efe5b2673d17b5eaa8e026eadee72d7"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -205,7 +211,13 @@ Public Member Functions</h2></td></tr>
           <td class="memname">void smoothg::LocalGraphEdgeSolver::Mult </td>
           <td>(</td>
           <td class="paramtype">const mfem::Vector &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
+          <td class="paramname"><em>rhs_sigma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>rhs_u</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -222,15 +234,58 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td></td>
           <td>)</td>
-          <td></td><td></td>
+          <td></td><td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = g$" src="form_22.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>. </p>
+<p>Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = f - D M^{-1} g $" src="form_58.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} (D^T u + g) $" src="form_59.png"/>. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">rhs</td><td><img class="formulaInl" alt="$ g $" src="form_24.png"/> in the formula above </td></tr>
+    <tr><td class="paramname">rhs_sigma</td><td><img class="formulaInl" alt="$ g $" src="form_24.png"/> in the formula above </td></tr>
+    <tr><td class="paramname">rhs_u</td><td><img class="formulaInl" alt="$ f $" src="form_32.png"/> in the formula above </td></tr>
+    <tr><td class="paramname">sol_sigma</td><td><img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> in the formula above </td></tr>
+    <tr><td class="paramname">sol_u</td><td><img class="formulaInl" alt="$ u $" src="form_26.png"/> in the formula above </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a class="anchor" id="a7ae382cd98dbf20ef346c5f2a98b8376"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::LocalGraphEdgeSolver::Mult </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>rhs_u</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>sol_sigma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>sol_u</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Solves <img class="formulaInl" alt="$ (D M^{-1} D^T) u = f$" src="form_57.png"/>, <img class="formulaInl" alt="$ \sigma = M^{-1} D^T u $" src="form_23.png"/>. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">rhs_u</td><td><img class="formulaInl" alt="$ f $" src="form_32.png"/> in the formula above </td></tr>
     <tr><td class="paramname">sol_sigma</td><td><img class="formulaInl" alt="$ \sigma $" src="form_25.png"/> in the formula above </td></tr>
     <tr><td class="paramname">sol_u</td><td><img class="formulaInl" alt="$ u $" src="form_26.png"/> in the formula above </td></tr>
   </table>

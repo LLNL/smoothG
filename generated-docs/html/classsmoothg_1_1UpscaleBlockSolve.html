@@ -73,7 +73,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -96,9 +96,6 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 
-<p><a class="el" href="classsmoothg_1_1UpscaleBlockSolve.html" title="UpscaleBlockSolve performs the same thing as Upscale, but in mixed form. ">UpscaleBlockSolve</a> performs the same thing as <a class="el" href="classsmoothg_1_1Upscale.html" title="Use upscaling as operator. ">Upscale</a>, but in mixed form.  
- <a href="classsmoothg_1_1UpscaleBlockSolve.html#details">More...</a></p>
-
 <p><code>#include &lt;src/UpscaleOperators.hpp&gt;</code></p>
 <div class="dynheader">
 Inheritance diagram for smoothg::UpscaleBlockSolve:</div>
@@ -111,15 +108,15 @@ Inheritance diagram for smoothg::UpscaleBlockSolve:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa28f2e57c1dd4ac688cb0061f0c3789c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa28f2e57c1dd4ac688cb0061f0c3789c"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>UpscaleBlockSolve</b> (const <a class="el" href="classsmoothg_1_1Upscale.html">Upscale</a> &amp;A)</td></tr>
-<tr class="separator:aa28f2e57c1dd4ac688cb0061f0c3789c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a446c70b444d292839a3f9a60d71f5619"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a446c70b444d292839a3f9a60d71f5619"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>UpscaleBlockSolve</b> (const <a class="el" href="classsmoothg_1_1Hierarchy.html">Hierarchy</a> &amp;h, int level=1)</td></tr>
+<tr class="separator:a446c70b444d292839a3f9a60d71f5619"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae916e5a7410c3376328ece680bcf8194"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae916e5a7410c3376328ece680bcf8194"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>Mult</b> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
 <tr class="separator:ae916e5a7410c3376328ece680bcf8194"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p><a class="el" href="classsmoothg_1_1UpscaleBlockSolve.html" title="UpscaleBlockSolve performs the same thing as Upscale, but in mixed form. ">UpscaleBlockSolve</a> performs the same thing as <a class="el" href="classsmoothg_1_1Upscale.html" title="Use upscaling as operator. ">Upscale</a>, but in mixed form. </p>
+<div class="textblock"><p>Solves the problem in the mixed form in a given level </p>
 <dl class="section note"><dt>Note</dt><dd>All vectors assumed to be block vectors with the same offsets as the Upscaler </dd></dl>
 </div><hr/>The documentation for this class was generated from the following file:<ul>
 <li>src/<a class="el" href="UpscaleOperators_8hpp.html">UpscaleOperators.hpp</a></li>

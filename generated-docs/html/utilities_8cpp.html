@@ -72,7 +72,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -100,7 +100,6 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="textblock"><code>#include &lt;mfem.hpp&gt;</code><br/>
 <code>#include &quot;<a class="el" href="utilities_8hpp.html">utilities.hpp</a>&quot;</code><br/>
 <code>#include &quot;<a class="el" href="MatrixUtilities_8hpp.html">MatrixUtilities.hpp</a>&quot;</code><br/>
-<code>#include &quot;<a class="el" href="SpectralAMG__MGL__Coarsener_8hpp.html">SpectralAMG_MGL_Coarsener.hpp</a>&quot;</code><br/>
 <code>#include &quot;<a class="el" href="MixedLaplacianSolver_8hpp.html">MixedLaplacianSolver.hpp</a>&quot;</code><br/>
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
@@ -114,33 +113,14 @@ Functions</h2></td></tr>
 <tr class="memitem:a9d895bd62661aa1735089322e37104c6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9d895bd62661aa1735089322e37104c6"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>dgesvd_</b> (const char *jobu, const char *jobvt, const int *m, const int *n, double *a, const int *lda, double *s, double *u, const int *ldu, double *vt, const int *ldvt, double *work, const int *lwork, int *info)</td></tr>
 <tr class="separator:a9d895bd62661aa1735089322e37104c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af3e5bf5554f640810772982e98e43e73"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af3e5bf5554f640810772982e98e43e73"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>dsytrd_</b> (char *uplo, const int *n, double *a, const int *lda, double *d, double *e, double *tau, double *work, int *lwork, int *info)</td></tr>
-<tr class="separator:af3e5bf5554f640810772982e98e43e73"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a62aa05b87e0f4e489d33cf7b79d9a03d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a62aa05b87e0f4e489d33cf7b79d9a03d"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>dsterf_</b> (const int *n, double *d, double *e, int *info)</td></tr>
-<tr class="separator:a62aa05b87e0f4e489d33cf7b79d9a03d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a01a2944ce27316025da77660c805be4a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a01a2944ce27316025da77660c805be4a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>dstein_</b> (const int *n, const double *d, const double *e, int *m, const double *w, const int *iblock, const int *isplit, double *z, const int *ldz, double *work, int *iwork, int *ifailv, int *info)</td></tr>
-<tr class="separator:a01a2944ce27316025da77660c805be4a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4413bbe577d523f1fed5bcd4d62d4f39"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4413bbe577d523f1fed5bcd4d62d4f39"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>dormtr_</b> (char *side, char *uplo, char *trans, const int *m, const int *n, const double *a, const int *lda, const double *tau, double *c, const int *ldc, double *work, int *lwork, int *info)</td></tr>
-<tr class="separator:a4413bbe577d523f1fed5bcd4d62d4f39"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4af8bece0841226866214c4ae81c8e08"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4af8bece0841226866214c4ae81c8e08"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a4af8bece0841226866214c4ae81c8e08">smoothg::VisualizeSolution</a> (int k, mfem::ParFiniteElementSpace *sigmafespace, mfem::ParFiniteElementSpace *ufespace, const mfem::SparseMatrix &amp;D, const mfem::BlockVector &amp;sol)</td></tr>
-<tr class="memdesc:a4af8bece0841226866214c4ae81c8e08"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use GLVis to visualize finite volume solution. <br/></td></tr>
-<tr class="separator:a4af8bece0841226866214c4ae81c8e08"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1aa6c84f477a604527bbcadbfed9d38e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1aa6c84f477a604527bbcadbfed9d38e"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>smoothg::PostProcess</b> (mfem::SparseMatrix &amp;M_global, mfem::SparseMatrix &amp;D_global, GraphTopology &amp;graph_topology_, mfem::Vector &amp;sol, mfem::Vector &amp;solp, const mfem::Vector &amp;rhs)</td></tr>
-<tr class="separator:a1aa6c84f477a604527bbcadbfed9d38e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adc07e3540f008ab670e20be6373e152b"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#adc07e3540f008ab670e20be6373e152b">smoothg::GenerateBoundaryAttributeTable</a> (const mfem::Mesh *mesh)</td></tr>
-<tr class="memdesc:adc07e3540f008ab670e20be6373e152b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Build boundary attribute table from mesh.  <a href="#adc07e3540f008ab670e20be6373e152b">More...</a><br/></td></tr>
-<tr class="separator:adc07e3540f008ab670e20be6373e152b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6227fc30ba428ab9d49ac84b28d6dcb3"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a6227fc30ba428ab9d49ac84b28d6dcb3">smoothg::MarkDofsOnBoundary</a> (const mfem::SparseMatrix &amp;face_boundaryatt, const mfem::SparseMatrix &amp;face_dof, const mfem::Array&lt; int &gt; &amp;bndrAttributesMarker, mfem::Array&lt; int &gt; &amp;dofMarker)</td></tr>
 <tr class="separator:a6227fc30ba428ab9d49ac84b28d6dcb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a314172fc52915b9835aba5825b33f28f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a314172fc52915b9835aba5825b33f28f">smoothg::GetTableRow</a> (const mfem::SparseMatrix &amp;mat, int rownum, mfem::Array&lt; int &gt; &amp;J)</td></tr>
 <tr class="memdesc:a314172fc52915b9835aba5825b33f28f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Treat a SparseMatrix as a (boolean) table, and return the column indices of a given row in the Array J.  <a href="#a314172fc52915b9835aba5825b33f28f">More...</a><br/></td></tr>
 <tr class="separator:a314172fc52915b9835aba5825b33f28f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad71c306ac9435ba48eee404d4db907da"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ad71c306ac9435ba48eee404d4db907da">smoothg::GetTableRowCopy</a> (const mfem::SparseMatrix &amp;mat, int rownum, mfem::Array&lt; int &gt; &amp;J)</td></tr>
+<tr class="memdesc:ad71c306ac9435ba48eee404d4db907da"><td class="mdescLeft">&#160;</td><td class="mdescRight">instead of a reference, get a copy  <a href="#ad71c306ac9435ba48eee404d4db907da">More...</a><br/></td></tr>
+<tr class="separator:ad71c306ac9435ba48eee404d4db907da"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a62c0196b945970d7f1d40dd91d8208ea"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a62c0196b945970d7f1d40dd91d8208ea">smoothg::ReadVertexEdge</a> (std::ifstream &amp;graphFile, mfem::SparseMatrix &amp;out)</td></tr>
 <tr class="memdesc:a62c0196b945970d7f1d40dd91d8208ea"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read a graph from a file.  <a href="#a62c0196b945970d7f1d40dd91d8208ea">More...</a><br/></td></tr>
 <tr class="separator:a62c0196b945970d7f1d40dd91d8208ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -165,6 +145,15 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>smoothg::ShowErrors</
 double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#acd62db02f43f795aa63150b83ae954e3">smoothg::PowerIterate</a> (MPI_Comm comm, const mfem::Operator &amp;A, mfem::Vector &amp;result, int max_iter=1000, double tol=1e-8, bool verbose=false)</td></tr>
 <tr class="memdesc:acd62db02f43f795aa63150b83ae954e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use power iterations to find the maximum eigenpair. <br/></td></tr>
 <tr class="separator:acd62db02f43f795aa63150b83ae954e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1d42bb2d3ebf5215d1c0a30cf80bf0e7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1d42bb2d3ebf5215d1c0a30cf80bf0e7"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>smoothg::RescaleVector</b> (const mfem::Vector &amp;scaling, mfem::Vector &amp;vec)</td></tr>
+<tr class="separator:a1d42bb2d3ebf5215d1c0a30cf80bf0e7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a82aad145bc1cf3dcb4a68ff799cab2a4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a82aad145bc1cf3dcb4a68ff799cab2a4">smoothg::GetElementColoring</a> (mfem::Array&lt; int &gt; &amp;colors, const mfem::SparseMatrix &amp;el_el)</td></tr>
+<tr class="memdesc:a82aad145bc1cf3dcb4a68ff799cab2a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">A SERIAL coloring algorithm marking distinct colors for adjacent elements.  <a href="#a82aad145bc1cf3dcb4a68ff799cab2a4">More...</a><br/></td></tr>
+<tr class="separator:a82aad145bc1cf3dcb4a68ff799cab2a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a85ebfa65d53d958ba8ba4bc0db31cfdc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a85ebfa65d53d958ba8ba4bc0db31cfdc"></a>
+std::set&lt; unsigned &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>smoothg::FindNonZeroColumns</b> (const mfem::SparseMatrix &amp;mat)</td></tr>
+<tr class="separator:a85ebfa65d53d958ba8ba4bc0db31cfdc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Implements some shared code and utility functions. </p>

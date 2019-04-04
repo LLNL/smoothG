@@ -112,12 +112,12 @@ Inheritance diagram for smoothg::GraphUpscale:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a99b459f9924b5ba3d2b4f0f66f84b2a1"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html#a99b459f9924b5ba3d2b4f0f66f84b2a1">GraphUpscale</a> (MPI_Comm comm, const mfem::SparseMatrix &amp;vertex_edge, const mfem::Array&lt; int &gt; &amp;global_partitioning, double spect_tol=0.001, int max_evects=4, bool hybridization=false, const mfem::Vector &amp;weight=mfem::Vector())</td></tr>
-<tr class="memdesc:a99b459f9924b5ba3d2b4f0f66f84b2a1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor.  <a href="#a99b459f9924b5ba3d2b4f0f66f84b2a1">More...</a><br/></td></tr>
-<tr class="separator:a99b459f9924b5ba3d2b4f0f66f84b2a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac405b0e8f6e1d1bd548ef4381e69b66b"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html#ac405b0e8f6e1d1bd548ef4381e69b66b">GraphUpscale</a> (MPI_Comm comm, const mfem::SparseMatrix &amp;vertex_edge, int coarse_factor, double spect_tol=0.001, int max_evects=4, bool hybridization=false, const mfem::Vector &amp;weight=mfem::Vector())</td></tr>
-<tr class="memdesc:ac405b0e8f6e1d1bd548ef4381e69b66b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor.  <a href="#ac405b0e8f6e1d1bd548ef4381e69b66b">More...</a><br/></td></tr>
-<tr class="separator:ac405b0e8f6e1d1bd548ef4381e69b66b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a286e276412ecdb0b47fdb1bb08b7204d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html#a286e276412ecdb0b47fdb1bb08b7204d">GraphUpscale</a> (MPI_Comm comm, const mfem::SparseMatrix &amp;vertex_edge, const mfem::Array&lt; int &gt; &amp;global_partitioning, double spect_tol=0.001, int max_evects=4, bool dual_target=false, bool scaled_dual=false, bool energy_dual=false, bool hybridization=false, bool coarse_coefficient=false, const mfem::Vector &amp;weight=mfem::Vector(), const <a class="el" href="structsmoothg_1_1SAAMGeParam.html">SAAMGeParam</a> *saamge_param=nullptr)</td></tr>
+<tr class="memdesc:a286e276412ecdb0b47fdb1bb08b7204d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor.  <a href="#a286e276412ecdb0b47fdb1bb08b7204d">More...</a><br/></td></tr>
+<tr class="separator:a286e276412ecdb0b47fdb1bb08b7204d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab0b065d44307bb5830aa6e02a9a7c4a7"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html#ab0b065d44307bb5830aa6e02a9a7c4a7">GraphUpscale</a> (MPI_Comm comm, const mfem::SparseMatrix &amp;vertex_edge, int coarse_factor, double spect_tol=0.001, int max_evects=4, bool dual_target=false, bool scaled_dual=false, bool energy_dual=false, bool hybridization=false, bool coarse_components=false, const mfem::Vector &amp;weight=mfem::Vector(), const <a class="el" href="structsmoothg_1_1SAAMGeParam.html">SAAMGeParam</a> *saamge_param=nullptr)</td></tr>
+<tr class="memdesc:ab0b065d44307bb5830aa6e02a9a7c4a7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor.  <a href="#ab0b065d44307bb5830aa6e02a9a7c4a7">More...</a><br/></td></tr>
+<tr class="separator:ab0b065d44307bb5830aa6e02a9a7c4a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a29f87bd5211263c575ff78c6127bce6e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a29f87bd5211263c575ff78c6127bce6e"></a>
 mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html#a29f87bd5211263c575ff78c6127bce6e">ReadVertexVector</a> (const std::string &amp;filename) const </td></tr>
 <tr class="memdesc:a29f87bd5211263c575ff78c6127bce6e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read permuted vertex vector. <br/></td></tr>
@@ -142,9 +142,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="clas
 void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html#abd4aa0e2a70744accb1fd50731ff36e9">WriteEdgeVector</a> (const mfem::Vector &amp;vect, const std::string &amp;filename) const </td></tr>
 <tr class="memdesc:abd4aa0e2a70744accb1fd50731ff36e9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write permuted edge vector. <br/></td></tr>
 <tr class="separator:abd4aa0e2a70744accb1fd50731ff36e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a45f765a952527072947c293c71ed5993"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a45f765a952527072947c293c71ed5993"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>MakeFineSolver</b> () const </td></tr>
-<tr class="separator:a45f765a952527072947c293c71ed5993"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6d89a997e6e7b19489c9616bc546dd2f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6d89a997e6e7b19489c9616bc546dd2f"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>MakeFineSolver</b> ()</td></tr>
+<tr class="separator:a6d89a997e6e7b19489c9616bc546dd2f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_classsmoothg_1_1Upscale"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classsmoothg_1_1Upscale')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classsmoothg_1_1Upscale.html">smoothg::Upscale</a></td></tr>
 <tr class="memitem:aca86c576dcf9eec88fd2f258217bf3be inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aca86c576dcf9eec88fd2f258217bf3be"></a>
 virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aca86c576dcf9eec88fd2f258217bf3be">Mult</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const override</td></tr>
@@ -206,20 +206,20 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" hr
 <tr class="memitem:a3469002d915b9d2eb7cbaed7dbd217e0 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3469002d915b9d2eb7cbaed7dbd217e0"></a>
 virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Interpolate</b> (const mfem::BlockVector &amp;x) const </td></tr>
 <tr class="separator:a3469002d915b9d2eb7cbaed7dbd217e0 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9f0f55253661e454f8464f1739e7a82e inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9f0f55253661e454f8464f1739e7a82e"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9f0f55253661e454f8464f1739e7a82e">Coarsen</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
-<tr class="memdesc:a9f0f55253661e454f8464f1739e7a82e inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Coarsen a fine vector to the coarse level. <br/></td></tr>
-<tr class="separator:a9f0f55253661e454f8464f1739e7a82e inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1679ead86898a850cbeb83295f8af399 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1679ead86898a850cbeb83295f8af399"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>Coarsen</b> (const mfem::Vector &amp;x) const </td></tr>
-<tr class="separator:a1679ead86898a850cbeb83295f8af399 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9350e70064f6397bb0e4474f7c8c8e23 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9350e70064f6397bb0e4474f7c8c8e23"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9350e70064f6397bb0e4474f7c8c8e23">Coarsen</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
-<tr class="memdesc:a9350e70064f6397bb0e4474f7c8c8e23 inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Coarsen a fine vector to the coarse level, in mixed form. <br/></td></tr>
-<tr class="separator:a9350e70064f6397bb0e4474f7c8c8e23 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa75500b6122cea79cd5c5176c42e85bf inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa75500b6122cea79cd5c5176c42e85bf"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Coarsen</b> (const mfem::BlockVector &amp;x) const </td></tr>
-<tr class="separator:aa75500b6122cea79cd5c5176c42e85bf inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8728cad4a015e12f256ba511fb0191a7 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8728cad4a015e12f256ba511fb0191a7"></a>
+virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a8728cad4a015e12f256ba511fb0191a7">Restrict</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
+<tr class="memdesc:a8728cad4a015e12f256ba511fb0191a7 inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Restrict a fine vector to the coarse level. <br/></td></tr>
+<tr class="separator:a8728cad4a015e12f256ba511fb0191a7 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac0210c4ae9d2f4d9aaf75bdcf60bd490 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac0210c4ae9d2f4d9aaf75bdcf60bd490"></a>
+virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>Restrict</b> (const mfem::Vector &amp;x) const </td></tr>
+<tr class="separator:ac0210c4ae9d2f4d9aaf75bdcf60bd490 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1907ea6d2b3081bc93f795b860a12f41 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1907ea6d2b3081bc93f795b860a12f41"></a>
+virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a1907ea6d2b3081bc93f795b860a12f41">Restrict</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
+<tr class="memdesc:a1907ea6d2b3081bc93f795b860a12f41 inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Restrict a fine vector to the coarse level, in mixed form. <br/></td></tr>
+<tr class="separator:a1907ea6d2b3081bc93f795b860a12f41 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0237dfd8db65f258b9aadf13afd58397 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0237dfd8db65f258b9aadf13afd58397"></a>
+virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Restrict</b> (const mfem::BlockVector &amp;x) const </td></tr>
+<tr class="separator:a0237dfd8db65f258b9aadf13afd58397 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a72251652d32adce232b547c940c9603c inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a72251652d32adce232b547c940c9603c"></a>
 virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a72251652d32adce232b547c940c9603c">FineBlockOffsets</a> (mfem::Array&lt; int &gt; &amp;offsets) const </td></tr>
 <tr class="memdesc:a72251652d32adce232b547c940c9603c inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get block offsets. <br/></td></tr>
@@ -241,6 +241,12 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" hr
 <tr class="memitem:a7e030c19a73e794a75d2dc1eebd335f0 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7e030c19a73e794a75d2dc1eebd335f0"></a>
 virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>Orthogonalize</b> (mfem::BlockVector &amp;vect) const </td></tr>
 <tr class="separator:a7e030c19a73e794a75d2dc1eebd335f0 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a242d123ec1d4acfdca505fbd272b8371 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a242d123ec1d4acfdca505fbd272b8371"></a>
+virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>OrthogonalizeCoarse</b> (mfem::Vector &amp;vect) const </td></tr>
+<tr class="separator:a242d123ec1d4acfdca505fbd272b8371 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8236af49b53d5193938d2bf0204891f1 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8236af49b53d5193938d2bf0204891f1"></a>
+virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>OrthogonalizeCoarse</b> (mfem::BlockVector &amp;vect) const </td></tr>
+<tr class="separator:a8236af49b53d5193938d2bf0204891f1 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a877d2a7d9b3c7d30aff78a204cea1cf9 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a877d2a7d9b3c7d30aff78a204cea1cf9"></a>
 virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a877d2a7d9b3c7d30aff78a204cea1cf9">GetCoarseVector</a> () const </td></tr>
 <tr class="memdesc:a877d2a7d9b3c7d30aff78a204cea1cf9 inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a coarse vertex space vector. <br/></td></tr>
@@ -285,6 +291,8 @@ virtual <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &a
 <tr class="memitem:a3130b0423f04a14bab7524b4d7f376b2 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3130b0423f04a14bab7524b4d7f376b2"></a>
 virtual const <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetCoarseMatrix</b> () const </td></tr>
 <tr class="separator:a3130b0423f04a14bab7524b4d7f376b2 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a87fe6df83a9e10384ced58f7c98bb7c8 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top">const mfem::Vector &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a87fe6df83a9e10384ced58f7c98bb7c8">GetCoarseConstantRep</a> () const </td></tr>
+<tr class="separator:a87fe6df83a9e10384ced58f7c98bb7c8 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aed7270e1707a41bed8d8c9ec42f0d932 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aed7270e1707a41bed8d8c9ec42f0d932"></a>
 virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aed7270e1707a41bed8d8c9ec42f0d932">PrintInfo</a> (std::ostream &amp;out=std::cout) const </td></tr>
 <tr class="memdesc:aed7270e1707a41bed8d8c9ec42f0d932 inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Show Solver Information. <br/></td></tr>
@@ -293,10 +301,10 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" hr
 double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a55b7d5aec58114c6340fcfb2889ca8fb">OperatorComplexity</a> () const </td></tr>
 <tr class="memdesc:a55b7d5aec58114c6340fcfb2889ca8fb inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute Operator Complexity. <br/></td></tr>
 <tr class="separator:a55b7d5aec58114c6340fcfb2889ca8fb inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9e22a2731dcab47eeac82537f9a67bfd inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9e22a2731dcab47eeac82537f9a67bfd"></a>
-virtual mfem::Array&lt; HYPRE_Int &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9e22a2731dcab47eeac82537f9a67bfd">get_Drow_start</a> () const </td></tr>
-<tr class="memdesc:a9e22a2731dcab47eeac82537f9a67bfd inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Row Starts. <br/></td></tr>
-<tr class="separator:a9e22a2731dcab47eeac82537f9a67bfd inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a94162342328749bd70518f70aa93ab93 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a94162342328749bd70518f70aa93ab93"></a>
+virtual mfem::Array&lt; HYPRE_Int &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a94162342328749bd70518f70aa93ab93">GetDrowStart</a> () const </td></tr>
+<tr class="memdesc:a94162342328749bd70518f70aa93ab93 inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Row Starts. <br/></td></tr>
+<tr class="separator:a94162342328749bd70518f70aa93ab93 inherit pub_methods_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a01616f7a446916c67f6d4baa2ea2d7bb inherit pub_methods_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a01616f7a446916c67f6d4baa2ea2d7bb"></a>
 virtual MPI_Comm&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a01616f7a446916c67f6d4baa2ea2d7bb">GetComm</a> () const </td></tr>
 <tr class="memdesc:a01616f7a446916c67f6d4baa2ea2d7bb inherit pub_methods_classsmoothg_1_1Upscale"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get communicator. <br/></td></tr>
@@ -399,12 +407,15 @@ std::unique_ptr<br class="typebreak"/>
 std::unique_ptr<br class="typebreak"/>
 &lt; <a class="el" href="classsmoothg_1_1MixedLaplacianSolver.html">MixedLaplacianSolver</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>fine_solver_</b></td></tr>
 <tr class="separator:aec8d3345b13502f2fc5e823baa2c4e37 inherit pro_attribs_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abc4d033b6aeae3c7a62d21060826a5cc inherit pro_attribs_classsmoothg_1_1Upscale"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abc4d033b6aeae3c7a62d21060826a5cc"></a>
+mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>coarse_constant_rep_</b></td></tr>
+<tr class="separator:abc4d033b6aeae3c7a62d21060826a5cc inherit pro_attribs_classsmoothg_1_1Upscale"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Use upscaling as operator. </p>
-<dl><dt><b>Examples: </b></dt><dd><a class="el" href="examples_2generalgraph_8cpp-example.html#_a4">examples/generalgraph.cpp</a>.</dd>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#_a4">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
 </dl></div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a class="anchor" id="a99b459f9924b5ba3d2b4f0f66f84b2a1"></a>
+<a class="anchor" id="a286e276412ecdb0b47fdb1bb08b7204d"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -418,7 +429,7 @@ std::unique_ptr<br class="typebreak"/>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
-          <td class="paramname"><em>vertex_edge</em>, </td>
+          <td class="paramname"><em>vertex_edge_global</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -442,13 +453,43 @@ std::unique_ptr<br class="typebreak"/>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>dual_target</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>scaled_dual</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>energy_dual</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
           <td class="paramname"><em>hybridization</em> = <code>false</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>coarse_components</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
           <td class="paramtype">const mfem::Vector &amp;&#160;</td>
-          <td class="paramname"><em>weight</em> = <code>mfem::Vector()</code>&#160;</td>
+          <td class="paramname"><em>global_weight</em> = <code>mfem::Vector()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structsmoothg_1_1SAAMGeParam.html">SAAMGeParam</a> *&#160;</td>
+          <td class="paramname"><em>saamge_param</em> = <code>nullptr</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -464,17 +505,21 @@ std::unique_ptr<br class="typebreak"/>
     <tr><td class="paramname">comm</td><td>MPI communicator </td></tr>
     <tr><td class="paramname">vertex_edge</td><td>relationship between vertices and edge </td></tr>
     <tr><td class="paramname">global_partitioning</td><td>partition of global vertices </td></tr>
-    <tr><td class="paramname">weight</td><td>edge weights. if not provided, set to all ones </td></tr>
+    <tr><td class="paramname">weight</td><td>edge weights. if not provided, set to an empty vector </td></tr>
     <tr><td class="paramname">spect_tol</td><td>spectral tolerance determines how many eigenvectors to keep per aggregate </td></tr>
     <tr><td class="paramname">max_evects</td><td>maximum number of eigenvectors to keep per aggregate </td></tr>
+    <tr><td class="paramname">trace_method</td><td>methods for getting edge trace samples </td></tr>
     <tr><td class="paramname">hybridization</td><td>use hybridization as solver </td></tr>
+    <tr><td class="paramname">coefficient</td><td>use coarse coefficient rescaling construction </td></tr>
+    <tr><td class="paramname">saamge_param</td><td>SAAMGe paramters, use SAAMGe as preconditioner for coarse hybridized system if saamge_param is not nullptr</td></tr>
   </table>
   </dd>
 </dl>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000005">Todo:</a></b></dt><dd>why is there not timing here? </dd></dl>
 
 </div>
 </div>
-<a class="anchor" id="ac405b0e8f6e1d1bd548ef4381e69b66b"></a>
+<a class="anchor" id="ab0b065d44307bb5830aa6e02a9a7c4a7"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -512,13 +557,43 @@ std::unique_ptr<br class="typebreak"/>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>dual_target</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>scaled_dual</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>energy_dual</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
           <td class="paramname"><em>hybridization</em> = <code>false</code>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>coarse_components</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
           <td class="paramtype">const mfem::Vector &amp;&#160;</td>
-          <td class="paramname"><em>weight</em> = <code>mfem::Vector()</code>&#160;</td>
+          <td class="paramname"><em>weight</em> = <code>mfem::Vector()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structsmoothg_1_1SAAMGeParam.html">SAAMGeParam</a> *&#160;</td>
+          <td class="paramname"><em>saamge_param</em> = <code>nullptr</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -534,10 +609,15 @@ std::unique_ptr<br class="typebreak"/>
     <tr><td class="paramname">comm</td><td>MPI communicator </td></tr>
     <tr><td class="paramname">vertex_edge</td><td>relationship between vertices and edge </td></tr>
     <tr><td class="paramname">coarse_factor</td><td>how coarse to partition the graph </td></tr>
-    <tr><td class="paramname">weight</td><td>edge weights. if not provided, set to all ones </td></tr>
+    <tr><td class="paramname">weight</td><td>edge weights. if not provided, set to an empty vector </td></tr>
     <tr><td class="paramname">spect_tol</td><td>spectral tolerance determines how many eigenvectors to keep per aggregate </td></tr>
     <tr><td class="paramname">max_evects</td><td>maximum number of eigenvectors to keep per aggregate </td></tr>
+    <tr><td class="paramname">dual_target</td><td>get traces from eigenvectors of dual graph Laplacian </td></tr>
+    <tr><td class="paramname">scaled_dual</td><td>scale dual graph Laplacian by inverse edge weight. Typically coarse problem gets better accuracy but becomes harder to solve when this option is turned on. </td></tr>
+    <tr><td class="paramname">energy_dual</td><td>use energy matrix in (RHS of) dual graph eigen problem (guarantees approximation property in edge energy norm) </td></tr>
     <tr><td class="paramname">hybridization</td><td>use hybridization as solver </td></tr>
+    <tr><td class="paramname">coarse_components</td><td>whether to store different components of coarse M based on trace extensions and bubbles (for construction of coarse M) </td></tr>
+    <tr><td class="paramname">saamge_param</td><td>SAAMGe parameters, use SAAMGe as preconditioner for coarse hybridized system if saamge_param is not nullptr </td></tr>
   </table>
   </dd>
 </dl>

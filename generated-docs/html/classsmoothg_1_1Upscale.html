@@ -73,7 +73,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -90,7 +90,6 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="header">
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="#pro-methods">Protected Member Functions</a> &#124;
 <a href="#pro-attribs">Protected Attributes</a> &#124;
 <a href="classsmoothg_1_1Upscale-members.html">List of all members</a>  </div>
   <div class="headertitle">
@@ -108,272 +107,147 @@ Inheritance diagram for smoothg::Upscale:</div>
  <div class="center">
   <img src="classsmoothg_1_1Upscale.png" usemap="#smoothg::Upscale_map" alt=""/>
   <map id="smoothg::Upscale_map" name="smoothg::Upscale_map">
-<area href="classsmoothg_1_1FiniteVolumeUpscale.html" title="Construct upscaler with finite element information. " alt="smoothg::FiniteVolumeUpscale" shape="rect" coords="0,112,182,136"/>
-<area href="classsmoothg_1_1GraphUpscale.html" title="Use upscaling as operator. " alt="smoothg::GraphUpscale" shape="rect" coords="192,112,374,136"/>
 </map>
  </div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aca86c576dcf9eec88fd2f258217bf3be"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aca86c576dcf9eec88fd2f258217bf3be"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aca86c576dcf9eec88fd2f258217bf3be">Mult</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const override</td></tr>
-<tr class="memdesc:aca86c576dcf9eec88fd2f258217bf3be"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper for applying the upscaling, in mfem terminology. <br/></td></tr>
+<tr class="memitem:ad1ed5ba16fa3b7f1e6cba138d0b11822"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#ad1ed5ba16fa3b7f1e6cba138d0b11822">Upscale</a> (<a class="el" href="classsmoothg_1_1Graph.html">Graph</a> graph, const <a class="el" href="classsmoothg_1_1UpscaleParameters.html">UpscaleParameters</a> &amp;param=<a class="el" href="classsmoothg_1_1UpscaleParameters.html">UpscaleParameters</a>(), const mfem::Array&lt; int &gt; *partitioning=nullptr, const mfem::Array&lt; int &gt; *ess_attr=nullptr, const mfem::SparseMatrix &amp;w_block=<a class="el" href="namespacesmoothg.html#afb5681811902cac31df51a44d9c57e1d">SparseIdentity</a>(0))</td></tr>
+<tr class="memdesc:ad1ed5ba16fa3b7f1e6cba138d0b11822"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct upscaled system and solver for graph Laplacian.  <a href="#ad1ed5ba16fa3b7f1e6cba138d0b11822">More...</a><br/></td></tr>
+<tr class="separator:ad1ed5ba16fa3b7f1e6cba138d0b11822"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa6568db6980ba19cb25b618b8a8b25e8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa6568db6980ba19cb25b618b8a8b25e8"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>Upscale</b> (<a class="el" href="classsmoothg_1_1Hierarchy.html">Hierarchy</a> &amp;&amp;hierarchy)</td></tr>
+<tr class="separator:aa6568db6980ba19cb25b618b8a8b25e8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad7de46c09c60739f31af17cf01107918"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#ad7de46c09c60739f31af17cf01107918">Mult</a> (int level, const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
+<tr class="memdesc:ad7de46c09c60739f31af17cf01107918"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply the upscaling.  <a href="#ad7de46c09c60739f31af17cf01107918">More...</a><br/></td></tr>
+<tr class="separator:ad7de46c09c60739f31af17cf01107918"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aca86c576dcf9eec88fd2f258217bf3be"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aca86c576dcf9eec88fd2f258217bf3be">Mult</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const override</td></tr>
 <tr class="separator:aca86c576dcf9eec88fd2f258217bf3be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4ee21bbe9754506ba1431410fc265a01"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4ee21bbe9754506ba1431410fc265a01"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a4ee21bbe9754506ba1431410fc265a01">Solve</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
-<tr class="memdesc:a4ee21bbe9754506ba1431410fc265a01"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper for applying the upscaling. <br/></td></tr>
-<tr class="separator:a4ee21bbe9754506ba1431410fc265a01"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9ccfb21e8795214a87f2f8707925dfcb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9ccfb21e8795214a87f2f8707925dfcb"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>Solve</b> (const mfem::Vector &amp;x) const </td></tr>
-<tr class="separator:a9ccfb21e8795214a87f2f8707925dfcb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0cf4804215cdac54e056d5fce7989a00"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0cf4804215cdac54e056d5fce7989a00"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a0cf4804215cdac54e056d5fce7989a00">Solve</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
-<tr class="memdesc:a0cf4804215cdac54e056d5fce7989a00"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper for applying the upscaling in mixed form. <br/></td></tr>
-<tr class="separator:a0cf4804215cdac54e056d5fce7989a00"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a46e77fcae4c1525772d6dc587293e496"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a46e77fcae4c1525772d6dc587293e496"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Solve</b> (const mfem::BlockVector &amp;x) const </td></tr>
-<tr class="separator:a46e77fcae4c1525772d6dc587293e496"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a66b17dadca713479b3b3e9744bfc0245"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a66b17dadca713479b3b3e9744bfc0245"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a66b17dadca713479b3b3e9744bfc0245">SolveCoarse</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
-<tr class="memdesc:a66b17dadca713479b3b3e9744bfc0245"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper for only the coarse level, no coarsen, interpolate with fine level. <br/></td></tr>
-<tr class="separator:a66b17dadca713479b3b3e9744bfc0245"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a08565abfdedf23bb54f2b6663972dc02"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a08565abfdedf23bb54f2b6663972dc02"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>SolveCoarse</b> (const mfem::Vector &amp;x) const </td></tr>
-<tr class="separator:a08565abfdedf23bb54f2b6663972dc02"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab0725090b2e6020f17a7d30ee57c5578"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab0725090b2e6020f17a7d30ee57c5578"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#ab0725090b2e6020f17a7d30ee57c5578">SolveCoarse</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
-<tr class="memdesc:ab0725090b2e6020f17a7d30ee57c5578"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper for only the coarse level, no coarsen, interpolate with fine level,. <br/></td></tr>
-<tr class="separator:ab0725090b2e6020f17a7d30ee57c5578"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9128efe7e6f81bd528db2752f45d959b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9128efe7e6f81bd528db2752f45d959b"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>SolveCoarse</b> (const mfem::BlockVector &amp;x) const </td></tr>
-<tr class="separator:a9128efe7e6f81bd528db2752f45d959b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad3b4c25ffa9eccabc3545a856b0f908e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad3b4c25ffa9eccabc3545a856b0f908e"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#ad3b4c25ffa9eccabc3545a856b0f908e">SolveFine</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
-<tr class="memdesc:ad3b4c25ffa9eccabc3545a856b0f908e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solve Fine Level. <br/></td></tr>
-<tr class="separator:ad3b4c25ffa9eccabc3545a856b0f908e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3bf2940662804c51020d244b9c72c0a5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3bf2940662804c51020d244b9c72c0a5"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>SolveFine</b> (const mfem::Vector &amp;x) const </td></tr>
-<tr class="separator:a3bf2940662804c51020d244b9c72c0a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6c1a3502c91f0c4ce7d1ca7873a031bd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6c1a3502c91f0c4ce7d1ca7873a031bd"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a6c1a3502c91f0c4ce7d1ca7873a031bd">SolveFine</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
-<tr class="memdesc:a6c1a3502c91f0c4ce7d1ca7873a031bd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solve Fine Level, in mixed form. <br/></td></tr>
-<tr class="separator:a6c1a3502c91f0c4ce7d1ca7873a031bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6f0f91ed8cc67a99d96e583c59553ca1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6f0f91ed8cc67a99d96e583c59553ca1"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>SolveFine</b> (const mfem::BlockVector &amp;x) const </td></tr>
-<tr class="separator:a6f0f91ed8cc67a99d96e583c59553ca1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ace0c6ad6a440319301f1e100682cd769"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ace0c6ad6a440319301f1e100682cd769"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#ace0c6ad6a440319301f1e100682cd769">Interpolate</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
-<tr class="memdesc:ace0c6ad6a440319301f1e100682cd769"><td class="mdescLeft">&#160;</td><td class="mdescRight">Interpolate a coarse vector to the fine level. <br/></td></tr>
-<tr class="separator:ace0c6ad6a440319301f1e100682cd769"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7a4d658e766329553a5a567737e64585"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7a4d658e766329553a5a567737e64585"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>Interpolate</b> (const mfem::Vector &amp;x) const </td></tr>
-<tr class="separator:a7a4d658e766329553a5a567737e64585"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a81fc7368a0308c6323dcb290aa31193a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a81fc7368a0308c6323dcb290aa31193a"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a81fc7368a0308c6323dcb290aa31193a">Interpolate</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
-<tr class="memdesc:a81fc7368a0308c6323dcb290aa31193a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Interpolate a coarse vector to the fine level, in mixed form. <br/></td></tr>
-<tr class="separator:a81fc7368a0308c6323dcb290aa31193a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3469002d915b9d2eb7cbaed7dbd217e0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3469002d915b9d2eb7cbaed7dbd217e0"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Interpolate</b> (const mfem::BlockVector &amp;x) const </td></tr>
-<tr class="separator:a3469002d915b9d2eb7cbaed7dbd217e0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9f0f55253661e454f8464f1739e7a82e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9f0f55253661e454f8464f1739e7a82e"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9f0f55253661e454f8464f1739e7a82e">Coarsen</a> (const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
-<tr class="memdesc:a9f0f55253661e454f8464f1739e7a82e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Coarsen a fine vector to the coarse level. <br/></td></tr>
-<tr class="separator:a9f0f55253661e454f8464f1739e7a82e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1679ead86898a850cbeb83295f8af399"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1679ead86898a850cbeb83295f8af399"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>Coarsen</b> (const mfem::Vector &amp;x) const </td></tr>
-<tr class="separator:a1679ead86898a850cbeb83295f8af399"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9350e70064f6397bb0e4474f7c8c8e23"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9350e70064f6397bb0e4474f7c8c8e23"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9350e70064f6397bb0e4474f7c8c8e23">Coarsen</a> (const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
-<tr class="memdesc:a9350e70064f6397bb0e4474f7c8c8e23"><td class="mdescLeft">&#160;</td><td class="mdescRight">Coarsen a fine vector to the coarse level, in mixed form. <br/></td></tr>
-<tr class="separator:a9350e70064f6397bb0e4474f7c8c8e23"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa75500b6122cea79cd5c5176c42e85bf"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa75500b6122cea79cd5c5176c42e85bf"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Coarsen</b> (const mfem::BlockVector &amp;x) const </td></tr>
-<tr class="separator:aa75500b6122cea79cd5c5176c42e85bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a72251652d32adce232b547c940c9603c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a72251652d32adce232b547c940c9603c"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a72251652d32adce232b547c940c9603c">FineBlockOffsets</a> (mfem::Array&lt; int &gt; &amp;offsets) const </td></tr>
-<tr class="memdesc:a72251652d32adce232b547c940c9603c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get block offsets. <br/></td></tr>
-<tr class="separator:a72251652d32adce232b547c940c9603c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a136ae9b169b28ff35d2a22222f87d528"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a136ae9b169b28ff35d2a22222f87d528"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>CoarseBlockOffsets</b> (mfem::Array&lt; int &gt; &amp;offsets) const </td></tr>
-<tr class="separator:a136ae9b169b28ff35d2a22222f87d528"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3977664db50cb8dfd104d74c561c36a2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3977664db50cb8dfd104d74c561c36a2"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a3977664db50cb8dfd104d74c561c36a2">FineTrueBlockOffsets</a> (mfem::Array&lt; int &gt; &amp;offsets) const </td></tr>
-<tr class="memdesc:a3977664db50cb8dfd104d74c561c36a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get true block offsets. <br/></td></tr>
-<tr class="separator:a3977664db50cb8dfd104d74c561c36a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a07148a0f90007d1b6f88b96af797dc29"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a07148a0f90007d1b6f88b96af797dc29"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>CoarseTrueBlockOffsets</b> (mfem::Array&lt; int &gt; &amp;offsets) const </td></tr>
-<tr class="separator:a07148a0f90007d1b6f88b96af797dc29"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3485e9ff3277a8a84d95e01d51d1bb7c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3485e9ff3277a8a84d95e01d51d1bb7c"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a3485e9ff3277a8a84d95e01d51d1bb7c">Orthogonalize</a> (mfem::Vector &amp;vect) const </td></tr>
-<tr class="memdesc:a3485e9ff3277a8a84d95e01d51d1bb7c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Orthogonalize against the constant vector. <br/></td></tr>
-<tr class="separator:a3485e9ff3277a8a84d95e01d51d1bb7c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7e030c19a73e794a75d2dc1eebd335f0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7e030c19a73e794a75d2dc1eebd335f0"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>Orthogonalize</b> (mfem::BlockVector &amp;vect) const </td></tr>
-<tr class="separator:a7e030c19a73e794a75d2dc1eebd335f0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a877d2a7d9b3c7d30aff78a204cea1cf9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a877d2a7d9b3c7d30aff78a204cea1cf9"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a877d2a7d9b3c7d30aff78a204cea1cf9">GetCoarseVector</a> () const </td></tr>
-<tr class="memdesc:a877d2a7d9b3c7d30aff78a204cea1cf9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a coarse vertex space vector. <br/></td></tr>
-<tr class="separator:a877d2a7d9b3c7d30aff78a204cea1cf9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af1911bbfbd9a92993ef34829ac39109e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af1911bbfbd9a92993ef34829ac39109e"></a>
-virtual mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#af1911bbfbd9a92993ef34829ac39109e">GetFineVector</a> () const </td></tr>
-<tr class="memdesc:af1911bbfbd9a92993ef34829ac39109e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a fine vertex space vector. <br/></td></tr>
-<tr class="separator:af1911bbfbd9a92993ef34829ac39109e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0afc1929baa9eb7461f570a7e1e5678d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0afc1929baa9eb7461f570a7e1e5678d"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a0afc1929baa9eb7461f570a7e1e5678d">GetCoarseBlockVector</a> () const </td></tr>
-<tr class="memdesc:a0afc1929baa9eb7461f570a7e1e5678d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a coarse mixed form vector. <br/></td></tr>
-<tr class="separator:a0afc1929baa9eb7461f570a7e1e5678d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7f926e8b9c8a2d4a8932df012cf8f225"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7f926e8b9c8a2d4a8932df012cf8f225"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a7f926e8b9c8a2d4a8932df012cf8f225">GetFineBlockVector</a> () const </td></tr>
-<tr class="memdesc:a7f926e8b9c8a2d4a8932df012cf8f225"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a fine mixed form vector. <br/></td></tr>
-<tr class="separator:a7f926e8b9c8a2d4a8932df012cf8f225"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad9a78f5d7e07f39766223ef3ebe04435"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad9a78f5d7e07f39766223ef3ebe04435"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#ad9a78f5d7e07f39766223ef3ebe04435">GetCoarseTrueBlockVector</a> () const </td></tr>
-<tr class="memdesc:ad9a78f5d7e07f39766223ef3ebe04435"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a coarse mixed form vector on true dofs. <br/></td></tr>
-<tr class="separator:ad9a78f5d7e07f39766223ef3ebe04435"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a922a14102000611a90a82a6bc747509a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a922a14102000611a90a82a6bc747509a"></a>
-virtual mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a922a14102000611a90a82a6bc747509a">GetFineTrueBlockVector</a> () const </td></tr>
-<tr class="memdesc:a922a14102000611a90a82a6bc747509a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a fine mixed form vector on true dofs. <br/></td></tr>
-<tr class="separator:a922a14102000611a90a82a6bc747509a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5b50b6badbca9f8a15587e8cdda919e3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5b50b6badbca9f8a15587e8cdda919e3"></a>
-virtual <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetMatrix</b> (int level)</td></tr>
-<tr class="separator:a5b50b6badbca9f8a15587e8cdda919e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa250915ccf74cee4fed6296d3752cc93"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa250915ccf74cee4fed6296d3752cc93"></a>
-virtual const <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetMatrix</b> (int level) const </td></tr>
-<tr class="separator:aa250915ccf74cee4fed6296d3752cc93"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6506ffcd524f6c257a50f4b84417c408"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6506ffcd524f6c257a50f4b84417c408"></a>
-virtual <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a6506ffcd524f6c257a50f4b84417c408">GetFineMatrix</a> ()</td></tr>
-<tr class="memdesc:a6506ffcd524f6c257a50f4b84417c408"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Fine level Mixed Matrix. <br/></td></tr>
-<tr class="separator:a6506ffcd524f6c257a50f4b84417c408"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a78833cde5b2a4809af64065a3b1a7061"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a78833cde5b2a4809af64065a3b1a7061"></a>
-virtual const <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetFineMatrix</b> () const </td></tr>
-<tr class="separator:a78833cde5b2a4809af64065a3b1a7061"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7d8d1c29f4b928517cc7b575ad4947bb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7d8d1c29f4b928517cc7b575ad4947bb"></a>
-virtual <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a7d8d1c29f4b928517cc7b575ad4947bb">GetCoarseMatrix</a> ()</td></tr>
-<tr class="memdesc:a7d8d1c29f4b928517cc7b575ad4947bb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Coarse level Mixed Matrix. <br/></td></tr>
-<tr class="separator:a7d8d1c29f4b928517cc7b575ad4947bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3130b0423f04a14bab7524b4d7f376b2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3130b0423f04a14bab7524b4d7f376b2"></a>
-virtual const <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetCoarseMatrix</b> () const </td></tr>
-<tr class="separator:a3130b0423f04a14bab7524b4d7f376b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6f86678b0beae859e02e528bc834b9b2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a6f86678b0beae859e02e528bc834b9b2">Solve</a> (int level, const mfem::Vector &amp;x, mfem::Vector &amp;y) const </td></tr>
+<tr class="separator:a6f86678b0beae859e02e528bc834b9b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae9dc65f80ace5efd2245d04b19b32341"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae9dc65f80ace5efd2245d04b19b32341"></a>
+mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>Solve</b> (int level, const mfem::Vector &amp;x) const </td></tr>
+<tr class="separator:ae9dc65f80ace5efd2245d04b19b32341"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a565ab598731ebdc03b3d8c0acf624b07"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a565ab598731ebdc03b3d8c0acf624b07"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a565ab598731ebdc03b3d8c0acf624b07">Solve</a> (int level, const mfem::BlockVector &amp;x, mfem::BlockVector &amp;y) const </td></tr>
+<tr class="memdesc:a565ab598731ebdc03b3d8c0acf624b07"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper for applying the upscaling in mixed form: result is at finest level. <br/></td></tr>
+<tr class="separator:a565ab598731ebdc03b3d8c0acf624b07"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5b261b1fa20bb47f591eb0d783255db8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5b261b1fa20bb47f591eb0d783255db8"></a>
+mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><b>Solve</b> (int level, const mfem::BlockVector &amp;x) const </td></tr>
+<tr class="separator:a5b261b1fa20bb47f591eb0d783255db8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5cd53227519ea1e4456509c6b5748fd8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5cd53227519ea1e4456509c6b5748fd8"></a>
+const mfem::Array&lt; int &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a5cd53227519ea1e4456509c6b5748fd8">BlockOffsets</a> (int level) const </td></tr>
+<tr class="memdesc:a5cd53227519ea1e4456509c6b5748fd8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get block offsets for sigma, u blocks of mixed form dofs. <br/></td></tr>
+<tr class="separator:a5cd53227519ea1e4456509c6b5748fd8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af90422756978a0453dacd866e38b678e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af90422756978a0453dacd866e38b678e"></a>
+const <a class="el" href="classsmoothg_1_1Hierarchy.html">Hierarchy</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetHierarchy</b> () const </td></tr>
+<tr class="separator:af90422756978a0453dacd866e38b678e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aed7270e1707a41bed8d8c9ec42f0d932"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aed7270e1707a41bed8d8c9ec42f0d932"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aed7270e1707a41bed8d8c9ec42f0d932">PrintInfo</a> (std::ostream &amp;out=std::cout) const </td></tr>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aed7270e1707a41bed8d8c9ec42f0d932">PrintInfo</a> (std::ostream &amp;out=std::cout) const </td></tr>
 <tr class="memdesc:aed7270e1707a41bed8d8c9ec42f0d932"><td class="mdescLeft">&#160;</td><td class="mdescRight">Show Solver Information. <br/></td></tr>
 <tr class="separator:aed7270e1707a41bed8d8c9ec42f0d932"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a55b7d5aec58114c6340fcfb2889ca8fb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a55b7d5aec58114c6340fcfb2889ca8fb"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a55b7d5aec58114c6340fcfb2889ca8fb">OperatorComplexity</a> () const </td></tr>
-<tr class="memdesc:a55b7d5aec58114c6340fcfb2889ca8fb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute Operator Complexity. <br/></td></tr>
-<tr class="separator:a55b7d5aec58114c6340fcfb2889ca8fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9e22a2731dcab47eeac82537f9a67bfd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9e22a2731dcab47eeac82537f9a67bfd"></a>
-virtual mfem::Array&lt; HYPRE_Int &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9e22a2731dcab47eeac82537f9a67bfd">get_Drow_start</a> () const </td></tr>
-<tr class="memdesc:a9e22a2731dcab47eeac82537f9a67bfd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Row Starts. <br/></td></tr>
-<tr class="separator:a9e22a2731dcab47eeac82537f9a67bfd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a01616f7a446916c67f6d4baa2ea2d7bb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a01616f7a446916c67f6d4baa2ea2d7bb"></a>
-virtual MPI_Comm&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a01616f7a446916c67f6d4baa2ea2d7bb">GetComm</a> () const </td></tr>
-<tr class="memdesc:a01616f7a446916c67f6d4baa2ea2d7bb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get communicator. <br/></td></tr>
-<tr class="separator:a01616f7a446916c67f6d4baa2ea2d7bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a53ac03174105510a6f5299289c6dbcc4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a53ac03174105510a6f5299289c6dbcc4"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a53ac03174105510a6f5299289c6dbcc4">SetPrintLevel</a> (int print_level)</td></tr>
-<tr class="memdesc:a53ac03174105510a6f5299289c6dbcc4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set solver parameters. <br/></td></tr>
-<tr class="separator:a53ac03174105510a6f5299289c6dbcc4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5f6616fa0e8a8308384e3f72f4336e97"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5f6616fa0e8a8308384e3f72f4336e97"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>SetMaxIter</b> (int max_num_iter)</td></tr>
-<tr class="separator:a5f6616fa0e8a8308384e3f72f4336e97"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a60a3d9570f2da0903f9a02f567bfeba1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a60a3d9570f2da0903f9a02f567bfeba1"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>SetRelTol</b> (double rtol)</td></tr>
-<tr class="separator:a60a3d9570f2da0903f9a02f567bfeba1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a78ad7ee56b7f8e51f2cb92a97df8d3e5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a78ad7ee56b7f8e51f2cb92a97df8d3e5"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>SetAbsTol</b> (double atol)</td></tr>
-<tr class="separator:a78ad7ee56b7f8e51f2cb92a97df8d3e5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a13fb3bdbaa23141b8dcdaf3f83cbf9ca"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a13fb3bdbaa23141b8dcdaf3f83cbf9ca"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a13fb3bdbaa23141b8dcdaf3f83cbf9ca">ShowCoarseSolveInfo</a> (std::ostream &amp;out=std::cout) const </td></tr>
-<tr class="memdesc:a13fb3bdbaa23141b8dcdaf3f83cbf9ca"><td class="mdescLeft">&#160;</td><td class="mdescRight">Show Total Solve time on the coarse level, negative id will show on all processors. <br/></td></tr>
-<tr class="separator:a13fb3bdbaa23141b8dcdaf3f83cbf9ca"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6adbd510292421b5f89da29906f071d9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6adbd510292421b5f89da29906f071d9"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a6adbd510292421b5f89da29906f071d9">ShowFineSolveInfo</a> (std::ostream &amp;out=std::cout) const </td></tr>
-<tr class="memdesc:a6adbd510292421b5f89da29906f071d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Show Total Solve time on the fine level, negative id will show on all processors. <br/></td></tr>
-<tr class="separator:a6adbd510292421b5f89da29906f071d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a83aa11bb0faa07010c306c454b2508e7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a83aa11bb0faa07010c306c454b2508e7"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a83aa11bb0faa07010c306c454b2508e7">ShowSetupTime</a> (std::ostream &amp;out=std::cout) const </td></tr>
-<tr class="memdesc:a83aa11bb0faa07010c306c454b2508e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Show Total setup time, negative id will show on all processors. <br/></td></tr>
-<tr class="separator:a83aa11bb0faa07010c306c454b2508e7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4eaaedf98a40ebb19a2a3f1379cb149f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4eaaedf98a40ebb19a2a3f1379cb149f"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a4eaaedf98a40ebb19a2a3f1379cb149f">GetCoarseSolveTime</a> () const </td></tr>
-<tr class="memdesc:a4eaaedf98a40ebb19a2a3f1379cb149f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Total Solve time on the coarse level. <br/></td></tr>
-<tr class="separator:a4eaaedf98a40ebb19a2a3f1379cb149f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af4d24ae672f0b90383cf84add594ffd2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af4d24ae672f0b90383cf84add594ffd2"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#af4d24ae672f0b90383cf84add594ffd2">GetFineSolveTime</a> () const </td></tr>
-<tr class="memdesc:af4d24ae672f0b90383cf84add594ffd2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Total Solve time on the fine level. <br/></td></tr>
-<tr class="separator:af4d24ae672f0b90383cf84add594ffd2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a994dddd467ac7be8caf931bcb23595c0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a994dddd467ac7be8caf931bcb23595c0"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a994dddd467ac7be8caf931bcb23595c0">GetCoarseSolveIters</a> () const </td></tr>
-<tr class="memdesc:a994dddd467ac7be8caf931bcb23595c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Total Solve iterations on the coarse level. <br/></td></tr>
-<tr class="separator:a994dddd467ac7be8caf931bcb23595c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a941b3ad202c5d539960b624418957fe3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a941b3ad202c5d539960b624418957fe3"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a941b3ad202c5d539960b624418957fe3">GetFineSolveIters</a> () const </td></tr>
-<tr class="memdesc:a941b3ad202c5d539960b624418957fe3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Total Solve iterations on the fine level. <br/></td></tr>
-<tr class="separator:a941b3ad202c5d539960b624418957fe3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9efe65ca4ebdf0fd5a9bfa91b22c2ef6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9efe65ca4ebdf0fd5a9bfa91b22c2ef6"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9efe65ca4ebdf0fd5a9bfa91b22c2ef6">GetSetupTime</a> () const </td></tr>
-<tr class="memdesc:a9efe65ca4ebdf0fd5a9bfa91b22c2ef6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get Total setup time. <br/></td></tr>
-<tr class="separator:a9efe65ca4ebdf0fd5a9bfa91b22c2ef6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaa8885f1223ae6c70ed452e664782231"><td class="memItemLeft" align="right" valign="top">std::vector&lt; double &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aaa8885f1223ae6c70ed452e664782231">ComputeErrors</a> (const mfem::BlockVector &amp;upscaled_sol, const mfem::BlockVector &amp;fine_sol) const </td></tr>
-<tr class="separator:aaa8885f1223ae6c70ed452e664782231"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a654092541141cec4ecd946c8b7df7d8f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a654092541141cec4ecd946c8b7df7d8f">ShowErrors</a> (const mfem::BlockVector &amp;upscaled_sol, const mfem::BlockVector &amp;fine_sol) const </td></tr>
-<tr class="separator:a654092541141cec4ecd946c8b7df7d8f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-methods"></a>
-Protected Member Functions</h2></td></tr>
-<tr class="memitem:a25af44aedba7e3ca656710e75d90b112"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a25af44aedba7e3ca656710e75d90b112"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Upscale</b> (MPI_Comm comm, int size, bool hybridization=false)</td></tr>
-<tr class="separator:a25af44aedba7e3ca656710e75d90b112"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad281c1e714f32c258422864d01855c5a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad281c1e714f32c258422864d01855c5a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>MakeCoarseVectors</b> ()</td></tr>
-<tr class="separator:ad281c1e714f32c258422864d01855c5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9cf77e1327d4ebd8fe0f4afcdb24126d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9cf77e1327d4ebd8fe0f4afcdb24126d"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a9cf77e1327d4ebd8fe0f4afcdb24126d">ShowSolveInfo</a> (int level, std::ostream &amp;out=std::cout) const </td></tr>
+<tr class="memdesc:a9cf77e1327d4ebd8fe0f4afcdb24126d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Show Total Solve time and other info on the given level. <br/></td></tr>
+<tr class="separator:a9cf77e1327d4ebd8fe0f4afcdb24126d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7303eed0c042222249ed96401944298d"><td class="memItemLeft" align="right" valign="top">std::vector&lt; double &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a7303eed0c042222249ed96401944298d">ComputeErrors</a> (const mfem::BlockVector &amp;upscaled_sol, const mfem::BlockVector &amp;fine_sol, int level) const </td></tr>
+<tr class="separator:a7303eed0c042222249ed96401944298d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaa762a1e2125f2d0740efe9dbf1133f2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#aaa762a1e2125f2d0740efe9dbf1133f2">ShowErrors</a> (const mfem::BlockVector &amp;upscaled_sol, const mfem::BlockVector &amp;fine_sol, int level) const </td></tr>
+<tr class="separator:aaa762a1e2125f2d0740efe9dbf1133f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2a32a6ce15f2bcd5c4da1fdccd2f3a0b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2a32a6ce15f2bcd5c4da1fdccd2f3a0b"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html#a2a32a6ce15f2bcd5c4da1fdccd2f3a0b">RescaleCoefficient</a> (int level, const mfem::Vector &amp;coeff)</td></tr>
+<tr class="memdesc:a2a32a6ce15f2bcd5c4da1fdccd2f3a0b"><td class="mdescLeft">&#160;</td><td class="mdescRight">coeff should have the size of the number of vertices in the given level <br/></td></tr>
+<tr class="separator:a2a32a6ce15f2bcd5c4da1fdccd2f3a0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
-<tr class="memitem:a19fe2ff0d3cd12b107290c62bc3a08e2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a19fe2ff0d3cd12b107290c62bc3a08e2"></a>
-std::vector&lt; <a class="el" href="classsmoothg_1_1MixedMatrix.html">smoothg::MixedMatrix</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>mixed_laplacians_</b></td></tr>
-<tr class="separator:a19fe2ff0d3cd12b107290c62bc3a08e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae7e0b0573469e5548bd6845ce5ac3016"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae7e0b0573469e5548bd6845ce5ac3016"></a>
-std::unique_ptr<br class="typebreak"/>
-&lt; <a class="el" href="classsmoothg_1_1Mixed__GL__Coarsener.html">Mixed_GL_Coarsener</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>coarsener_</b></td></tr>
-<tr class="separator:ae7e0b0573469e5548bd6845ce5ac3016"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a675a782ea1da43b905c238413977428a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a675a782ea1da43b905c238413977428a"></a>
-std::unique_ptr<br class="typebreak"/>
-&lt; <a class="el" href="classsmoothg_1_1MixedLaplacianSolver.html">MixedLaplacianSolver</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>coarse_solver_</b></td></tr>
-<tr class="separator:a675a782ea1da43b905c238413977428a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a560ef5f3c467caf965e5b6c08b2d9645"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a560ef5f3c467caf965e5b6c08b2d9645"></a>
-const mfem::HypreParMatrix *&#160;</td><td class="memItemRight" valign="bottom"><b>edge_e_te_</b></td></tr>
-<tr class="separator:a560ef5f3c467caf965e5b6c08b2d9645"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf6484ab951255156b1424f335449e1f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="adf6484ab951255156b1424f335449e1f"></a>
 MPI_Comm&#160;</td><td class="memItemRight" valign="bottom"><b>comm_</b></td></tr>
 <tr class="separator:adf6484ab951255156b1424f335449e1f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac6d3b6b0f8810ebbcd203ff4ae6c0ad8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac6d3b6b0f8810ebbcd203ff4ae6c0ad8"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>myid_</b></td></tr>
 <tr class="separator:ac6d3b6b0f8810ebbcd203ff4ae6c0ad8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1784a869b57deaf0212542f1b2044ceb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1784a869b57deaf0212542f1b2044ceb"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><b>setup_time_</b></td></tr>
-<tr class="separator:a1784a869b57deaf0212542f1b2044ceb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af2489646808e3b6e17eff5f4e35da56d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af2489646808e3b6e17eff5f4e35da56d"></a>
-const bool&#160;</td><td class="memItemRight" valign="bottom"><b>hybridization_</b></td></tr>
-<tr class="separator:af2489646808e3b6e17eff5f4e35da56d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7871db4e64c91c74a6cdba384b6f84dc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7871db4e64c91c74a6cdba384b6f84dc"></a>
-std::unique_ptr<br class="typebreak"/>
-&lt; mfem::BlockVector &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>rhs_coarse_</b></td></tr>
-<tr class="separator:a7871db4e64c91c74a6cdba384b6f84dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3ba060787d469273ab4312479c00dd54"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3ba060787d469273ab4312479c00dd54"></a>
-std::unique_ptr<br class="typebreak"/>
-&lt; mfem::BlockVector &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sol_coarse_</b></td></tr>
-<tr class="separator:a3ba060787d469273ab4312479c00dd54"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aec8d3345b13502f2fc5e823baa2c4e37"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aec8d3345b13502f2fc5e823baa2c4e37"></a>
-std::unique_ptr<br class="typebreak"/>
-&lt; <a class="el" href="classsmoothg_1_1MixedLaplacianSolver.html">MixedLaplacianSolver</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>fine_solver_</b></td></tr>
-<tr class="separator:aec8d3345b13502f2fc5e823baa2c4e37"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a420557c31f0e9705c5154819b1475587"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a420557c31f0e9705c5154819b1475587"></a>
+<a class="el" href="classsmoothg_1_1Hierarchy.html">Hierarchy</a>&#160;</td><td class="memItemRight" valign="bottom"><b>hierarchy_</b></td></tr>
+<tr class="separator:a420557c31f0e9705c5154819b1475587"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abe61ba5dbf9f15738fee6212bdd48635"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abe61ba5dbf9f15738fee6212bdd48635"></a>
+std::vector&lt; mfem::BlockVector &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>rhs_</b></td></tr>
+<tr class="separator:abe61ba5dbf9f15738fee6212bdd48635"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5ff1dcc72061aae424bc2428bb76b22b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5ff1dcc72061aae424bc2428bb76b22b"></a>
+std::vector&lt; mfem::BlockVector &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sol_</b></td></tr>
+<tr class="separator:a5ff1dcc72061aae424bc2428bb76b22b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Use upscaling as operator. </p>
-</div><h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="aaa8885f1223ae6c70ed452e664782231"></a>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#_a9">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
+</dl></div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="ad1ed5ba16fa3b7f1e6cba138d0b11822"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">smoothg::Upscale::Upscale </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classsmoothg_1_1Graph.html">Graph</a>&#160;</td>
+          <td class="paramname"><em>graph</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="classsmoothg_1_1UpscaleParameters.html">UpscaleParameters</a> &amp;&#160;</td>
+          <td class="paramname"><em>param</em> = <code><a class="el" href="classsmoothg_1_1UpscaleParameters.html">UpscaleParameters</a>()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; *&#160;</td>
+          <td class="paramname"><em>partitioning</em> = <code>nullptr</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; *&#160;</td>
+          <td class="paramname"><em>ess_attr</em> = <code>nullptr</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>w_block</em> = <code><a class="el" href="namespacesmoothg.html#afb5681811902cac31df51a44d9c57e1d">SparseIdentity</a>(0)</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Construct upscaled system and solver for graph Laplacian. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">graph</td><td>the graph on which the graph Laplacian is defined </td></tr>
+    <tr><td class="paramname">param</td><td>upscaling parameters </td></tr>
+    <tr><td class="paramname">partitioning</td><td>partitioning of vertices for the first coarsening. If not provided, will call METIS to generate one based on param </td></tr>
+    <tr><td class="paramname">edge_boundary_att</td><td>edge to boundary attribute relation. If not provided, will assume no boundary </td></tr>
+    <tr><td class="paramname">ess_attr</td><td>indicate which boundary attributes to impose essential edge condition. If not provided, will assume no boundary </td></tr>
+    <tr><td class="paramname">w_block</td><td>the W matrix in the saddle-point system. If not provided, it will assumed to be zero </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a7303eed0c042222249ed96401944298d"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -387,7 +261,13 @@ std::unique_ptr<br class="typebreak"/>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">const mfem::BlockVector &amp;&#160;</td>
-          <td class="paramname"><em>fine_sol</em>&#160;</td>
+          <td class="paramname"><em>fine_sol</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>level</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -396,11 +276,82 @@ std::unique_ptr<br class="typebreak"/>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Compare errors between upscaled and fine solution. Returns {vertex_error, edge_error, div_error} array. </p>
+<p>Compare errors between upscaled and fine solution. Returns {vertex_error, edge_error, div_error, complexity} array. </p>
 
 </div>
 </div>
-<a class="anchor" id="a654092541141cec4ecd946c8b7df7d8f"></a>
+<a class="anchor" id="ad7de46c09c60739f31af17cf01107918"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::Upscale::Mult </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>y</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Apply the upscaling. </p>
+<p>Both vector arguments are sized for the finest level; the right-hand side is restricted to desired level, solved there, and interpolated back up to the finest level. </p>
+
+</div>
+</div>
+<a class="anchor" id="aca86c576dcf9eec88fd2f258217bf3be"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::Upscale::Mult </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>y</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">override</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Wrapper for applying the upscaling, in mfem terminology </p>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000017">Todo:</a></b></dt><dd>this method (and the inheritance from mfem::Operator) makes much less sense in a multilevel setting. </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="aaa762a1e2125f2d0740efe9dbf1133f2"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -414,7 +365,13 @@ std::unique_ptr<br class="typebreak"/>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">const mfem::BlockVector &amp;&#160;</td>
-          <td class="paramname"><em>fine_sol</em>&#160;</td>
+          <td class="paramname"><em>fine_sol</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>level</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -424,6 +381,40 @@ std::unique_ptr<br class="typebreak"/>
       </table>
 </div><div class="memdoc">
 <p>Compare errors between upscaled and fine solution. Displays error to stdout on processor 0 </p>
+
+</div>
+</div>
+<a class="anchor" id="a6f86678b0beae859e02e528bc834b9b2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::Upscale::Solve </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>y</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Wrapper for applying the upscaling: both x and y are at finest level.</p>
+<p>As in <a class="el" href="classsmoothg_1_1Upscale.html#ad7de46c09c60739f31af17cf01107918" title="Apply the upscaling. ">Mult()</a>, solve itself takes place at desired (coarse) level. </p>
 
 </div>
 </div>

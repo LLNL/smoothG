@@ -72,7 +72,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -105,9 +105,9 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a2ca89cf79dc26bad7d130746702cd1fa"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2ca89cf79dc26bad7d130746702cd1fa"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>MetisPart</b> (const mfem::SparseMatrix &amp;vertex_edge, mfem::Array&lt; int &gt; &amp;part, int num_parts, int isolate)</td></tr>
-<tr class="separator:a2ca89cf79dc26bad7d130746702cd1fa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e37551443417a0b815c593e88989d2b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4e37551443417a0b815c593e88989d2b"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>MetisGraphPart</b> (const mfem::SparseMatrix &amp;vertex_edge, mfem::Array&lt; int &gt; &amp;part, int num_parts, int isolate)</td></tr>
+<tr class="separator:a4e37551443417a0b815c593e88989d2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:accff0f3240025bbf68f6a53304f5785c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="accff0f3240025bbf68f6a53304f5785c"></a>
 mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>ComputeFiedlerVector</b> (const <a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a> &amp;mixed_laplacian)</td></tr>
 <tr class="separator:accff0f3240025bbf68f6a53304f5785c"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -142,20 +142,17 @@ mfem::Vector&#160;</td><td class="memItemRight" valign="bottom"><b>ComputeFiedle
 </div><div class="memdoc">
 <p>[Load graph from file or generate one]</p>
 <p>[Load graph from file or generate one]</p>
-<p>[Partitioning]</p>
-<p>[Partitioning]</p>
 <p>[Load the edge weights]</p>
 <p>[Load the edge weights]</p>
+<p>[Partitioning]</p>
+<p>[Partitioning]</p>
 <p>[Upscale]</p>
 <p>[Upscale]</p>
 <p>[Right Hand Side]</p>
 <p>[Right Hand Side]</p>
 <p>[Solve]</p>
-<p>[Solve]</p>
-<p>[Check Error]</p>
-<p>[Check Error] </p>
-<dl><dt><b>Examples: </b></dt><dd><a class="el" href="examples_2generalgraph_8cpp-example.html#a1">examples/generalgraph.cpp</a>.</dd>
-</dl>
+<p>[Solve] </p>
+
 </div>
 </div>
 </div><!-- contents -->

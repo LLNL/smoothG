@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['inversepermeabilityfunction',['InversePermeabilityFunction',['../classsmoothg_1_1InversePermeabilityFunction.html',1,'smoothg']]]
+  ['inversepermeabilitycoefficient',['InversePermeabilityCoefficient',['../classsmoothg_1_1InversePermeabilityCoefficient.html',1,'smoothg']]]
 ];

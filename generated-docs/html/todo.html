@@ -66,7 +66,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -82,30 +82,32 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><dl class="reflist">
-<dt><a class="anchor" id="_todo000001"></a>Member <a class="el" href="classsmoothg_1_1GraphCoarsen.html#ad698588e5fa8ef0bd63430e99797dd18">smoothg::GraphCoarsen::BuildInterpolation</a>  (std::vector&lt; mfem::DenseMatrix &gt; &amp;edge_trace, std::vector&lt; mfem::DenseMatrix &gt; &amp;vertex_targets, mfem::SparseMatrix &amp;Pvertices, mfem::SparseMatrix &amp;Pedges, mfem::SparseMatrix &amp;face_dof, std::vector&lt; mfem::DenseMatrix &gt; &amp;CM_el, bool build_coarse_relation=false)</dt>
-<dd>document CM_el properly  </dd>
-<dt><a class="anchor" id="_todo000002"></a>Member <a class="el" href="classsmoothg_1_1GraphTopology.html#a1c8f5ff633c3d78207d21437c8b92a90">smoothg::GraphTopology::GraphTopology</a>  (const mfem::SparseMatrix &amp;face_edge, const mfem::SparseMatrix &amp;Agg_vertex, const mfem::SparseMatrix &amp;Agg_edge, const mfem::HypreParMatrix &amp;pAggExt_vertex, const mfem::HypreParMatrix &amp;pAggExt_edge, const mfem::SparseMatrix &amp;Agg_face, const mfem::HypreParMatrix &amp;edge_d_td, const mfem::HypreParMatrix &amp;face_d_td, const mfem::HypreParMatrix &amp;face_d_td_d)</dt>
-<dd>the arguments to this constructor should be carefully documented  </dd>
-<dt><a class="anchor" id="_todo000005"></a>Member <a class="el" href="classsmoothg_1_1HybridSolver.html#a24858dc915d1b130bfb3a578edd45b6c">smoothg::HybridSolver::AssembleHybridSystem</a>  (const std::vector&lt; mfem::DenseMatrix &gt; &amp;M_el, const mfem::Array&lt; int &gt; &amp;j_multiplier_edgedof)</dt>
-<dd>this method and its cousin share a lot of duplicated code  </dd>
-<dt><a class="anchor" id="_todo000003"></a>Member <a class="el" href="classsmoothg_1_1HybridSolver.html#a4c61c7839e6afa91b89190df1b013214">smoothg::HybridSolver::Mult</a>  (const mfem::BlockVector &amp;Rhs, mfem::BlockVector &amp;Sol) const </dt>
-<dd>nonzero BC  </dd>
-<dt><a class="anchor" id="_todo000004"></a>Member <a class="el" href="classsmoothg_1_1HybridSolver.html#a46c4c887dd4a856c336cfe3c78f487ad">smoothg::HybridSolver::RHSTransform</a>  (const mfem::BlockVector &amp;OriginalRHS, mfem::Vector &amp;HybridRHS) const </dt>
+<dt><a class="anchor" id="_todo000002"></a>Member <a class="el" href="classsmoothg_1_1CoefficientMBuilder.html#a816e751ff96270cec7c690c1f0faf789">smoothg::CoefficientMBuilder::BuildComponents</a>  (const mfem::Vector &amp;fineMdiag, const mfem::SparseMatrix &amp;Pedges, const mfem::SparseMatrix &amp;face_fine_edof_, const mfem::SparseMatrix &amp;face_coarse_edof, const mfem::SparseMatrix &amp;agg_edof)</dt>
+<dd>remove Pedges_noconst and const_cast when we move to MFEM 3.4  </dd>
+<dt><a class="anchor" id="_todo000004"></a>Member <a class="el" href="classsmoothg_1_1HybridSolver.html#a4c61c7839e6afa91b89190df1b013214">smoothg::HybridSolver::Mult</a>  (const mfem::BlockVector &amp;Rhs, mfem::BlockVector &amp;Sol) const </dt>
+<dd>nonzero Neumann BC (edge unknown), solve on true dof (original system)  </dd>
+<dt><a class="anchor" id="_todo000005"></a>Member <a class="el" href="classsmoothg_1_1HybridSolver.html#a46c4c887dd4a856c336cfe3c78f487ad">smoothg::HybridSolver::RHSTransform</a>  (const mfem::BlockVector &amp;OriginalRHS, mfem::Vector &amp;HybridRHS) const </dt>
 <dd>impose nonzero boundary condition for u.n  </dd>
-<dt><a class="anchor" id="_todo000009"></a>Member <a class="el" href="classsmoothg_1_1MinresBlockSolver.html#aa343d2aa5652e79a24d2c81107bf868a">smoothg::MinresBlockSolver::MinresBlockSolver</a>  (MPI_Comm comm, mfem::HypreParMatrix *M, mfem::HypreParMatrix *D, mfem::HypreParMatrix *W, const mfem::Array&lt; int &gt; &amp;block_true_offsets, bool use_W=false)</dt>
+<dt><a class="anchor" id="_todo000006"></a>Member <a class="el" href="classsmoothg_1_1HybridSolver.html#a809e9d237a4d2766ffd956f885c3850a">smoothg::HybridSolver::UpdateElemScaling</a>  (const mfem::Vector &amp;elem_scaling_inverse)</dt>
+<dd>when W is non-zero, Aloc and Hybrid_el need to be recomputed  </dd>
+<dt><a class="anchor" id="_todo000013"></a>Class <a class="el" href="classsmoothg_1_1LogLikelihood.html">smoothg::LogLikelihood</a>  </dt>
+<dd>allow different covariance.  </dd>
+<dt><a class="anchor" id="_todo000012"></a>Member <a class="el" href="classsmoothg_1_1MinresBlockSolver.html#a151473e2f0dbb60add44b8d06eb4ddd3">smoothg::MinresBlockSolver::MinresBlockSolver</a>  (mfem::HypreParMatrix *M, mfem::HypreParMatrix *D, mfem::SparseMatrix *W, const mfem::Array&lt; int &gt; &amp;block_true_offsets)</dt>
 <dd>can this be inferred from the matrices?)  </dd>
-<dt><a class="anchor" id="_todo000007"></a>Member <a class="el" href="namespacesmoothg.html#aee8776e75d8f97d83b52ad0e3fed8f88">smoothg::orthogonalize_from_constant</a>  (mfem::Vector &amp;vec)</dt>
-<dd>improve this for the finite volume case  </dd>
-<dt><a class="anchor" id="_todo000006"></a>Member <a class="el" href="namespacesmoothg.html#a2bcfe4bfbd5b1cc452acd5139b512b1b">smoothg::par_orthogonalize_from_constant</a>  (mfem::Vector &amp;vec, int globalsize)</dt>
+<dt><a class="anchor" id="_todo000010"></a>Member <a class="el" href="namespacesmoothg.html#a2bcfe4bfbd5b1cc452acd5139b512b1b">smoothg::par_orthogonalize_from_constant</a>  (mfem::Vector &amp;vec, int globalsize)</dt>
 <dd><p class="startdd">MPI_COMM_WORLD should be more generic </p>
 <p>improve this for the finite volume case </p>
 <p>improve this for the finite volume case </p>
 <p class="enddd">improve this for the finite volume case  </p>
 </dd>
-<dt><a class="anchor" id="_todo000011"></a>Class <a class="el" href="classsmoothg_1_1UpscalingStatistics.html">smoothg::UpscalingStatistics</a>  </dt>
-<dd><p class="startdd">Actually populate ndofs </p>
-<p class="enddd">make the enum { TOPOLOGY = 0, COARSENING, SOLVER } a public typedef </p>
-</dd>
+<dt><a class="anchor" id="_todo000015"></a>Member <a class="el" href="classsmoothg_1_1PDESampler.html#a530695270bba03c33ac7ee81276723ad">smoothg::PDESampler::GetCoefficient</a>  (int level)</dt>
+<dd>: not working multilevel unless restricted to one eigenvector / agg (which maybe is the only sensible case for sampling anyway?)  </dd>
+<dt><a class="anchor" id="_todo000016"></a>Member <a class="el" href="classsmoothg_1_1PDESampler.html#ac259c75d1e4b5e3d1d037910e96ae3bc">smoothg::PDESampler::PDESampler</a>  (int dimension, double cell_volume, double kappa, int seed, Hierarchy &amp;&amp;hierarchy)</dt>
+<dd>cell_volume should be potentially spatially-varying  </dd>
+<dt><a class="anchor" id="_todo000014"></a>Member <a class="el" href="classsmoothg_1_1PDESampler.html#a3b4c5bf9e0b48c9b3f4ff6e38261f964">smoothg::PDESampler::SetSample</a>  (const mfem::Vector &amp;state)</dt>
+<dd>cell_volume should be variable rather than constant  </dd>
+<dt><a class="anchor" id="_todo000017"></a>Member <a class="el" href="classsmoothg_1_1Upscale.html#aca86c576dcf9eec88fd2f258217bf3be">smoothg::Upscale::Mult</a>  (const mfem::Vector &amp;x, mfem::Vector &amp;y) const override</dt>
+<dd>this method (and the inheritance from mfem::Operator) makes much less sense in a multilevel setting. </dd>
 </dl>
 </div></div><!-- contents -->
 <!-- start footer part -->

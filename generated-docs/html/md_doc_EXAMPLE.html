@@ -66,7 +66,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -98,73 +98,76 @@ A walkthrough of example code           </h1>
 <p> and compares it to <img class="formulaInl" alt="$ x $" src="form_1.png"/> to see how accurate our upscaling is.</p>
 <h3>The code</h3>
 <p>After some initialization and reading command line arguments, the first substantive code is to read a (mixed) graph from a file:</p>
-<div class="fragment"><div class="line">    mfem::SparseMatrix vertex_edge_global;</div>
+<div class="fragment"><div class="line">    mfem::SparseMatrix global_vertex_edge;</div>
 <div class="line">    <span class="keywordflow">if</span> (generate_graph)</div>
 <div class="line">    {</div>
 <div class="line">        mfem::SparseMatrix tmp = <a class="code" href="namespacesmoothg.html#a573089cfdbcc5cab22e56dac68581703">GenerateGraph</a>(comm, gen_vertices, mean_degree, beta, seed);</div>
-<div class="line">        vertex_edge_global.Swap(tmp);</div>
+<div class="line">        global_vertex_edge.Swap(tmp);</div>
 <div class="line">    }</div>
 <div class="line">    <span class="keywordflow">else</span></div>
 <div class="line">    {</div>
 <div class="line">        mfem::SparseMatrix tmp = <a class="code" href="namespacesmoothg.html#a62c0196b945970d7f1d40dd91d8208ea">ReadVertexEdge</a>(graphFileName);</div>
-<div class="line">        vertex_edge_global.Swap(tmp);</div>
+<div class="line">        global_vertex_edge.Swap(tmp);</div>
 <div class="line">    }</div>
 <div class="line"></div>
-<div class="line">    <span class="keyword">const</span> <span class="keywordtype">int</span> nedges_global = vertex_edge_global.Width();</div>
-<div class="line">    <span class="keyword">const</span> <span class="keywordtype">int</span> nvertices_global = vertex_edge_global.Height();</div>
+<div class="line">    <span class="keyword">const</span> <span class="keywordtype">int</span> nedges_global = global_vertex_edge.Width();</div>
+<div class="line">    <span class="keyword">const</span> <span class="keywordtype">int</span> nvertices_global = global_vertex_edge.Height();</div>
 <div class="line"></div>
 </div><!-- fragment --><p> We consider graphs in a <em>vertex-edge</em> format, which means we interpret them as matrices with as many rows as there are vertices in the graph, and as many columns as there are edges. This matrix has a 1 wherever a vertex and an edge are connected, and 0 elsewhere. As a result, each column has exactly two nonzeros, since each edge is connected to exactly two vertices in a graph.</p>
 <p>After loading the graph, we partition the vertices into <em>agglomerated vertices</em>, which are key to our upscaling approach. If you have a partitioning you like, you can provide it in a file. Otherwise we use Metis to partition the vertices into agglomerates, putting the results into a partitioning vector <code>global_partitioning</code> which, for each vertex, indicates which agglomerate it is in.</p>
-<div class="fragment"><div class="line">    mfem::Array&lt;int&gt; global_partitioning;</div>
-<div class="line">    <span class="keywordflow">if</span> (metis_agglomeration || generate_graph)</div>
+<div class="fragment"><div class="line">    mfem::Array&lt;int&gt; partitioning;</div>
+<div class="line">    <span class="keywordflow">if</span> (metis_agglomeration || generate_graph || num_procs &gt; 1)</div>
 <div class="line">    {</div>
-<div class="line">        MetisPart(vertex_edge_global, global_partitioning, num_partitions, isolate);</div>
+<div class="line">        MetisGraphPart(graph.VertexToEdge(), partitioning,</div>
+<div class="line">                       num_partitions / num_procs, isolate);</div>
 <div class="line">    }</div>
 <div class="line">    <span class="keywordflow">else</span></div>
 <div class="line">    {</div>
 <div class="line">        std::ifstream partFile(partition_filename);</div>
-<div class="line">        global_partitioning.SetSize(nvertices_global);</div>
-<div class="line">        global_partitioning.Load(partFile, nvertices_global);</div>
+<div class="line">        partitioning.SetSize(nvertices_global);</div>
+<div class="line">        partitioning.Load(partFile, nvertices_global);</div>
 <div class="line">    }</div>
 </div><!-- fragment --><p> If the user has provided edge weights to use, we load them from file. Otherwise, all weights are set to 1.</p>
-<div class="fragment"><div class="line">    mfem::Vector weight(nedges_global);</div>
+<div class="fragment"><div class="line">    mfem::Vector edge_weight(nedges_global);</div>
 <div class="line">    <span class="keywordflow">if</span> (std::strlen(weight_filename))</div>
 <div class="line">    {</div>
 <div class="line">        std::ifstream weight_file(weight_filename);</div>
-<div class="line">        weight.Load(weight_file, nedges_global);</div>
+<div class="line">        edge_weight.Load(weight_file, nedges_global);</div>
 <div class="line">    }</div>
 <div class="line">    <span class="keywordflow">else</span></div>
 <div class="line">    {</div>
-<div class="line">        weight = 1.0;</div>
+<div class="line">        edge_weight = 1.0;</div>
 <div class="line">    }</div>
-</div><!-- fragment --><p> The next step is to create an <a class="el" href="classsmoothg_1_1GraphUpscale.html">GraphUpscale</a> object. Given some user parameters, the <a class="el" href="classsmoothg_1_1GraphUpscale.html">GraphUpscale</a> object handles the construction of the coarse space. </p>
-<div class="fragment"><div class="line">        GraphUpscale upscale(comm, vertex_edge_global, global_partitioning,</div>
-<div class="line">                             spect_tol, max_evects, hybridization, weight);</div>
-<div class="line"></div>
+</div><!-- fragment --><p> The next step is to create an GraphUpscale object. Given some user parameters, the GraphUpscale object handles the construction of the coarse space. </p>
+<div class="fragment"><div class="line">        Upscale upscale(std::move(graph), upscale_param, &amp;partitioning);</div>
 <div class="line">        upscale.PrintInfo();</div>
-<div class="line">        upscale.ShowSetupTime();</div>
 </div><!-- fragment --><p> The right hand side can be read from file or computed as the Fielder vector of the fine level graph. It is then set into the appropriate mixed form. </p>
-<div class="fragment"><div class="line">        <span class="keywordflow">if</span> (generate_graph || generate_fiedler)</div>
+<div class="fragment"><div class="line">        mfem::BlockVector fine_rhs(upscale.BlockOffsets(0));</div>
+<div class="line">        fine_rhs.GetBlock(0) = 0.0;</div>
+<div class="line"></div>
+<div class="line">        <span class="keyword">const</span> MixedMatrix&amp; fine_mgL = upscale.GetHierarchy().GetMatrix(0);</div>
+<div class="line">        <span class="keywordflow">if</span> (generate_graph || generate_fiedler)</div>
 <div class="line">        {</div>
-<div class="line">            rhs_u_fine = ComputeFiedlerVector(upscale.GetFineMatrix());</div>
+<div class="line">            fine_rhs.GetBlock(1) = ComputeFiedlerVector(fine_mgL);</div>
 <div class="line">        }</div>
 <div class="line">        <span class="keywordflow">else</span></div>
 <div class="line">        {</div>
-<div class="line">            rhs_u_fine = upscale.ReadVertexVector(FiedlerFileName);</div>
+<div class="line">            fine_rhs.GetBlock(1) = fine_mgL.GetGraph().ReadVertexVector(FiedlerFileName);</div>
 <div class="line">        }</div>
-<div class="line"></div>
-<div class="line">        mfem::BlockVector fine_rhs(upscale.GetFineBlockVector());</div>
-<div class="line">        fine_rhs.GetBlock(0) = 0.0;</div>
-<div class="line">        fine_rhs.GetBlock(1) = rhs_u_fine;</div>
 </div><!-- fragment --><p> The next major step is to actually solve the system. Both the upscaled solution and the fine level solution can be computed by the <a class="el" href="classsmoothg_1_1Upscale.html">Upscale</a> object. </p>
-<div class="fragment"><div class="line">        mfem::BlockVector upscaled_sol = upscale.Solve(fine_rhs);</div>
-<div class="line">        upscale.ShowCoarseSolveInfo();</div>
+<div class="fragment"><div class="line">        std::vector&lt;mfem::BlockVector&gt; sol(upscale_param.max_levels, fine_rhs);</div>
+<div class="line">        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> level = 0; level &lt; upscale_param.max_levels; ++level)</div>
+<div class="line">        {</div>
+<div class="line">            upscale.Solve(level, fine_rhs, sol[level]);</div>
+<div class="line">            upscale.ShowSolveInfo(level);</div>
 <div class="line"></div>
-<div class="line">        mfem::BlockVector fine_sol = upscale.SolveFine(fine_rhs);</div>
-<div class="line">        upscale.ShowFineSolveInfo();</div>
+<div class="line">            <span class="keywordflow">if</span> (level &gt; 0)</div>
+<div class="line">            {</div>
+<div class="line">                upscale.ShowErrors(sol[level], sol[0], level);</div>
+<div class="line">            }</div>
+<div class="line">        }</div>
 </div><!-- fragment --><p> The last few lines of the code compare the solutions on each level, to see how close the upscaled model is to the original fine-scale graph. </p>
-<div class="fragment"><div class="line">        upscale.ShowErrors(upscaled_sol, fine_sol);</div>
-</div><!-- fragment --></div></div><!-- contents -->
+<div class="fragment"></div><!-- fragment --></div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
 Generated by &#160;<a href="http://www.doxygen.org/index.html">

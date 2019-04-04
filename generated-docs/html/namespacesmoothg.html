@@ -72,7 +72,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Pages</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Friends</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Pages</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -96,23 +96,66 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1FiniteVolumeUpscale.html">FiniteVolumeUpscale</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct upscaler with finite element information.  <a href="classsmoothg_1_1FiniteVolumeUpscale.html#details">More...</a><br/></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1InversePermeabilityCoefficient.html">InversePermeabilityCoefficient</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A utility class for working with the SPE10 or Egg model data set.  <a href="classsmoothg_1_1InversePermeabilityCoefficient.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GCoefficient.html">GCoefficient</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A forcing function that is supposed to very roughly represent some wells that are resolved on the <em>coarse</em> level.  <a href="classsmoothg_1_1GCoefficient.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1HalfCoeffecient.html">HalfCoeffecient</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A function that marks half the resevior w/ value and the other -value.  <a href="classsmoothg_1_1HalfCoeffecient.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalTPFA.html">LocalTPFA</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">compute transmissibility based on two-point flux approximation  <a href="classsmoothg_1_1LocalTPFA.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1DarcyProblem.html">DarcyProblem</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Darcy's flow problem discretized in finite volume (TPFA)  <a href="classsmoothg_1_1DarcyProblem.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1SPE10Problem.html">SPE10Problem</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct finite volume problem on the SPE10 data set.  <a href="classsmoothg_1_1SPE10Problem.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Graph.html">Graph</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Distributed graph containing vertex to edge relation and edge weight.  <a href="classsmoothg_1_1Graph.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphCoarsen.html">GraphCoarsen</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Usually used wrapped in <a class="el" href="classsmoothg_1_1Mixed__GL__Coarsener.html" title="Abstract class for coarsening a mixed graph Laplacian problem. ">Mixed_GL_Coarsener</a>.  <a href="classsmoothg_1_1GraphCoarsen.html#details">More...</a><br/></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Usually used wrapped in Mixed_GL_Coarsener.  <a href="classsmoothg_1_1GraphCoarsen.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MBuilder.html">MBuilder</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Abstract base class to build the mass matrix M.  <a href="classsmoothg_1_1MBuilder.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1CoarseMBuilder.html">CoarseMBuilder</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Abstract base class to help building the coarse mass matrix in <a class="el" href="classsmoothg_1_1GraphCoarsen.html#a50cf9760c2c8e54a51b73b016582260b" title="Construct Pedges, the projector from coarse edge degrees of freedom to fine edge dofs. ">GraphCoarsen::BuildPEdges()</a>  <a href="classsmoothg_1_1CoarseMBuilder.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1ElementMBuilder.html">ElementMBuilder</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Assembles local (coarse) mass matrices.  <a href="classsmoothg_1_1ElementMBuilder.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1CoefficientMBuilder.html">CoefficientMBuilder</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stores components of local coarse mass matrix so that it can have its coefficients rescaled without re-coarsening.  <a href="classsmoothg_1_1CoefficientMBuilder.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphGenerator.html">GraphGenerator</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Generator of random graphs based on the Watts-Strogatz model.  <a href="classsmoothg_1_1GraphGenerator.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphSpace.html">GraphSpace</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Contains information about degrees of freedom to vertex/edge.  <a href="classsmoothg_1_1GraphSpace.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphTopology.html">GraphTopology</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class to represent the topology of a graph as it is coarsened.  <a href="classsmoothg_1_1GraphTopology.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1GraphUpscale.html">GraphUpscale</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use upscaling as operator.  <a href="classsmoothg_1_1GraphUpscale.html#details">More...</a><br/></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Hierarchy.html">Hierarchy</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1Hierarchy.html" title="Hierarchy of mixed systems containing mixed systems in each level and mappings between different leve...">Hierarchy</a> of mixed systems containing mixed systems in each level and mappings between different levels.  <a href="classsmoothg_1_1Hierarchy.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1HybridSolver.html">HybridSolver</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Hybridization solver for saddle point problems.  <a href="classsmoothg_1_1HybridSolver.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalEigenSolver.html">LocalEigenSolver</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper class for eigen solvers in LAPACK and ARPACK.  <a href="classsmoothg_1_1LocalEigenSolver.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structsmoothg_1_1SAAMGeParam.html">SAAMGeParam</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Container for SAAMGe parameters.  <a href="structsmoothg_1_1SAAMGeParam.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleParameters.html">UpscaleParameters</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structsmoothg_1_1DofAggregate.html">DofAggregate</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LocalMixedGraphSpectralTargets.html">LocalMixedGraphSpectralTargets</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Take a mixed form graph Laplacian, do local eigenvalue problems, and generate targets in parallel.  <a href="classsmoothg_1_1LocalMixedGraphSpectralTargets.html#details">More...</a><br/></td></tr>
@@ -129,47 +172,52 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MinresBlockSolverFalse.html">MinresBlockSolverFalse</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1MinresBlockSolver.html" title="Block diagonal preconditioned MINRES solver for saddle point problem. ">MinresBlockSolver</a> acts on "true" dofs, this one does not.  <a href="classsmoothg_1_1MinresBlockSolverFalse.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Mixed__GL__Coarsener.html">Mixed_GL_Coarsener</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Abstract class for coarsening a mixed graph Laplacian problem.  <a href="classsmoothg_1_1Mixed__GL__Coarsener.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MixedLaplacianSolver.html">MixedLaplacianSolver</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Abstract base class for solvers of graph Laplacian problems.  <a href="classsmoothg_1_1MixedLaplacianSolver.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MixedMatrix.html">MixedMatrix</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Encapuslates the mixed form of a graph in saddle-point form.  <a href="classsmoothg_1_1MixedMatrix.html#details">More...</a><br/></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Container for the building blocks of some saddle-point problem.  <a href="classsmoothg_1_1MixedMatrix.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1QuantityOfInterest.html">QuantityOfInterest</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Abstract class to define quantity of interest as a function of coefficient, flux, and pressure.  <a href="classsmoothg_1_1QuantityOfInterest.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1PressureFunctionalQoI.html">PressureFunctionalQoI</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Discretize a QoI as a linear functional on the pressure space.  <a href="classsmoothg_1_1PressureFunctionalQoI.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1FunctionalQoI.html">FunctionalQoI</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Discretize a QoI as a linear functional on both flux and pressure.  <a href="classsmoothg_1_1FunctionalQoI.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1LogLikelihood.html">LogLikelihood</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Likelihood.html">Likelihood</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1RatioNumerator.html">RatioNumerator</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MLMCManager.html">MLMCManager</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class to manage multilevel sampling of quantities of interest.  <a href="classsmoothg_1_1MLMCManager.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1NormalDistribution.html">NormalDistribution</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">scalar normal distribution  <a href="classsmoothg_1_1NormalDistribution.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1MultilevelSampler.html">MultilevelSampler</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1SimpleSampler.html">SimpleSampler</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1PDESampler.html">PDESampler</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1SharedEntityCommunication.html">SharedEntityCommunication</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Handles sharing information across processors, where that information belongs to entities that are also shared across processors.  <a href="classsmoothg_1_1SharedEntityCommunication.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1SpectralAMG__MGL__Coarsener.html">SpectralAMG_MGL_Coarsener</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use spectral AMG to coarsen the mixed graph Laplacian.  <a href="classsmoothg_1_1SpectralAMG__MGL__Coarsener.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Upscale.html">Upscale</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use upscaling as operator.  <a href="classsmoothg_1_1Upscale.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleSolve.html">UpscaleSolve</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Solves the problem in the primal form in a given level.  <a href="classsmoothg_1_1UpscaleSolve.html#details">More...</a><br/></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleBlockSolve.html">UpscaleBlockSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleBlockSolve.html" title="UpscaleBlockSolve performs the same thing as Upscale, but in mixed form. ">UpscaleBlockSolve</a> performs the same thing as <a class="el" href="classsmoothg_1_1Upscale.html" title="Use upscaling as operator. ">Upscale</a>, but in mixed form.  <a href="classsmoothg_1_1UpscaleBlockSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleFineSolve.html">UpscaleFineSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleFineSolve.html" title="UpscaleFineSolve Solves the fine problem in primal form as its operation. ">UpscaleFineSolve</a> Solves the fine problem in primal form as its operation.  <a href="classsmoothg_1_1UpscaleFineSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleFineBlockSolve.html">UpscaleFineBlockSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleFineSolve.html" title="UpscaleFineSolve Solves the fine problem in primal form as its operation. ">UpscaleFineSolve</a> Solves the fine problem in the mixed form as its operation.  <a href="classsmoothg_1_1UpscaleFineBlockSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleCoarseSolve.html">UpscaleCoarseSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleCoarseSolve.html" title="UpscaleCoarseSolve Solves the coarse problem in the primal form as its operation. ...">UpscaleCoarseSolve</a> Solves the coarse problem in the primal form as its operation.  <a href="classsmoothg_1_1UpscaleCoarseSolve.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscaleCoarseBlockSolve.html">UpscaleCoarseBlockSolve</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="classsmoothg_1_1UpscaleCoarseBlockSolve.html" title="UpscaleCoarseBlockSolve Solves the coarse problem in the mixed form as its operation. ">UpscaleCoarseBlockSolve</a> Solves the coarse problem in the mixed form as its operation.  <a href="classsmoothg_1_1UpscaleCoarseBlockSolve.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structsmoothg_1_1mpi__session.html">mpi_session</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A quick-and dirty RAII struct for managing the MPI resource.  <a href="structsmoothg_1_1mpi__session.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1UpscalingStatistics.html">UpscalingStatistics</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Collect information about upscaling process for systematic output.  <a href="classsmoothg_1_1UpscalingStatistics.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1ParGraph.html">ParGraph</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manage topological information for the coarsening.  <a href="classsmoothg_1_1ParGraph.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1FiniteVolumeMassIntegrator.html">FiniteVolumeMassIntegrator</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Finite volume integrator.  <a href="classsmoothg_1_1FiniteVolumeMassIntegrator.html#details">More...</a><br/></td></tr>
@@ -177,19 +225,34 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1SVD__Calculator.html">SVD_Calculator</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes SVD of mfem::DenseMatrix to find linear dependence.  <a href="classsmoothg_1_1SVD__Calculator.html#details">More...</a><br/></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1Eigensolver.html">Eigensolver</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dense eigensolver based on LAPACK dsyevx.  <a href="classsmoothg_1_1Eigensolver.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classsmoothg_1_1InversePermeabilityFunction.html">InversePermeabilityFunction</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A utility class for working with the SPE10 data set.  <a href="classsmoothg_1_1InversePermeabilityFunction.html#details">More...</a><br/></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:adc07e3540f008ab670e20be6373e152b"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#adc07e3540f008ab670e20be6373e152b">GenerateBoundaryAttributeTable</a> (const mfem::Mesh *mesh)</td></tr>
+<tr class="memdesc:adc07e3540f008ab670e20be6373e152b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct edge to boundary attribute table (orientation is not considered)  <a href="#adc07e3540f008ab670e20be6373e152b">More...</a><br/></td></tr>
+<tr class="separator:adc07e3540f008ab670e20be6373e152b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a47ed07019c4b76b4ee1aaf697850a196"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a47ed07019c4b76b4ee1aaf697850a196"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>swap</b> (<a class="el" href="classsmoothg_1_1Graph.html">Graph</a> &amp;lhs, <a class="el" href="classsmoothg_1_1Graph.html">Graph</a> &amp;rhs) noexcept</td></tr>
+<tr class="separator:a47ed07019c4b76b4ee1aaf697850a196"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a573089cfdbcc5cab22e56dac68581703"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a573089cfdbcc5cab22e56dac68581703"></a>
 mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a573089cfdbcc5cab22e56dac68581703">GenerateGraph</a> (MPI_Comm comm, int nvertices, int mean_degree, double beta, double seed)</td></tr>
 <tr class="memdesc:a573089cfdbcc5cab22e56dac68581703"><td class="mdescLeft">&#160;</td><td class="mdescRight">Generate a vertex edge relationship for a WattsStrogatz random graph. <br/></td></tr>
 <tr class="separator:a573089cfdbcc5cab22e56dac68581703"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a671f402d990a2bff6cf175f53a4c7d81"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a671f402d990a2bff6cf175f53a4c7d81"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><b>BuildEntityToDof</b> (const std::vector&lt; mfem::DenseMatrix &gt; &amp;local_targets)</td></tr>
+<tr class="separator:a671f402d990a2bff6cf175f53a4c7d81"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a02bc4e9ddd00a4256fb48eb75c900c99"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a02bc4e9ddd00a4256fb48eb75c900c99"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>swap</b> (<a class="el" href="classsmoothg_1_1GraphSpace.html">GraphSpace</a> &amp;lhs, <a class="el" href="classsmoothg_1_1GraphSpace.html">GraphSpace</a> &amp;rhs) noexcept</td></tr>
+<tr class="separator:a02bc4e9ddd00a4256fb48eb75c900c99"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac49bf822ee792b19e80b7ff21383e9c3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac49bf822ee792b19e80b7ff21383e9c3"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><b>FaceReorderMap</b> (const mfem::HypreParMatrix &amp;face_trueface, const mfem::HypreParMatrix &amp;face_trueface_face)</td></tr>
+<tr class="separator:ac49bf822ee792b19e80b7ff21383e9c3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4ecc5d36236b3b0da95f9ad01eb83d51"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4ecc5d36236b3b0da95f9ad01eb83d51"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>OrderingCheck</b> (const mfem::HypreParMatrix &amp;face_trueface_face, const mfem::SparseMatrix &amp;face_entity, const mfem::HypreParMatrix &amp;entity_trueentity)</td></tr>
+<tr class="separator:a4ecc5d36236b3b0da95f9ad01eb83d51"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a26c26cc2161982aaabec6307900b74d4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a26c26cc2161982aaabec6307900b74d4"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><b>CombineM</b> (const mfem::SparseMatrix &amp;M0, const mfem::SparseMatrix &amp;M1, int num_face_edofs)</td></tr>
+<tr class="separator:a26c26cc2161982aaabec6307900b74d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad9fb8c426c39e89c98b4be6981f701b6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad9fb8c426c39e89c98b4be6981f701b6"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ad9fb8c426c39e89c98b4be6981f701b6">Print</a> (const mfem::DenseMatrix &amp;mat, const std::string &amp;label=&quot;&quot;, std::ostream &amp;out=std::cout)</td></tr>
 <tr class="memdesc:ad9fb8c426c39e89c98b4be6981f701b6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Prints dense matrices. <br/></td></tr>
@@ -205,14 +268,36 @@ mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="
 mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a73f21a9a7d1292763ed8d1343ba02ddc">Mult</a> (const mfem::SparseMatrix &amp;A, const mfem::SparseMatrix &amp;B)</td></tr>
 <tr class="memdesc:a73f21a9a7d1292763ed8d1343ba02ddc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Multiply two sparse matrices C = A * B. <br/></td></tr>
 <tr class="separator:a73f21a9a7d1292763ed8d1343ba02ddc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad122480ce3940768078a156f33296211"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad122480ce3940768078a156f33296211"></a>
-mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ad122480ce3940768078a156f33296211">Threshold</a> (const mfem::SparseMatrix &amp;mat, double tol=1e-8)</td></tr>
-<tr class="memdesc:ad122480ce3940768078a156f33296211"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove small entries from a matrix. <br/></td></tr>
-<tr class="separator:ad122480ce3940768078a156f33296211"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4ed67c6b7549e2d5d5c77f5f15fd4641"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4ed67c6b7549e2d5d5c77f5f15fd4641"></a>
-mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a4ed67c6b7549e2d5d5c77f5f15fd4641">TableToSparse</a> (const mfem::Table &amp;table)</td></tr>
-<tr class="memdesc:a4ed67c6b7549e2d5d5c77f5f15fd4641"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a sparse matrix from a table. <br/></td></tr>
-<tr class="separator:a4ed67c6b7549e2d5d5c77f5f15fd4641"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0b6698bbd0da58ff31a495b57c64c63b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0b6698bbd0da58ff31a495b57c64c63b"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a0b6698bbd0da58ff31a495b57c64c63b">AAt</a> (const mfem::SparseMatrix &amp;A)</td></tr>
+<tr class="memdesc:a0b6698bbd0da58ff31a495b57c64c63b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the product A * A^T. <br/></td></tr>
+<tr class="separator:a0b6698bbd0da58ff31a495b57c64c63b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ada0875da8a2bb1a2868a138298c06cae"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ada0875da8a2bb1a2868a138298c06cae"></a>
+std::unique_ptr<br class="typebreak"/>
+&lt; mfem::HypreParMatrix &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>AAt</b> (const mfem::HypreParMatrix &amp;A)</td></tr>
+<tr class="separator:ada0875da8a2bb1a2868a138298c06cae"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a343fbcc3b1ec99b26e83deffe8f99685"><td class="memItemLeft" align="right" valign="top">std::unique_ptr<br class="typebreak"/>
+&lt; mfem::HypreParMatrix &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a343fbcc3b1ec99b26e83deffe8f99685">ParMult</a> (const mfem::HypreParMatrix &amp;A, const mfem::SparseMatrix &amp;B, const mfem::Array&lt; int &gt; &amp;B_colpart)</td></tr>
+<tr class="memdesc:a343fbcc3b1ec99b26e83deffe8f99685"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the product A * B between HypreParMatrix and SparseMatrix.  <a href="#a343fbcc3b1ec99b26e83deffe8f99685">More...</a><br/></td></tr>
+<tr class="separator:a343fbcc3b1ec99b26e83deffe8f99685"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7a51928e06ed6bca70bd83e6fe38f9b7"><td class="memItemLeft" align="right" valign="top">std::unique_ptr<br class="typebreak"/>
+&lt; mfem::HypreParMatrix &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a7a51928e06ed6bca70bd83e6fe38f9b7">ParMult</a> (const mfem::SparseMatrix &amp;A, const mfem::HypreParMatrix &amp;B, const mfem::Array&lt; int &gt; &amp;A_rowpart)</td></tr>
+<tr class="memdesc:a7a51928e06ed6bca70bd83e6fe38f9b7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the product A * B between SparseMatrix and HypreParMatrix.  <a href="#a7a51928e06ed6bca70bd83e6fe38f9b7">More...</a><br/></td></tr>
+<tr class="separator:a7a51928e06ed6bca70bd83e6fe38f9b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a88b8291c2e0db93801eafa6218948b2c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a88b8291c2e0db93801eafa6218948b2c"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a88b8291c2e0db93801eafa6218948b2c">DropSmall</a> (const mfem::SparseMatrix &amp;mat, double tol=1e-8)</td></tr>
+<tr class="memdesc:a88b8291c2e0db93801eafa6218948b2c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove small entries (absolute value &lt; tol) from a matrix. <br/></td></tr>
+<tr class="separator:a88b8291c2e0db93801eafa6218948b2c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:add43bdd4aa98bb96cd2f2e66064f2449"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="add43bdd4aa98bb96cd2f2e66064f2449"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#add43bdd4aa98bb96cd2f2e66064f2449">TableToMatrix</a> (const mfem::Table &amp;table)</td></tr>
+<tr class="memdesc:add43bdd4aa98bb96cd2f2e66064f2449"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a sparse matrix from a table. <br/></td></tr>
+<tr class="separator:add43bdd4aa98bb96cd2f2e66064f2449"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a37d2fde67c0080b6ef2f0bef3c89efa2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a37d2fde67c0080b6ef2f0bef3c89efa2"></a>
+mfem::Table&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a37d2fde67c0080b6ef2f0bef3c89efa2">MatrixToTable</a> (const mfem::SparseMatrix &amp;mat)</td></tr>
+<tr class="memdesc:a37d2fde67c0080b6ef2f0bef3c89efa2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a table from a sparse matrix's graph. <br/></td></tr>
+<tr class="separator:a37d2fde67c0080b6ef2f0bef3c89efa2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8e4fd47c852263e5aa565a067e4ee968"><td class="memItemLeft" align="right" valign="top">mfem::HypreParMatrix *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a8e4fd47c852263e5aa565a067e4ee968">Mult</a> (const mfem::HypreParMatrix &amp;A, const mfem::HypreParMatrix &amp;B, const mfem::HypreParMatrix &amp;C)</td></tr>
+<tr class="separator:a8e4fd47c852263e5aa565a067e4ee968"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af546d3176c315dd1dd67271f9a80a937"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af546d3176c315dd1dd67271f9a80a937"></a>
 mfem::HypreParMatrix *&#160;</td><td class="memItemRight" valign="bottom"><b>RAP</b> (const mfem::HypreParMatrix &amp;R, const mfem::HypreParMatrix &amp;A, const mfem::HypreParMatrix &amp;P)</td></tr>
 <tr class="separator:af546d3176c315dd1dd67271f9a80a937"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -223,14 +308,14 @@ mfem::HypreParMatrix *&#160;</td><td class="memItemRight" valign="bottom"><b>RAP
 void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a8e8af82a4c75783a1c00e4a262b299bb">BroadCast</a> (MPI_Comm comm, mfem::SparseMatrix &amp;mat)</td></tr>
 <tr class="memdesc:a8e8af82a4c75783a1c00e4a262b299bb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Broadcast a SparseMatrix on processor 0 to all other processors. <br/></td></tr>
 <tr class="separator:a8e8af82a4c75783a1c00e4a262b299bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8462c47e554826e19abcf3f9e42f277c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8462c47e554826e19abcf3f9e42f277c"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a8462c47e554826e19abcf3f9e42f277c">MultSparseDense</a> (const mfem::SparseMatrix &amp;A, mfem::DenseMatrix &amp;B, mfem::DenseMatrix &amp;C)</td></tr>
-<tr class="memdesc:a8462c47e554826e19abcf3f9e42f277c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute <img class="formulaInl" alt="$ C = AB $" src="form_15.png"/>, where <img class="formulaInl" alt="$ A $" src="form_0.png"/> is sparse and <img class="formulaInl" alt="$ B $" src="form_16.png"/> is dense. <br/></td></tr>
-<tr class="separator:a8462c47e554826e19abcf3f9e42f277c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac24b00fa9f7f31b0d18a12ce09fca656"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac24b00fa9f7f31b0d18a12ce09fca656"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ac24b00fa9f7f31b0d18a12ce09fca656">MultSparseDenseTranspose</a> (const mfem::SparseMatrix &amp;A, mfem::DenseMatrix &amp;B, mfem::DenseMatrix &amp;C)</td></tr>
-<tr class="memdesc:ac24b00fa9f7f31b0d18a12ce09fca656"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute <img class="formulaInl" alt="$ C = AB $" src="form_15.png"/>, where <img class="formulaInl" alt="$ A $" src="form_0.png"/> is sparse and <img class="formulaInl" alt="$ B $" src="form_16.png"/> is dense, but C is kept transposed. <br/></td></tr>
-<tr class="separator:ac24b00fa9f7f31b0d18a12ce09fca656"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaf8654cf467d03ca6a8604e11e47fe27"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aaf8654cf467d03ca6a8604e11e47fe27"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#aaf8654cf467d03ca6a8604e11e47fe27">MultSparseDense</a> (const mfem::SparseMatrix &amp;A, const mfem::DenseMatrix &amp;B, mfem::DenseMatrix &amp;C)</td></tr>
+<tr class="memdesc:aaf8654cf467d03ca6a8604e11e47fe27"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute <img class="formulaInl" alt="$ C = AB $" src="form_15.png"/>, where <img class="formulaInl" alt="$ A $" src="form_0.png"/> is sparse and <img class="formulaInl" alt="$ B $" src="form_16.png"/> is dense. <br/></td></tr>
+<tr class="separator:aaf8654cf467d03ca6a8604e11e47fe27"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a35e069b55bc0cef2368c950f7d180498"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a35e069b55bc0cef2368c950f7d180498"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a35e069b55bc0cef2368c950f7d180498">MultSparseDenseTranspose</a> (const mfem::SparseMatrix &amp;A, const mfem::DenseMatrix &amp;B, mfem::DenseMatrix &amp;C)</td></tr>
+<tr class="memdesc:a35e069b55bc0cef2368c950f7d180498"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute <img class="formulaInl" alt="$ C = AB $" src="form_15.png"/>, where <img class="formulaInl" alt="$ A $" src="form_0.png"/> is sparse and <img class="formulaInl" alt="$ B $" src="form_16.png"/> is dense, but C is kept transposed. <br/></td></tr>
+<tr class="separator:a35e069b55bc0cef2368c950f7d180498"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a78aa208a6e56502beb7962055df7684e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a78aa208a6e56502beb7962055df7684e">Mult_a_VVt</a> (const double a, const mfem::Vector &amp;v, mfem::DenseMatrix &amp;aVVt)</td></tr>
 <tr class="memdesc:a78aa208a6e56502beb7962055df7684e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the (scaled) outer product <img class="formulaInl" alt="$ a v v^T $" src="form_17.png"/>.  <a href="#a78aa208a6e56502beb7962055df7684e">More...</a><br/></td></tr>
 <tr class="separator:a78aa208a6e56502beb7962055df7684e"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -249,21 +334,39 @@ mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="
 <tr class="memitem:afc66645634ac5a0d2bbac57b2abe508c"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#afc66645634ac5a0d2bbac57b2abe508c">SparseIdentity</a> (int rows, int cols, int row_offset=0, int col_offset=0)</td></tr>
 <tr class="memdesc:afc66645634ac5a0d2bbac57b2abe508c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct an rectangular identity matrix (as a SparseMatrix)  <a href="#afc66645634ac5a0d2bbac57b2abe508c">More...</a><br/></td></tr>
 <tr class="separator:afc66645634ac5a0d2bbac57b2abe508c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7f99a95df53cf1b71bcb351d5fb216e8"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a7f99a95df53cf1b71bcb351d5fb216e8">Add</a> (const double a, mfem::SparseMatrix &amp;mat, const double b, const mfem::Vector &amp;vec, const bool invert_vec=false)</td></tr>
+<tr class="memdesc:a7f99a95df53cf1b71bcb351d5fb216e8"><td class="mdescLeft">&#160;</td><td class="mdescRight">mat = a * mat + b * diag(vec) or diag(vec^{-1}) if invert_vec = true  <a href="#a7f99a95df53cf1b71bcb351d5fb216e8">More...</a><br/></td></tr>
+<tr class="separator:a7f99a95df53cf1b71bcb351d5fb216e8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6b19055689ec01cc7577d91495139f8d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a6b19055689ec01cc7577d91495139f8d">Add</a> (mfem::SparseMatrix &amp;mat, const mfem::Vector &amp;vec, const bool invert_vec=false)</td></tr>
+<tr class="memdesc:a6b19055689ec01cc7577d91495139f8d"><td class="mdescLeft">&#160;</td><td class="mdescRight">mat = mat + diag(vec) or diag(vec^{-1}) if invert_vec = true  <a href="#a6b19055689ec01cc7577d91495139f8d">More...</a><br/></td></tr>
+<tr class="separator:a6b19055689ec01cc7577d91495139f8d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abe251a89bd06726b8701168dae241958"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abe251a89bd06726b8701168dae241958"></a>
+mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#abe251a89bd06726b8701168dae241958">Mult_AtDA</a> (const mfem::SparseMatrix &amp;A, const mfem::Vector &amp;D)</td></tr>
+<tr class="memdesc:abe251a89bd06726b8701168dae241958"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute A^t * diag(D) * A. <br/></td></tr>
+<tr class="separator:abe251a89bd06726b8701168dae241958"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf1c72e21539d2be5cbe3bb039faf9ce"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#adf1c72e21539d2be5cbe3bb039faf9ce">VectorToMatrix</a> (const mfem::Vector &amp;vect)</td></tr>
 <tr class="memdesc:adf1c72e21539d2be5cbe3bb039faf9ce"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a diagonal matrix with the entries specified by a vector.  <a href="#adf1c72e21539d2be5cbe3bb039faf9ce">More...</a><br/></td></tr>
 <tr class="separator:adf1c72e21539d2be5cbe3bb039faf9ce"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4b5cca66eb2c87ba2ce3bb59912f0abd"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a4b5cca66eb2c87ba2ce3bb59912f0abd">AddScaledSubMatrix</a> (mfem::SparseMatrix &amp;mat, const mfem::Array&lt; int &gt; &amp;rows, const mfem::Array&lt; int &gt; &amp;cols, const mfem::DenseMatrix &amp;subm, double scaling, int skip_zeros)</td></tr>
+<tr class="separator:a4b5cca66eb2c87ba2ce3bb59912f0abd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a122311dc2c2578bd483a89334938cfad"><td class="memItemLeft" align="right" valign="top">mfem::HypreParMatrix *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a122311dc2c2578bd483a89334938cfad">ParAdd</a> (const mfem::HypreParMatrix &amp;A, const mfem::HypreParMatrix &amp;B)</td></tr>
 <tr class="memdesc:a122311dc2c2578bd483a89334938cfad"><td class="mdescLeft">&#160;</td><td class="mdescRight">Add two parallel matrices C = A + B.  <a href="#a122311dc2c2578bd483a89334938cfad">More...</a><br/></td></tr>
 <tr class="separator:a122311dc2c2578bd483a89334938cfad"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af48002c1039dcb0c8301b45364394c9c"><td class="memItemLeft" align="right" valign="top">double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#af48002c1039dcb0c8301b45364394c9c">MaxNorm</a> (const mfem::HypreParMatrix &amp;A)</td></tr>
 <tr class="memdesc:af48002c1039dcb0c8301b45364394c9c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute max norm of parallel matrix.  <a href="#af48002c1039dcb0c8301b45364394c9c">More...</a><br/></td></tr>
 <tr class="separator:af48002c1039dcb0c8301b45364394c9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aea52878759caac720edcd0f611941323"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#aea52878759caac720edcd0f611941323">ExtractRowAndColumns</a> (const mfem::SparseMatrix &amp;A, const mfem::Array&lt; int &gt; &amp;rows, const mfem::Array&lt; int &gt; &amp;cols)</td></tr>
+<tr class="memdesc:aea52878759caac720edcd0f611941323"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a submatrix from a matrix.  <a href="#aea52878759caac720edcd0f611941323">More...</a><br/></td></tr>
+<tr class="separator:aea52878759caac720edcd0f611941323"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af14519b1c256224b0cc87002eded8c23"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#af14519b1c256224b0cc87002eded8c23">ExtractRowAndColumns</a> (const mfem::SparseMatrix &amp;A, const mfem::Array&lt; int &gt; &amp;rows, const mfem::Array&lt; int &gt; &amp;cols, mfem::Array&lt; int &gt; &amp;colMapper, bool colMapper_not_filled=true)</td></tr>
 <tr class="memdesc:af14519b1c256224b0cc87002eded8c23"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a submatrix from a matrix.  <a href="#af14519b1c256224b0cc87002eded8c23">More...</a><br/></td></tr>
 <tr class="separator:af14519b1c256224b0cc87002eded8c23"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad4246dcf5055f29128164b2ad25c0f76"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ad4246dcf5055f29128164b2ad25c0f76">ExtractSubMatrix</a> (const mfem::SparseMatrix &amp;A, const mfem::Array&lt; int &gt; &amp;rows, const mfem::Array&lt; int &gt; &amp;cols, const mfem::Array&lt; int &gt; &amp;colMapper, mfem::DenseMatrix &amp;A_sub)</td></tr>
 <tr class="memdesc:ad4246dcf5055f29128164b2ad25c0f76"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a submatrix from a sparse matrix, return it dense.  <a href="#ad4246dcf5055f29128164b2ad25c0f76">More...</a><br/></td></tr>
 <tr class="separator:ad4246dcf5055f29128164b2ad25c0f76"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5a1febf87506d25d8a9b4744cf77ff7f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a5a1febf87506d25d8a9b4744cf77ff7f">ExtractColumns</a> (const mfem::DenseMatrix &amp;A, const mfem::Array&lt; int &gt; &amp;col_to_ref, const mfem::Array&lt; int &gt; &amp;subcol_to_ref, mfem::Array&lt; int &gt; &amp;ref_workspace, mfem::DenseMatrix &amp;A_sub, int row_offset=0)</td></tr>
+<tr class="memdesc:a5a1febf87506d25d8a9b4744cf77ff7f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract columns from a dense matrix (A) to another dense matrix (A_sub)  <a href="#a5a1febf87506d25d8a9b4744cf77ff7f">More...</a><br/></td></tr>
+<tr class="separator:a5a1febf87506d25d8a9b4744cf77ff7f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5e9d52f60e116a5026a1992b62dfe0cc"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a5e9d52f60e116a5026a1992b62dfe0cc">Full</a> (const mfem::SparseMatrix &amp;Asparse, mfem::DenseMatrix &amp;Adense)</td></tr>
 <tr class="memdesc:a5e9d52f60e116a5026a1992b62dfe0cc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Fill a DenseMatrix with the entries of a SparseMatrix.  <a href="#a5e9d52f60e116a5026a1992b62dfe0cc">More...</a><br/></td></tr>
 <tr class="separator:a5e9d52f60e116a5026a1992b62dfe0cc"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -277,9 +380,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="name
 <tr class="memitem:a3393af3ae95d1a28009e2784476ba92c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a3393af3ae95d1a28009e2784476ba92c">Deflate</a> (mfem::DenseMatrix &amp;a, const mfem::Vector &amp;v)</td></tr>
 <tr class="memdesc:a3393af3ae95d1a28009e2784476ba92c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make all column vectors of a orthogonal to v.  <a href="#a3393af3ae95d1a28009e2784476ba92c">More...</a><br/></td></tr>
 <tr class="separator:a3393af3ae95d1a28009e2784476ba92c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aee8776e75d8f97d83b52ad0e3fed8f88"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#aee8776e75d8f97d83b52ad0e3fed8f88">orthogonalize_from_constant</a> (mfem::Vector &amp;vec)</td></tr>
-<tr class="memdesc:aee8776e75d8f97d83b52ad0e3fed8f88"><td class="mdescLeft">&#160;</td><td class="mdescRight">Orthogonalize this vector from the constant vector.  <a href="#aee8776e75d8f97d83b52ad0e3fed8f88">More...</a><br/></td></tr>
-<tr class="separator:aee8776e75d8f97d83b52ad0e3fed8f88"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aecb6ee2276b932e03d6bd3d9d8a4921d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#aecb6ee2276b932e03d6bd3d9d8a4921d">orthogonalize_from_vector</a> (mfem::Vector &amp;vec, const mfem::Vector &amp;wrt)</td></tr>
+<tr class="memdesc:aecb6ee2276b932e03d6bd3d9d8a4921d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Orthogonalize this vector against wrt.  <a href="#aecb6ee2276b932e03d6bd3d9d8a4921d">More...</a><br/></td></tr>
+<tr class="separator:aecb6ee2276b932e03d6bd3d9d8a4921d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2bcfe4bfbd5b1cc452acd5139b512b1b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a2bcfe4bfbd5b1cc452acd5139b512b1b">par_orthogonalize_from_constant</a> (mfem::Vector &amp;vec, int globalsize)</td></tr>
 <tr class="memdesc:a2bcfe4bfbd5b1cc452acd5139b512b1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Orthogonalize this vector from the constant vector.  <a href="#a2bcfe4bfbd5b1cc452acd5139b512b1b">More...</a><br/></td></tr>
 <tr class="separator:a2bcfe4bfbd5b1cc452acd5139b512b1b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -298,6 +401,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="name
 void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a72242e6f25ceaa18cdce6ca81c41ba73">GenerateOffsets</a> (MPI_Comm comm, int local_size, mfem::Array&lt; HYPRE_Int &gt; &amp;offsets)</td></tr>
 <tr class="memdesc:a72242e6f25ceaa18cdce6ca81c41ba73"><td class="mdescLeft">&#160;</td><td class="mdescRight">Generate the "start" array for HypreParMatrix based on the number of local true dofs Single case. <br/></td></tr>
 <tr class="separator:a72242e6f25ceaa18cdce6ca81c41ba73"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aef1fd264bdb38ec3fc1079fbbc567299"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aef1fd264bdb38ec3fc1079fbbc567299"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>IsDiag</b> (const mfem::SparseMatrix &amp;A)</td></tr>
+<tr class="separator:aef1fd264bdb38ec3fc1079fbbc567299"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3a700414304bda429eed073858c70107"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3a700414304bda429eed073858c70107"></a>
 double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a3a700414304bda429eed073858c70107">InnerProduct</a> (const mfem::Vector &amp;weight, const mfem::Vector &amp;u, const mfem::Vector &amp;v)</td></tr>
 <tr class="memdesc:a3a700414304bda429eed073858c70107"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the weighted l2 inner product between u and v. <br/></td></tr>
@@ -306,24 +412,38 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a6c164d11d16e6049109e7bc2083cfe24">InnerProduct</a> (const mfem::Vector &amp;u, const mfem::Vector &amp;v)</td></tr>
 <tr class="memdesc:a6c164d11d16e6049109e7bc2083cfe24"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute the usual l2 inner product between u and v. <br/></td></tr>
 <tr class="separator:a6c164d11d16e6049109e7bc2083cfe24"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9316676ba86a92240eb3cbcfe2a4beba"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9316676ba86a92240eb3cbcfe2a4beba"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>Partition</b> (const mfem::SparseMatrix &amp;w_table, mfem::Array&lt; int &gt; &amp;partitioning, int num_parts)</td></tr>
-<tr class="separator:a9316676ba86a92240eb3cbcfe2a4beba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4af8bece0841226866214c4ae81c8e08"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4af8bece0841226866214c4ae81c8e08"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a4af8bece0841226866214c4ae81c8e08">VisualizeSolution</a> (int k, mfem::ParFiniteElementSpace *sigmafespace, mfem::ParFiniteElementSpace *ufespace, const mfem::SparseMatrix &amp;D, const mfem::BlockVector &amp;sol)</td></tr>
-<tr class="memdesc:a4af8bece0841226866214c4ae81c8e08"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use GLVis to visualize finite volume solution. <br/></td></tr>
-<tr class="separator:a4af8bece0841226866214c4ae81c8e08"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1aa6c84f477a604527bbcadbfed9d38e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1aa6c84f477a604527bbcadbfed9d38e"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>PostProcess</b> (mfem::SparseMatrix &amp;M_global, mfem::SparseMatrix &amp;D_global, <a class="el" href="classsmoothg_1_1GraphTopology.html">GraphTopology</a> &amp;graph_topology_, mfem::Vector &amp;sol, mfem::Vector &amp;solp, const mfem::Vector &amp;rhs)</td></tr>
-<tr class="separator:a1aa6c84f477a604527bbcadbfed9d38e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adc07e3540f008ab670e20be6373e152b"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#adc07e3540f008ab670e20be6373e152b">GenerateBoundaryAttributeTable</a> (const mfem::Mesh *mesh)</td></tr>
-<tr class="memdesc:adc07e3540f008ab670e20be6373e152b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Build boundary attribute table from mesh.  <a href="#adc07e3540f008ab670e20be6373e152b">More...</a><br/></td></tr>
-<tr class="separator:adc07e3540f008ab670e20be6373e152b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a97a0ec315121a31884025776fb7b38de"><td class="memItemLeft" align="right" valign="top">std::unique_ptr<br class="typebreak"/>
+&lt; mfem::HypreParMatrix &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a97a0ec315121a31884025776fb7b38de">BuildEntityToTrueEntity</a> (const mfem::HypreParMatrix &amp;entity_trueentity_entity)</td></tr>
+<tr class="memdesc:a97a0ec315121a31884025776fb7b38de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct entity to true entity table from entity_trueentity_entity.  <a href="#a97a0ec315121a31884025776fb7b38de">More...</a><br/></td></tr>
+<tr class="separator:a97a0ec315121a31884025776fb7b38de"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1adfe04363602226ba2fc6bca5b60c27"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1adfe04363602226ba2fc6bca5b60c27"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a1adfe04363602226ba2fc6bca5b60c27">BooleanMult</a> (const mfem::SparseMatrix &amp;mat, const mfem::Array&lt; int &gt; &amp;vec, mfem::Array&lt; int &gt; &amp;out)</td></tr>
+<tr class="memdesc:a1adfe04363602226ba2fc6bca5b60c27"><td class="mdescLeft">&#160;</td><td class="mdescRight">out = bool(mat) * bool(vec) Compute mat * vec, with entries of mat and vec treated as boolean. For mat, entries in the matrix graph are treated as 1, otherwise 0. <br/></td></tr>
+<tr class="separator:a1adfe04363602226ba2fc6bca5b60c27"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a06e21d37d3d14ccd40e6d645509ca89f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a06e21d37d3d14ccd40e6d645509ca89f"></a>
+unique_ptr&lt; mfem::HypreParMatrix &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a06e21d37d3d14ccd40e6d645509ca89f">Copy</a> (const mfem::HypreParMatrix &amp;mat)</td></tr>
+<tr class="memdesc:a06e21d37d3d14ccd40e6d645509ca89f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make a copy of mfem::HypreParMatrix. <br/></td></tr>
+<tr class="separator:a06e21d37d3d14ccd40e6d645509ca89f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab9fa7a68d09e4d3c9429124efcdec39d"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ab9fa7a68d09e4d3c9429124efcdec39d">GetDiag</a> (const mfem::HypreParMatrix &amp;mat)</td></tr>
+<tr class="separator:ab9fa7a68d09e4d3c9429124efcdec39d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3d979298b1571e0185050fafb01fc024"><td class="memItemLeft" align="right" valign="top">mfem::SparseMatrix&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a3d979298b1571e0185050fafb01fc024">GetOffd</a> (const mfem::HypreParMatrix &amp;mat)</td></tr>
+<tr class="separator:a3d979298b1571e0185050fafb01fc024"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af17f8e35ffade4cf3d33b07f9492de33"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af17f8e35ffade4cf3d33b07f9492de33"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>Partition</b> (const mfem::SparseMatrix &amp;w_table, mfem::Array&lt; int &gt; &amp;partitioning, int num_parts, bool use_edge_weight)</td></tr>
+<tr class="separator:af17f8e35ffade4cf3d33b07f9492de33"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab44594bb764745f821caaac1dd12ba43"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab44594bb764745f821caaac1dd12ba43"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>PartitionAAT</b> (const mfem::SparseMatrix &amp;vertex_edge, mfem::Array&lt; int &gt; &amp;partitioning, int coarsening_factor)</td></tr>
+<tr class="separator:ab44594bb764745f821caaac1dd12ba43"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af3878645c1b4b016a395830d6bbc76b1"><td class="memItemLeft" align="right" valign="top">mfem::BlockVector&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#af3878645c1b4b016a395830d6bbc76b1">InterpolateToFine</a> (const <a class="el" href="classsmoothg_1_1Hierarchy.html">Hierarchy</a> &amp;hierarchy, int level, const mfem::BlockVector &amp;in)</td></tr>
+<tr class="separator:af3878645c1b4b016a395830d6bbc76b1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6227fc30ba428ab9d49ac84b28d6dcb3"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a6227fc30ba428ab9d49ac84b28d6dcb3">MarkDofsOnBoundary</a> (const mfem::SparseMatrix &amp;face_boundaryatt, const mfem::SparseMatrix &amp;face_dof, const mfem::Array&lt; int &gt; &amp;bndrAttributesMarker, mfem::Array&lt; int &gt; &amp;dofMarker)</td></tr>
 <tr class="separator:a6227fc30ba428ab9d49ac84b28d6dcb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a314172fc52915b9835aba5825b33f28f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a314172fc52915b9835aba5825b33f28f">GetTableRow</a> (const mfem::SparseMatrix &amp;mat, int rownum, mfem::Array&lt; int &gt; &amp;J)</td></tr>
 <tr class="memdesc:a314172fc52915b9835aba5825b33f28f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Treat a SparseMatrix as a (boolean) table, and return the column indices of a given row in the Array J.  <a href="#a314172fc52915b9835aba5825b33f28f">More...</a><br/></td></tr>
 <tr class="separator:a314172fc52915b9835aba5825b33f28f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad71c306ac9435ba48eee404d4db907da"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#ad71c306ac9435ba48eee404d4db907da">GetTableRowCopy</a> (const mfem::SparseMatrix &amp;mat, int rownum, mfem::Array&lt; int &gt; &amp;J)</td></tr>
+<tr class="memdesc:ad71c306ac9435ba48eee404d4db907da"><td class="mdescLeft">&#160;</td><td class="mdescRight">instead of a reference, get a copy  <a href="#ad71c306ac9435ba48eee404d4db907da">More...</a><br/></td></tr>
+<tr class="separator:ad71c306ac9435ba48eee404d4db907da"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a62c0196b945970d7f1d40dd91d8208ea"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a62c0196b945970d7f1d40dd91d8208ea">ReadVertexEdge</a> (std::ifstream &amp;graphFile, mfem::SparseMatrix &amp;out)</td></tr>
 <tr class="memdesc:a62c0196b945970d7f1d40dd91d8208ea"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read a graph from a file.  <a href="#a62c0196b945970d7f1d40dd91d8208ea">More...</a><br/></td></tr>
 <tr class="separator:a62c0196b945970d7f1d40dd91d8208ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -348,10 +468,179 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>ShowErrors</b> (const
 double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#acd62db02f43f795aa63150b83ae954e3">PowerIterate</a> (MPI_Comm comm, const mfem::Operator &amp;A, mfem::Vector &amp;result, int max_iter=1000, double tol=1e-8, bool verbose=false)</td></tr>
 <tr class="memdesc:acd62db02f43f795aa63150b83ae954e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Use power iterations to find the maximum eigenpair. <br/></td></tr>
 <tr class="separator:acd62db02f43f795aa63150b83ae954e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1d42bb2d3ebf5215d1c0a30cf80bf0e7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1d42bb2d3ebf5215d1c0a30cf80bf0e7"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>RescaleVector</b> (const mfem::Vector &amp;scaling, mfem::Vector &amp;vec)</td></tr>
+<tr class="separator:a1d42bb2d3ebf5215d1c0a30cf80bf0e7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a82aad145bc1cf3dcb4a68ff799cab2a4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacesmoothg.html#a82aad145bc1cf3dcb4a68ff799cab2a4">GetElementColoring</a> (mfem::Array&lt; int &gt; &amp;colors, const mfem::SparseMatrix &amp;el_el)</td></tr>
+<tr class="memdesc:a82aad145bc1cf3dcb4a68ff799cab2a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">A SERIAL coloring algorithm marking distinct colors for adjacent elements.  <a href="#a82aad145bc1cf3dcb4a68ff799cab2a4">More...</a><br/></td></tr>
+<tr class="separator:a82aad145bc1cf3dcb4a68ff799cab2a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a85ebfa65d53d958ba8ba4bc0db31cfdc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a85ebfa65d53d958ba8ba4bc0db31cfdc"></a>
+std::set&lt; unsigned &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>FindNonZeroColumns</b> (const mfem::SparseMatrix &amp;mat)</td></tr>
+<tr class="separator:a85ebfa65d53d958ba8ba4bc0db31cfdc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>The overall namespace for the smoothG project. </p>
 </div><h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="a7f99a95df53cf1b71bcb351d5fb216e8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::Add </td>
+          <td>(</td>
+          <td class="paramtype">const double&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>mat</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const double&#160;</td>
+          <td class="paramname"><em>b</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>vec</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const bool&#160;</td>
+          <td class="paramname"><em>invert_vec</em> = <code>false</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>mat = a * mat + b * diag(vec) or diag(vec^{-1}) if invert_vec = true </p>
+<p>mat must have nonzeros on the diagonal </p>
+
+</div>
+</div>
+<a class="anchor" id="a6b19055689ec01cc7577d91495139f8d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::Add </td>
+          <td>(</td>
+          <td class="paramtype">mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>mat</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>vec</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const bool&#160;</td>
+          <td class="paramname"><em>invert_vec</em> = <code>false</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>mat = mat + diag(vec) or diag(vec^{-1}) if invert_vec = true </p>
+<p>mat must have nonzeros on the diagonal </p>
+
+</div>
+</div>
+<a class="anchor" id="a4b5cca66eb2c87ba2ce3bb59912f0abd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::AddScaledSubMatrix </td>
+          <td>(</td>
+          <td class="paramtype">mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>mat</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>cols</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::DenseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>subm</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">double&#160;</td>
+          <td class="paramname"><em>scaling</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>skip_zeros</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>I am worried that some of these methods (especially <em>Add</em>) will not be public in future versions of MFEM</p>
+<p>Add scaling*subm into the matrix mat at locations given by rows and cols.</p>
+<p>The implementation is simply copied from mfem::SparseMatrix::AddSubMatrix, with the scaling added. </p>
+
+</div>
+</div>
+<a class="anchor" id="a97a0ec315121a31884025776fb7b38de"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; mfem::HypreParMatrix &gt; smoothg::BuildEntityToTrueEntity </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>entity_trueentity_entity</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Construct entity to true entity table from entity_trueentity_entity. </p>
+<p>Pick one of the processors sharing a true entity to own the true entity (pick the processor with a smaller id)</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">entity_trueentity_entity</td><td>= entity_trueentity * trueentity_entity </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
 <a class="anchor" id="a4d646143475c95cec019eaecf5dfc877"></a>
 <div class="memitem">
 <div class="memproto">
@@ -423,6 +712,112 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 
 <p>Make all column vectors of a orthogonal to v. </p>
 <p>The input vector v is assumed to be a unit vector </p>
+
+</div>
+</div>
+<a class="anchor" id="a5a1febf87506d25d8a9b4744cf77ff7f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::ExtractColumns </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::DenseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>A</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>col_to_ref</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>subcol_to_ref</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>ref_workspace</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::DenseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>A_sub</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>row_offset</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Extract columns from a dense matrix (A) to another dense matrix (A_sub) </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">A</td><td>the matrix to extract from </td></tr>
+    <tr><td class="paramname">col_to_ref</td><td>mapping from column index of A to reference index </td></tr>
+    <tr><td class="paramname">subcol_to_ref</td><td>mapping from column index of A_sub to reference index </td></tr>
+    <tr><td class="paramname">ref_workspace</td><td>array of "-1" of size at least dimension of reference space </td></tr>
+    <tr><td class="paramname">A_sub</td><td>the returned matrix where the extracted columns are collected </td></tr>
+    <tr><td class="paramname">row_offset</td><td>which row of A_sub to start putting the extracted columns </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a class="anchor" id="aea52878759caac720edcd0f611941323"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">mfem::SparseMatrix smoothg::ExtractRowAndColumns </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>A</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>cols</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Extract a submatrix from a matrix. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">A</td><td>the matrix to extract from </td></tr>
+    <tr><td class="paramname">rows</td><td>the rows to extract </td></tr>
+    <tr><td class="paramname">cols</td><td>the columns to extract</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>the extracted submatrix </dd></dl>
 
 </div>
 </div>
@@ -610,11 +1005,9 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
       </table>
 </div><div class="memdoc">
 
-<p>Build boundary attribute table from mesh. </p>
-<p>Construct edge to boundary attribute table (orientation is not considered)</p>
+<p>Construct edge to boundary attribute table (orientation is not considered) </p>
 <p>Copied from parelag::AgglomeratedTopology::generateFacetBdrAttributeTable</p>
-<p>Given a mesh and a boundary operator B[0], with height number of elements, width number of faces, this computes a table with a row for every face and a column for every boundary attribute, with a 1 if the face has that boundary attribute.</p>
-<p>This only works for the fine level, because of the mfem::Mesh. To get this table on a coarser mesh, premultiply by AEntity_entity. </p>
+<p>Given a mesh this computes a table with a row for every face and a column for every boundary attribute, with a 1 if the face has that boundary attribute. </p>
 
 </div>
 </div>
@@ -688,6 +1081,77 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 
 </div>
 </div>
+<a class="anchor" id="ab9fa7a68d09e4d3c9429124efcdec39d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">mfem::SparseMatrix smoothg::GetDiag </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>mat</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<dl class="section return"><dt>Returns</dt><dd>"diagonal block" of a HypreParMatrix </dd></dl>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#a28">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
+</dl>
+</div>
+</div>
+<a class="anchor" id="a82aad145bc1cf3dcb4a68ff799cab2a4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::GetElementColoring </td>
+          <td>(</td>
+          <td class="paramtype">mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>colors</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>el_el</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>A SERIAL coloring algorithm marking distinct colors for adjacent elements. </p>
+<p>This function is copied from mfem::Mesh::GetElementColoring.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">colors</td><td>at return containing colors of all elements </td></tr>
+    <tr><td class="paramname">el_el</td><td>element connectivity matrix (assuming nonzero diagonal) </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a class="anchor" id="a3d979298b1571e0185050fafb01fc024"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">mfem::SparseMatrix smoothg::GetOffd </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>mat</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<dl class="section return"><dt>Returns</dt><dd>"off diagonal block" of a HypreParMatrix </dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="a314172fc52915b9835aba5825b33f28f"></a>
 <div class="memitem">
 <div class="memproto">
@@ -721,6 +1185,75 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 <p>Treat a SparseMatrix as a (boolean) table, and return the column indices of a given row in the Array J. </p>
 <p>This implementation basically taken from DofAgglomeration::GetViewAgglomerateDofGlobalNumbering() as one step to extracting from Parelag.</p>
 <p>This is normally used with a mat that corresponds to some entity_dof or related table. </p>
+
+</div>
+</div>
+<a class="anchor" id="ad71c306ac9435ba48eee404d4db907da"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void smoothg::GetTableRowCopy </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>mat</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rownum</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>J</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>instead of a reference, get a copy </p>
+<p>if you call GetTableRow repeatedly, bad things might happen </p>
+
+</div>
+</div>
+<a class="anchor" id="af3878645c1b4b016a395830d6bbc76b1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">mfem::BlockVector smoothg::InterpolateToFine </td>
+          <td>(</td>
+          <td class="paramtype">const Hierarchy &amp;&#160;</td>
+          <td class="paramname"><em>hierarchy</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::BlockVector &amp;&#160;</td>
+          <td class="paramname"><em>in</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>This ugly implementation is to use Vector::Swap which does not exist for BlockVector, so we wrap Vector in temporary BlockVector objects that share the data with Vector. </p>
+<p>Interpolate from k to the finer k-1 </p>
 
 </div>
 </div>
@@ -788,6 +1321,39 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 
 </div>
 </div>
+<a class="anchor" id="a8e4fd47c852263e5aa565a067e4ee968"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">mfem::HypreParMatrix * smoothg::Mult </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>A</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>B</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>C</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<dl class="section return"><dt>Returns</dt><dd>triple matrix product A * B * C </dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="a78aa208a6e56502beb7962055df7684e"></a>
 <div class="memitem">
 <div class="memproto">
@@ -830,24 +1396,39 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 
 </div>
 </div>
-<a class="anchor" id="aee8776e75d8f97d83b52ad0e3fed8f88"></a>
+<a class="anchor" id="aecb6ee2276b932e03d6bd3d9d8a4921d"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void smoothg::orthogonalize_from_constant </td>
+          <td class="memname">void smoothg::orthogonalize_from_vector </td>
           <td>(</td>
           <td class="paramtype">mfem::Vector &amp;&#160;</td>
-          <td class="paramname"><em>vec</em></td><td>)</td>
+          <td class="paramname"><em>vec</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">const mfem::Vector &amp;&#160;</td>
+          <td class="paramname"><em>wrt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Orthogonalize this vector from the constant vector. </p>
-<p>This is equivalent to shifting the vector so it has zero mean.</p>
-<p>The correct way to do this is with respect to a finite element space, take an FiniteElementSpace argument or a list of volumes or something. For now we assume equal size volumes, or a graph, and just take vec.Sum() / vec.Size()</p>
-<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000007">Todo:</a></b></dt><dd>improve this for the finite volume case </dd></dl>
+<p>Orthogonalize this vector against wrt. </p>
+<p>In most cases, wrt is some (possibly non-nodal) representation of the constant vector, in which case this funtion shifts the vector so that it has zero mean.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">vec</td><td>the vector to be modified </td></tr>
+    <tr><td class="paramname">wrt</td><td>the vector with respect to which to orthogonalize vec </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -876,10 +1457,10 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 </div><div class="memdoc">
 
 <p>Orthogonalize this vector from the constant vector. </p>
-<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000006">Todo:</a></b></dt><dd>MPI_COMM_WORLD should be more generic </dd></dl>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000010">Todo:</a></b></dt><dd>MPI_COMM_WORLD should be more generic </dd></dl>
 <p>This is equivalent to shifting the vector so it has zero mean.</p>
 <p>The correct way to do this is with respect to a finite element space, take an FiniteElementSpace argument or a list of volumes or something. For now we assume equal size volumes, or a graph, and just take vec.Sum() / vec.Size()</p>
-<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000008">Todo:</a></b></dt><dd>improve this for the finite volume case </dd></dl>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000011">Todo:</a></b></dt><dd>improve this for the finite volume case </dd></dl>
 
 </div>
 </div>
@@ -916,8 +1497,79 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
   </dd>
 </dl>
 <dl class="section note"><dt>Note</dt><dd>can be removed with MFEM version &gt; 3.3.2 </dd></dl>
-<dl><dt><b>Examples: </b></dt><dd><a class="el" href="examples_2generalgraph_8cpp-example.html#a15">examples/generalgraph.cpp</a>.</dd>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#a27">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
 </dl>
+</div>
+</div>
+<a class="anchor" id="a343fbcc3b1ec99b26e83deffe8f99685"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; mfem::HypreParMatrix &gt; smoothg::ParMult </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>A</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>B</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>B_colpart</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Compute the product A * B between HypreParMatrix and SparseMatrix. </p>
+<p>First interpret B as a block-diagonal HypreParMatrix, then call mfem::ParMult </p>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#a23">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
+</dl>
+</div>
+</div>
+<a class="anchor" id="a7a51928e06ed6bca70bd83e6fe38f9b7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; mfem::HypreParMatrix &gt; smoothg::ParMult </td>
+          <td>(</td>
+          <td class="paramtype">const mfem::SparseMatrix &amp;&#160;</td>
+          <td class="paramname"><em>A</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::HypreParMatrix &amp;&#160;</td>
+          <td class="paramname"><em>B</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const mfem::Array&lt; int &gt; &amp;&#160;</td>
+          <td class="paramname"><em>A_rowpart</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Compute the product A * B between SparseMatrix and HypreParMatrix. </p>
+<p>First interpret A as a block-diagonal HypreParMatrix, then call mfem::ParMult </p>
+
 </div>
 </div>
 <a class="anchor" id="a62c0196b945970d7f1d40dd91d8208ea"></a>
@@ -961,7 +1613,7 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
   </table>
   </dd>
 </dl>
-<dl><dt><b>Examples: </b></dt><dd><a class="el" href="examples_2generalgraph_8cpp-example.html#a3">examples/generalgraph.cpp</a>.</dd>
+<dl><dt><b>Examples: </b></dt><dd><a class="el" href="_2home_2barker29_2graph-laplacian_2gh-pages_2examples_2generalgraph_8cpp-example.html#a7">/home/barker29/graph-laplacian/gh-pages/examples/generalgraph.cpp</a>.</dd>
 </dl>
 </div>
 </div>
@@ -1005,7 +1657,9 @@ double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="na
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">rows</td><td>number of row </td></tr>
-    <tr><td class="paramname">cols</td><td>number of columns  row_offset offset row where diagonal identity starts  col_offset offset column where diagonal identity starts </td></tr>
+    <tr><td class="paramname">cols</td><td>number of columns </td></tr>
+    <tr><td class="paramname">row_offset</td><td>offset row where diagonal identity starts </td></tr>
+    <tr><td class="paramname">col_offset</td><td>offset column where diagonal identity starts </td></tr>
   </table>
   </dd>
 </dl>

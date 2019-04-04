@@ -35,3 +35,29 @@
 \form#34:$ f_c $
 \form#35:$ sigma_c $
 \form#36:$ g_c $
+\form#37:$ \sigma_i^T M_{A} \sigma_j $
+\form#38:$ M_{A} $
+\form#39:\[ P_\sigma = \left( \begin{array}{cc} P_F& 0 \\ P_{E(A),F}& P_{E(A)} \end{array} \right) \]
+\form#40:$ P_F $
+\form#41:$ P_{E(A),F} $
+\form#42:$ P_{E(A)} $
+\form#43:\[ \left( \begin{array}{cc} M_{TT}& M_{TB} \\ M_{BT}& M_{BB} \end{array} \right) \]
+\form#44:$ T $
+\form#45:$ R^T D P $
+\form#46:$ A, B $
+\form#47:$ Ax = \lambda Bx $
+\form#48:\[ \kappa^2 u - \Delta u = w \]
+\form#49:$ \int v \cdot n dS $
+\form#50:$ kappa^{-1} $
+\form#51:$ M, D $
+\form#52:$ (DM^{-1}D^T)x = \lambda x $
+\form#53:$ mat[0] x = \lambda x $
+\form#54:$ mat[0] x = \lambda mat[1] x $
+\form#55:\[ \left( \begin{array}{cc} M& D^T \\ D& -W \end{array} \right) \]
+\form#56:\[ \left( \begin{array}{cc} M& D^T \\ D& \end{array} \right) \left( \begin{array}{c} \sigma \\ u \end{array} \right) = \left( \begin{array}{c} -g \\ -f \end{array} \right) \]
+\form#57:$ (D M^{-1} D^T) u = f$
+\form#58:$ (D M^{-1} D^T) u = f - D M^{-1} g $
+\form#59:$ \sigma = M^{-1} (D^T u + g) $
+\form#60:\[ \begin{pmatrix} M & D^T \\ D & -W \end{pmatrix}. \]
+\form#61:$ x_{fine} $
+\form#62:\[ \begin{bmatrix} M & D^T \\ D & 0 \end{bmatrix} \begin{bmatrix} \sigma \\ u \end{bmatrix} = \begin{bmatrix} g \\ f \end{bmatrix} \]
