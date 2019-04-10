@@ -299,12 +299,12 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
                                               mfem::DenseMatrix& AggExt_sigmaT)
 {
     const int nevects = evects.Width();
-    if (!edge_eigensystem)
+    if (!edge_eigensystem || !M_is_diag_)
     {
         mfem::DenseMatrix evects_tmp;
         // Do not consider the first vertex eigenvector, which is constant
         evects_tmp.UseExternalData(evects.Data() + evects.Height(),
-                                   evects.Height(), nevects - 1);
+                                   evects.Height(), 1 - 1);
 
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later

@@ -91,6 +91,13 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
 
     hierarchy_.Solve(level, rhs_[level], sol_[level]);
 
+//    if (level)
+//    {
+//    auto tmp = hierarchy_.PWConstProject(level, sol_[level].GetBlock(1));
+//    sol_[level].GetBlock(1) = hierarchy_.PWConstInterpolate(level, tmp);
+//    }
+
+
     // interpolate solution
     for (int i = level; i > 0; --i)
     {

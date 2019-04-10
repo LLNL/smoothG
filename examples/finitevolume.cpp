@@ -95,15 +95,31 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
+    SAAMGeParam sa_param;
+    sa_param.num_levels = 2;
+    sa_param.first_coarsen_factor = 64;
+    sa_param.first_theta = 1e-3;
+//    sa_param.do_aggregates = false;
+
+    upscale_param.saamge_param = &sa_param;
+
     mfem::Array<int> coarsening_factors(nDimensions);
-    coarsening_factors = 10;
-    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
+    if (metis_agglomeration)
+    {
+        coarsening_factors = 1;
+        coarsening_factors.Last() = upscale_param.coarse_factor;
+    }
+    else
+    {
+        coarsening_factors = 10;
+        coarsening_factors.Last() = nDimensions == 3 ? 2 : 10;
+    }
 
     mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
     ess_attr = 1;
     if (lateral_pressure)
     {
-        ess_attr[0] = ess_attr[2] = 0;
+        ess_attr[nDimensions - 2] = ess_attr[nDimensions] = 0;
     }
 
     // Setting up finite volume discretization problem
@@ -117,6 +133,8 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
+upscale.GetHierarchy().SetMaxIter(1, 1000);
+upscale.GetHierarchy().SetPrintLevel(1);
 
     upscale.PrintInfo();
 
@@ -132,6 +150,7 @@ int main(int argc, char* argv[])
     {
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);
+
 
         if (lateral_pressure)
         {

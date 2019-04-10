@@ -33,7 +33,9 @@ namespace smoothg
 Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor)
 {
     mfem::Array<int> partitioning;
-    PartitionAAT(fine_graph.VertexToEdge(), partitioning, coarsening_factor);
+    mfem::SparseMatrix vert_edge(fine_graph.VertexToEdge(), false);
+    vert_edge = 1.0;
+    PartitionAAT(vert_edge, partitioning, coarsening_factor);
     return Coarsen(fine_graph, partitioning);
 }
 

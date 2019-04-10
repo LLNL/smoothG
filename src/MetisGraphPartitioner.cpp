@@ -30,6 +30,7 @@ MetisGraphPartitioner::MetisGraphPartitioner(PartType _part_type)
 {
     METIS_SetDefaultOptions(options_);
     options_[METIS_OPTION_CONTIG] = 1;
+//    options_[METIS_OPTION_MINCONN] = 1;
 }
 
 void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
@@ -68,6 +69,12 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
     {
         adj_weight_int.SetSize(adjacency.NumNonZeroElems());
         mfem::Vector adj_weight(adjacency.GetData(), adj_weight_int.Size());
+
+        for (int i = 0; i < adj_weight.Size(); ++i)
+        {
+            adj_weight[i] = std::fabs(adj_weight[i]);
+        }
+
         double adj_wt_min = adj_weight.Min();
         for (int i = 0; i < adj_weight.Size(); i++)
             adj_weight_int[i] = floor(log2(adj_weight[i] / adj_wt_min)) + 1;
@@ -327,7 +334,7 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
                int num_parts, bool use_edge_weight)
 {
     MetisGraphPartitioner partitioner;
-    partitioner.setUnbalanceTol(2);
+    partitioner.setUnbalanceTol(2.0);
     partitioner.doPartition(w_table, num_parts, partitioning, use_edge_weight);
 }
 
@@ -341,7 +348,7 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
     const int nvertices = vert_vert.Height();
     int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
     num_partitions = std::max(1, num_partitions);
-    Partition(vert_vert, partitioning, num_partitions);
+    Partition(vert_vert, partitioning, num_partitions, false);
 }
 
 } // namespace smoothg

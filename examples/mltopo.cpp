@@ -66,8 +66,8 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    constexpr auto num_levels = 4;
-    const int coarsening_factor = nDimensions == 2 ? 8 : 32;
+    constexpr auto num_levels = 2;
+     int coarsening_factor = nDimensions == 2 ? 8 : 32;
     mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
 
     // Setting up a mesh (2D or 3D SPE10 model)
@@ -84,7 +84,8 @@ int main(int argc, char* argv[])
     }
 
     // Construct a graph from a finite volume problem defined on the mesh
-    DarcyProblem spe10problem(*pmesh, ess_attr);
+    ess_attr = 1;
+    SPE10Problem spe10problem("spe_perm.dat", 3, 5, 0, 1, ess_attr);
 
     // Build multilevel graph topology
     std::vector<GraphTopology> topologies(num_levels - 1);
@@ -93,9 +94,24 @@ int main(int argc, char* argv[])
     graphs.reserve(num_levels);
     graphs.push_back(spe10problem.GetFVGraph());
 
+    MixedMatrix mm(graphs[0]);
+    mm.BuildM();
+    mfem::SparseMatrix M = mm.GetM();
+    mfem::SparseMatrix v_e = graphs[0].VertexToEdge();
+
     for (int i = 0; i < num_levels - 1; i++)
     {
-        graphs.push_back(topologies[i].Coarsen(graphs[i], coarsening_factor));
+        mfem::Vector w(M.NumRows());
+for (int j = 0; j < M.NumRows(); j++)
+{
+    w[j] = 1./std::sqrt(M(j,j));
+}
+coarsening_factor = 32;
+v_e.ScaleRows(w);
+mfem::Array<int> partitioning;
+PartitionAAT(v_e,partitioning,coarsening_factor);
+
+        graphs.push_back(topologies[i].Coarsen(graphs[i], partitioning));
     }
 
     // Visualize aggregates in all levels

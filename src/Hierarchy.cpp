@@ -91,10 +91,13 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization) // Hybridization solver
+    if (param.hybridization && level) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
-        solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_, 0, sa_param));
+//        SAAMGeParam saamge_param;
+//        SAAMGeParam* sa_param = (level == 1) ? &saamge_param : nullptr;
+        solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
+                                               level ? 20 : 0, sa_param));
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -107,6 +110,12 @@ void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& 
 {
     assert(level >= 0 && level < NumLevels());
     solvers_[level]->Solve(x, y);
+
+//    if (level)
+//    {
+//    auto tmp = PWConstProject(level, y.GetBlock(1));
+//    y.GetBlock(1) = PWConstInterpolate(level, tmp);
+//    }
 }
 
 mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
@@ -149,6 +158,10 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
     assert(level >= 1 && level < NumLevels());
     Psigma_[level - 1].Mult(x.GetBlock(0), y.GetBlock(0));
     Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
+
+//    auto tmp = PWConstProject(level, x.GetBlock(1));
+//    auto tmp2 = PWConstInterpolate(level, tmp);
+//    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
 }
 
 mfem::BlockVector Hierarchy::Interpolate(int level, const mfem::BlockVector& x) const
@@ -456,7 +469,7 @@ void Hierarchy::Debug_tests(int level) const
 
     out -= random_vec;
     double diff = mfem::ParNormlp(out, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
-    if (diff >= error_tolerance)
+    if (myid_ == 0 && diff >= error_tolerance)
     {
         std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || / || rand || = " << diff
                   << "\nWarning: Edge projection operator is not a projection!\n";
@@ -486,7 +499,7 @@ void Hierarchy::Debug_tests(int level) const
 
     pi_u_D_rand -= D_pi_sigma_rand;
     diff = mfem::ParNormlp(pi_u_D_rand, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
-    if (diff >= error_tolerance)
+    if (myid_ == 0 && diff >= error_tolerance)
     {
         std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || / || rand || = "
                   << diff << "\nWarning: commutativity does not hold!\n";

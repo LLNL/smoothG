@@ -19,6 +19,7 @@
    @brief Implements HybridSolver object
 */
 
+#include "sharedentitycommunication.hpp"
 #include "HybridSolver.hpp"
 #include "utilities.hpp"
 #include "MatrixUtilities.hpp"
@@ -718,6 +719,7 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     // Mark dofs that are shared by more than one processor
     saamge::SharedEntityCommunication<mfem::Vector> sec(comm_, *multiplier_d_td_);
+
     std::vector<saamge::agg_dof_status_t> bdr_dofs(elem_dof->Width(), 0);
     for (unsigned int i = 0; i < bdr_dofs.size(); i++)
     {

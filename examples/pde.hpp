@@ -678,7 +678,7 @@ void DarcyProblem::PrintMeshWithPartitioning(mfem::Array<int>& partition)
     ofid.precision(8);
     pmesh_->PrintWithPartitioning(partition.GetData(), ofid, 1);
 }
-
+int yo=0;
 void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min,
                             double range_max, const std::string& caption, int coef) const
 {
@@ -686,14 +686,15 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
 
     const char vishost[] = "localhost";
     const int  visport   = 19916;
-    vis_v.open(vishost, visport);
+    if (yo==0)
+    {vis_v.open(vishost, visport);yo=0;}
     vis_v.precision(8);
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
-    vis_v << "window_size 800 250\n";//500 800
+    vis_v << "window_size 900 800\n";//800 250
     vis_v << "window_title 'vertex space unknown'\n";
-    vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
+    vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
     if (range_max > range_min)
     {
         vis_v << "valuerange " << range_min << " " << range_max << "\n";
@@ -703,14 +704,15 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
     {
         vis_v << "view 0 0\n"; // view from top
         vis_v << "keys jl\n";  // turn off perspective and light
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+//        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]\n";
     }
     else
     {
         vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
     }
 
-    //    vis_v << "keys c\n"; // colorbar
+        vis_v << "keys c\n"; // colorbar
 
     if (coef)
     {
@@ -735,6 +737,11 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
+
+    vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]\n";
+//    vis_v << "keys c\n"; // colorbar
+//    vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
+//    vis_v << "keys c\n"; // colorbar
 
     MPI_Barrier(comm_);
 
@@ -792,6 +799,13 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
     DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
     DivOp.Assemble();
     DivOp.Finalize();
+
+    mfem::Vector weight_sqrt(weight_);
+    for (int i = 0; i < weight_.Size(); ++i)
+    {
+        weight_sqrt[i] = std::sqrt(weight_[i]);
+    }
+    DivOp.SpMat().ScaleColumns(weight_sqrt);
 
     int metis_coarsening_factor = 1;
     for (const auto factor : coarsening_factor)
@@ -977,9 +991,9 @@ void SPE10Problem::MakeRHS()
     {
         mfem::Array<int> nat_negative_one(ess_attr_.Size());
         nat_negative_one = 0;
-        nat_negative_one[0] = 1;
+        nat_negative_one[pmesh_->Dimension() == 2 ? 0 : 1] = 1;
 
-        mfem::ConstantCoefficient negative_one(-1.0);
+        mfem::ConstantCoefficient negative_one(1.0);
         mfem::RestrictedCoefficient pinflow_coeff(negative_one, nat_negative_one);
 
         mfem::LinearForm g(sigma_fes_.get());

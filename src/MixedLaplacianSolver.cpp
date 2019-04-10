@@ -31,7 +31,9 @@ MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
     : comm_(comm), rhs_(block_offsets), sol_(block_offsets), nnz_(0),
       num_iterations_(0), timing_(0), remove_one_dof_(true),
       W_is_nonzero_(W_is_nonzero), gmres_(comm_), is_symmetric_(true)
-{ }
+{
+    sol_ = 0.0;
+}
 
 void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
 {

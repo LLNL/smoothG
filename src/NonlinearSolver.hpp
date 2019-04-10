@@ -142,6 +142,9 @@ protected:
     /// Relaxation on each level
     virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
 
+    virtual void BackTracking(int level, const mfem::Vector &rhs, double prev_resid_norm,
+                              mfem::Vector& x, mfem::Vector& dx) = 0;
+
     Cycle cycle_;
     int num_levels_;
     std::vector<mfem::Vector> rhs_;

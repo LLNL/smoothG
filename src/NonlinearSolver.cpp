@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag)
     : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(0.1)
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(1e-6)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -92,6 +92,7 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
             IterationStep(rhs, sol);
         }
 
+        timing_ = chrono.RealTime();
         if (myid_ == 0 && !converged_ && print_level_ >= 0)
         {
             std::cout << "Warning: " << tag_ << " solver reached maximum "
@@ -100,7 +101,7 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
         else if (myid_ == 0 && print_level_ >= 0)
         {
             std::cout << tag_ << " solver took " << iter_ << " iterations in "
-                      << chrono.RealTime() << " seconds.\n\n";
+                      << timing_ << " seconds.\n\n";
         }
     }
 }
@@ -108,15 +109,15 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 void NonlinearSolver::UpdateLinearSolveTol()
 {
     double tol;
-    if (linear_tol_criterion_ == TaylorResidual)
+//    if (linear_tol_criterion_ == TaylorResidual)
+//    {
+//        tol = std::fabs(resid_norm_ - linear_resid_norm_) / prev_resid_norm_;
+//    }
+//    else // NonlinearResidual
     {
-        tol = std::fabs(resid_norm_ - linear_resid_norm_) / prev_resid_norm_;
-    }
-    else // NonlinearResidual
-    {
-//        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
+        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
         double ref_norm = solve_type_ == Newton ? prev_resid_norm_ : rhs_norm_;
-        tol = std::pow(resid_norm_ / ref_norm, 1.0);
+        tol = std::pow(resid_norm_ / rhs_norm_, 1.0);
     }
 
     linear_tol_ = std::max(std::min(tol, linear_tol_), rtol_);
@@ -176,10 +177,24 @@ void NonlinearMG::FAS_Cycle(int level)
             if (resid_norm_ < adjusted_tol_)
             {
                 converged_ = true;
+                if (level==0 && myid_==0)
+                {
+                    std::cout<<"V cycle terminated after pre-smoothing\n";
+                }
                 return;
             }
         }
 
+//        if (level==0 && myid_==0)
+//        {
+//            std::cout<<"pre-smooth resid = " << resid_norm_<<" "<<resid_norm_/rhs_norm_<<"\n";
+//        }
+
+//if (solve_type_ == Picard || (level || resid_norm_ > rhs_norm_*1e-2))
+
+if (level || resid_norm_ > rhs_norm_*(solve_type_ == Picard ? 1e-6 : 1e-2))
+//if (iter_ == 0)
+{
         Restrict(level, help_[level], help_[level + 1]);
 
         Project(level, sol_[level], sol_[level + 1]);
@@ -198,6 +213,29 @@ void NonlinearMG::FAS_Cycle(int level)
 
         Interpolate(level + 1, coarse_sol, help_[level]);
         sol_[level] -= help_[level];
+
+//        BackTracking(level, rhs_[level], prev_resid_norm_, sol_[level], help_[level]);
+
+//if (level == 0)
+//{
+//    Mult(level, sol_[level], help_[level]);
+//    help_[level] -= rhs_[level];
+
+//    for (int i = 0; i < GetEssDofs().Size(); ++i)
+//    {
+//        if (GetEssDofs()[i])
+//            help_[level][i] = 0.0;
+//    }
+
+//    mfem::Vector true_resid = AssembleTrueVector(help_[level]);
+//    resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
+//}
+
+//if (level==0 && myid_==0)
+//{
+//    std::cout<<"coarse grid correction resid = " << resid_norm_<<"\n";
+//}
+}
 
         // Post-smoothing
         Smoothing(level, rhs_[level], sol_[level]);
