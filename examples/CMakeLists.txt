@@ -43,6 +43,9 @@ target_link_libraries(samplesolve smoothg ${TPL_LIBRARIES})
 add_executable(qoi qoi.cpp)
 target_link_libraries(qoi smoothg ${TPL_LIBRARIES})
 
+add_executable(spe10_mlmc spe10_mlmc.cpp)
+target_link_libraries(spe10_mlmc smoothg ${TPL_LIBRARIES})
+
 # add tests
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
     set(SMOOTHG_TEST_PROCS 2)
