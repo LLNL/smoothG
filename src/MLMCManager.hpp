@@ -255,7 +255,7 @@ public:
 
 private:
     /// Incremental updates of mean_, varsum_, and cost_
-    void UpdateStatistics(int level, double l_qoi, double current_cost);
+    void UpdateStatistics(int level, double l_Q, double l_Y, double current_cost);
 
     /// remove super-small values from a coefficient
     /// (not recommended)
@@ -271,8 +271,14 @@ private:
     /// one for each level (ie, diff -> 0, coarse -> 1)
     std::vector<mfem::BlockVector> rhs_;
     std::vector<int> sample_count_;
-    std::vector<double> mean_;
-    std::vector<double> varsum_;
+
+    std::vector<double> eQ_;
+    /// E[Y_l] = E[Q_l - Q_{l+1}]
+    std::vector<double> eY_;
+    /// Used in variance computation
+    std::vector<double> eQ2_;
+    std::vector<double> eY2_;
+
     std::vector<double> cost_;
     std::vector<int> initial_samples_;
     int choose_samples_;

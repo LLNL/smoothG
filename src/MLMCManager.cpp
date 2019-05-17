@@ -116,8 +116,11 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     num_levels_ = (num_levels < 0) ? hierarchy.NumLevels() : num_levels;
 
     sample_count_.resize(num_levels_);
-    mean_.resize(num_levels_);
-    varsum_.resize(num_levels_);
+    eQ_.resize(num_levels_);
+    eY_.resize(num_levels_);
+    eQ2_.resize(num_levels_);
+    eY2_.resize(num_levels_);
+
     cost_.resize(num_levels_);
     initial_samples_.resize(num_levels_);
 
@@ -147,6 +150,7 @@ void MLMCManager::Simulate(bool verbose)
     {
         if (verbose)
             std::cout << "---\nChoose sample " << sample << "\n---" << std::endl;
+
         BestSample(verbose);
     }
 }
@@ -163,7 +167,7 @@ void MLMCManager::FloorCoefficient(mfem::Vector& coef, double floor)
 
 double MLMCManager::GetEstimate() const
 {
-    return std::accumulate(mean_.begin(), mean_.end(), 0.0);
+    return std::accumulate(eY_.begin(), eY_.end(), 0.0);
 }
 
 /**
@@ -197,12 +201,16 @@ mfem::BlockVector InterpolateToFine(const Hierarchy& hierarchy, int level,
     return out;
 }
 
-void MLMCManager::UpdateStatistics(int level, double l_qoi, double current_cost)
+void MLMCManager::UpdateStatistics(int level, double l_Q, double l_Y, double current_cost)
 {
-    const double scale = 1.0 / ((double) sample_count_[level] + 1.0);
-    varsum_[level] += scale * ((double) sample_count_[level]) *
-                      (l_qoi - mean_[level]) * (l_qoi - mean_[level]);
-    mean_[level] += scale * (l_qoi  - mean_[level]);
+    const double scale = 1.0 / ((double) sample_count_[level] + 1.0 );
+
+    eQ_[level] += scale * (l_Q  - eQ_[level]);
+    eY_[level] += scale * (l_Y  - eY_[level]);
+
+    eQ2_[level] += scale * (l_Q*l_Q  - eQ2_[level]);
+    eY2_[level] += scale * (l_Y*l_Y  - eY2_[level]);
+
     cost_[level] += scale * (current_cost - cost_[level]);
 }
 
@@ -216,7 +224,7 @@ void MLMCManager::FixedLevelSample(int level, bool verbose)
     mfem::BlockVector sol = hierarchy_.Solve(level, rhs_[level]);
     double l_qoi = qoi_.Evaluate(coefficient, sol);
     double current_cost = hierarchy_.GetSolveTime(level);
-    UpdateStatistics(level, l_qoi, current_cost);
+    UpdateStatistics(level, l_qoi, l_qoi, current_cost);
 
     if (verbose)
     {
@@ -272,7 +280,7 @@ void MLMCManager::CorrectionSample(int level,
     double fineq = qoi_.Evaluate(fine_coefficient, sol_fine);
     temp_cost += hierarchy_.GetSolveTime(fine_level);
 
-    UpdateStatistics(fine_level, fineq - upscaledq, temp_cost);
+    UpdateStatistics(fine_level, fineq, fineq - upscaledq, temp_cost);
 
     if (verbose)
     {
@@ -311,10 +319,11 @@ void MLMCManager::CorrectionSample(int level,
 
 void MLMCManager::BestSample(bool verbose)
 {
-    std::vector<double> variance(num_levels_);
+    std::vector<double> varianceY(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
-        variance[level] = varsum_[level] / ((double) sample_count_[level] - 1.0);
+        varianceY[level] = ((double) sample_count_[level])*(eY2_[level] - eY_[level]*eY_[level])
+                              / ((double) sample_count_[level] - 1.0);
     }
 
     // see OVV (27) and following
@@ -323,7 +332,7 @@ void MLMCManager::BestSample(bool verbose)
     std::vector<double> sample_prop(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
-        sample_prop[level] = std::sqrt(variance[level] / cost_[level]);
+        sample_prop[level] = std::sqrt(varianceY[level] / cost_[level]);
         total_sample_prop += sample_prop[level];
         current_total_samples += (double) sample_count_[level];
     }
@@ -338,8 +347,6 @@ void MLMCManager::BestSample(bool verbose)
     // our rule is to sample on the coarsest level that is currently under-sampled
     for (int level = num_levels_ - 1; level >= 0; level--)
     {
-        std::cout << "  level " << level << " current_frac: " << current_sample_frac[level]
-                  << ", wanted_sample_frac: " << best_sample_frac[level] << std::endl;
         if (current_sample_frac[level] < best_sample_frac[level])
         {
             if (verbose)
@@ -355,21 +362,28 @@ void MLMCManager::BestSample(bool verbose)
 
 void MLMCManager::DisplayStatus(picojson::object& serialize)
 {
-    std::vector<double> variance(num_levels_);
+    std::vector<double> varianceQ(num_levels_);
+    std::vector<double> varianceY(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
-        variance[level] = varsum_[level] / ((double) sample_count_[level] - 1.0);
+        varianceY[level] = ((double) sample_count_[level])*(eY2_[level] - eY_[level]*eY_[level])
+                              / ((double) sample_count_[level] - 1.0);
+
+        varianceQ[level] = ((double) sample_count_[level])*(eQ2_[level] - eQ_[level]*eQ_[level])
+                              / ((double) sample_count_[level] - 1.0);
     }
 
     // see OVV (27) and following
     double total_sample_prop = 0.0;
     double current_total_samples = 0.0;
+    double sampling_error_estimate = 0.0;
     std::vector<double> sample_prop(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
-        sample_prop[level] = std::sqrt(variance[level] / cost_[level]);
+        sample_prop[level] = std::sqrt(varianceY[level] / cost_[level]);
         total_sample_prop += sample_prop[level];
         current_total_samples += (double) sample_count_[level];
+        sampling_error_estimate += varianceY[level] / ((double) sample_count_[level]);
     }
     std::vector<double> best_sample_frac(num_levels_);
     std::vector<double> current_sample_frac(num_levels_);
@@ -380,22 +394,28 @@ void MLMCManager::DisplayStatus(picojson::object& serialize)
     }
 
     std::cout << "=====" << std::endl;
+    std::cout << "Number of levels: " << num_levels_ << std::endl;
     for (int level = 0; level < num_levels_; ++level)
     {
         std::cout << "Level " << level << " cost estimate: " << cost_[level] << std::endl;
-        std::cout << "        mean/correction: " << mean_[level] << std::endl;
-        std::cout << "        variance: " << variance[level] << std::endl;
+        std::cout << "        num vertices: " << hierarchy_.NumVertices(level) << std::endl;
+        std::cout << "        eQ: " << eQ_[level] << std::endl;
+        std::cout << "        varQ: " << varianceQ[level] << std::endl;
+        std::cout << "        eY: " << eY_[level] << std::endl;
+        std::cout << "        varY: " << varianceY[level] << std::endl;
         std::cout << "        sample count: " << sample_count_[level] << std::endl;
         std::cout << "        recommended samples: " << best_sample_frac[level] * current_total_samples <<
                   std::endl;
     }
+
     std::cout << "MLMC estimate: " << GetEstimate() << std::endl;
+    std::cout << "Sampling error estimate: " << sampling_error_estimate << std::endl;
 
     if (num_levels_ > 1)
     {
-        serialize["coarse-variance"] = picojson::value(variance[1]);
+        serialize["coarse-variance"] = picojson::value(varianceY[1]);
     }
-    serialize["correction-variance"] = picojson::value(variance[0]);
+    serialize["correction-variance"] = picojson::value(varianceY[0]);
     serialize["mlmc-estimate"] = picojson::value(GetEstimate());
     std::cout << picojson::value(serialize).serialize() << std::endl;
 }
