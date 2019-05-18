@@ -398,7 +398,6 @@ void MLMCManager::DisplayStatus(picojson::object& serialize)
     for (int level = 0; level < num_levels_; ++level)
     {
         std::cout << "Level " << level << " cost estimate: " << cost_[level] << std::endl;
-        std::cout << "        num vertices: " << hierarchy_.NumVertices(level) << std::endl;
         std::cout << "        eQ: " << eQ_[level] << std::endl;
         std::cout << "        varQ: " << varianceQ[level] << std::endl;
         std::cout << "        eY: " << eY_[level] << std::endl;
