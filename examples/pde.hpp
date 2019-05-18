@@ -815,6 +815,52 @@ void DarcyProblem::Partition(bool metis_parition,
 /**
    @brief Construct finite volume problem on the SPE10 data set
 */
+class DirichletBCDarcyProblem : public DarcyProblem
+{
+public:
+    /**
+       @brief Constructor
+       @param ess_attr marker for boundary attributes where essential edge
+              condition is imposed
+    */
+    DirichletBCDarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& ess_attr);
+
+private:
+    void MakeRHS();
+};
+
+DirichletBCDarcyProblem::DirichletBCDarcyProblem(const mfem::ParMesh& pmesh,
+                                                 const mfem::Array<int>& ess_attr)
+  : DarcyProblem(pmesh.GetComm(), pmesh.Dimension(), ess_attr)
+{
+    pmesh_ = make_unique<mfem::ParMesh>(pmesh, false);
+    InitGraph();
+    kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
+    ComputeGraphWeight();
+    MakeRHS();
+}
+
+void DirichletBCDarcyProblem::MakeRHS()
+{
+    mfem::Array<int> nat_negative_one(ess_attr_.Size());
+    nat_negative_one = 0;
+    nat_negative_one[0] = 1;
+
+    mfem::ConstantCoefficient negative_one(-1.0);
+    mfem::RestrictedCoefficient pinflow_coeff(negative_one, nat_negative_one);
+
+    mfem::LinearForm g(sigma_fes_.get());
+    g.AddBoundaryIntegrator(
+        new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
+    g.Assemble();
+    rhs_sigma_ = g;
+
+    rhs_u_ = 0.0;
+}
+
+/**
+   @brief Construct finite volume problem on the SPE10 data set
+*/
 class SPE10Problem : public DarcyProblem
 {
 public:
