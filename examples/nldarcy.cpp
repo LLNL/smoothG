@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
     Hierarchy hierarchy(std::move(graph), upscale_param, &partitioning, &ess_attr);
     hierarchy.PrintInfo();
 
-//    if (upscale_param.hybridization)
+    if (upscale_param.hybridization)
     {
         hierarchy.SetRelTol(1e-12);
         hierarchy.SetAbsTol(1e-15);
@@ -279,108 +279,21 @@ int main(int argc, char* argv[])
         rhs.GetBlock(1) = -fv_problem->CellVolume();
     }
 
-    mfem::BlockVector sol_picard(rhs);
-//    sol_picard = 0.0;
-//    LevelSolver sls(hierarchy, 0, Z_fine, use_newton ? Newton : Picard);
-//    sls.SetPrintLevel(1);
-//    sls.SetMaxIter(500);
-//    sls.Solve(rhs, sol_picard);
-
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
     EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard);
     nlmg.SetPrintLevel(1);
     nlmg.SetMaxIter(300);
-//    mfem::socketstream sout1;
-//    for (int i = 0; i < upscale_param.max_evects; ++i)
-    {
-        nlmg.Solve(rhs, sol_nlmg);
-//        if (i)
-//            fv_problem->VisUpdate(sout1, sol_nlmg.GetBlock(1));
-//        else
-    }
-//    fv_problem->VisSetup(sout1, sol_nlmg.GetBlock(1), 0,0, "");
-
-//    hierarchy.SetPrintLevel(1);
-//    Upscale up(std::move(hierarchy));
-//    std::vector<mfem::BlockVector> sol;
-//    sol.reserve(up.GetHierarchy().NumLevels());
-
-//    std::vector<mfem::BlockVector> rhss;
-//    rhss.reserve(up.GetHierarchy().NumLevels());
-//    std::vector<mfem::BlockVector> sol_level;
-//    sol_level.reserve(up.GetHierarchy().NumLevels());
-
-//    mfem::socketstream sout1;
-
-//    for (int i = 0; i < up.GetHierarchy().NumLevels(); ++i)
-//    {
-////        LevelSolver sls(hierarchy, i, Z_fine, use_newton ? Newton : Picard);
-////sls.SetPrintLevel(1);
-////sls.SetMaxIter(20);
-////        if (i == 0)
-////            rhss.push_back(rhs);
-////        else
-////            rhss.push_back(hierarchy.Restrict(i - 1, rhss[i - 1]));
-
-////        sol_level.push_back(rhss[i]);
-////        sol_level[i] = 0.0;
-////        sls.Solve(rhss[i], sol_level[i]);
-
-////        for (int j = i; j > 0; --j)
-////        {
-////            sol_level[j - 1] = hierarchy.Interpolate(j, sol_level[j]);
-////        }
-
-////        if (i == 0)
-////            sol.push_back(sol_level[0]);
-////        else
-////            sol.push_back(hierarchy.Interpolate(i, sol_level));
-//        sol.push_back(up.Solve(i, rhs));
-
-//        if (i > 0)
-//        {
-//            double p_err = CompareError(comm, sol[i].GetBlock(1), sol[0].GetBlock(1));
-//            double s_err = CompareError(comm, sol[i].GetBlock(0), sol[0].GetBlock(0));
-//            if (myid == 0)
-//            {
-//                std::cout << "Level " << i << ":\n";
-//                std::cout << "Relative pressure errors: " << p_err << "\n";
-//                std::cout << "Relative flux errors: " << s_err << "\n\n";
-//            }
-//        }
-
-
-////        if (i)
-////            fv_problem->VisUpdate(sout1, sol[i].GetBlock(1));
-////        else
-//            fv_problem->VisSetup(sout1, sol[i].GetBlock(1), 0,0, "");
-//    }
-
-    double p_err = CompareError(comm, sol_nlmg.GetBlock(1), sol_picard.GetBlock(1));
-
-    if (myid == 0)
-    {
-        std::cout << "Relative errors: " << p_err << "\n";
-//        std::cout << "P max:" << sol_nlmg.GetBlock(1).Max() << "\n";
-//        std::cout << "P min:" << sol_nlmg.GetBlock(1).Min() << "\n";
-    }
-
-
-
+    nlmg.Solve(rhs, sol_nlmg);
 
     if (visualization)
     {
         if (problem == "richard")
         {
-            sol_picard.GetBlock(1) -= Z_fine;
             sol_nlmg.GetBlock(1) -= Z_fine;
         }
 
         mfem::socketstream sout;
-//        fv_problem->VisSetup(sout, sol_picard.GetBlock(1), 0.0, 0.0, "");
-//        if (problem == "richard")
-//            sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
         fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "");
         if (problem == "richard")
             sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
