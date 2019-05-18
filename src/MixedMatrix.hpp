@@ -85,6 +85,11 @@ public:
         M_.Swap(M_tmp);
     }
 
+    void UpdateMBuilder(std::unique_ptr<MBuilder> new_mbuilder)
+    {
+        mbuilder_ = std::move(new_mbuilder);
+    }
+
     /// assemble the parallel edge mass matrix
     mfem::HypreParMatrix* MakeParallelM(const mfem::SparseMatrix& M) const;
 

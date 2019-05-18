@@ -101,7 +101,7 @@ protected:
     double linear_resid_norm_;
 };
 
-enum Cycle { V_CYCLE, FMG };
+enum Cycle { V_CYCLE, FMG, CASCADIC };
 
 /**
    @brief Nonlinear multigrid using full approximation scheme and nonlinear relaxation.
@@ -117,7 +117,6 @@ public:
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
 protected:
-    void FAS_FMG();
     void FAS_Cycle(int level);
 
     virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
@@ -145,11 +144,17 @@ protected:
     virtual void BackTracking(int level, const mfem::Vector &rhs, double prev_resid_norm,
                               mfem::Vector& x, mfem::Vector& dx) = 0;
 
+
+    virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec_dof) const = 0;
+    virtual const mfem::Array<int>& GetEssDofs(int level) const = 0;
+
     Cycle cycle_;
     int num_levels_;
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;
     mutable std::vector<mfem::Vector> help_;
+
+    std::vector<double> residual_norms_;
 };
 
 } // namespace smoothg

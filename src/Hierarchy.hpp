@@ -138,6 +138,10 @@ public:
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
+    /// evaluate coefficient on fine level and assemble coarse operator by RAP
+    void RescaleCoefficient(int level, const mfem::Vector& coarse_sol,
+                            void (*f)(const mfem::Vector&, mfem::Vector&));
+
     /// At a given level, update mixed Jacobian system associated with the nonlinear problem
     void UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
                         const std::vector<mfem::DenseMatrix>& dMdp);
@@ -189,6 +193,9 @@ private:
     double setup_time_;
 
     const mfem::Array<int>* ess_attr_;
+
+    std::vector<mfem::SparseMatrix > agg_vert;
+    UpscaleParameters param_;
 };
 
 } // namespace smoothg

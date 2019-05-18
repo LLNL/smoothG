@@ -33,7 +33,8 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
     : comm_(mixed_system.GetComm()),
       solvers_(param.max_levels),
       setup_time_(0.0),
-      ess_attr_(ess_attr)
+      ess_attr_(ess_attr),
+      param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -45,6 +46,8 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
     if (ess_attr)
         mixed_systems_.back().SetEssDofs(*ess_attr);
     MakeSolver(0, param);
+
+    agg_vert.reserve(param.max_levels - 1);
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
@@ -67,6 +70,8 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     GraphTopology topology;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning)
                          : topology.Coarsen(mgL.GetGraph(), param.coarse_factor);
+
+    agg_vert.push_back(topology.Agg_vertex_);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
@@ -91,13 +96,17 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization && level) // Hybridization solver
+    if (param.hybridization & level) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
 //        SAAMGeParam saamge_param;
+//        saamge_param.first_coarsen_factor = 12;
+//        saamge_param.num_levels = 3;
+//        saamge_param.first_theta = 1e-4;
+//        saamge_param.do_aggregates = false;
 //        SAAMGeParam* sa_param = (level == 1) ? &saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
-                                               level ? 20 : 0, sa_param));
+                                               level ? 5 : 0, sa_param));
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -430,6 +439,50 @@ void Hierarchy::DumpDebug(const std::string& prefix) const
 void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coeff)
 {
     solvers_[level]->UpdateElemScaling(coeff);
+}
+
+void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coarse_sol,
+                                   void (*f)(const mfem::Vector&, mfem::Vector&))
+{
+    mfem::Vector fine_sol = Interpolate(level, coarse_sol);
+
+    auto& coarse_mbuilder = ((ElementMBuilder&)GetMatrix(level).GetMBuilder());
+    if (level == 1)
+    {
+        mfem::Vector coeff(fine_sol);
+        (*f)(fine_sol, coeff);
+
+        auto& fine_mbuilder = ((ElementMBuilder&)GetMatrix(level - 1).GetMBuilder());
+        auto agg_Ms = fine_mbuilder.BuildAggM(agg_vert[level - 1], coeff);
+
+        auto& agg_coarse_edof = GetMatrix(level).GetGraphSpace().VertexToEDof();
+        auto agg_fine_edof = smoothg::Mult(agg_vert[level - 1], fine_mbuilder.GetElemEdgeDofTable());
+
+        mfem::Array<int> fine_edofs, coarse_edofs, colmap(Psigma_[level - 1].NumCols());
+        colmap = -1;
+
+        std::vector<mfem::DenseMatrix> agg_CMs(agg_vert[level - 1].NumRows());
+        for (int a = 0 ; a < agg_vert[level - 1].NumRows(); ++a)
+        {
+            GetTableRow(agg_fine_edof, a, fine_edofs);
+            GetTableRow(agg_coarse_edof, a, coarse_edofs);
+
+            auto agg_Psigma = ExtractRowAndColumns(Psigma_[level - 1], fine_edofs,
+                                                   coarse_edofs, colmap);
+            auto agg_PsigmaT = smoothg::Transpose(agg_Psigma);
+
+            std::unique_ptr<mfem::SparseMatrix> agg_CM(RAP(agg_Ms[a], agg_PsigmaT));
+            Full(*agg_CM, agg_CMs[a]);
+        }
+
+        coarse_mbuilder.SetElementMatrices(std::move(agg_CMs));
+    }
+    else
+    {
+        RescaleCoefficient(level - 1, fine_sol, *f);
+    }
+
+    MakeSolver(level, param_);
 }
 
 void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,

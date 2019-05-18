@@ -252,9 +252,17 @@ void InversePermeabilityCoefficient::InversePermeability(const mfem::Vector& x,
     }
 
     const int offset = N_slice_ * k + N_[0] * j + i;
+    double val_inv;
     for (int l = 0; l < vdim; ++l)
     {
         val[l] = inverse_permeability_[offset + N_all_ * l];
+        val_inv = 1. / val[l];
+        double k_min(0.0022715), k_max(2e4);
+        assert(val_inv > k_min);
+        val_inv = (val_inv - k_min) / (k_max - k_min) * (1. - 1.e-5) + 1.e-5;
+        assert(val_inv >= 1.e-5);
+
+        val[l] = 1. / (val_inv * 9.869233e-16 / 1e-3);
     }
 }
 
@@ -695,10 +703,10 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
     vis_v << "window_size 900 800\n";//800 250
     vis_v << "window_title 'vertex space unknown'\n";
     vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
-    if (range_max > range_min)
-    {
-        vis_v << "valuerange " << range_min << " " << range_max << "\n";
-    }
+//    if (range_max > range_min)
+//    {
+//        vis_v << "valuerange " << range_min << " " << range_max << "\n";
+//    }
 
     if (pmesh_->SpaceDimension() == 2)
     {
@@ -898,6 +906,32 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
     }
 
     InitGraph();
+
+    // coeff visual
+//    {
+//        mfem::Array<int> vertices;
+//        for (int i = 0; i < pmesh_->GetNE(); ++i)
+//        {
+//            pmesh_->GetElement(i)->GetVertices(vertices);
+//            mfem::Vector center(nDimensions);
+//            center = 0.0;
+//            for (int index = 0; index < nDimensions; ++index)
+//            {
+//                for (auto& vertex : vertices)
+//                {
+//                    center[index] += pmesh_->GetVertex(vertex)[index];
+//                }
+//                center[index] /= vertices.Size();
+//            }
+//            (*coeff_gf_)[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).InvNorm2(center)*std::sqrt(2.);
+//        }
+
+//        mfem::socketstream soc;
+//        VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+//        std::cout<<"max min = "<<coeff_gf_->Max()<<" "<<coeff_gf_->Min()<<"\n";
+//    }
+
+
     ComputeGraphWeight(unit_weight);
     MakeRHS();
 }
@@ -917,9 +951,9 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
 
     // SPE10 grid cell sizes
     mfem::Vector h(3);
-    h(0) = 20.0;
-    h(1) = 10.0;
-    h(2) = 2.0;
+    h(0) = 365.76 / 60.; // 20.0;
+    h(1) = 670.56 / 220.; // 10.0;
+    h(2) = 51.816 / 85.; // 2.0;
 
     const int Lx = N[0] * h(0);
     const int Ly = N[1] * h(1);
@@ -944,10 +978,15 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     {
         mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
         pmesh_ = MakeParMesh(mesh, metis_partition);
+
         return;
     }
     mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
     pmesh_ = MakeParMesh(mesh, metis_partition);
+
+    // visualize coefficient norm
+//        kinv_scalar_ = make_unique<mfem::FunctionCoefficient>(  ((IPC&)(*kinv_vector_)).InvNorm2   );
+
 }
 
 unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)

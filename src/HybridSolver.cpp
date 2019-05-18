@@ -683,7 +683,7 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
 {
     if (diagonal_scaling_.Size() == 0)
     {
-        mfem::HypreSmoother prec_scale(const_cast<mfem::HypreParMatrix&>(H));
+        mfem::HypreDiagScale prec_scale(const_cast<mfem::HypreParMatrix&>(H));
 
         mfem::Vector zeros(H.Height());
         zeros = 1e-8;
@@ -692,8 +692,8 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
 
         mfem::CGSolver cg_scale(comm_);
         cg_scale.SetMaxIter(rescale_iter_);
-        cg_scale.SetPreconditioner(prec_scale);
         cg_scale.SetOperator(H);
+        cg_scale.SetPreconditioner(prec_scale);
         cg_scale.Mult(zeros, diagonal_scaling_);
     }
 
