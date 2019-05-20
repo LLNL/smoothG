@@ -983,10 +983,6 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     }
     mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
     pmesh_ = MakeParMesh(mesh, metis_partition);
-
-    // visualize coefficient norm
-//        kinv_scalar_ = make_unique<mfem::FunctionCoefficient>(  ((IPC&)(*kinv_vector_)).InvNorm2   );
-
 }
 
 unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
