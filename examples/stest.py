@@ -105,7 +105,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0312444586906591e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.14743131732550618,
           "finest-u-error": 0.22621045683612057,
           "operator-complexity": 1.0221724964280585}]
@@ -116,7 +116,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "4",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0336350399372878e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.05516198497834629,
           "finest-u-error": 0.052317636963252999,
           "operator-complexity": 1.3017591339648173}]
@@ -128,7 +128,7 @@ def make_tests():
           "--max-evects", "4",
           "--hybridization",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.3301680521537587e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055161984984368362,
           "finest-u-error": 0.052317636981330032,
           "operator-complexity": 1.1362437864707153}]
@@ -139,7 +139,7 @@ def make_tests():
           "--slice", "19",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.2837519341678676e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
           "operator-complexity": 1.0221724964280585}]
@@ -175,7 +175,7 @@ def make_tests():
           "--max-evects", "4",
           "--dual-target",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2049690562060094e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055207481027916193,
           "finest-u-error": 0.06430185063505546,
           "operator-complexity": 1.3017591339648173}]
@@ -188,7 +188,7 @@ def make_tests():
           "--dual-target",
           "--scaled-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.9821133537907875e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055054636384856817,
           "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
@@ -201,7 +201,7 @@ def make_tests():
           "--dual-target",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2032854597960414e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055279347333696799,
           "finest-u-error": 0.068336534035533678,
           "operator-complexity": 1.3017591339648173}]
@@ -215,7 +215,7 @@ def make_tests():
           "--scaled-dual",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2079666982238907e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055052992284074398,
           "finest-u-error": 0.035336370431801843,
           "operator-complexity": 1.3017591339648173}]
@@ -447,7 +447,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0312444586906591e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.14743131732550618,
           "finest-u-error": 0.22621045683612057,
           "operator-complexity": 1.0221724964280585}]
@@ -458,7 +458,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "4",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0336350399372878e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.05516198497834629,
           "finest-u-error": 0.052317636963252999,
           "operator-complexity": 1.3017591339648173}]
@@ -470,7 +470,7 @@ def make_tests():
           "--max-evects", "4",
           "--hybridization",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.3301680521537587e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055161984984368362,
           "finest-u-error": 0.052317636981330032,
           "operator-complexity": 1.1362437864707153}]
@@ -481,7 +481,7 @@ def make_tests():
           "--slice", "19",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.2837519341678676e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
           "operator-complexity": 1.0221724964280585}]
@@ -493,7 +493,7 @@ def make_tests():
           "--max-evects", "4",
           "--dual-target",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2049690562060094e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055207481027916193,
           "finest-u-error": 0.06430185063505546,
           "operator-complexity": 1.3017591339648173}]
@@ -506,7 +506,7 @@ def make_tests():
           "--dual-target",
           "--scaled-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.9821133537907875e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055054636384856817,
           "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
@@ -519,7 +519,7 @@ def make_tests():
           "--dual-target",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2032854597960414e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055279347333696799,
           "finest-u-error": 0.068336534035533678,
           "operator-complexity": 1.3017591339648173}]
@@ -533,7 +533,7 @@ def make_tests():
           "--scaled-dual",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2079666982238907e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055052992284074398,
           "finest-u-error": 0.035336370431801843,
           "operator-complexity": 1.3017591339648173}]
