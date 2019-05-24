@@ -604,7 +604,7 @@ def make_tests():
          {"finest-div-error": 0.1438138616203242,
           "finest-p-error": 0.1874559440644907,
           "finest-u-error": 0.25470044682041143,
-          "operator-complexity": 1.2292477075229247}]
+          "operator-complexity": (1.229388, 3.e-4)}]
 
     tests["parsamplegraph4-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -643,7 +643,7 @@ def make_tests():
          {"finest-div-error": 0.19793206480307649,
           "finest-p-error": 0.28945297307624301,
           "finest-u-error": 0.29617987947507896,
-          "operator-complexity": 1.1895581044189558}]
+          "operator-complexity": (1.189778, 3.e-4)}]
 
     tests["pargraph-usegenerator-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
