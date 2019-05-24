@@ -36,7 +36,7 @@ memorycheck_command = "@MEMORYCHECK_COMMAND@"
 
 # Test paramaters
 num_procs = "@SMOOTHG_TEST_PROCS@"
-test_tol = float("@SMOOTHG_TEST_TOL@")
+default_test_tol = float("@SMOOTHG_TEST_TOL@")
 
 def run_test(command, expected={}, verbose=False):
     """ Executes test
@@ -66,10 +66,19 @@ def run_test(command, expected={}, verbose=False):
 
     output = readjson.json_parse_lines(stdout.splitlines())
 
-    for key, expected_val in expected.items():
+    for key, expected_valpair in expected.items():
         test_val = output[key]
 
-        if abs(float(expected_val) - float(test_val)) > test_tol:
+        try:
+            expected_val = expected_valpair[0]
+            test_tol = expected_valpair[1]
+        except TypeError:
+            expected_val = expected_valpair
+            test_tol = default_test_tol
+        fexpected = float(expected_val)
+        ftest = float(test_val)
+        if abs(fexpected - ftest) > test_tol:
+            print("test {0:s} failed, expected {1:f}, got {2:f}\n".format(key, fexpected, ftest))
             return False
 
     return True
