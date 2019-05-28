@@ -396,6 +396,14 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
     }
 }
 
+void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
+{
+    for (int i = 0; i < vec.Size(); i++)
+    {
+        vec[i] /= scaling[i];
+    }
+}
+
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el)
 {
     const int el0 = 0;
@@ -482,6 +490,57 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat)
     }
 
     return cols;
+}
+
+mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
+                                    const mfem::HypreParMatrix& entity_trueentity_entity)
+{
+    mfem::SparseMatrix entity_is_shared, diag, offd;
+    HYPRE_Int* colmap;
+    entity_trueentity_entity.GetOffd(entity_is_shared, colmap);
+    entity_trueentity.GetDiag(diag);
+    entity_trueentity.GetOffd(offd, colmap);
+    const HYPRE_Int entity_start = entity_trueentity.GetRowStarts()[0];
+
+    std::vector<int> sharedentity_to_entity;
+    sharedentity_to_entity.reserve(entity_is_shared.NumNonZeroElems());
+
+
+    std::map<int, int> trueentity_map;
+    for (int entity = 0; entity < entity_trueentity.NumRows(); ++entity)
+    {
+        if (entity_is_shared.RowSize(entity))
+        {
+            sharedentity_to_entity.push_back(entity);
+
+            if (diag.RowSize(entity)) // entity is owned
+            {
+                assert(diag.RowSize(entity) == 1);
+                trueentity_map[diag.GetRowColumns(entity)[0] + entity_start] = entity;
+            }
+            else
+            {
+                assert(offd.RowSize(entity) == 1);
+                trueentity_map[colmap[offd.GetRowColumns(entity)[0]]] = entity;
+            }
+        }
+    }
+
+    mfem::SparseMatrix entity_reorder_map(entity_trueentity.NumRows());
+
+    int count = 0;
+    auto it = trueentity_map.begin();
+    for (int entity = 0; entity < entity_trueentity.NumRows(); ++entity)
+    {
+        bool is_shared = entity_is_shared.RowSize(entity);
+        int row = is_shared ? sharedentity_to_entity[count++] : entity;
+        int col = is_shared ? (it++)->second : entity;
+        entity_reorder_map.Add(row, col, 1.0);
+    }
+
+    entity_reorder_map.Finalize();
+
+    return entity_reorder_map;
 }
 
 } // namespace smoothg
