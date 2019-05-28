@@ -718,9 +718,9 @@ def make_tests():
           "--shared-samples", "18",
           "--choose-samples", "0",
           "--seed", "1"],
-         {"coarse-variance":0.00016563124437545969,
-          "correction-variance":3.6669929731798261e-05,
-          "mlmc-estimate":-0.0075878586626547968}]
+         {"coarse-variance":0.00019821590592782775,
+          "correction-variance":5.532948306092317e-05,
+          "mlmc-estimate":-0.0059401689449150533}]
 
     tests["qoi-hb"] = \
         [["./qoi",
@@ -732,9 +732,9 @@ def make_tests():
           "--choose-samples", "0",
           "--hybridization",
           "--seed", "1"],
-         {"coarse-variance":0.00016563124437545969,
-          "correction-variance":3.6669929731798261e-05,
-          "mlmc-estimate":-0.0075878586626547968}]
+         {"coarse-variance":0.00019821590592782775,
+          "correction-variance":5.532948306092317e-05,
+          "mlmc-estimate":-0.0059401689449150533}]
 
     tests["qoi-one-level"] = \
         [["./qoi",

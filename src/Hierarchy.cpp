@@ -108,6 +108,7 @@ void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& 
 mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
 {
     mfem::BlockVector y(BlockOffsets(level));
+    y = 0.0;
     Solve(level, x, y);
     return y;
 }
@@ -121,6 +122,7 @@ void Hierarchy::Solve(int level, const mfem::Vector& x, mfem::Vector& y) const
 mfem::Vector Hierarchy::Solve(int level, const mfem::Vector& x) const
 {
     mfem::Vector y(GetMatrix(level).NumVDofs());
+    y = 0.0;
     Solve(level, x, y);
     return y;
 }
@@ -413,7 +415,7 @@ void Hierarchy::Debug_tests(int level) const
     const mfem::SparseMatrix& D = GetMatrix(level).GetD();
 
     mfem::Vector random_vec(Proj_sigma_[level].Height());
-    random_vec.Randomize();
+    random_vec.Randomize(myid_);
 
     const double error_tolerance = 5e-10;
 
@@ -423,16 +425,15 @@ void Hierarchy::Debug_tests(int level) const
     Proj_sigma_[level].Mult(Psigma_rand, out);
 
     out -= random_vec;
-    double diff = out.Norml2();
+    double diff = mfem::ParNormlp(out, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
     if (diff >= error_tolerance)
     {
-        std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || = " << diff
-                  << "\nEdge projection operator is not a projection!\n";
+        std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || / || rand || = " << diff
+                  << "\nWarning: Edge projection operator is not a projection!\n";
     }
-    assert(diff < error_tolerance);
 
     random_vec.SetSize(Psigma_[level].Height());
-    random_vec.Randomize();
+    random_vec.Randomize(myid_);
 
     // Compute D * pi_sigma * random vector
     mfem::Vector D_pi_sigma_rand(D.Height());
@@ -454,13 +455,12 @@ void Hierarchy::Debug_tests(int level) const
     }
 
     pi_u_D_rand -= D_pi_sigma_rand;
-    diff = pi_u_D_rand.Norml2();
+    diff = mfem::ParNormlp(pi_u_D_rand, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
     if (diff >= error_tolerance)
     {
-        std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || = " << diff
-                  << "\nCommutativity does not hold!\n";
+        std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || / || rand || = "
+                  << diff << "\nWarning: commutativity does not hold!\n";
     }
-    assert(diff < error_tolerance);
 }
 
 } // namespace smoothg
