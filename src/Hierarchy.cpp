@@ -522,6 +522,7 @@ void Hierarchy::Debug_tests(int level) const
 
     out -= random_vec;
     double diff = mfem::ParNormlp(out, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
+
     if (myid_ == 0 && diff >= error_tolerance)
     {
         std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || / || rand || = " << diff
@@ -552,6 +553,7 @@ void Hierarchy::Debug_tests(int level) const
 
     pi_u_D_rand -= D_pi_sigma_rand;
     diff = mfem::ParNormlp(pi_u_D_rand, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
+
     if (myid_ == 0 && diff >= error_tolerance)
     {
         std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || / || rand || = "

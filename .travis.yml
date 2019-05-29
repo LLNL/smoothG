@@ -165,7 +165,7 @@ script:
        -DMETIS_DIR="/home/travis/build/LLNL/metis-install" \
        -DUSE_ARPACK=OFF -DCMAKE_BUILD_TYPE=Debug \
        -DSPE10_PERM="/home/travis/build/LLNL/spe10-install/spe_perm.dat" \
-       -DSMOOTHG_TEST_PROCS=2 -DSMOOTHG_TEST_TOL="1e-2" ..;
+       -DSMOOTHG_TEST_PROCS=2 ..;
 
    # Build the library
    - make -j3
