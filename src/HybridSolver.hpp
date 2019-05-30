@@ -240,17 +240,16 @@ private:
 };
 
 
-/// assuming symmetric problems
+/// Auxiliary space preconditioner, smoother is block Jacobi (on each edge)
 class AuxSpacePrec : public mfem::Solver
 {
 public:
-    /// dofs are in true dofs numbering, coarse_map: coarse to fine
+    /// dofs are in true dofs numbering, aux_map: map to span of PV vectors
     AuxSpacePrec(mfem::HypreParMatrix& op, mfem::SparseMatrix aux_map,
                  const std::vector<mfem::Array<int>>& loc_dofs);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
     virtual void SetOperator(const mfem::Operator& op) {}
-
 private:
 
     void Smoothing(const mfem::Vector& x, mfem::Vector& y) const;
