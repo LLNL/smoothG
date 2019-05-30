@@ -115,7 +115,7 @@ void NonlinearSolver::UpdateLinearSolveTol()
     }
     else // NonlinearResidual
     {
-        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
+//        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
         double ref_norm = solve_type_ == Newton ? prev_resid_norm_ : rhs_norm_;
         tol = std::pow(resid_norm_ / ref_norm, 1.0);
     }
@@ -225,8 +225,8 @@ void NonlinearMG::FAS_Cycle(int level)
             Interpolate(level + 1, coarse_sol, help_[level]);
             sol_[level] -= help_[level];
 
-            BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
-                         sol_[level], help_[level]);
+//            BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
+//                         sol_[level], help_[level]);
 
 //            {
 //                Mult(level, sol_[level], help_[level]);

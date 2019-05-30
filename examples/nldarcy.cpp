@@ -42,9 +42,10 @@ public:
        @todo take Kappa(p) as input
     */
     LevelSolver(Hierarchy& hierarchy, int level,
-                mfem::Vector Z_vector, SolveType solve_type);
+                mfem::Vector Z_vector, SolveType solve_type,
+                mfem::BlockVector b);
 
-    // Compute Ax = A(x).
+    // Compute Ax = A(x) - b.
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax);
 
     double GetLinearResidualNorm() const { return linear_resid_norm_; }
@@ -52,6 +53,7 @@ public:
     void BackTracking(const mfem::Vector &rhs,  double prev_resid_norm,
                       mfem::Vector& x, mfem::Vector& dx);
 
+    const mfem::BlockVector& Get_b() const { return b_; }
 private:
     void EvalCoef(const mfem::Vector& sol_block1);
     void EvalCoefDerivative(const mfem::Vector& sol_block1);
@@ -80,6 +82,8 @@ private:
 
     std::vector<mfem::DenseMatrix> dMdp_;
     mfem::Vector Z_vector_;
+
+    const mfem::BlockVector b_; // the vector in A(x) - b = 0
 };
 
 // nonlinear elliptic hierarchy
@@ -87,11 +91,14 @@ class EllipticNLMG : public NonlinearMG
 {
 public:
     EllipticNLMG(Hierarchy& hierarchy_, const mfem::Vector& Z_fine,
-                 Cycle cycle, SolveType solve_type);
+                 Cycle cycle, SolveType solve_type, mfem::BlockVector b);
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     {
         NonlinearSolver::Solve(rhs, sol);
     }
+
+
+    LevelSolver& GetLevelSolver(int level) { return solvers_[level]; }
 
 private:
     virtual void Mult(int level, const mfem::Vector& x, mfem::Vector& Ax);
@@ -149,11 +156,12 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     upscale_param.spect_tol = 1.0;
+    upscale_param.hybridization = true;
     mfem::OptionsParser args(argc, argv);
     const char* problem_name = "spe10";
     args.AddOption(&problem_name, "-mp", "--model-problem",
                    "Model problem (spe10, egg, lognormal, richard)");
-    const char* perm_file = "spe_perm.dat";
+    const char* perm_file = "spe_perm_rescaled.dat";
     args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
     int dim = 2;
     args.AddOption(&dim, "-d", "--dim",
@@ -212,6 +220,7 @@ int main(int argc, char* argv[])
     }
     else if (problem == "egg")
     {
+        ess_attr[2] = 1;
         fv_problem.reset(new EggModel(num_sr, num_pr, ess_attr));
         alpha = 3.;//-5e-1;
     }
@@ -267,24 +276,50 @@ int main(int argc, char* argv[])
         hierarchy.SetAbsTol(1e-15);
     }
 
+    mfem::BlockVector b(hierarchy.GetMatrix(0).BlockOffsets());
+//    if (problem != "lognormal")
+    {
+        b.GetBlock(0) = fv_problem->GetEdgeRHS();
+        b.GetBlock(1) = fv_problem->GetVertexRHS();
+    }
+//    else
+//    {
+//        b.GetBlock(0) = 0.0;
+//        b.GetBlock(1) = -fv_problem->CellVolume();
+//    }
+
     mfem::BlockVector rhs(hierarchy.GetMatrix(0).BlockOffsets());
-    if (problem == "richard" || problem == "spe10")
-    {
-        rhs.GetBlock(0) = fv_problem->GetEdgeRHS();
-        rhs.GetBlock(1) = fv_problem->GetVertexRHS();
-    }
-    else
-    {
-        rhs.GetBlock(0) = 0.0;
-        rhs.GetBlock(1) = -fv_problem->CellVolume();
-    }
+    rhs = 0.0;
 
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
-    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard);
+    mfem::BlockVector sol_nlmg2(rhs);
+    sol_nlmg2 = 0.0;
+
+    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
     nlmg.SetPrintLevel(1);
     nlmg.SetMaxIter(300);
     nlmg.Solve(rhs, sol_nlmg);
+
+//    auto coarse_rhs = hierarchy.Restrict(0, rhs);
+//    mfem::BlockVector coarse_sol(coarse_rhs);
+
+//    LevelSolver& level_solver = nlmg.GetLevelSolver(1);
+//    level_solver.SetPrintLevel(1);
+//    level_solver.SetMaxIter(30);
+//    level_solver.Solve(coarse_rhs, coarse_sol);
+
+//    sol_nlmg = hierarchy.Interpolate(1, coarse_sol);
+//    auto sol_pwc = hierarchy.PWConstProject(1, coarse_sol.GetBlock(1));
+//    hierarchy.GetAggVert(0).MultTranspose(sol_pwc, sol_nlmg.GetBlock(1));
+
+
+//    sol_nlmg2 -= sol_nlmg;
+//    double diff = mfem::ParNormlp(sol_nlmg2.GetBlock(1), 2, comm);
+//    double norm = mfem::ParNormlp(sol_nlmg.GetBlock(1), 2, comm);
+
+//    if (myid ==0)
+//    std::cout<<"|| sol - sol_c || = "<<diff/norm<<"\n";
 
     if (visualization)
     {
@@ -303,16 +338,16 @@ int main(int argc, char* argv[])
 }
 
 /// @todo take MixedMatrix only
-LevelSolver::LevelSolver(Hierarchy& hierarchy, int level,
-                         mfem::Vector Z_vector, SolveType solve_type)
+LevelSolver::LevelSolver(Hierarchy& hierarchy, int level, mfem::Vector Z_vector,
+                         SolveType solve_type, mfem::BlockVector b)
     : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2],
                       solve_type, solve_type == Picard ? "Picard" : "Newton"),
       level_(level), hierarchy_(hierarchy), offsets_(hierarchy_.BlockOffsets(level)),
       p_(hierarchy_.NumVertices(level)), kp_(p_.Size()), dkinv_dp_(p_.Size()),
-      Z_vector_(std::move(Z_vector))
+      Z_vector_(std::move(Z_vector)), b_(std::move(b))
 {
     hierarchy_.SetPrintLevel(level_, 0);
-    hierarchy_.SetAbsTol(level_, 0);
+//    hierarchy_.SetAbsTol(level_, 0);
     hierarchy_.SetMaxIter(level_, 200);
 }
 
@@ -334,6 +369,7 @@ void LevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
         kp_ = 1.0;
         hierarchy_.GetMatrix(level_).Mult(kp_, block_x, block_Ax);
     }
+    block_Ax -= b_;
 }
 
 mfem::Vector LevelSolver::AssembleTrueVector(const mfem::Vector& vec) const
@@ -394,7 +430,10 @@ void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
     mfem::BlockVector delta_x(x);
     prev_resid_norm_ = ResidualNorm(x, rhs);
 
-    hierarchy_.Solve(level_, rhs, x);
+    mfem::BlockVector rhs_plus_b(rhs);
+    rhs_plus_b += b_;
+
+    hierarchy_.Solve(level_, rhs_plus_b, x);
 
     delta_x -= x;
 
@@ -439,7 +478,7 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
                                mfem::Vector& x, mfem::Vector& dx)
 {
-    int k = 0, k_max = 4;
+    int k = 0, k_max = 0;
     resid_norm_ = ResidualNorm(x, rhs);
 
     while (resid_norm_ > prev_resid_norm && k < k_max)
@@ -555,7 +594,7 @@ void LevelSolver::Build_dMdp(const mfem::BlockVector& iterate)
 }
 
 EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
-                           Cycle cycle, SolveType solve_type)
+                           Cycle cycle, SolveType solve_type, mfem::BlockVector b)
     : NonlinearMG(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2],
                   hierarchy.NumLevels(), solve_type, cycle),
       hierarchy_(hierarchy)
@@ -564,7 +603,7 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
     solvers_.reserve(num_levels_);
     for (int level = 0; level < num_levels_; ++level)
     {
-        mfem::Vector Z_vec;
+        mfem::Vector Z_l;
         if (Z_fine.Size())
         {
             if (level == 0)
@@ -575,7 +614,7 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
             {
                 help[level] = hierarchy.Project(level - 1, help[level - 1]);
             }
-            Z_vec = hierarchy.PWConstProject(level, help[level]);
+            Z_l = hierarchy.PWConstProject(level, help[level]);
         }
 
         if (level > 0)
@@ -588,9 +627,19 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
         help_[level].SetSize(LevelSize(level));
         help_[level] = 0.0;
 
-        solvers_.emplace_back(hierarchy_, level, std::move(Z_vec), solve_type);
-        solvers_[level].SetPrintLevel(1);
+        if (level == 0)
+        {
+            solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type, std::move(b));
+        }
+        else
+        {
+            mfem::BlockVector b_l = hierarchy.Restrict(level - 1, solvers_[level - 1].Get_b());
+            solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type, std::move(b_l));
+        }
+        solvers_[level].SetPrintLevel(-1);
         solvers_[level].SetMaxIter(1);
+//        if (level == num_levels_-1)
+//             solvers_[level].SetMaxIter(20);
     }
 }
 
@@ -656,6 +705,7 @@ void Kappa(const mfem::Vector& p, mfem::Vector& kp)
     assert(kp.Size() == p.Size());
     for (int i = 0; i < p.Size(); i++)
     {
+//        assert(p[i] >= 0.0);
         kp[i] = std::exp(alpha * p[i]);
         assert(kp[i] > 0.0);
     }

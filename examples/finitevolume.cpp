@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
+    const char* permFile = "spe_perm_rescaled.dat";
     args.AddOption(&permFile, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
     sa_param.first_theta = 1e-3;
 //    sa_param.do_aggregates = false;
 
-    upscale_param.saamge_param = &sa_param;
+//    upscale_param.saamge_param = &sa_param;
 
     mfem::Array<int> coarsening_factors(nDimensions);
     if (metis_agglomeration)
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        coarsening_factors = 10;
+        coarsening_factors = 20;
         coarsening_factors.Last() = nDimensions == 3 ? 2 : 10;
     }
 

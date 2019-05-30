@@ -348,7 +348,7 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
     const int nvertices = vert_vert.Height();
     int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
     num_partitions = std::max(1, num_partitions);
-    Partition(vert_vert, partitioning, num_partitions, false);
+    Partition(vert_vert, partitioning, num_partitions, true);
 }
 
 } // namespace smoothg

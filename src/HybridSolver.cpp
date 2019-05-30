@@ -383,8 +383,14 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     mfem::Array<int> col_marker(mgL_.GetD().NumCols());
     col_marker = -1;
 
+    const int scaling_size = rescale_iter_ < 0 ? H_proc.NumRows() : 0;
+    mfem::Vector CCT_diag(scaling_size), CDT1(scaling_size);
+    CCT_diag = 0.0;
+    CDT1 = 0.0;
+
     mfem::DenseMatrix DlocT, Aloc, CMinv, CMinvN, DMinvCT, CMDADMC;
     mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
+    mfem::Vector one;
 
     mfem::DenseMatrixInverse Aloc_solver;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
@@ -469,6 +475,44 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         // Add contribution of the element matrix to the global system
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, Hybrid_el_[iAgg]);
+
+        // Save CCT and CDT1
+        if (scaling_size > 0)
+        {
+            mfem::SparseMatrix ClocT = smoothg::Transpose(C_[iAgg]);
+            mfem::SparseMatrix CCT = smoothg::Mult(C_[iAgg], ClocT);
+            mfem::Vector CCT_diag_local;
+            CCT.GetDiag(CCT_diag_local);
+
+            const_rep_->GetSubVector(local_vertexdof, one);
+            mfem::Vector DTone(nlocal_edgedof);
+            Dloc.MultTranspose(one, DTone);
+
+            mfem::Vector CDT1_local(nlocal_multiplier);
+            C_[iAgg].Mult(DTone, CDT1_local);
+
+            for (int i = 0; i < nlocal_multiplier; ++i)
+            {
+                CCT_diag[local_multiplier[i]] += CCT_diag_local[i];
+                CDT1[local_multiplier[i]] += CDT1_local[i];
+            }
+        }
+    }
+
+    // Assemble global rescaling vector (CC^T)^{-1}CD^T 1
+    if (scaling_size)
+    {
+        mfem::Vector CCT_diag_global(multiplier_d_td_->NumCols());
+        multiplier_td_d_->Mult(CCT_diag, CCT_diag_global);
+
+        mfem::Vector CDT1_global(multiplier_d_td_->NumCols());
+        multiplier_td_d_->Mult(CDT1, CDT1_global);
+
+        diagonal_scaling_.SetSize(multiplier_d_td_->NumCols());
+        for (int i = 0; i < diagonal_scaling_.Size(); ++i)
+        {
+            diagonal_scaling_[i] = CDT1_global[i] / CCT_diag_global[i];
+        }
     }
 
     return H_proc;

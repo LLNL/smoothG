@@ -173,6 +173,8 @@ public:
 
     void DumpDebug(const std::string& prefix) const;
 
+    const mfem::SparseMatrix& GetAggVert(int level) const { return agg_vert[level]; }
+
 private:
     void Coarsen(int level, const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning);
