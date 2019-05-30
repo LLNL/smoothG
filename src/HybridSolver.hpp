@@ -181,14 +181,11 @@ private:
     mfem::Vector MakeInitialGuess(const mfem::BlockVector& sol,
                                   const mfem::BlockVector& rhs) const;
 
+    const MixedMatrix& mgL_;
+
     mfem::SparseMatrix Agg_multiplier_;
-    mfem::SparseMatrix Agg_vertexdof_;
-    mfem::SparseMatrix Agg_edgedof_;
 
     mfem::Array<int> edgedof_is_shared_;
-
-    const mfem::SparseMatrix& D_;
-    const mfem::SparseMatrix& W_;
 
     std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
@@ -229,7 +226,6 @@ private:
     mutable mfem::Vector Mu_;
 
     int nAggs_;
-    int num_edge_dofs_;
     int num_multiplier_dofs_;
 
     int rescale_iter_;
@@ -241,6 +237,32 @@ private:
     saamge::agg_partitioning_relations_t* sa_apr_;
     saamge::ml_data_t* sa_ml_data_;
 #endif
+};
+
+
+/// assuming symmetric problems
+class AuxSpacePrec : public mfem::Solver
+{
+public:
+    /// dofs are in true dofs numbering, coarse_map: coarse to fine
+    AuxSpacePrec(mfem::HypreParMatrix& op, mfem::SparseMatrix aux_map,
+                 const std::vector<mfem::Array<int>>& loc_dofs);
+
+    virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
+    virtual void SetOperator(const mfem::Operator& op) {}
+
+private:
+
+    void Smoothing(const mfem::Vector& x, mfem::Vector& y) const;
+    std::vector<mfem::Array<int>> local_dofs_;
+    std::vector<mfem::DenseMatrix> local_ops_;
+    std::vector<mfem::DenseMatrix> local_solvers_;
+
+    mfem::HypreParMatrix& op_;
+    mfem::SparseMatrix op_diag_;
+    mfem::SparseMatrix aux_map_;
+    std::unique_ptr<mfem::HypreParMatrix> aux_op_;
+    std::unique_ptr<mfem::HypreBoomerAMG> aux_solver_;
 };
 
 } // namespace smoothg

@@ -1026,7 +1026,7 @@ void SPE10Problem::MakeRHS()
     {
         mfem::Array<int> nat_negative_one(ess_attr_.Size());
         nat_negative_one = 0;
-        nat_negative_one[pmesh_->Dimension() == 2 ? 0 : 1] = 1;
+        nat_negative_one[pmesh_->Dimension() - 2] = 1;
 
         mfem::ConstantCoefficient negative_one(1.0);
         mfem::RestrictedCoefficient pinflow_coeff(negative_one, nat_negative_one);

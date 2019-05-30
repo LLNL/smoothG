@@ -99,14 +99,8 @@ void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
     if (param.hybridization & level) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
-//        SAAMGeParam saamge_param;
-//        saamge_param.first_coarsen_factor = 12;
-//        saamge_param.num_levels = 3;
-//        saamge_param.first_theta = 1e-4;
-//        saamge_param.do_aggregates = false;
-//        SAAMGeParam* sa_param = (level == 1) ? &saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
-                                               level ? 5 : 0, sa_param));
+                                               param.rescale_iter, sa_param));
     }
     else // L2-H1 block diagonal preconditioner
     {

@@ -67,6 +67,7 @@ struct SAAMGeParam
    @param trace_method methods for getting edge trace samples
    @param hybridization use hybridization as solver
    @param coefficient use coarse coefficient rescaling construction
+   @param rescale_iter number of iteration to compute scaling in hybridization
    @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
           coarse hybridized system if saamge_param is not nullptr
 */
@@ -82,6 +83,7 @@ public:
     bool hybridization;
     bool coarse_components;
     int coarse_factor;
+    int rescale_iter;
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
 
@@ -94,6 +96,7 @@ public:
         hybridization(false),
         coarse_components(false),
         coarse_factor(64),
+        rescale_iter(-1),
         saamge_param(NULL)
     {}
 
@@ -117,6 +120,8 @@ public:
                        "--no-coarse-components", "Store trace, bubble components of coarse M.");
         args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
                        "Coarsening factor for metis agglomeration.");
+        args.AddOption(&rescale_iter, "--rescale-iter", "--rescale-iter",
+                       "Number of iteration to compute rescale vector in hybridization.");
     }
 };
 
