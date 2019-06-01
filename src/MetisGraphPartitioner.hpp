@@ -125,10 +125,12 @@ private:
 };
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
-               int num_parts, bool use_edge_weight = false);
+               int num_parts, bool use_edge_weight = false,
+               const mfem::Array<int>& iso_verts = mfem::Array<int>());
 
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
-                  mfem::Array<int>& partitioning, int coarsening_factor);
+                  mfem::Array<int>& partitioning, int coarsening_factor,
+                  const mfem::Array<int>& iso_verts = mfem::Array<int>());
 
 } // namespace smoothg
 

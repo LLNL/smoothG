@@ -225,8 +225,8 @@ void NonlinearMG::FAS_Cycle(int level)
             Interpolate(level + 1, coarse_sol, help_[level]);
             sol_[level] -= help_[level];
 
-//            BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
-//                         sol_[level], help_[level]);
+            BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
+                         sol_[level], help_[level]);
 
 //            {
 //                Mult(level, sol_[level], help_[level]);

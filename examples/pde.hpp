@@ -257,7 +257,7 @@ void InversePermeabilityCoefficient::InversePermeability(const mfem::Vector& x,
     {
         val[l] = inverse_permeability_[offset + N_all_ * l];
 
-//        val[l] *= 1e-3; // viscosoity unit
+        val[l] *= 1e-3; // viscosoity unit
 
 //        val_inv = 1. / val[l];
 //        double k_min(0.0022715), k_max(2e4);
@@ -536,6 +536,14 @@ public:
         assert(pmesh_);
         return pmesh_->GetElementVolume(0); // assumed uniform mesh
     }
+
+    InversePermeabilityCoefficient& GetCoeff() { return (InversePermeabilityCoefficient&)(*kinv_vector_); }
+
+    const mfem::ParMesh& GetMesh() const { return *pmesh_; }
+
+    mfem::GridFunction& GetGF() const { return *coeff_gf_; }
+
+
 
     /// Save mesh with partitioning information (GLVis can separate partitions)
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
@@ -823,7 +831,26 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
     for (const auto factor : coarsening_factor)
         metis_coarsening_factor *= factor;
 
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
+    mfem::Array<int> nat_attr(ess_attr_.Size()), nat_edges_marker, iso_verts_marker;
+    for (int i = 0; i < ess_attr_.Size(); ++i)
+    {
+        nat_attr[i] = 1 - ess_attr_[i];
+    }
+    BooleanMult(edge_bdratt_, nat_attr, nat_edges_marker);
+    BooleanMult(vertex_edge_, nat_edges_marker, iso_verts_marker);
+
+    mfem::Array<int> iso_verts(iso_verts_marker.Sum());
+    assert(nat_edges_marker.Sum() == iso_verts.Size());
+    int iso_vert_count = 0;
+    for (int i = 0; i < iso_verts_marker.Size(); ++i)
+    {
+        if (iso_verts_marker[i])
+        {
+            iso_verts[iso_vert_count++] = i;
+        }
+    }
+
+    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor, iso_verts);
 }
 
 void DarcyProblem::Partition(bool metis_parition,
@@ -1166,6 +1193,13 @@ private:
     void SetupCoeff();
 };
 
+void VelocityEgg(const mfem::Vector& x, mfem::Vector& out)
+{
+    out.SetSize(x.Size());
+    out = 0.0;
+    out[0] = 1000.0;
+}
+
 EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess_attr)
     : DarcyProblem(MPI_COMM_WORLD, 3, ess_attr)
 {
@@ -1175,28 +1209,58 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
     SetupCoeff();
     ComputeGraphWeight();
 
-    if (ess_attr_.Find(0) == -1) // Neumann condition on whole boundary
-    {
-        rhs_sigma_ = 0.0;
-        rhs_u_ = -1.0 * CellVolume();
-    }
-    else
-    {
-        mfem::Array<int> nat_one(ess_attr_.Size());
-        nat_one = 0;
-        nat_one[0] = 1;
+//    if (ess_attr_.Find(0) == -1) // Neumann condition on whole boundary
+//    {
+//        rhs_sigma_ = 0.0;
+//        rhs_u_ = -1.0 * CellVolume();
+//    }
+//    else
+//    {
+////        mfem::Array<int> nat_one(ess_attr_.Size());
+////        nat_one = 0;
+////        nat_one[0] = 1;
 
-        mfem::ConstantCoefficient one(1.0);
-        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
+////        mfem::ConstantCoefficient one(1.0);
+////        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
 
-        mfem::LinearForm g(sigma_fes_.get());
-        g.AddBoundaryIntegrator(
-            new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
-        g.Assemble();
-        rhs_sigma_ = g;
+////        mfem::LinearForm g(sigma_fes_.get());
+////        g.AddBoundaryIntegrator(
+////            new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
 
-        rhs_u_ = 0.0;
-    }
+
+
+////        mfem::Array<int> nat_negative_one(ess_attr_.Size());
+////        nat_negative_one = 0;
+////        nat_negative_one[1] = 1;
+
+////        mfem::ConstantCoefficient negative_one(-1.0);
+////        mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
+////        g.AddBoundaryIntegrator(
+////                    new mfem::VectorFEBoundaryFluxLFIntegrator(poutflow_coeff));
+
+//        g.Assemble();
+//        rhs_sigma_ = g;
+
+//        rhs_u_ = 0.0;
+//    }
+
+            mfem::Array<int> nat_one(ess_attr_.Size());
+            nat_one = 0;
+            nat_one[0] = 1;
+
+
+    mfem::ParMixedBilinearForm bVarf(sigma_fes_.get(), u_fes_.get());
+    bVarf.AddDomainIntegrator(new mfem::VectorFEDivergenceIntegrator);
+    bVarf.Assemble();
+    bVarf.Finalize();
+
+    mfem::ParGridFunction flux_gf(sigma_fes_.get());
+    flux_gf = 0.0;
+
+    mfem::VectorFunctionCoefficient velocity_coeff(3, VelocityEgg);
+    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, nat_one);
+
+    bVarf.SpMat().AddMult(flux_gf, rhs_u_, 1.0);
 }
 
 void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
@@ -1230,28 +1294,28 @@ void EggModel::SetupCoeff()
     kinv_vector_ = make_unique<IPC>(comm_, "egg_perm_rescaled.dat", N, N, h);
 
 //     visualize coefficient norm
-    {
-        mfem::Array<int> vertices;
-        for (int i = 0; i < pmesh_->GetNE(); ++i)
-        {
-            pmesh_->GetElement(i)->GetVertices(vertices);
-            mfem::Vector center(pmesh_->Dimension());
-            center = 0.0;
-            for (int index = 0; index < pmesh_->Dimension(); ++index)
-            {
-                for (auto& vertex : vertices)
-                {
-                    center[index] += pmesh_->GetVertex(vertex)[index];
-                }
-                center[index] /= vertices.Size();
-            }
-            (*coeff_gf_)[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).InvNorm2(center)*std::sqrt(2.);
-        }
+//    {
+//        mfem::Array<int> vertices;
+//        for (int i = 0; i < pmesh_->GetNE(); ++i)
+//        {
+//            pmesh_->GetElement(i)->GetVertices(vertices);
+//            mfem::Vector center(pmesh_->Dimension());
+//            center = 0.0;
+//            for (int index = 0; index < pmesh_->Dimension(); ++index)
+//            {
+//                for (auto& vertex : vertices)
+//                {
+//                    center[index] += pmesh_->GetVertex(vertex)[index];
+//                }
+//                center[index] /= vertices.Size();
+//            }
+//            (*coeff_gf_)[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).InvNorm2(center)*std::sqrt(2.);
+//        }
 
-        mfem::socketstream soc;
-        VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
-        std::cout<<"max min = "<<coeff_gf_->Max()<<" "<<coeff_gf_->Min()<<"\n";
-    }
+//        mfem::socketstream soc;
+//        VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+//        std::cout<<"max min = "<<coeff_gf_->Max()<<" "<<coeff_gf_->Min()<<"\n";
+//    }
 }
 
 // domain = (0, 4000) x (0, 1000) cm

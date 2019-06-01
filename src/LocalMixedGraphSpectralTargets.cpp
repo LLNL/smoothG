@@ -508,7 +508,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
-//        evects_restricted.SetSize(evects_restricted.NumRows(), 0);
+//        evects_restrsicted.SetSize(evects_restricted.NumRows(), 0);
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[agg]);
 
         // Compute edge trace samples (before restriction and SVD)
@@ -929,7 +929,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 solver.Mult(OneNegOne, PV_sigma);
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
-            else
+            else if (face_Agg.RowSize(iface) > 1) // interior to processor
             {
                 // This face is not shared between processors
                 mfem::SparseMatrix& Mloc_0 = shared_Mloc_f[0];
@@ -946,6 +946,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
                 solver.Mult(OneNegOne, PV_sigma);
 
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
+            }
+            else // boundary face
+            {
+                PV_sigma_on_face.SetSize(num_iface_edofs);
+                PV_sigma_on_face = 1.;
             }
 
             // add PV vector to other vectors and orthogonalize

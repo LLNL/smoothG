@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    int num_sr = 3;
+    int num_sr = 0;
     args.AddOption(&num_sr, "-nsr", "--num-serial-refine",
                    "Number of serial refinement");
     int num_pr = 0;
@@ -221,6 +221,8 @@ int main(int argc, char* argv[])
     else if (problem == "egg")
     {
         ess_attr[2] = 1;
+        ess_attr[1] = 1;
+
         fv_problem.reset(new EggModel(num_sr, num_pr, ess_attr));
         alpha = 3.;//-5e-1;
     }
@@ -299,22 +301,55 @@ int main(int argc, char* argv[])
     EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
     nlmg.SetPrintLevel(1);
     nlmg.SetMaxIter(300);
-    nlmg.Solve(rhs, sol_nlmg);
+//    nlmg.Solve(rhs, sol_nlmg);
 
-//    auto coarse_rhs = hierarchy.Restrict(0, rhs);
-//    mfem::BlockVector coarse_sol(coarse_rhs);
+    nlmg.GetLevelSolver(0).Solve(rhs, sol_nlmg2);
 
-//    LevelSolver& level_solver = nlmg.GetLevelSolver(1);
+    auto coarse_rhs = hierarchy.Restrict(0, rhs);
+    mfem::BlockVector coarse_sol(coarse_rhs);
+
+    LevelSolver& level_solver = nlmg.GetLevelSolver(1);
 //    level_solver.SetPrintLevel(1);
-//    level_solver.SetMaxIter(30);
-//    level_solver.Solve(coarse_rhs, coarse_sol);
+    level_solver.SetMaxIter(30);
+    level_solver.Solve(coarse_rhs, coarse_sol);
 
-//    sol_nlmg = hierarchy.Interpolate(1, coarse_sol);
+    sol_nlmg = hierarchy.Interpolate(1, coarse_sol);
 //    auto sol_pwc = hierarchy.PWConstProject(1, coarse_sol.GetBlock(1));
 //    hierarchy.GetAggVert(0).MultTranspose(sol_pwc, sol_nlmg.GetBlock(1));
 
 
+//        {
+
+//        auto& pmesh_ = fv_problem->GetMesh();
+//        auto& coeff_gf_ = fv_problem->GetGF();
+
+//            mfem::Array<int> vertices;
+//            for (int i = 0; i < pmesh_.GetNE(); ++i)
+//            {
+//                pmesh_.GetElement(i)->GetVertices(vertices);
+//                mfem::Vector center(3);
+//                center = 0.0;
+//                for (int index = 0; index < 3; ++index)
+//                {
+//                    for (auto& vertex : vertices)
+//                    {
+//                        center[index] += pmesh_.GetVertex(vertex)[index];
+//                    }
+//                    center[index] /= vertices.Size();
+//                }
+//                coeff_gf_[i] = fv_problem->GetCoeff().InvNorm2(center) * std::exp(alpha * std::fabs(sol_nlmg2.GetBlock(1)[i]));
+//            }
+
+//            mfem::socketstream soc;
+//            fv_problem->VisSetup(soc, coeff_gf_, 0., 0., "", 1);
+//    }
+
+
+
+
 //    sol_nlmg2 -= sol_nlmg;
+//    for (int i = 0; i < sol_nlmg2.BlockSize(1); ++i)
+//        sol_nlmg2.GetBlock(1)[i] = std::fabs(sol_nlmg2.GetBlock(1)[i]);
 //    double diff = mfem::ParNormlp(sol_nlmg2.GetBlock(1), 2, comm);
 //    double norm = mfem::ParNormlp(sol_nlmg.GetBlock(1), 2, comm);
 
@@ -329,7 +364,7 @@ int main(int argc, char* argv[])
         }
 
         mfem::socketstream sout;
-        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "");
+        fv_problem->VisSetup(sout, sol_nlmg2.GetBlock(1), 0.0, 0.0, "");
         if (problem == "richard")
             sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
     }
@@ -637,7 +672,7 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
             solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type, std::move(b_l));
         }
         solvers_[level].SetPrintLevel(-1);
-        solvers_[level].SetMaxIter(1);
+        solvers_[level].SetMaxIter(100);
 //        if (level == num_levels_-1)
 //             solvers_[level].SetMaxIter(20);
     }
