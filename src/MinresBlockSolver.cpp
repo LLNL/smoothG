@@ -107,7 +107,7 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+            M_proc.EliminateRowCol(mm); // assume essential data = 0
     }
 
     hM_.reset(mgL.MakeParallelM(M_proc));
@@ -203,7 +203,7 @@ void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+            M_proc.EliminateRowCol(mm); // assume essential data = 0
     }
 
     hM_.reset(mixed_matrix_.MakeParallelM(M_proc));

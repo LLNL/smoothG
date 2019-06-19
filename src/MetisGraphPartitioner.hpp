@@ -93,7 +93,9 @@ public:
        (this does a deep copy of the indices)
     */
     void SetPreIsolateVertices(int index);
-    void SetPreIsolateVertices(const mfem::Array<int>& indices);
+    void SetPreIsolateVertices(std::vector<int> indices);
+    void SetPreIsolateVertices(std::vector<std::vector<int>> sets);
+
     void SetPostIsolateVertices(int index);
     void SetPostIsolateVertices(const mfem::Array<int>& indices);
 
@@ -103,7 +105,7 @@ private:
 
     PartType part_type_;
     real_t unbalance_tol_;
-    mfem::Array<int> pre_isolated_vertices_;
+    std::vector<std::vector<int>> pre_isolated_vertices_;
     mfem::Array<int> post_isolated_vertices_;
 
     void removeEmptyParts(mfem::Array<int>& partitioning,
@@ -126,11 +128,11 @@ private:
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
                int num_parts, bool use_edge_weight = false,
-               const mfem::Array<int>& iso_verts = mfem::Array<int>());
+               std::vector<std::vector<int>> iso_verts = std::vector<std::vector<int>>());
 
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
                   mfem::Array<int>& partitioning, int coarsening_factor,
-                  const mfem::Array<int>& iso_verts = mfem::Array<int>());
+                  std::vector<std::vector<int>> iso_verts = std::vector<std::vector<int>>());
 
 } // namespace smoothg
 

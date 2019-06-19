@@ -46,7 +46,7 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
     mfem::Array<int> sub_part;
     mfem::Array<int> sub_to_global;
 
-    if (pre_isolated_vertices_.Size() > 0)
+    if (pre_isolated_vertices_.size() > 0)
     {
         IsolatePreProcess(wtable, sub_table, sub_to_global);
         sub_part.SetSize(sub_to_global.Size());
@@ -126,16 +126,20 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
         sub_part = 0;
     }
 
-    if (pre_isolated_vertices_.Size() > 0)
+    if (pre_isolated_vertices_.size() > 0)
     {
         for (int i = 0; i < sub_part.Size(); ++i)
         {
             partitioning[sub_to_global[i]] = sub_part[i];
         }
 
-        for (auto vertex : pre_isolated_vertices_)
+        for (auto& partition : pre_isolated_vertices_)
         {
-            partitioning[vertex] = num_partitions++;
+            for (auto vertex : partition)
+            {
+                partitioning[vertex] = num_partitions;
+            }
+            num_partitions++;
         }
     }
 
@@ -149,12 +153,20 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
 
 void MetisGraphPartitioner::SetPreIsolateVertices(int index)
 {
-    pre_isolated_vertices_.Append(index);
+    pre_isolated_vertices_.push_back(std::vector<int>(1, index));
 }
 
-void MetisGraphPartitioner::SetPreIsolateVertices(const mfem::Array<int>& indices)
+void MetisGraphPartitioner::SetPreIsolateVertices(std::vector<int> indices)
 {
-    pre_isolated_vertices_.Append(indices);
+    pre_isolated_vertices_.push_back(std::move(indices));
+}
+
+void MetisGraphPartitioner::SetPreIsolateVertices(std::vector<std::vector<int>> sets)
+{
+    for (auto&& indices : sets)
+    {
+        pre_isolated_vertices_.push_back(indices);
+    }
 }
 
 void MetisGraphPartitioner::SetPostIsolateVertices(int index)
@@ -230,10 +242,17 @@ void MetisGraphPartitioner::IsolatePreProcess(const mfem::SparseMatrix& wtable,
                                               mfem::SparseMatrix& sub_table,
                                               mfem::Array<int>& sub_to_global)
 {
+    mfem::Array<int> pre_iso_verts;
+    for (auto& partition : pre_isolated_vertices_)
+    {
+        mfem::Array<int> partition_arr(partition.data(), partition.size());
+        pre_iso_verts.Append(partition_arr);
+    }
+
     std::vector<int> indices(wtable.Height());
     std::iota(std::begin(indices), std::end(indices), 0);
     indices.erase(std::remove_if(std::begin(indices), std::end(indices),
-    [this](int x) { return pre_isolated_vertices_.Find(x) != -1; }),
+    [&pre_iso_verts](int x) { return pre_iso_verts.Find(x) != -1; }),
     std::end(indices));
 
     mfem::Array<int> indices_m(indices.data(), indices.size());
@@ -331,17 +350,18 @@ int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
 }
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
-               int num_parts, bool use_edge_weight, const mfem::Array<int>& iso_verts)
+               int num_parts, bool use_edge_weight,
+               std::vector<std::vector<int>> iso_verts)
 {
     MetisGraphPartitioner partitioner;
-    partitioner.setUnbalanceTol(2.0);
-    partitioner.SetPreIsolateVertices(iso_verts);
+    partitioner.setUnbalanceTol(2);
+    partitioner.SetPreIsolateVertices(std::move(iso_verts));
     partitioner.doPartition(w_table, num_parts, partitioning, use_edge_weight);
 }
 
 void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
                   mfem::Array<int>& partitioning, int coarsening_factor,
-                  const mfem::Array<int>& iso_verts)
+                  std::vector<std::vector<int>> iso_verts)
 {
     MFEM_ASSERT(coarsening_factor > 1,
                 "coarsening_factor does not make sense!");
@@ -350,7 +370,7 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
     const int nvertices = vert_vert.Height();
     int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
     num_partitions = std::max(1, num_partitions);
-    Partition(vert_vert, partitioning, num_partitions, true, iso_verts);
+    Partition(vert_vert, partitioning, num_partitions, true, std::move(iso_verts));
 }
 
 } // namespace smoothg
