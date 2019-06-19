@@ -63,7 +63,8 @@ int main(int argc, char* argv[])
         post_isolated_vertices[0] = 2;
         isolated_vertices.Append(post_isolated_vertices);
 
-        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices);
+        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices[0]);
+        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices[1]);
         metis_partitioner.SetPostIsolateVertices(post_isolated_vertices);
 
         metis_partitioner.doPartition(vertex_vertex, num_partitions,
