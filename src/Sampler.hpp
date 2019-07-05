@@ -136,6 +136,9 @@ public:
     /// calling this, this is equivalent to NewSample())
     void SetSample(const mfem::Vector& state);
 
+    /// In case you have an external state that is specific to a certain level
+    void SetSampleAtLevel(int level, const mfem::Vector& state);
+
     /// Solve PDE with current white-noise RHS to find coeffiicent
     /// on coarser level, the result is on *aggregates*
     mfem::Vector& GetCoefficient(int level);

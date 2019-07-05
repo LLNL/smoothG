@@ -139,6 +139,18 @@ void PDESampler::SetSample(const mfem::Vector& state)
     }
 }
 
+void PDESampler::SetSampleAtLevel(int level, const mfem::Vector& state)
+{
+    MFEM_ASSERT(state.Size() == num_aggs_[level],
+                "State vector is the wrong size for this level!");
+    sampled_ = true;
+
+    for (int i = 0; i < num_aggs_[level]; ++i)
+    {
+        rhs_[level](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
+    }
+}
+
 /**
    Implementation notes:
 
