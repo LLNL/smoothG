@@ -158,9 +158,9 @@ void PDESampler::SetSampleAtLevel(int level, const mfem::Vector& state)
    q_i represents the constant on the coarse mesh
 
    c_i              : coefficient for coarse basis function, representing ~normal field K
-   (c_i / q_i)      : value of ~normal field K on agg i
-   exp(c_i/q_i)     : value of lognormal field exp(K) on agg i (what this returns)
-   exp(c_i/q_i) q_i : coefficient for coarse basis function, representing lognormal field exp(K) (what ForVisualization variant returns)
+   (c_i / q_i)      : value of ~normal field K on agg i (comes from PWConstProject)
+   exp(c_i/q_i)     : value of lognormal field exp(K) on agg i (what this returns, usable to rescale a linear system)
+   exp(c_i/q_i) q_i : coefficient for coarse basis function, representing lognormal field exp(K) (what ForVisualization variant returns, usable for projection...)
 
    indexing: the indexing above is wrong if there is more than one dof / aggregate,
              we consider only the coefficient for the *constant* component i
@@ -168,6 +168,16 @@ void PDESampler::SetSampleAtLevel(int level, const mfem::Vector& state)
    @todo: not working multilevel unless restricted to one eigenvector / agg (which maybe is the only sensible case for sampling anyway?)
 */
 mfem::Vector& PDESampler::GetCoefficient(int level)
+{
+    mfem::Vector pw1_coarse_sol = GetLogCoefficient(level);
+    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
+    {
+        coefficient_[level](i) = std::exp(pw1_coarse_sol(i));
+    }
+    return coefficient_[level];
+}
+
+mfem::Vector PDESampler::GetLogCoefficient(int level)
 {
     MFEM_ASSERT(sampled_,
                 "PDESampler object in wrong state (call NewSample() first)!");
@@ -177,18 +187,22 @@ mfem::Vector& PDESampler::GetCoefficient(int level)
     // coarse solution projected to piece-wise constant on aggregates
     mfem::Vector pw1_coarse_sol = hierarchy_.PWConstProject(level, coarse_sol);
 
-    for (int i = 0; i < pw1_coarse_sol.Size(); ++i)
-    {
-        coefficient_[level](i) = std::exp(pw1_coarse_sol(i));
-    }
-
-    return coefficient_[level];
+    return pw1_coarse_sol;
 }
 
 mfem::Vector PDESampler::GetCoefficientForVisualization(int level)
 {
     // coarse solution projected to piece-wise constant on aggregates
     mfem::Vector pw1_coarse_sol = GetCoefficient(level);
+
+    // interpolate piece-wise constant function to vertex space
+    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;
+}
+
+mfem::Vector PDESampler::GetLogCoefficientForVisualization(int level)
+{
+    // coarse solution projected to piece-wise constant on aggregates
+    mfem::Vector pw1_coarse_sol = GetLogCoefficient(level);
 
     // interpolate piece-wise constant function to vertex space
     return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;

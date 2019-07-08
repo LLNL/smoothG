@@ -143,8 +143,12 @@ public:
     /// on coarser level, the result is on *aggregates*
     mfem::Vector& GetCoefficient(int level);
 
+    mfem::Vector GetLogCoefficient(int level);
+
     /// Only for debugging/visualization, most users should use GetCoefficient
     mfem::Vector GetCoefficientForVisualization(int level);
+
+    mfem::Vector GetLogCoefficientForVisualization(int level);
 
     const Hierarchy& GetHierarchy() const { return hierarchy_; }
 
