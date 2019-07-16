@@ -103,7 +103,7 @@ int main(int argc, char* argv[])
     ess_attr = 1;
     if (lateral_pressure)
     {
-        ess_attr[0] = ess_attr[2] = 0;
+        ess_attr[nDimensions - 2] = ess_attr[nDimensions] = 0;
     }
 
     // Setting up finite volume discretization problem
