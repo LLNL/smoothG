@@ -129,7 +129,7 @@ void PrimalSolver::Init(mfem::SparseMatrix M_proc)
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+            M_proc.EliminateRowCol(mm); // assume essential data = 0
     }
     std::unique_ptr<mfem::HypreParMatrix> M(mixed_matrix_.MakeParallelM(M_proc));
 
