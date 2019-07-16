@@ -782,7 +782,7 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
         mfem::HypreSmoother prec_scale(const_cast<mfem::HypreParMatrix&>(H));
 
         mfem::Vector zeros(H.Height());
-        zeros = 1e-8;
+        zeros = 0.0;
         diagonal_scaling_.SetSize(H.Height());
         diagonal_scaling_ = 1.0;
 

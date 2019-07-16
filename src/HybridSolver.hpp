@@ -88,15 +88,17 @@ public:
        @param mgL Mixed matrices for the graph Laplacian in the fine level
        @param face_bdrattr Boundary edge to boundary attribute table
        @param ess_edge_dofs An array indicating essential edge dofs
-       @param rescale_iter number of iterations to compute diagonal scaling
-              vector for hybridized system. No rescaling if set to 0.
+       @param rescale_iter if negative, a rescaling vector for the hybridized
+              system will be computed based on SISC, 41(3), B425–B447 Prop. 4.3;
+              if positive, the rescaling vector will be computed by performing
+              rescale_iter smoothing steps to H; no rescaling if set to 0.
        @param saamge_param SAAMGe parameters. Use SAAMGe as preconditioner for
               hybridized system if saamge_param is not nullptr, otherwise
               BoomerAMG is used instead.
     */
     HybridSolver(const MixedMatrix& mgL,
                  const mfem::Array<int>* ess_attr = nullptr,
-                 const int rescale_iter = 0,
+                 const int rescale_iter = -1,
                  const SAAMGeParam* saamge_param = nullptr);
 
     virtual ~HybridSolver();
