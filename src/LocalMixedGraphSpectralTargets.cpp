@@ -304,7 +304,7 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
         mfem::DenseMatrix evects_tmp;
         // Do not consider the first vertex eigenvector, which is constant
         evects_tmp.UseExternalData(evects.Data() + evects.Height(),
-                                   evects.Height(), (nevects - 1) );
+                                   evects.Height(), (1 - 1) );
 
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later
@@ -508,7 +508,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
-//        evects_restrsicted.SetSize(evects_restricted.NumRows(), 0);
+//        evects_restricted.SetSize(evects_restricted.NumRows(), 0);
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[agg]);
 
         // Compute edge trace samples (before restriction and SVD)

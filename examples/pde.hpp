@@ -537,6 +537,8 @@ public:
         return pmesh_->GetElementVolume(0); // assumed uniform mesh
     }
 
+    int NumIsoVerts() const { return iso_vert_count_; }
+
     InversePermeabilityCoefficient& GetCoeff() { return (InversePermeabilityCoefficient&)(*kinv_vector_); }
 
     const mfem::ParMesh& GetMesh() const { return *pmesh_; }
@@ -595,6 +597,8 @@ protected:
     mfem::Array<int> ess_attr_;
 
     mutable mfem::ParGridFunction u_fes_gf_;
+
+    mutable int iso_vert_count_;
 
     MPI_Comm comm_;
     int myid_;
@@ -832,22 +836,33 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
         metis_coarsening_factor *= factor;
 
     mfem::Array<int> nat_attr(ess_attr_.Size()), nat_edges_marker, iso_verts_marker;
-    for (int i = 0; i < ess_attr_.Size(); ++i)
-    {
-        nat_attr[i] = 1 - ess_attr_[i];
-    }
-    BooleanMult(edge_bdratt_, nat_attr, nat_edges_marker);
-    BooleanMult(vertex_edge_, nat_edges_marker, iso_verts_marker);
 
-    mfem::Array<int> iso_verts(iso_verts_marker.Sum());
-    assert(nat_edges_marker.Sum() == iso_verts.Size());
-    int iso_vert_count = 0;
-    for (int i = 0; i < iso_verts_marker.Size(); ++i)
+//    int num_nat_attr = ess_attr_.Size() - const_cast<mfem::Array<int>&>(ess_attr_).Sum();
+    std::vector<std::vector<int>> iso_verts;
+
+    iso_vert_count_ = 0;
+//    for (int k = 0; k < num_nat_attr; k++)
     {
-        if (iso_verts_marker[i])
+        for (int i = 0; i < ess_attr_.Size(); ++i)
         {
-            iso_verts[iso_vert_count++] = i;
+            nat_attr[i] = 1 - ess_attr_[i];
         }
+        BooleanMult(edge_bdratt_, nat_attr, nat_edges_marker);
+        BooleanMult(vertex_edge_, nat_edges_marker, iso_verts_marker);
+
+//        std::vector<int>iso_verts_i(iso_verts_marker.Sum());
+//        assert(nat_edges_marker.Sum() - iso_verts_i.size() == 0);
+
+        for (int i = 0; i < iso_verts_marker.Size(); ++i)
+        {
+            if (iso_verts_marker[i])
+            {
+//                iso_verts_i[iso_vert_count_++] = i;
+                iso_vert_count_++;
+                iso_verts.push_back(std::vector<int>(1, i));
+            }
+        }
+//        iso_verts.push_back(iso_verts_i);
     }
 
     PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor, iso_verts);
@@ -1200,6 +1215,11 @@ void VelocityEgg(const mfem::Vector& x, mfem::Vector& out)
     out[0] = 1000.0;
 }
 
+double Source(const mfem::Vector& x)
+{
+    return -0.025 * std::exp(std::max((x(1) + 4.0) / 480.0 - 0.9, 0.0));
+}
+
 EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess_attr)
     : DarcyProblem(MPI_COMM_WORLD, 3, ess_attr)
 {
@@ -1215,52 +1235,57 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
 //        rhs_u_ = -1.0 * CellVolume();
 //    }
 //    else
-//    {
-////        mfem::Array<int> nat_one(ess_attr_.Size());
-////        nat_one = 0;
-////        nat_one[0] = 1;
+    {
+//        mfem::Array<int> nat_one(ess_attr_.Size());
+//        nat_one = 0;
+//        nat_one[0] = 1;
 
-////        mfem::ConstantCoefficient one(1.0);
-////        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
+//        mfem::ConstantCoefficient one(1.0);
+//        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
 
-////        mfem::LinearForm g(sigma_fes_.get());
-////        g.AddBoundaryIntegrator(
-////            new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
-
-
-
-////        mfem::Array<int> nat_negative_one(ess_attr_.Size());
-////        nat_negative_one = 0;
-////        nat_negative_one[1] = 1;
-
-////        mfem::ConstantCoefficient negative_one(-1.0);
-////        mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
-////        g.AddBoundaryIntegrator(
-////                    new mfem::VectorFEBoundaryFluxLFIntegrator(poutflow_coeff));
-
-//        g.Assemble();
-//        rhs_sigma_ = g;
-
-//        rhs_u_ = 0.0;
-//    }
-
-            mfem::Array<int> nat_one(ess_attr_.Size());
-            nat_one = 0;
-            nat_one[0] = 1;
+        mfem::LinearForm g(sigma_fes_.get());
+//        g.AddBoundaryIntegrator(
+//            new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
 
 
-    mfem::ParMixedBilinearForm bVarf(sigma_fes_.get(), u_fes_.get());
-    bVarf.AddDomainIntegrator(new mfem::VectorFEDivergenceIntegrator);
-    bVarf.Assemble();
-    bVarf.Finalize();
 
-    mfem::ParGridFunction flux_gf(sigma_fes_.get());
-    flux_gf = 0.0;
+//        mfem::Array<int> nat_negative_one(ess_attr_.Size());
+//        nat_negative_one = 0;
+//        nat_negative_one[1] = 1;
 
-    mfem::VectorFunctionCoefficient velocity_coeff(3, VelocityEgg);
-    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, nat_one);
+//        mfem::ConstantCoefficient negative_one(-1.0);
+//        mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
+//        g.AddBoundaryIntegrator(
+//                    new mfem::VectorFEBoundaryFluxLFIntegrator(poutflow_coeff));
 
-    bVarf.SpMat().AddMult(flux_gf, rhs_u_, 1.0);
+        g.Assemble();
+        rhs_sigma_ = g;
+
+        mfem::FunctionCoefficient source_coeff(Source);
+        mfem::LinearForm f(u_fes_.get());
+        f.AddDomainIntegrator(new mfem::DomainLFIntegrator(source_coeff));
+        f.Assemble();
+
+        rhs_u_ = f;
+    }
+
+//    mfem::Array<int> nat_one(ess_attr_.Size());
+//    nat_one = 0;
+//    nat_one[0] = 1;
+
+
+//    mfem::ParMixedBilinearForm bVarf(sigma_fes_.get(), u_fes_.get());
+//    bVarf.AddDomainIntegrator(new mfem::VectorFEDivergenceIntegrator);
+//    bVarf.Assemble();
+//    bVarf.Finalize();
+
+//    mfem::ParGridFunction flux_gf(sigma_fes_.get());
+//    flux_gf = 0.0;
+
+//    mfem::VectorFunctionCoefficient velocity_coeff(3, VelocityEgg);
+//    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, nat_one);
+
+//    bVarf.SpMat().AddMult(flux_gf, rhs_u_, 1.0);
 }
 
 void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)

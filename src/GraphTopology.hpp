@@ -50,7 +50,7 @@ public:
        @param coarsening_factor intended number of vertices in an aggregate
        @return coarse graph
     */
-    Graph Coarsen(const Graph& fine_graph, int coarsening_factor);
+    Graph Coarsen(const Graph& fine_graph, int coarsening_factor, int num_iso_verts = 0);
 
     /**
        @brief Coarsen a given graph

@@ -929,6 +929,10 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
             if (diagonal_scaling_.Size() > 0)
             {
                 PV_map.ScaleRows(diagonal_scaling_);
+                for (int i = 0; i < PV_map.NumCols(); ++i)
+                {
+                    assert(PV_map.GetData()[i] != 0.0);
+                }
                 diagonal_scaling_.SetSize(0);
             }
 
@@ -970,8 +974,13 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
         }
     }
 
+    int num_local_ess_true_mult = ess_true_multipliers_.Size();
+    int num_global_ess_true_mult;
+    MPI_Allreduce(&num_local_ess_true_mult, &num_global_ess_true_mult,
+                  1, MPI_INT, MPI_SUM, comm_);
+
     // In case of normal graph Laplacian, eliminate one multiplier
-    if (!ess_true_multipliers_.Size() && !W_is_nonzero_ && myid_ == 0)
+    if (!num_global_ess_true_mult && !W_is_nonzero_ && myid_ == 0)
     {
         GetTableRow(mult_truemult, 0, true_multiplier);
         assert(true_multiplier.Size() == 1);

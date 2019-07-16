@@ -30,12 +30,20 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor)
+Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int num_iso_verts)
 {
     mfem::Array<int> partitioning;
     mfem::SparseMatrix vert_edge(fine_graph.VertexToEdge(), false);
     vert_edge = 1.0;
-    PartitionAAT(vert_edge, partitioning, coarsening_factor);
+
+    std::vector<std::vector<int>> iso_verts;
+    iso_verts.reserve(num_iso_verts);
+    for (int i = vert_edge.NumRows() - num_iso_verts; i < vert_edge.NumRows(); ++i)
+    {
+        iso_verts.push_back(std::vector<int>(1, i));
+    }
+
+    PartitionAAT(vert_edge, partitioning, coarsening_factor, std::move(iso_verts));
     return Coarsen(fine_graph, partitioning);
 }
 

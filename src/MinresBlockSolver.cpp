@@ -138,6 +138,16 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     Init(hM_.get(), hD_.get(), W_.get());
 }
 
+double FroNorm(const mfem::SparseMatrix& mat)
+{
+    double norm = 0.0;
+    for (int i = 0; i < mat.NumNonZeroElems(); ++i)
+    {
+        norm += mat.GetData()[i] * mat.GetData()[i];
+    }
+    return norm;
+}
+
 void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
                              mfem::BlockVector& sol) const
 {
@@ -155,7 +165,12 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
                                 : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
 
+//    std::cout<<"FNorm = "<< FroNorm(GetDiag(*hD_))<<"\n";
+
+//    std::cout<<"Rhs Norm = "<< const_cast<mfem::Array<int>&>(ess_edofs_).Sum()<<"\n";
+
     solver->Mult(rhs, sol);
+
 
     const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 

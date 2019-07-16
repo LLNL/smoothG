@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag)
     : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(1e-10)
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(1e-12)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -147,6 +147,14 @@ void NonlinearMG::FAS_Cycle(int level)
     if (level == num_levels_ - 1)
     {
         Solve(level, rhs_[level], sol_[level]);
+
+        {
+            for (int i = 0; i < GetEssDofs(level).Size(); ++i)
+            {
+                if (GetEssDofs(level)[i])
+                    sol_[level][i] = 0.0;
+            }
+        }
     }
     else
     {
@@ -182,7 +190,7 @@ void NonlinearMG::FAS_Cycle(int level)
                 if (resid_norm_ < adjusted_tol_)
                 {
                     converged_ = true;
-                    if (level==0 && myid_==0)
+                    if (level == 0 && myid_ == 0)
                     {
                         std::cout<<"V cycle terminated after pre-smoothing\n";
                     }
