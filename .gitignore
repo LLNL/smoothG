@@ -12,6 +12,7 @@ generated-docs/
 *.md~
 *.swp
 
+out.cmake
 GPATH
 GRTAGS
 GTAGS
