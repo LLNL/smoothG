@@ -111,16 +111,16 @@ install:
    # hypre
    - if [ $MPI == "YES" ]; then
         if [ ! -e hypre-install/lib/libHYPRE.a ]; then
-           wget https://computation.llnl.gov/project/linear_solvers/download/hypre-2.10.0b.tar.gz --no-check-certificate;
-           rm -rf hypre-2.10.0b;
-           tar xzf hypre-2.10.0b.tar.gz;
-           cd hypre-2.10.0b/src;
+           git clone https://github.com/hypre-space/hypre.git hypre;
+           cd hypre;
+           git checkout v2.15.1;
+           cd src;
            ./configure --disable-fortran --without-fei CC=mpicc CXX=mpic++ prefix=/home/travis/build/LLNL/hypre-install;
            make -j3;
            make install;
            cd ../..;
         else
-            echo "Reusing cached hypre-2.10.0b/";
+            echo "Reusing cached hypre-2.15.1/";
         fi;
      else
         echo "Serial build, not using hypre";
@@ -131,7 +131,7 @@ install:
         if [ ! -e mfem-install/lib/libmfem.a ]; then
             git clone https://github.com/mfem/mfem.git mfem;
             cd mfem;
-            git checkout v3.3.2;
+            git checkout v3.4;
             make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES HYPRE_DIR=/home/travis/build/LLNL/hypre-install SUITESPARSE_DIR=/home/travis/build/LLNL/SuiteSparse-install METIS_DIR=/home/travis/build/LLNL/metis-install PREFIX=/home/build/travis/build/LLNL/mfem-install;
             CC=mpicc CXX=mpic++ make -j3 install PREFIX=/home/travis/build/LLNL/mfem-install;
             cd ..;
