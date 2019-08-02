@@ -92,6 +92,8 @@ def parse_packages(filename="config.mk", verbose=False):
             print("  ", o)
     expected_names = ["HYPRE", "metis", "suitesparseconfig",
                       "unwind", "z", "lapack"]
+    if len(packages) == 0 or len(includes) == 0:
+        print("WARNING: could not parse config.mk!")
     for p in packages:
         name_package(p, expected_names)
     if verbose:

@@ -82,7 +82,9 @@ set_property(TARGET MFEM_LIB PROPERTY IMPORTED_LOCATION ${MFEM_LIBRARY_PATH}/${M
 list(APPEND TPL_LIBRARIES ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
 
 # steal all of MFEM's dependencies
-execute_process(COMMAND python parsemk.py ${MFEM_DIR}/share/mfem/config.mk WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+find_path(MFEM_CONFIG_PATH config.mk
+    PATHS ${MFEM_DIR}/share/mfem ${MFEM_DIR})
+execute_process(COMMAND python parsemk.py ${MFEM_CONFIG_PATH}/config.mk WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 include("out.cmake")
 include_directories(${MK_INCLUDES})
 list(APPEND TPL_LIBRARIES ${MK_LIBRARIES})
