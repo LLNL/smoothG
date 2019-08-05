@@ -58,9 +58,11 @@ def parse_packages(filename="config.mk", verbose=False):
     linkpathopen = "-L"
     libraryopen = "-l"
     other = []
-    packages = []
+    packages = [{"rpaths": [],
+                 "linkpaths": [],
+                 "libraries": []}]
     includes = []
-    status = "library"  # switch *from* library to rpath triggers new package
+    status = "begin"  # switch *from* library to rpath triggers new package
     with open(filename, "r") as fd:
         for line in fd:
             p = line.split()
@@ -69,14 +71,16 @@ def parse_packages(filename="config.mk", verbose=False):
                     if len(item) > 2 and item[0:2] == "-I":
                         includes.append(item[2:])
             if len(p) > 0 and p[0] == "MFEM_EXT_LIBS":
-                # print("Found MFEM_EXT_LIBS.")
+                print("Found MFEM_EXT_LIBS.")
                 for item in p[2:]:
+                    print("  parsing", item)
                     b = False
                     rp = matchopencheck(item, rpathopen)
                     if status == "library" and rp:
                         packages.append({"rpaths": [],
                                          "linkpaths": [],
                                          "libraries": []})
+                    if rp:
                         status = "rpath"
                     b = b or matchopen(item, rpathopen, packages[-1]["rpaths"])
                     lp = matchopen(item, linkpathopen, packages[-1]["linkpaths"])
