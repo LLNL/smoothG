@@ -52,47 +52,67 @@ def name_package(p, expected_names):
     p["name"] = "unexpected:" + p["libraries"][0]
 
 
-def parse_packages(filename="config.mk", verbose=False):
-    # print("Opening", filename)
+def parse_lib_line(line, status, packages, other):
     rpathopen = "-Wl,-rpath,"
     linkpathopen = "-L"
     libraryopen = "-l"
+    for item in line:
+        b = False
+        rp = matchopencheck(item, rpathopen)
+        if status == "library" and rp:
+            packages.append({"rpaths": [],
+                             "linkpaths": [],
+                             "libraries": []})
+        if rp:
+            status = "rpath"
+        b = b or matchopen(item, rpathopen, packages[-1]["rpaths"])
+        lp = matchopen(item, linkpathopen, packages[-1]["linkpaths"])
+        if lp:
+            status = "library"
+        b = b or lp
+        b = b or matchopen(item, libraryopen, packages[-1]["libraries"])
+        if item == "$(MFEM_EXT_LIBS)":
+            b = True
+        if not b:
+            other.append(item)
+
+
+def parse_packages(filename="config.mk", verbose=False):
     other = []
     packages = [{"rpaths": [],
                  "linkpaths": [],
                  "libraries": []}]
+    alt_packages = [{"rpaths": [],
+                     "linkpaths": [],
+                     "libraries": []}]
     includes = []
     status = "begin"  # switch *from* library to rpath triggers new package
+    found_ext_libs = False
     with open(filename, "r") as fd:
+        print("parsemk.py: Found config file", filename)
         for line in fd:
             p = line.split()
             if len(p) > 0 and p[0] == "MFEM_TPLFLAGS":
+                print("parsemk.py: Found MFEM_TPLFLAGS")
                 for item in p[2:]:
                     if len(item) > 2 and item[0:2] == "-I":
                         includes.append(item[2:])
             if len(p) > 0 and p[0] == "MFEM_EXT_LIBS":
+                found_ext_libs = True
                 print("parsemk.py: Found MFEM_EXT_LIBS.")
-                for item in p[2:]:
-                    b = False
-                    rp = matchopencheck(item, rpathopen)
-                    if status == "library" and rp:
-                        packages.append({"rpaths": [],
-                                         "linkpaths": [],
-                                         "libraries": []})
-                    if rp:
-                        status = "rpath"
-                    b = b or matchopen(item, rpathopen, packages[-1]["rpaths"])
-                    lp = matchopen(item, linkpathopen, packages[-1]["linkpaths"])
-                    if lp:
-                        status = "library"
-                    b = b or lp
-                    b = b or matchopen(item, libraryopen, packages[-1]["libraries"])
-                    if not b:
-                        other.append(item)
+                parse_lib_line(p[2:], status, packages, other)
+            if len(p) > 0 and p[0] == "MFEM_LIBS":
+                print("parsemk.py: Found MFEM_LIBS.")
+                parse_lib_line(p[2:], status, alt_packages, other)
+    if not found_ext_libs:
+        packages = alt_packages
     if len(other) > 0:
-        print("WARNING: could not parse MFEM_EXT_LIBS: did not understand following tokens:")
+        print("WARNING: could not parse external MFEM libraries: "
+              "did not understand following tokens:")
         for o in other:
             print("  ", o)
+    if len(packages) == 0:
+        print("WARNING: did not find any external MFEM libraries!")
     expected_names = ["HYPRE", "metis", "suitesparseconfig",
                       "unwind", "z", "lapack"]
     if len(packages) == 0 or len(includes) == 0:
