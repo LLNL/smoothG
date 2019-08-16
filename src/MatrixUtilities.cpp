@@ -1041,7 +1041,7 @@ LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
     M_is_diag_ = IsDiag(M);
     if (M_is_diag_)
     {
-        const mfem::Vector M_diag(M.GetData(), M.Height());
+        const mfem::Vector M_diag(const_cast<double*>(M.GetData()), M.Height());
         Init(M_diag, D);
     }
     else
@@ -1289,6 +1289,16 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
 int NNZ(const mfem::SparseMatrix& mat)
 {
     return mat.NumNonZeroElems();
+}
+
+double FroNorm(const mfem::SparseMatrix& mat)
+{
+    double norm = 0.0;
+    for (int i = 0; i < mat.NumNonZeroElems(); ++i)
+    {
+        norm += mat.GetData()[i] * mat.GetData()[i];
+    }
+    return norm;
 }
 
 } // namespace smoothg

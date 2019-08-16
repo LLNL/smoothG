@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag)
     : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(1e-12)
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(1e-8)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -66,12 +66,9 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
         adjusted_tol_ = std::max(atol_, rtol_ * rhs_norm_);
 
         converged_ = false;
-        for (iter_ = 0; iter_ < max_num_iter_; iter_++)
+        for (iter_ = 0; iter_ < max_num_iter_ + 1; iter_++)
         {
-            if (converged_ == false)
-            {
-                resid_norm_ = ResidualNorm(sol, rhs);
-            }
+            resid_norm_ = ResidualNorm(sol, rhs);
 
             if (myid_ == 0 && print_level_ > 0)
             {
@@ -80,9 +77,10 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
                           << rel_resid << ", abs resid = " << resid_norm_ << ".\n";
             }
 
-            if (resid_norm_ < adjusted_tol_)
+            converged_ = (resid_norm_ < adjusted_tol_);
+
+            if (converged_ || iter_ == max_num_iter_)
             {
-                converged_ = true;
                 break;
             }
 
@@ -93,7 +91,7 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
         }
 
         timing_ = chrono.RealTime();
-        if (myid_ == 0 && !converged_ && print_level_ >= 0)
+        if (!converged_ && myid_ == 0 && print_level_ >= 0)
         {
             std::cout << "Warning: " << tag_ << " solver reached maximum "
                       << "number of iterations!\n";
@@ -120,7 +118,7 @@ void NonlinearSolver::UpdateLinearSolveTol()
         tol = std::pow(resid_norm_ / ref_norm, 1.0);
     }
 
-    linear_tol_ = std::max(std::min(tol, linear_tol_), rtol_);
+    linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
 NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, SolveType solve_type, Cycle cycle)

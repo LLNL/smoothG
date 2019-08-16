@@ -84,6 +84,9 @@ private:
     mfem::Vector Z_vector_;
 
     const mfem::BlockVector b_; // the vector in A(x) - b = 0
+
+    // for debug purpose
+    int print_help = 0;
 };
 
 // nonlinear elliptic hierarchy
@@ -204,7 +207,7 @@ int main(int argc, char* argv[])
     }
 
     // Setting up finite volume discretization problem
-    double use_metis = true;
+    double use_metis = false;
     std::string problem(problem_name);
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
     ess_attr = 0;
@@ -214,8 +217,9 @@ int main(int argc, char* argv[])
     if (problem == "spe10")
     {
         ess_attr = 1;
-        ess_attr[dim - 2] = ess_attr[dim] = 0;
-        fv_problem.reset(new SPE10Problem(perm_file, dim, 5, slice, use_metis, ess_attr));
+        ess_attr[dim - 2] = 0;
+//        ess_attr[dim] = 0;
+        fv_problem.reset(new SPE10Problem(perm_file, dim, 5, slice, use_metis, ess_attr, true));
         alpha = 1.*(1e-3);
     }
     else if (problem == "egg")
@@ -252,21 +256,6 @@ int main(int argc, char* argv[])
 
     Graph graph = fv_problem->GetFVGraph(true);
 
-//    auto e_v(graph.EdgeToVertex());
-//    int count=0;
-//    for (int i = 0; i < e_v.NumRows(); ++i)
-//    {
-//        if (e_v.RowSize(i)==1)
-//        {
-//            count++;
-//        }
-//        else
-//        {
-//            assert(e_v.RowSize(i)==2);
-//        }
-//    }
-    std::cout<<"num bdr edges = "<<graph.NumEdges()<<"\n";
-
     mfem::Array<int> partitioning;
     mfem::Array<int> coarsening_factors(dim);
 
@@ -277,20 +266,24 @@ int main(int argc, char* argv[])
     }
     else
     {
-        coarsening_factors = 5;
+        coarsening_factors[0] = 10;
+        coarsening_factors[1] = 22;
         coarsening_factors.Last() = dim == 3 ? 2 : 10;
     }
 
-    fv_problem->Partition(use_metis, coarsening_factors, partitioning);
-    upscale_param.num_iso_verts = fv_problem->NumIsoVerts();
-//slice = 16
+    if (upscale_param.max_levels > 1)
+    {
+        fv_problem->Partition(use_metis, coarsening_factors, partitioning);
+        upscale_param.num_iso_verts = fv_problem->NumIsoVerts();
+    }
+
     // Create hierarchy
-    Hierarchy hierarchy(std::move(graph), upscale_param, &partitioning, &ess_attr);
+    Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr);
     hierarchy.PrintInfo();
 
     if (upscale_param.hybridization)
     {
-        hierarchy.SetRelTol(1e-12);
+        hierarchy.SetRelTol(1e-8);
         hierarchy.SetAbsTol(1e-15);
     }
 
@@ -316,12 +309,16 @@ int main(int argc, char* argv[])
     sol_nlmg2 = 0.0;
 
 //    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
-    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
+    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard, b);
     nlmg.SetPrintLevel(1);
-    nlmg.SetMaxIter(300);
+    nlmg.SetMaxIter(150);
+//    nlmg.SetRelTol(1e-14);
+//    nlmg.SetAbsTol(1e-8);
+//hierarchy.SetPrintLevel(1);
     nlmg.Solve(rhs, sol_nlmg);
 //    nlmg.GetLevelSolver(0).SetPrintLevel(1);
-//    nlmg.GetLevelSolver(0).SetMaxIter(100);
+//    nlmg.GetLevelSolver(0).SetMaxIter(20);
+//    hierarchy.SetPrintLevel(1);
 //    nlmg.GetLevelSolver(0).Solve(rhs, sol_nlmg2);
 
 //    auto coarse_rhs = hierarchy.Restrict(0, rhs);
@@ -330,13 +327,12 @@ int main(int argc, char* argv[])
 
 //    LevelSolver& level_solver = nlmg.GetLevelSolver(1);
 //    level_solver.SetPrintLevel(1);
-//    level_solver.SetMaxIter(100);
+//    level_solver.SetMaxIter(15);
 //    level_solver.Solve(coarse_rhs, coarse_sol);
 
 //    sol_nlmg = hierarchy.Interpolate(1, coarse_sol);
 ////    auto sol_pwc = hierarchy.PWConstProject(1, coarse_sol.GetBlock(1));
 ////    hierarchy.GetAggVert(0).MultTranspose(sol_pwc, sol_nlmg.GetBlock(1));
-
 
 //    sol_nlmg2 -= sol_nlmg;
 //    for (int i = 0; i < sol_nlmg2.BlockSize(1); ++i)
@@ -374,6 +370,24 @@ int main(int argc, char* argv[])
 //            fv_problem->VisSetup(soc, coeff_gf_, 0., 0., "", 1);
 //    }
 
+//    upscale_param.hybridization = false;
+//    Hierarchy hierarchy2(std::move(graph), upscale_param, &partitioning, &ess_attr);
+
+
+//    EllipticNLMG nlmg2(hierarchy2, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
+//    nlmg2.SetPrintLevel(1);
+//    nlmg2.SetMaxIter(2);
+//    nlmg2.Solve(rhs, sol_nlmg2);
+
+//        sol_nlmg2 -= sol_nlmg;
+////        for (int i = 0; i < sol_nlmg2.BlockSize(1); ++i)
+////            sol_nlmg2.GetBlock(1)[i] = std::fabs(sol_nlmg2.GetBlock(1)[i]);
+//        double diff = mfem::ParNormlp(sol_nlmg2.GetBlock(1), 2, comm);
+//        double norm = mfem::ParNormlp(sol_nlmg.GetBlock(1), 2, comm);
+
+//        if (myid ==0)
+//        std::cout<<"|| sol - sol_c || = "<<diff/norm<<"\n";
+
 
     if (visualization)
     {
@@ -383,7 +397,10 @@ int main(int argc, char* argv[])
         }
 
         mfem::socketstream sout;
+//        fv_problem->VisSetup2(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "");
         fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "");
+//        fv_problem->VisSetup2(sout, sol_nlmg2.GetBlock(0), 0.0, 0.0, "");
+        fv_problem->VisSetup(sout, sol_nlmg2.GetBlock(1), 0.0, 0.0, "");
         if (problem == "richard")
             sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
     }
@@ -454,6 +471,15 @@ void LevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 void LevelSolver::EvalCoef(const mfem::Vector& sol_block1)
 {
     p_ = hierarchy_.PWConstProject(level_, sol_block1);
+
+//    double p_max = AbsMax(p_, comm_);
+//    double p_min = Min(p_, comm_);
+//    if (myid_==0)
+//    {
+//        std::cout << "  Level " << level_ <<"\n";
+//        std::cout << "  \tmax pressure =  " << p_max <<"\n";
+//        std::cout << "  \tmin pressure =  " << p_min <<"\n";
+//    }
     if (Z_vector_.Size())
         Kappa(p_, Z_vector_, kp_);
     else
@@ -471,18 +497,30 @@ void LevelSolver::EvalCoefDerivative(const mfem::Vector& sol_block1)
 
 void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
+    mfem::BlockVector delta_x(x);
+    prev_resid_norm_ = ResidualNorm(x, rhs);
+
+    double p_max = AbsMax(p_, comm_);
+    double p_min = Min(p_, comm_);
+
+    if (myid_==0)
+    {
+        if (level_ == 0 && !(print_help % 3))
+            std::cout << "\n";
+        std::cout << "  Level " << level_ << " before solving:\n";
+        std::cout << "  \tmax pressure =  " << p_max <<"\n";
+        std::cout << "  \tmin pressure =  " << p_min <<"\n\n";
+    }
+
     if (level_ >= 0)
     {
-        EvalCoef(x.GetBlock(1));
+//        EvalCoef(x.GetBlock(1));
         hierarchy_.RescaleCoefficient(level_, kp_);
     }
     else // exact evaluation of nonlinear problem
     {
         hierarchy_.RescaleCoefficient(level_, x.GetBlock(1), Kappa);
     }
-
-    mfem::BlockVector delta_x(x);
-    prev_resid_norm_ = ResidualNorm(x, rhs);
 
 //    mfem::BlockVector rhs_plus_b(rhs);
 //    rhs_plus_b += b_;
@@ -511,6 +549,21 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 
     Build_dMdp(x);
 
+    double p_max = AbsMax(p_, comm_);
+    double p_min = Min(p_, comm_);
+
+    if (myid_==0)
+    {
+        if (level_ == 0 && !(print_help % 3))
+            std::cout << "\n";
+        std::cout << "  Level " << level_ << " before solving:\n";
+        std::cout << "  \tmax pressure =  " << p_max <<"\n";
+        std::cout << "  \tmin pressure =  " << p_min <<"\n\n";
+    }
+
+//                std::cout<<"p_max = " <<p_.Max()<<"\n";
+//                std::cout<<"p_min = " <<p_.Min()<<"\n";
+
     hierarchy_.UpdateJacobian(level_, kp_, dMdp_);
 
     mfem::BlockVector block_residual(residual_.GetData(), offsets_);
@@ -532,10 +585,60 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
                                mfem::Vector& x, mfem::Vector& dx)
 {
-    int k = 0, k_max = 0;
-    resid_norm_ = ResidualNorm(x, rhs);
+    int k = 0, k_max = 4;
 
-    while (resid_norm_ > prev_resid_norm && k < k_max)
+    print_help++;
+
+    // check percentage change and enforce it to be under 20 percent
+//    if(0)
+    {
+//        double persentage_treshold = .5;
+//        mfem::Vector true_dx = AssembleTrueVector(dx);
+//        mfem::Vector true_x = AssembleTrueVector(x);
+//        true_x += true_dx;
+
+//        double x_norm = mfem::ParNormlp(true_x, 2, comm_);
+//        x_norm = x_norm == 0.0 ? prev_resid_norm : x_norm;
+//        double relative_change = mfem::ParNormlp(true_dx, 2, comm_) / x_norm;
+
+//        std::cout << "  relative_change =  " << relative_change <<"\n";
+//        if (relative_change > persentage_treshold)
+
+        mfem::BlockVector block_dx(dx.GetData(), offsets_);
+        auto delta_p = hierarchy_.PWConstProject(level_, block_dx.GetBlock(1));
+        delta_p *= -1.;
+
+        double max_change_threshold = std::log(level_ ? 1e2 : 1e2);
+        double max_pressure_change = AbsMax(delta_p, comm_);
+
+        double relative_change = max_pressure_change * alpha / max_change_threshold;
+
+        if (relative_change > 1)
+        {
+//            if (myid_ ==0)
+//            {
+//                std::cout << "  Level " << level_ <<":\n";
+////                std::cout << "  \trelative_change =  " << relative_change <<"\n";
+//                std::cout << "  \tmax_pressure_change =  " << max_pressure_change <<"\n";
+//            }
+//            if (level_ ==0)
+            {
+                dx /= relative_change;
+                x.Add(relative_change - 1.0, dx);
+            }
+//            else
+            {
+//                if (myid_ ==0)
+//                    std::cout << "Level "<< level_ << ": the step is not used due to large change\n";
+//                x += dx;
+            }
+        }
+    }
+
+    if (k_max > 0)
+        resid_norm_ = ResidualNorm(x, rhs);
+
+    while (k < k_max && resid_norm_ > prev_resid_norm)
     {
         double backtracking_resid_norm = resid_norm_;
 
@@ -550,7 +653,7 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
             break;
         }
 
-        if (myid_ == 0 && print_level_ > 1)
+        if (myid_ == 0  && print_level_ > 1)
         {
             if (k == 0)
             {
@@ -564,6 +667,34 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
     if (k > 0 && myid_ == 0 && print_level_ > 1)
     {
         std::cout << "\n";
+    }
+
+    bool enforce_positivity = false;
+
+    // enforce positivity
+    if (level_ == 0  && (print_help % 3 == 2))
+    {
+        mfem::Vector chopped_help(offsets_[2] - offsets_[1]);
+        chopped_help = 0.0;
+        for (int i = offsets_[1]; i < x.Size(); ++i)
+        {
+            if (x[i] < 0.0)
+            {
+                if (enforce_positivity)
+                    x[i] = 0.0;
+                chopped_help[i - offsets_[1]] = 1.0;
+            }
+        }
+
+        double num_chopped = mfem::ParNormlp(chopped_help, 1, comm_);
+        if (myid_ == 0)
+        {
+            std::cout << "  Level " << level_ << " (after coarse grid correction):\n";
+            std::cout << "\tNumber of cells with negative pressure: " << num_chopped <<"\n";
+            if (enforce_positivity && num_chopped)
+                std::cout << "\tWarning: negative pressure is manually set to zero!\n";
+            std::cout << "\n";
+        }
     }
 }
 
@@ -683,17 +814,17 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
 
         if (level == 0)
         {
-            solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type, std::move(b));
+            solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type_, std::move(b));
         }
         else
         {
             mfem::BlockVector b_l = hierarchy.Restrict(level - 1, solvers_[level - 1].Get_b());
-            solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type, std::move(b_l));
+            solvers_.emplace_back(hierarchy, level, std::move(Z_l), solve_type_, std::move(b_l));
         }
         solvers_[level].SetPrintLevel(-1);
-        solvers_[level].SetMaxIter(1);
+        solvers_[level].SetMaxIter(level && solve_type_ == Picard ? 1 : 1);
 //        if (level == num_levels_-1)
-//             solvers_[level].SetMaxIter(20);
+//             solvers_[level].SetMaxIter(3);
     }
 }
 
@@ -728,7 +859,7 @@ void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& co
 void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
     double ratio = solve_type_ == Newton ? 1e-6 : 1e-2;
-    hierarchy_.SetRelTol(level, std::max((level ? ratio : 1.0) * linear_tol_, 1e-12));
+    hierarchy_.SetRelTol(level, std::max((level ? ratio : 1.0) * linear_tol_, 1e-8));
 
     solvers_[level].Solve(in, out);
 
@@ -757,10 +888,23 @@ int EllipticNLMG::LevelSize(int level) const
 void Kappa(const mfem::Vector& p, mfem::Vector& kp)
 {
     assert(kp.Size() == p.Size());
+//    std::cout<<"p_max = " <<p.Max()<<"\n";
+//    std::cout<<"p_min = " <<p.Min()<<"\n";
+//    std::cout<<"size = "<<p.Size()<<"\n";
+
     for (int i = 0; i < p.Size(); i++)
     {
 //        assert(p[i] >= 0.0);
         kp[i] = std::exp(alpha * p[i]);
+
+        if (kp[i] == 0.0)
+        {
+//            std::cout<<"p_max = " <<p.Max()<<"\n";
+//            std::cout<<"p_min = " <<p.Min()<<"\n";
+//            std::cout<<"size = "<<p.Size()<<"\n";
+            std::cout<<"(p, kp) = "<<p[i] << " " <<kp[i]<<"\n";
+        }
+
         assert(kp[i] > 0.0);
     }
 }

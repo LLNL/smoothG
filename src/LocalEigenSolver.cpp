@@ -89,7 +89,7 @@ LocalEigenSolver::LocalEigenSolver(
 void LocalEigenSolver::AllocateWorkspace(int n, bool is_gev)
 {
     A_.resize(n * n, 0.0);
-    if (is_gev)
+//    if (is_gev)
     {
         B_.resize(n * n, 0.0);
     }

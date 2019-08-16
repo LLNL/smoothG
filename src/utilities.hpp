@@ -92,8 +92,7 @@ int MarkDofsOnBoundary(
    This is normally used with a mat that corresponds to some entity_dof or
    related table.
 */
-void GetTableRow(
-    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
+void GetTableRow(const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
 
 /// if you call GetTableRow repeatedly, bad things might happen
 void GetTableRowCopy(
@@ -238,6 +237,8 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
                                     const mfem::HypreParMatrix& entity_trueentity_entity);
 
+double AbsMax(const mfem::Vector& vec, MPI_Comm comm);
+double Min(const mfem::Vector& vec, MPI_Comm comm);
 
 } // namespace smoothg
 

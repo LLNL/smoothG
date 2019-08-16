@@ -51,6 +51,7 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
+//        param_.max_evects = param.max_evects + level;
         Coarsen(level, param, level ? nullptr : partitioning);
         MakeSolver(level + 1, param);
         if (ess_attr)
@@ -69,7 +70,8 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     GraphTopology topology;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
-                         topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
+                         topology.Coarsen(mgL.GetGraph(), level ? 8 : param.coarse_factor,
+                                          param.num_iso_verts);
 
     agg_vert.push_back(topology.Agg_vertex_);
 

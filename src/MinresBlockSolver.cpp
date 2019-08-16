@@ -138,16 +138,6 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     Init(hM_.get(), hD_.get(), W_.get());
 }
 
-double FroNorm(const mfem::SparseMatrix& mat)
-{
-    double norm = 0.0;
-    for (int i = 0; i < mat.NumNonZeroElems(); ++i)
-    {
-        norm += mat.GetData()[i] * mat.GetData()[i];
-    }
-    return norm;
-}
-
 void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
                              mfem::BlockVector& sol) const
 {
@@ -165,9 +155,39 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
                                 : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
 
+    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-12);
+    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-15);
+
+    // debug
+    {
 //    std::cout<<"FNorm = "<< FroNorm(GetDiag(*hD_))<<"\n";
 
 //    std::cout<<"Rhs Norm = "<< const_cast<mfem::Array<int>&>(ess_edofs_).Sum()<<"\n";
+
+//    mfem::Array<int> offsets;
+//    auto& nonconst_op = const_cast<mfem::BlockOperator&>(operator_);
+//    nonconst_op.ColOffsets().Copy(offsets);
+//    mfem::BlockMatrix op_proc(offsets);
+
+//    auto Mproc = GetDiag(*hM_);
+//    auto Dproc = GetDiag(*hD_);
+//    auto& block01 = dynamic_cast<mfem::HypreParMatrix&>(nonconst_op.GetBlock(0, 1));
+//    auto DprocT = GetDiag(block01);
+
+//    op_proc.SetBlock(0, 0, &Mproc);
+//    op_proc.SetBlock(0, 1, &DprocT);
+//    op_proc.SetBlock(1, 0, &Dproc);
+//    if (W_)
+//        op_proc.SetBlock(1, 1, W_.get());
+
+//    std::unique_ptr<mfem::SparseMatrix> op_mono(op_proc.CreateMonolithic());
+//    mfem::UMFPackSolver direct_solver(*op_mono);
+//    direct_solver.Mult(rhs, sol);
+
+//    mfem::BlockVector r(sol); r = 0.0;
+//    prec_.Mult(rhs, r);
+//     std::cout<<"||r|| = " <<FroNorm(GetDiag(block01))<<"\n";
+    }
 
     solver->Mult(rhs, sol);
 
@@ -214,7 +234,6 @@ void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_
     chrono.Start();
 
     auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
-
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])

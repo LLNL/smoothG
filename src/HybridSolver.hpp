@@ -221,6 +221,7 @@ private:
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;
+    std::unique_ptr<mfem::HypreParMatrix> edof_shared_mean_;
 
     mutable mfem::Vector trueHrhs_;
     mutable mfem::Vector trueMu_;
@@ -264,6 +265,7 @@ private:
     mfem::SparseMatrix aux_map_;
     std::unique_ptr<mfem::HypreParMatrix> aux_op_;
     std::unique_ptr<mfem::HypreBoomerAMG> aux_solver_;
+    mfem::GMRESSolver gmres_;
 };
 
 } // namespace smoothg

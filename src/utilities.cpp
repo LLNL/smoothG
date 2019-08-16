@@ -82,14 +82,13 @@ int MarkDofsOnBoundary(
    DofAgglomeration::GetViewAgglomerateDofGlobalNumbering()
    as one step to extracting from Parelag.
 */
-void GetTableRow(
-    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
+void GetTableRow(const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J)
 {
     const int begin = mat.GetI()[rownum];
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
     assert(size >= 0);
-    J.MakeRef(mat.GetJ() + begin, size);
+    J.MakeRef(const_cast<int*>(mat.GetJ()) + begin, size);
 }
 
 /// instead of a reference, get a copy
@@ -100,7 +99,7 @@ void GetTableRowCopy(
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
     mfem::Array<int> temp;
-    temp.MakeRef(mat.GetJ() + begin, size);
+    temp.MakeRef(const_cast<int*>(mat.GetJ()) + begin, size);
     temp.Copy(J);
 }
 
@@ -483,7 +482,7 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat)
 {
     std::set<unsigned> cols;
-    int* mat_j = mat.GetJ();
+    int* mat_j = const_cast<int*>(mat.GetJ());
     int* end = mat_j + mat.NumNonZeroElems();
     for (; mat_j != end; mat_j++)
     {
@@ -542,6 +541,20 @@ mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentit
     entity_reorder_map.Finalize();
 
     return entity_reorder_map;
+}
+
+double AbsMax(const mfem::Vector& vec, MPI_Comm comm)
+{
+    double global_abs_max, loc_abs_max = vec.Normlinf();
+    MPI_Allreduce(&loc_abs_max, &global_abs_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+    return global_abs_max;
+}
+
+double Min(const mfem::Vector& vec, MPI_Comm comm)
+{
+    double global_min, local_min = vec.Min();
+    MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, comm);
+    return global_min;
 }
 
 } // namespace smoothg

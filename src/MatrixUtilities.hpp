@@ -483,6 +483,8 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 
 int NNZ(const mfem::SparseMatrix& mat);
 
+double FroNorm(const mfem::SparseMatrix& mat);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

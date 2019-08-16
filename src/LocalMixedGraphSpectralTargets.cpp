@@ -54,7 +54,9 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
             }
     }
 
-    sz = std::min(std::min(max_evects_ - 1, single_vec.Size() - 1), sz);
+    int max_num = offset == 1 ? max_evects_ : ceil(single_vec.Size() * (double)max_evects_ / 100.0);// (max_evects_+1) /2;
+
+    sz = std::min(std::min(max_num - 1, single_vec.Size() - 1), sz);
     out.SetSize(single_vec.Size(), sz + 1);
     Concatenate(single_vec, vectors, out);
 }
@@ -304,7 +306,7 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
         mfem::DenseMatrix evects_tmp;
         // Do not consider the first vertex eigenvector, which is constant
         evects_tmp.UseExternalData(evects.Data() + evects.Height(),
-                                   evects.Height(), (1 - 1) );
+                                   evects.Height(), (nevects - 1) );
 
         // Collect trace samples from M^{-1}Dloc^T times vertex eigenvectors
         // transposed for extraction later
@@ -463,7 +465,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         GetExtAggDofs(DofType::VDOF, agg, ext_loc_vdofs);
 
         // Single vertex aggregate
-        if (ext_loc_edofs.Size() == 0)
+        if (ext_loc_edofs.Size() == 0 || ext_loc_vdofs.Size() == 1)
         {
             local_vertex_targets[agg] = mfem::DenseMatrix(1, 1);
             local_vertex_targets[agg] = 1.0;
