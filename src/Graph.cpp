@@ -360,6 +360,7 @@ void Graph::ReorderEdges(const mfem::HypreParMatrix& edge_trueedge)
     auto reorder_map_tmp = EntityReorderMap(edge_trueedge, *edge_trueedge_edge_);
     edge_reorder_map_.Swap(reorder_map_tmp);
     edge_trueedge_ = ParMult(edge_reorder_map_, edge_trueedge, edge_starts_);
+
     edge_trueedge_->CopyColStarts();
     edge_trueedge_edge_ = AAt(*edge_trueedge_);
 

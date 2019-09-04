@@ -105,6 +105,8 @@ void GetTableRowCopy(
    This is the integrator for the artificial mass matrix in a finite
    volume discretization, tricking MFEM into doing finite volumes instead
    of finite elements.
+
+   @deprecated this is replaced by LocalTPFA, which is more direct and general
 */
 class FiniteVolumeMassIntegrator: public mfem::BilinearFormIntegrator
 {

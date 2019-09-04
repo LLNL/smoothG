@@ -36,7 +36,7 @@ memorycheck_command = "@MEMORYCHECK_COMMAND@"
 
 # Test paramaters
 num_procs = "@SMOOTHG_TEST_PROCS@"
-test_tol = float("@SMOOTHG_TEST_TOL@")
+default_test_tol = float("@SMOOTHG_TEST_TOL@")
 
 def run_test(command, expected={}, verbose=False):
     """ Executes test
@@ -66,10 +66,19 @@ def run_test(command, expected={}, verbose=False):
 
     output = readjson.json_parse_lines(stdout.splitlines())
 
-    for key, expected_val in expected.items():
+    for key, expected_valpair in expected.items():
         test_val = output[key]
 
-        if abs(float(expected_val) - float(test_val)) > test_tol:
+        try:
+            expected_val = expected_valpair[0]
+            test_tol = expected_valpair[1]
+        except TypeError:
+            expected_val = expected_valpair
+            test_tol = default_test_tol
+        fexpected = float(expected_val)
+        ftest = float(test_val)
+        if abs(fexpected - ftest) > test_tol:
+            print("test {0:s} failed, expected {1:f}, got {2:f}\n".format(key, fexpected, ftest))
             return False
 
     return True
@@ -96,7 +105,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0312444586906591e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.14743131732550618,
           "finest-u-error": 0.22621045683612057,
           "operator-complexity": 1.0221724964280585}]
@@ -107,7 +116,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "4",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0336350399372878e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.05516198497834629,
           "finest-u-error": 0.052317636963252999,
           "operator-complexity": 1.3017591339648173}]
@@ -119,7 +128,7 @@ def make_tests():
           "--max-evects", "4",
           "--hybridization",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.3301680521537587e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055161984984368362,
           "finest-u-error": 0.052317636981330032,
           "operator-complexity": 1.1362437864707153}]
@@ -130,7 +139,7 @@ def make_tests():
           "--slice", "19",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.2837519341678676e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
           "operator-complexity": 1.0221724964280585}]
@@ -166,7 +175,7 @@ def make_tests():
           "--max-evects", "4",
           "--dual-target",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2049690562060094e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055207481027916193,
           "finest-u-error": 0.06430185063505546,
           "operator-complexity": 1.3017591339648173}]
@@ -179,7 +188,7 @@ def make_tests():
           "--dual-target",
           "--scaled-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.9821133537907875e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055054636384856817,
           "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
@@ -192,7 +201,7 @@ def make_tests():
           "--dual-target",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2032854597960414e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055279347333696799,
           "finest-u-error": 0.068336534035533678,
           "operator-complexity": 1.3017591339648173}]
@@ -206,7 +215,7 @@ def make_tests():
           "--scaled-dual",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2079666982238907e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055052992284074398,
           "finest-u-error": 0.035336370431801843,
           "operator-complexity": 1.3017591339648173}]
@@ -438,7 +447,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0312444586906591e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.14743131732550618,
           "finest-u-error": 0.22621045683612057,
           "operator-complexity": 1.0221724964280585}]
@@ -449,7 +458,7 @@ def make_tests():
           "--slice", "0",
           "--max-evects", "4",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 2.0336350399372878e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.05516198497834629,
           "finest-u-error": 0.052317636963252999,
           "operator-complexity": 1.3017591339648173}]
@@ -461,7 +470,7 @@ def make_tests():
           "--max-evects", "4",
           "--hybridization",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.3301680521537587e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055161984984368362,
           "finest-u-error": 0.052317636981330032,
           "operator-complexity": 1.1362437864707153}]
@@ -472,7 +481,7 @@ def make_tests():
           "--slice", "19",
           "--max-evects", "1",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.2837519341678676e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.23763409361749516,
           "finest-u-error": 0.16419932734829923,
           "operator-complexity": 1.0221724964280585}]
@@ -484,7 +493,7 @@ def make_tests():
           "--max-evects", "4",
           "--dual-target",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2049690562060094e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055207481027916193,
           "finest-u-error": 0.06430185063505546,
           "operator-complexity": 1.3017591339648173}]
@@ -497,7 +506,7 @@ def make_tests():
           "--dual-target",
           "--scaled-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 1.9821133537907875e-08,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055054636384856817,
           "finest-u-error": 0.034260930604399109,
           "operator-complexity": 1.3017591339648173}]
@@ -510,7 +519,7 @@ def make_tests():
           "--dual-target",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2032854597960414e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055279347333696799,
           "finest-u-error": 0.068336534035533678,
           "operator-complexity": 1.3017591339648173}]
@@ -524,7 +533,7 @@ def make_tests():
           "--scaled-dual",
           "--energy-dual",
           "--perm", spe10_perm_file],
-         {"finest-div-error": 3.2079666982238907e-8,
+         {"finest-div-error": (0.0, 1.e-7),
           "finest-p-error": 0.055052992284074398,
           "finest-u-error": 0.035336370431801843,
           "operator-complexity": 1.3017591339648173}]
@@ -595,7 +604,7 @@ def make_tests():
          {"finest-div-error": 0.1438138616203242,
           "finest-p-error": 0.1874559440644907,
           "finest-u-error": 0.25470044682041143,
-          "operator-complexity": 1.2292477075229247}]
+          "operator-complexity": (1.229388, 3.e-4)}]
 
     tests["parsamplegraph4-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -634,7 +643,7 @@ def make_tests():
          {"finest-div-error": 0.19793206480307649,
           "finest-p-error": 0.28945297307624301,
           "finest-u-error": 0.29617987947507896,
-          "operator-complexity": 1.1895581044189558}]
+          "operator-complexity": (1.189778, 3.e-4)}]
 
     tests["pargraph-usegenerator-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -709,9 +718,9 @@ def make_tests():
           "--shared-samples", "18",
           "--choose-samples", "0",
           "--seed", "1"],
-         {"coarse-variance":0.00016563124437545969,
-          "correction-variance":3.6669929731798261e-05,
-          "mlmc-estimate":-0.0075878586626547968}]
+         {"coarse-variance":0.00019821590592782775,
+          "correction-variance":5.532948306092317e-05,
+          "mlmc-estimate":-0.0059401689449150533}]
 
     tests["qoi-hb"] = \
         [["./qoi",
@@ -723,9 +732,9 @@ def make_tests():
           "--choose-samples", "0",
           "--hybridization",
           "--seed", "1"],
-         {"coarse-variance":0.00016563124437545969,
-          "correction-variance":3.6669929731798261e-05,
-          "mlmc-estimate":-0.0075878586626547968}]
+         {"coarse-variance":0.00019821590592782775,
+          "correction-variance":5.532948306092317e-05,
+          "mlmc-estimate":-0.0059401689449150533}]
 
     tests["qoi-one-level"] = \
         [["./qoi",

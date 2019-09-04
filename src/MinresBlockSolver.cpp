@@ -80,6 +80,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     Mprec_.reset(new mfem::HypreSmoother(*M));
     Sprec_.reset(new mfem::HypreBoomerAMG(*schur_block_));
     Sprec_->SetPrintLevel(0);
+    schur_block_->EliminateZeroRows();
 
     prec_.SetDiagonalBlock(0, Mprec_.get());
     prec_.SetDiagonalBlock(1, Sprec_.get());
@@ -211,7 +212,7 @@ void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+            M_proc.EliminateRowCol(mm); // assume essential data = 0
     }
 
     hM_.reset(mixed_matrix_.MakeParallelM(M_proc));

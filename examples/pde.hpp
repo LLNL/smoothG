@@ -343,6 +343,137 @@ double HalfCoeffecient::Eval(mfem::ElementTransformation& T,
 }
 
 /**
+ @brief compute transmissibility based on two-point flux approximation
+
+ The implementation is based on (Sec. 4.4.1 of) the preliminary version of
+
+ K.-A. Lie. An introduction to reservoir simulation using MATLAB/GNU Octave
+ **/
+class LocalTPFA
+{
+    mfem::Coefficient* Q_;
+    mfem::VectorCoefficient* VQ_;
+    const mfem::ParMesh& mesh_;
+
+    mfem::DenseMatrix EvalKappa(int i);
+    mfem::Vector ComputeShapeCenter(const mfem::Element& el);
+    mfem::Vector ComputeLocalWeight(int i);
+public:
+    LocalTPFA(const mfem::ParMesh& mesh)
+        : Q_(NULL), VQ_(NULL), mesh_(mesh) { }
+
+    /// @param q inverse of permeability \f$ kappa^{-1} \f$ in Darcy's law
+    LocalTPFA(const mfem::ParMesh& mesh, mfem::Coefficient& q)
+        : Q_(&q), VQ_(NULL), mesh_(mesh) { }
+
+    LocalTPFA(const mfem::ParMesh& mesh, mfem::VectorCoefficient& q)
+        : Q_(NULL), VQ_(&q), mesh_(mesh) { }
+
+    /// Compute local edge weights for the corresponding graph Laplacian
+    std::vector<mfem::Vector> ComputeLocalWeights()
+    {
+        std::vector<mfem::Vector> local_weights(mesh_.GetNE());
+        for (int i = 0; i < mesh_.GetNE(); ++i)
+        {
+            local_weights[i] = ComputeLocalWeight(i);
+        }
+        return local_weights;
+    }
+};
+
+mfem::DenseMatrix LocalTPFA::EvalKappa(int i)
+{
+    const int dim = mesh_.Dimension();
+    const mfem::Element& el = *(mesh_.GetElement(i));
+    auto trans = const_cast<mfem::ParMesh&>(mesh_).GetElementTransformation(i);
+    const auto& ip = mfem::IntRules.Get(el.GetType(), 1).IntPoint(0);
+
+    mfem::DenseMatrix kappa(dim);
+
+    // Note that Q is kappa^{-1}
+    if (VQ_)
+    {
+        mfem::Vector vq(dim);
+        VQ_->Eval(vq, *trans, ip);
+        for (int d = 0; d < dim; ++d)
+            kappa(d, d) = 1.0 / vq(d);
+    }
+    else if (Q_)
+    {
+        double sq = Q_->Eval(*trans, ip);
+        for (int d = 0; d < dim; ++d)
+            kappa(d, d) = 1.0 / sq;
+    }
+    else
+    {
+        for (int d = 0; d < dim; ++d)
+            kappa(d, d) = 1.0;
+    }
+
+    return kappa;
+}
+
+mfem::Vector LocalTPFA::ComputeShapeCenter(const mfem::Element& el)
+{
+    const int dim = mesh_.Dimension();
+    const int num_verts = el.GetNVertices();
+
+    mfem::Vector center(dim);
+    center = 0.0;
+
+    for (int v = 0; v < num_verts; ++v)
+    {
+        const double* vert_coord = mesh_.GetVertex(el.GetVertices()[v]);
+        for (int d = 0; d < dim; ++d)
+        {
+            center[d] += vert_coord[d];
+        }
+    }
+    return center /= num_verts;
+}
+
+mfem::Vector LocalTPFA::ComputeLocalWeight(int i)
+{
+    const int dim = mesh_.Dimension();
+    auto& elem_face = dim > 2 ? mesh_.ElementToFaceTable() : mesh_.ElementToEdgeTable();
+    const int num_faces = elem_face.RowSize(i);
+    const mfem::DenseMatrix kappa = EvalKappa(i);
+    const mfem::Vector cell_center = ComputeShapeCenter(*(mesh_.GetElement(i)));
+    const int* faces = elem_face.GetRow(i);
+
+    mfem::ParMesh& non_const_mesh = const_cast<mfem::ParMesh&>(mesh_);
+    mfem::Vector normal(dim), c_vector(dim);
+    mfem::Vector local_weight(num_faces);
+
+    for (int f = 0; f < num_faces; ++f)
+    {
+        auto trans = non_const_mesh.GetFaceTransformation(faces[f]);
+        auto& ip = mfem::IntRules.Get(trans->GetGeometryType(), 1).IntPoint(0);
+        trans->SetIntPoint(&ip);
+
+        double face_measure = ip.weight * trans->Weight();
+        assert(face_measure > 0);
+
+        mfem::CalcOrtho(trans->Jacobian(), normal);
+        normal /= normal.Norml2();   // make it unit normal
+
+        auto facet_ceter = ComputeShapeCenter(*(mesh_.GetFace(faces[f])));
+
+        for (int d = 0; d < dim; ++d)
+        {
+            c_vector[d] = facet_ceter[d] - cell_center[d];
+        }
+
+        // Note that edge weight is inverse of M
+        double delta_x = c_vector.Norml2();
+        double nkc = std::fabs(kappa.InnerProduct(normal, c_vector));
+        local_weight(f) = (face_measure * nkc) / (delta_x * delta_x);
+    }
+
+    return local_weight;
+}
+
+/**
    @brief Darcy's flow problem discretized in finite volume (TPFA)
 
    Abstract class serves as interface between graph and finite volume problem.
@@ -513,45 +644,29 @@ void DarcyProblem::ComputeGraphWeight(bool unit_weight)
         return;
     }
 
-    // Construct "finite volume mass" matrix
-    mfem::ParBilinearForm a(sigma_fes_.get());
-    if (kinv_vector_)
-    {
-        assert(kinv_scalar_ == nullptr);
-        a.AddDomainIntegrator(new FiniteVolumeMassIntegrator(*kinv_vector_));
-    }
-    else
-    {
-        assert(kinv_scalar_);
-        a.AddDomainIntegrator(new FiniteVolumeMassIntegrator(*kinv_scalar_));
-    }
+    // Compute local edge weights
+    LocalTPFA local_TPFA(*pmesh_, *kinv_vector_);
+    local_weight_ = local_TPFA.ComputeLocalWeights();
 
-    // Compute element mass matrices, assemble mass matrix and edge weight
-    a.ComputeElementMatrices();
-    a.Assemble();
-    a.Finalize();
-    a.SpMat().GetDiag(weight_);
+    // Assemble edge weights w_ij = (w_{ij,i}^{-1} + w_{ij,j}^{-1})^{-1}
+    mfem::Array<int> edges;
+
+    weight_.SetSize(vertex_edge_.NumCols());
+    weight_ = 0.0;
+
+    for (int i = 0; i < vertex_edge_.NumRows(); ++i)
+    {
+        GetTableRow(vertex_edge_, i, edges);
+        for (int j = 0; j < edges.Size(); ++j)
+        {
+            weight_[edges[j]] += 1.0 / local_weight_[i][j];
+        }
+    }
 
     for (int i = 0; i < weight_.Size(); ++i)
     {
         assert(mfem::IsFinite(weight_[i]) && weight_[i] != 0.0);
         weight_[i] = 1.0 / weight_[i];
-    }
-
-    // Store element mass matrices and local edge weights
-    local_weight_.resize(vertex_edge_.NumRows());
-    mfem::DenseMatrix M_el_i;
-    for (int i = 0; i < pmesh_->GetNE(); i++)
-    {
-        a.ComputeElementMatrix(i, M_el_i);
-
-        mfem::Vector& local_weight_i = local_weight_[i];
-        local_weight_i.SetSize(M_el_i.Height());
-
-        for (int j = 0; j < M_el_i.Height(); j++)
-        {
-            local_weight_i[j] = 1.0 / M_el_i(j, j);
-        }
     }
 }
 
@@ -862,7 +977,7 @@ void SPE10Problem::MakeRHS()
     {
         mfem::Array<int> nat_negative_one(ess_attr_.Size());
         nat_negative_one = 0;
-        nat_negative_one[0] = 1;
+        nat_negative_one[pmesh_->Dimension() - 2] = 1;
 
         mfem::ConstantCoefficient negative_one(-1.0);
         mfem::RestrictedCoefficient pinflow_coeff(negative_one, nat_negative_one);
