@@ -59,8 +59,6 @@ class FEDarcyProblem
     OperatorPtr B_;
     Vector rhs_;
     Vector ess_data_;
-    Vector hybrid_rhs_;
-    Vector hybrid_ess_data_;
     ParGridFunction u_;
     ParGridFunction p_;
     ParMesh mesh_;
@@ -77,12 +75,10 @@ public:
     HypreParMatrix& GetB() { return *B_.As<HypreParMatrix>(); }
     const Vector& GetRHS() { return rhs_; }
     const Vector& GetBC() { return ess_data_; }
-    const Vector& GetHRHS() { return hybrid_rhs_; }
-    const Vector& GetHBC() { return hybrid_ess_data_; }
     const DFSDataCollector& GetDFSDataCollector() const { return collector_; }
     const MixedMatrix& GetMixedMatrix() const { return *mixed_system_; }
 
-    void ShowError(const Vector& sol, bool verbose, bool reorder);
+    void ShowError(const Vector& sol, bool verbose);
 };
 
 FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
@@ -199,26 +195,10 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     fform.ParallelAssemble(block0_view);
     gform.ParallelAssemble(block1_view);
 
-    hybrid_rhs_.SetSize(fform.Size()+gform.Size());
-    block0_view.SetDataAndSize(hybrid_rhs_.GetData(), fform.Size());
-    block1_view.SetDataAndSize(hybrid_rhs_.GetData()+fform.Size(), gform.Size());
-    block0_view = fform;
-    block1_view = gform;
-    Vector reordered_item(fform);
-    edge_reoder_mapT.MultTranspose(block0_view, reordered_item);
-    block0_view = reordered_item;
-
     ess_data_.SetSize(M_->NumRows()+B_->NumRows());
     ess_data_ = 0.0;
     Vector ess_data_block0(ess_data_.GetData(), M_->NumRows());
     u_.ParallelProject(ess_data_block0);
-
-    hybrid_ess_data_.SetSize(u_.Size()+p_.Size());
-    hybrid_ess_data_ = 0.0;
-    block0_view.SetDataAndSize(hybrid_ess_data_.GetData(), u_.Size());
-    block0_view = u_;
-    edge_reoder_mapT.MultTranspose(block0_view, reordered_item);
-    block0_view = reordered_item;
 
     int order_quad = max(2, 2*order+1);
     for (int i=0; i < Geometry::NumGeom; ++i)
@@ -227,7 +207,7 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     }
 }
 
-void FEDarcyProblem::ShowError(const Vector &sol, bool verbose, bool reorder)
+void FEDarcyProblem::ShowError(const Vector &sol, bool verbose)
 {
     u_.Distribute(Vector(sol.GetData(), M_->NumRows()));
     p_.Distribute(Vector(sol.GetData()+M_->NumRows(), B_->NumRows()));
@@ -342,7 +322,7 @@ int main(int argc, char *argv[])
             if (verbose) cout << "  solve time: " << chrono.RealTime() << "s.\n";
             if (verbose) cout << "  iteration count: "
                               << solver->GetNumIterations() <<"\n";
-            if (show_error) darcy.ShowError(sol, verbose, name == "Hybridization");
+            if (show_error) darcy.ShowError(sol, verbose);
         }
     }
 
