@@ -90,11 +90,11 @@ int main(int argc, char *argv[])
    // 3. Read the (serial) mesh from the given mesh file on all processors.  We
    //    can handle triangular, quadrilateral, tetrahedral, hexahedral, surface
    //    and volume meshes with the same code.
-//   int nx = pow(2, par_ref_levels + 1);
-//   Mesh *mesh = new Mesh(nx, nx, nx, mfem::Element::HEXAHEDRON, 1);
-   std::ifstream imesh("/Users/lee1029/Codes/meshes/cylinder_mfem.mesh3d");
-   Mesh *mesh = new Mesh(imesh, 1, 1);
-   imesh.close();
+   int nx = 2;//pow(2, par_ref_levels + 1);
+   Mesh *mesh = new Mesh(nx, nx, nx, mfem::Element::HEXAHEDRON, true);
+//   std::ifstream imesh("/Users/lee1029/Codes/meshes/cylinder_mfem.mesh3d");
+//   Mesh *mesh = new Mesh(imesh, 1, 1);
+//   imesh.close();
    int dim = mesh->Dimension();
 
    // 4. Refine the serial mesh on all processors to increase the resolution. In
@@ -327,62 +327,62 @@ int main(int argc, char *argv[])
 }
 
 // This is actually the function for imposing boundary (or initial) condition
-double GaussianHill(const Vector& xt)
-{
-    return std::exp(-100.0 * (std::pow(xt(0) - 0.5, 2.0) + xt(1) * xt(1)));
-}
-
-//double GaussianHill(const Vector&xvec)
+//double GaussianHill(const Vector& xt)
 //{
-//    double x = xvec(0);
-//    double y = xvec(1);
-//    return exp(-100.0 * ((x - 0.5) * (x - 0.5) + y * y));
+//    return std::exp(-100.0 * (std::pow(xt(0) - 0.5, 2.0) + xt(1) * xt(1)));
 //}
 
-double uFun_ex(const Vector& xt)
-{
-    double x = xt(0);
-    double y = xt(1);
-    double r = sqrt(x*x + y*y);
-    double teta = atan2(y,x);
-    /*
-    if (fabs(x) < MYZEROTOL && y > 0)
-        teta = M_PI / 2.0;
-    else if (fabs(x) < MYZEROTOL && y < 0)
-        teta = - M_PI / 2.0;
-    else
-        teta = atan(y,x);
-    */
-    double t = xt(xt.Size()-1);
-    Vector xvec(2);
-    xvec(0) = r * cos (teta - t);
-    xvec(1) = r * sin (teta - t);
-    return GaussianHill(xvec);
-}
+////double GaussianHill(const Vector&xvec)
+////{
+////    double x = xvec(0);
+////    double y = xvec(1);
+////    return exp(-100.0 * ((x - 0.5) * (x - 0.5) + y * y));
+////}
 
-double fFun(const Vector& xt)
-{
-    return 0.0;
-}
+//double uFun_ex(const Vector& xt)
+//{
+//    double x = xt(0);
+//    double y = xt(1);
+//    double r = sqrt(x*x + y*y);
+//    double teta = atan2(y,x);
+//    /*
+//    if (fabs(x) < MYZEROTOL && y > 0)
+//        teta = M_PI / 2.0;
+//    else if (fabs(x) < MYZEROTOL && y < 0)
+//        teta = - M_PI / 2.0;
+//    else
+//        teta = atan(y,x);
+//    */
+//    double t = xt(xt.Size()-1);
+//    Vector xvec(2);
+//    xvec(0) = r * cos (teta - t);
+//    xvec(1) = r * sin (teta - t);
+//    return GaussianHill(xvec);
+//}
 
-void bFun_ex(const Vector& xt, Vector& b )
-{
-    b.SetSize(xt.Size());
+//double fFun(const Vector& xt)
+//{
+//    return 0.0;
+//}
 
-    if (xt.Size() == 3)
-    {
-        b(0) = -xt(1);
-        b(1) = xt(0);
-    }
-    else
-    {
-        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
-        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
-        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
-    }
+//void bFun_ex(const Vector& xt, Vector& b )
+//{
+//    b.SetSize(xt.Size());
 
-    b(xt.Size()-1) = 1.;
-}
+//    if (xt.Size() == 3)
+//    {
+//        b(0) = -xt(1);
+//        b(1) = xt(0);
+//    }
+//    else
+//    {
+//        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
+//        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
+//        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
+//    }
+
+//    b(xt.Size()-1) = 1.;
+//}
 
 void bfFun_ex(const Vector& xt, Vector& bf)
 {
@@ -426,42 +426,42 @@ void bbT_ex(const Vector& xt, DenseMatrix& bbT)
     MultVVt(b, bbT);
 }
 
-//double uFun_ex(const Vector& xt)
-//{
-//    double t = xt(xt.Size()-1);
-////    return t;
-//    return sin(t)*exp(t)*xt(0)*xt(1);
-//}
+double uFun_ex(const Vector& xt)
+{
+    double t = xt(xt.Size()-1);
+//    return t;
+    return sin(t)*exp(t)*xt(0)*xt(1);
+}
 
-//double fFun(const Vector& xt)
-//{
-////    double tmp = 0.;
-////    for (int i = 0; i < xt.Size()-1; i++)
-////        tmp += xt(i);
-////    return 1.;//+ (xt.Size()-1-2*tmp) * uFun_ex(xt);
-//    double t = xt(xt.Size()-1);
-//    Vector b;
-//    bFun_ex(xt, b);
-//    return (cos(t)*exp(t)+sin(t)*exp(t))*xt(0)*xt(1)+
-//            b(0)*sin(t)*exp(t)*xt(1) + b(1)*sin(t)*exp(t)*xt(0);
-//}
+double fFun(const Vector& xt)
+{
+//    double tmp = 0.;
+//    for (int i = 0; i < xt.Size()-1; i++)
+//        tmp += xt(i);
+//    return 1.;//+ (xt.Size()-1-2*tmp) * uFun_ex(xt);
+    double t = xt(xt.Size()-1);
+    Vector b;
+    bFun_ex(xt, b);
+    return (cos(t)*exp(t)+sin(t)*exp(t))*xt(0)*xt(1)+
+            b(0)*sin(t)*exp(t)*xt(1) + b(1)*sin(t)*exp(t)*xt(0);
+}
 
-//void bFun_ex(const Vector& xt, Vector& b)
-//{
-//    b.SetSize(xt.Size());
-//    b = 0.;
+void bFun_ex(const Vector& xt, Vector& b)
+{
+    b.SetSize(xt.Size());
+    b = 0.;
 
-//    b(xt.Size()-1) = 1.;
+    b(xt.Size()-1) = 1.;
 
-//    if (xt.Size() == 3)
-//    {
-//        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI);
-//        b(1) = -sin(xt(1)*M_PI)*cos(xt(0)*M_PI);
-//    }
-//    else
-//    {
-//        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
-//        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
-//        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
-//    }
-//}
+    if (xt.Size() == 3)
+    {
+        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI);
+        b(1) = -sin(xt(1)*M_PI)*cos(xt(0)*M_PI);
+    }
+    else
+    {
+        b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI)*cos(xt(2)*M_PI);
+        b(1) = -0.5*sin(xt(1)*M_PI)*cos(xt(0)*M_PI)*cos(xt(2)*M_PI);
+        b(2) = -0.5*sin(xt(2)*M_PI)*cos(xt(0)*M_PI)*cos(xt(1)*M_PI);
+    }
+}

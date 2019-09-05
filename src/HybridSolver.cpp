@@ -112,7 +112,7 @@ void HybridSolver::Init(
     cg_.SetMaxIter(max_num_iter_);
     cg_.SetRelTol(rtol_);
     cg_.SetAbsTol(atol_);
-    cg_.iterative_mode = true;
+    cg_.iterative_mode = false;
 
     BuildParallelSystemAndSolver(H_proc);
 
@@ -364,7 +364,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         for (int i = 0; i < diagonal_scaling_.Size(); ++i)
         {
             diagonal_scaling_[i] = CDT1_global[i] / CCT_diag_global[i];
-            if (diagonal_scaling_[i] == 0.0) diagonal_scaling_[i] = 1.0;
+//            if (diagonal_scaling_[i] == 0.0) diagonal_scaling_[i] = 1.0;
         }
     }
 
@@ -484,7 +484,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 
     if (is_symmetric_)
     {
-        trueMu_ = MakeInitialGuess(Sol, Rhs);
+        trueMu_ = 0.0;//MakeInitialGuess(Sol, Rhs);
     }
     else
     {
@@ -752,6 +752,14 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
         sli.Mult(zeros, diagonal_scaling_);
     }
 
+    for (int i = 0; i < diagonal_scaling_.Size(); ++i)
+    {
+        if (diagonal_scaling_[i]==0.0)
+        {
+            diagonal_scaling_[i]=1.0;
+        }
+    }
+
     if (num_multiplier_dofs_ == mgL_.GetGraph().NumEdges())
     {
         auto Scale = VectorToMatrix(diagonal_scaling_);
@@ -828,9 +836,9 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
         auto tmp = ParMult(*multiplier_td_d_, H_proc, multiplier_start_);
         H_.reset(mfem::ParMult(tmp.get(), multiplier_d_td_.get()));
     }
-
     H_elim_.reset(H_->EliminateRowsCols(ess_true_multipliers_));
 
+//    if(myid_==0)GetDiag(*H_).Print();
     if (std::abs(rescale_iter_) > 0 && !saamge_param_)
     {
         ComputeScaledHybridSystem(*H_);

@@ -99,7 +99,8 @@ Graph::Graph(const Graph& other) noexcept
       edge_bdratt_(other.edge_bdratt_),
       edge_vertex_local_(other.edge_vertex_local_),
       edge_trueedge_edge_(Copy(*other.edge_trueedge_edge_)),
-      vertex_trueedge_(Copy(*other.vertex_trueedge_))
+      vertex_trueedge_(Copy(*other.vertex_trueedge_)),
+      edge_reorder_map_(other.edge_reorder_map_)
 {
     other.vert_loc_to_glo_.Copy(vert_loc_to_glo_);
     other.edge_loc_to_glo_.Copy(edge_loc_to_glo_);
@@ -133,6 +134,8 @@ void swap(Graph& lhs, Graph& rhs) noexcept
     mfem::Swap(lhs.edge_loc_to_glo_, rhs.edge_loc_to_glo_);
     mfem::Swap(lhs.vertex_starts_, rhs.vertex_starts_);
     mfem::Swap(lhs.edge_starts_, rhs.edge_starts_);
+
+    lhs.edge_reorder_map_.Swap(rhs.edge_reorder_map_);
 }
 
 void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,

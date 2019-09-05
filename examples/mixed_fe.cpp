@@ -59,6 +59,8 @@ class FEDarcyProblem
     OperatorPtr B_;
     Vector rhs_;
     Vector ess_data_;
+    Vector hybrid_rhs_;
+    Vector hybrid_ess_data_;
     ParGridFunction u_;
     ParGridFunction p_;
     ParMesh mesh_;
@@ -75,10 +77,12 @@ public:
     HypreParMatrix& GetB() { return *B_.As<HypreParMatrix>(); }
     const Vector& GetRHS() { return rhs_; }
     const Vector& GetBC() { return ess_data_; }
+    const Vector& GetHRHS() { return hybrid_rhs_; }
+    const Vector& GetHBC() { return hybrid_ess_data_; }
     const DFSDataCollector& GetDFSDataCollector() const { return collector_; }
     const MixedMatrix& GetMixedMatrix() const { return *mixed_system_; }
 
-    void ShowError(const Vector& sol, bool verbose);
+    void ShowError(const Vector& sol, bool verbose, bool dist=true);
 };
 
 FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
@@ -127,75 +131,94 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     bVarf.Finalize();
     B_.Reset(bVarf.ParallelAssemble());
 
-    rhs_.SetSize(M_->NumRows() + B_->NumRows());
-    Vector rhs_block0(rhs_.GetData(), M_->NumRows());
-    Vector rhs_block1(rhs_.GetData()+M_->NumRows(), B_->NumRows());
-    fform.ParallelAssemble(rhs_block0);
-    gform.ParallelAssemble(rhs_block1);
+    mfem::SparseMatrix D_tmp(bVarf.SpMat());
+    auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh_);
+    auto vertex_edge = TableToMatrix(mesh_.ElementToFaceTable());
+    auto& edge_trueedge = *(collector_.hdiv_fes_.get()->Dof_TrueDof_Matrix()); //TODO: for higher order this doesn't work!
+    Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
 
-    ess_data_.SetSize(M_->NumRows() + B_->NumRows());
+    std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
+    mfem::Array<int> vdofs, reordered_edges, original_edges;
+    for (int i = 0; i < mesh_.GetNE(); ++i)
+    {
+        mVarf.ComputeElementMatrix(i, M_el[i]);
+
+        DenseMatrix sign_fix(M_el[i].NumRows());
+        collector_.hdiv_fes_.get()->GetElementVDofs(i, vdofs);
+        for (int j = 0; j < sign_fix.NumRows(); ++j)
+        {
+            sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
+        }
+
+        mfem::DenseMatrix help(sign_fix);
+        mfem::Mult(M_el[i], sign_fix, help);
+        mfem::Mult(sign_fix, help, M_el[i]);
+
+        GetTableRow(graph.VertexToEdge(), i, reordered_edges);
+        GetTableRow(vertex_edge, i, original_edges);
+        mfem::DenseMatrix local_reorder_map(reordered_edges.Size());
+        for (int j = 0; j < reordered_edges.Size(); ++j)
+        {
+            int reordered_edge = reordered_edges[j];
+            int original_edge = graph.EdgeReorderMap().GetRowColumns(reordered_edge)[0];
+            int original_local = original_edges.Find(original_edge);
+            assert(original_local != -1);
+            local_reorder_map(original_local, j) = 1;
+        }
+
+        mfem::Mult(M_el[i], local_reorder_map, help);
+        local_reorder_map.Transpose();
+        mfem::Mult(local_reorder_map, help, M_el[i]);
+    }
+    auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), graph.VertexToEdge());
+
+    auto edge_reoder_mapT = smoothg::Transpose(graph.EdgeReorderMap());
+    mfem::SparseMatrix D = smoothg::Mult(D_tmp, edge_reoder_mapT);
+
+    mfem::SparseMatrix W;
+    mfem::Vector const_rep(graph.NumVertices());
+    const_rep = 1.0;
+    mfem::Vector vertex_sizes(const_rep);
+    mfem::SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
+
+    mfem::Vector edge_bc(graph.NumEdges());
+    edge_bc = u_;
+
+    GraphSpace graph_space(std::move(graph));
+
+    mixed_system_.reset(new MixedMatrix(std::move(graph_space), std::move(mbuilder),
+                                        std::move(D), std::move(W), std::move(const_rep),
+                                        std::move(vertex_sizes), std::move(P_pwc)));
+    mixed_system_->SetEssDofs(ess_bdr);
+
+    rhs_.SetSize(M_->NumRows()+B_->NumRows());
+    rhs_ = 0.0;
+    Vector block0_view(rhs_.GetData(), M_->NumRows());
+    Vector block1_view(rhs_.GetData()+M_->NumRows(), B_->NumRows());
+
+    Vector reordered_fform(fform);
+    edge_reoder_mapT.Mult(fform, reordered_fform);
+    fform = reordered_fform;
+
+    fform.ParallelAssemble(block0_view);
+    gform.ParallelAssemble(block1_view);
+
+    hybrid_rhs_.SetSize(fform.Size()+gform.Size());
+    block0_view.SetDataAndSize(hybrid_rhs_.GetData(), fform.Size());
+    block1_view.SetDataAndSize(hybrid_rhs_.GetData()+fform.Size(), gform.Size());
+    block0_view = fform;
+    block1_view = gform;
+
+    ess_data_.SetSize(M_->NumRows()+B_->NumRows());
+    ess_data_ = 0.0;
     Vector ess_data_block0(ess_data_.GetData(), M_->NumRows());
     u_.ParallelProject(ess_data_block0);
 
-   mfem::SparseMatrix D_tmp(bVarf.SpMat());
-   auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh_);
-   auto vertex_edge = TableToMatrix(mesh_.ElementToFaceTable());
-   auto& edge_trueedge = *(collector_.hdiv_fes_.get()->Dof_TrueDof_Matrix()); //TODO: for higher order this doesn't work!
-   Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
+    hybrid_ess_data_.SetSize(u_.Size()+p_.Size());
+    hybrid_ess_data_ = 0.0;
+    block0_view.SetDataAndSize(hybrid_ess_data_.GetData(), u_.Size());
+    block0_view = u_;
 
-   std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
-   mfem::Array<int> vdofs, reordered_edges, original_edges;
-   for (int i = 0; i < mesh_.GetNE(); ++i)
-   {
-       mVarf.ComputeElementMatrix(i, M_el[i]);
-
-       DenseMatrix sign_fix(M_el[i].NumRows());
-       collector_.hdiv_fes_.get()->GetElementVDofs(i, vdofs);
-       for (int j = 0; j < sign_fix.NumRows(); ++j)
-       {
-           sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
-       }
-
-       mfem::DenseMatrix help(sign_fix);
-       mfem::Mult(M_el[i], sign_fix, help);
-       mfem::Mult(sign_fix, help, M_el[i]);
-
-       GetTableRow(graph.VertexToEdge(), i, reordered_edges);
-       GetTableRow(vertex_edge, i, original_edges);
-       mfem::DenseMatrix local_reorder_map(reordered_edges.Size());
-       for (int j = 0; j < reordered_edges.Size(); ++j)
-       {
-           int reordered_edge = reordered_edges[j];
-           int original_edge = graph.EdgeReorderMap().GetRowColumns(reordered_edge)[0];
-           int original_local = original_edges.Find(original_edge);
-           assert(original_local != -1);
-           local_reorder_map(original_local, j) = 1;
-       }
-
-       mfem::Mult(M_el[i], local_reorder_map, help);
-       local_reorder_map.Transpose();
-       mfem::Mult(local_reorder_map, help, M_el[i]);
-   }
-   auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), graph.VertexToEdge());
-
-   auto edge_reoder_mapT = smoothg::Transpose(graph.EdgeReorderMap());
-   mfem::SparseMatrix D = smoothg::Mult(D_tmp, edge_reoder_mapT);
-
-   mfem::SparseMatrix W;
-   mfem::Vector const_rep(graph.NumVertices());
-   const_rep = 1.0;
-   mfem::Vector vertex_sizes(const_rep);
-   mfem::SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
-
-   mfem::Vector edge_bc(graph.NumEdges());
-   edge_bc = 0.0;
-
-   GraphSpace graph_space(std::move(graph));
-
-   mixed_system_.reset(new MixedMatrix(std::move(graph_space), std::move(mbuilder),
-                                       std::move(D), std::move(W), std::move(const_rep),
-                                       std::move(vertex_sizes), std::move(P_pwc)));
-   mixed_system_->SetEssDofs(ess_bdr);
 
     int order_quad = max(2, 2*order+1);
     for (int i=0; i < Geometry::NumGeom; ++i)
@@ -204,10 +227,21 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     }
 }
 
-void FEDarcyProblem::ShowError(const Vector &sol, bool verbose)
+void FEDarcyProblem::ShowError(const Vector &sol, bool verbose, bool dist)
 {
-    u_.Distribute(Vector(sol.GetData(), M_->NumRows()));
-    p_.Distribute(Vector(sol.GetData()+M_->NumRows(), B_->NumRows()));
+    if (dist)
+    {
+        u_.Distribute(Vector(sol.GetData(), M_->NumRows()));
+        p_.Distribute(Vector(sol.GetData()+M_->NumRows(), B_->NumRows()));
+    }
+    else
+    {
+        cout<<"yoyoy111\n";
+        Vector blk0(sol.GetData(), M_->NumRows());
+        mixed_system_->GetGraph().EdgeReorderMap().MultTranspose(blk0, u_);
+        cout<<"yoyoy\n";
+        p_ = Vector(sol.GetData()+M_->NumRows(), B_->NumRows());
+    }
 
     double err_u  = u_.ComputeL2Error(ucoeff_, irs_);
     double norm_u = ComputeGlobalLpNorm(2, ucoeff_, mesh_, irs_);
@@ -261,7 +295,7 @@ int main(int argc, char *argv[])
 
     Array<int> ess_bdr(mesh.bdr_attributes.Max());
     ess_bdr = 0;
-    ess_bdr[1] = 1;
+//    ess_bdr[1] = 1;
 
     IterSolveParameters param;
     DFSParameters dfs_param;
@@ -295,13 +329,21 @@ int main(int argc, char *argv[])
         setup_time[&bdp] = chrono.RealTime();
 
         ResetTimer();
-        HybridSolver hybrid(mgL, &ess_bdr);
-        setup_time[&hybrid] = chrono.RealTime();
+        HybridSolver hybrid(mgL, &ess_bdr, 20);
+//        setup_time[&hybrid] = chrono.RealTime();
+        const Vector& hrhs = darcy.GetHRHS();
+        Vector sol = darcy.GetHBC();
+        ResetTimer();
+        hybrid.Mult(hrhs, sol);
+        if (verbose) cout << "  solve time: " << chrono.RealTime() << "s.\n";
+        if (verbose) cout << "  iteration count: "
+                          << hybrid.GetNumIterations() <<"\n";
+        if (show_error) darcy.ShowError(sol, verbose, false);
 
         std::map<const DarcySolver*, std::string> solver_to_name;
         solver_to_name[&dfs] = "Divergence free";
         solver_to_name[&bdp] = "Block-diagonal-preconditioned MINRES";
-	solver_to_name[&hybrid] = "Hybridization";
+//	solver_to_name[&hybrid] = "Hybridization";
 
         for (const auto& solver_pair : solver_to_name)
         {
