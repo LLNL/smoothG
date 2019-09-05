@@ -74,12 +74,12 @@ int main(int argc, char* argv[])
     std::unique_ptr<mfem::ParMesh> pmesh;
     if (nDimensions == 3)
     {
-        mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
+        mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, true, 1200, 2200, 170);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     else
     {
-        mfem::Mesh mesh(60, 220, mfem::Element::QUADRILATERAL, 1, 1200, 2200);
+        mfem::Mesh mesh(60, 220, mfem::Element::QUADRILATERAL, true, 1200, 2200);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
 

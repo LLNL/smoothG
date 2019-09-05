@@ -35,6 +35,7 @@
 #include "utilities.hpp"
 #include "MixedLaplacianSolver.hpp"
 #include "MixedMatrix.hpp"
+#include "mixed_fe_solvers.hpp"
 
 #if SMOOTHG_USE_SAAMGE
 #include "saamge.hpp"
@@ -78,7 +79,7 @@ namespace smoothg
    Each constraint in turn creates a dual variable (Lagrange multiplier).
    The construction is done locally in each element.
 */
-class HybridSolver : public MixedLaplacianSolver
+class HybridSolver : public MixedLaplacianSolver, public DarcySolver
 {
 public:
     /**
@@ -105,6 +106,15 @@ public:
 
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
+
+    virtual void Mult(const mfem::Vector& Rhs, mfem::Vector& Sol) const
+    {
+        BlockVector blk_rhs(Rhs.GetData(), DarcySolver::offsets_);
+        BlockVector blk_sol(Sol.GetData(), DarcySolver::offsets_);
+        Mult(blk_rhs, blk_sol);
+    }
+    virtual void SetOperator(const Operator &op) { }
+    virtual int GetNumIterations() const { return cg_.GetNumIterations(); }
 
     /**
        @brief Update weights of local M matrices on "elements"

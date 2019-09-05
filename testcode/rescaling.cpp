@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
     // Create a mesh graph, an edge fespace and a partition of the graph
     unique_ptr<mfem::ParMesh> pmesh;
     {
-        mfem::Mesh mesh(4, 4, 4, mfem::Element::HEXAHEDRON, 1);
+        mfem::Mesh mesh(4, 4, 4, mfem::Element::HEXAHEDRON, true);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     for (int i = 0; i < pmesh->GetNE(); i++)

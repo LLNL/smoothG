@@ -287,7 +287,7 @@ void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inv
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
-            M_proc.EliminateRowCol(mm, true); // assume essential data = 0
+            M_proc.EliminateRowCol(mm); // assume essential data = 0
     }
     hM_.reset(mixed_matrix_.MakeParallelM(M_proc));
     operator_.SetBlock(0, 0, hM_.get());

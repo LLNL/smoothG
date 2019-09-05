@@ -133,13 +133,13 @@ int main(int argc, char* argv[])
     std::unique_ptr<mfem::ParMesh> pmesh;
     if (dimension == 3)
     {
-        mfem::Mesh mesh(problem_size, problem_size, 10, mfem::Element::HEXAHEDRON, 1,
+        mfem::Mesh mesh(problem_size, problem_size, 10, mfem::Element::HEXAHEDRON, true,
                         problem_size * 100.0, problem_size * 100.0, 100.0);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }
     else
     {
-        mfem::Mesh mesh(problem_size, problem_size, mfem::Element::QUADRILATERAL, 1,
+        mfem::Mesh mesh(problem_size, problem_size, mfem::Element::QUADRILATERAL, true,
                         problem_size * 100.0, problem_size * 100.0);
         pmesh = make_unique<mfem::ParMesh>(comm, mesh);
     }

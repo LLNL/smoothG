@@ -229,7 +229,7 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
 {
     Mloc.SetSize(face_edofs.Size());
     Mloc = 0.0;
-    mfem::Array<int> partition(vert_agg.GetJ(), vert_agg.Height());
+    mfem::Array<int> partition(const_cast<int*>(vert_agg.GetJ()), vert_agg.Height());
     mfem::Array<int> verts, vert_edofs;
     mfem::Array<int> kmap(face_edofs.Size());
 
@@ -558,7 +558,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
     if (coef_mbuilder_ptr)
     {
         // next line assumes M_proc_ is diagonal
-        mfem::Vector M_v(M_proc_.GetData(), M_proc_.Width());
+        mfem::Vector M_v(const_cast<double*>(M_proc_.GetData()), M_proc_.Width());
         coef_mbuilder_ptr->BuildComponents(M_v, Pedges, face_edof,
                                            face_coarse_edof, agg_edof);
     }

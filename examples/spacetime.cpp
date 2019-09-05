@@ -240,13 +240,16 @@ int main(int argc, char *argv[])
    mfem::Vector vertex_sizes(const_rep);
    mfem::SparseMatrix P_pwc = SparseIdentity(graph.NumVertices());
 
+   mfem::Vector edge_bc(graph.NumEdges());
+   edge_bc = 0.0;
+
    GraphSpace graph_space(std::move(graph));
 
    MixedMatrix mixed_system(std::move(graph_space), std::move(mbuilder),
                             std::move(D), std::move(W), std::move(const_rep),
                             std::move(vertex_sizes), std::move(P_pwc));
 
-   Hierarchy hierarchy(std::move(mixed_system), upscale_param, nullptr, &ess_bdr);
+   Hierarchy hierarchy(std::move(mixed_system), edge_bc, upscale_param, nullptr, &ess_bdr);
    hierarchy.PrintInfo();
    Upscale upscale(std::move(hierarchy));
 

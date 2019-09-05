@@ -919,20 +919,20 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     coarsening_factor = 10;
     coarsening_factor.Last() = nDimensions == 3 ? 5 : 10;
 
-    int Hx = coarsening_factor[0] * h(0);
-    int Hy = coarsening_factor[1] * h(1);
-    int Hz = 1.0;
+    double Hx = coarsening_factor[0] * h(0);
+    double Hy = coarsening_factor[1] * h(1);
+    double Hz = 1.0;
     if (nDimensions == 3)
         Hz = coarsening_factor[2] * h(2);
     source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Lz, Hx, Hy, Hz);
 
     if (nDimensions == 2)
     {
-        mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
+        mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, true, Lx, Ly);
         pmesh_ = MakeParMesh(mesh, metis_partition);
         return;
     }
-    mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
+    mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, true, Lx, Ly, Lz);
     pmesh_ = MakeParMesh(mesh, metis_partition);
 }
 
@@ -1034,11 +1034,11 @@ void LognormalModel::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref
     unique_ptr<mfem::Mesh> mesh;
     if (nDimensions == 2)
     {
-        mesh = make_unique<mfem::Mesh>(N, N, mfem::Element::QUADRILATERAL, 1);
+        mesh = make_unique<mfem::Mesh>(N, N, mfem::Element::QUADRILATERAL, true);
     }
     else
     {
-        mesh = make_unique<mfem::Mesh>(N, N, N, mfem::Element::HEXAHEDRON, 1);
+        mesh = make_unique<mfem::Mesh>(N, N, N, mfem::Element::HEXAHEDRON, true);
     }
 
     pmesh_ = make_unique<mfem::ParMesh>(comm_, *mesh);
@@ -1062,7 +1062,8 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length, int 
     double scalar_g = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
                       std::sqrt( std::tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
 
-    mfem::Array<int> ess_attr(ess_attr_.Size(), 0);
+    mfem::Array<int> ess_attr(ess_attr_.Size());
+    ess_attr = 0;
 
     DarcyProblem darcy_problem(*pmesh_, ess_attr);
     mfem::SparseMatrix W_block = SparseIdentity(pmesh_->GetNE());
@@ -1178,7 +1179,7 @@ Richards::Richards(int num_ref, const mfem::Array<int>& ess_attr)
 
 void Richards::SetupMeshCoeff(int num_ref)
 {
-    mfem::Mesh mesh(40, 10, mfem::Element::QUADRILATERAL, 1, 4000.0, 1000.0);
+    mfem::Mesh mesh(40, 10, mfem::Element::QUADRILATERAL, true, 4000.0, 1000.0);
     for (int i = 0; i < num_ref; i++)
     {
         mesh.UniformRefinement();

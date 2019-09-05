@@ -35,6 +35,7 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.GetComm(), mgL.BlockOffsets(), mgL.CheckW()),
+    DarcySolver(mgL.GetD().NumCols(), mgL.GetD().NumRows()),
     mgL_(mgL),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)

@@ -49,6 +49,9 @@ target_link_libraries(nldarcy smoothg ${TPL_LIBRARIES})
 add_executable(spacetime spacetime.cpp)
 target_link_libraries(spacetime smoothg ${TPL_LIBRARIES})
 
+add_executable(mixed_fe mixed_fe.cpp)
+target_link_libraries(mixed_fe smoothg ${TPL_LIBRARIES})
+
 # add tests
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
     set(SMOOTHG_TEST_PROCS 2)
