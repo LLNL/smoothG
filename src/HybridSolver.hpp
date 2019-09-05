@@ -107,11 +107,21 @@ public:
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
 
-    virtual void Mult(const mfem::Vector& Rhs, mfem::Vector& Sol) const
+    virtual void Mult(const mfem::Vector& Rhs, mfem::Vector& Sol) const override
     {
+        assert(Rhs.Size() == DarcySolver::offsets_[2]);
+        assert(Sol.Size() == DarcySolver::offsets_[2]);
         BlockVector blk_rhs(Rhs.GetData(), DarcySolver::offsets_);
         BlockVector blk_sol(Sol.GetData(), DarcySolver::offsets_);
-        Mult(blk_rhs, blk_sol);
+
+        auto distribute = GetDiag(mgL_.GetGraphSpace().EDofToTrueEDof());
+        distribute.Mult(blk_rhs.GetBlock(0), rhs_.GetBlock(0));
+        rhs_.GetBlock(1) = blk_rhs.GetBlock(1);
+
+        Mult(rhs_, sol_);
+
+        distribute.MultTranspose(sol_.GetBlock(0), blk_sol.GetBlock(0));
+        blk_sol.GetBlock(1) = sol_.GetBlock(1);
     }
     virtual void SetOperator(const Operator &op) { }
     virtual int GetNumIterations() const { return cg_.GetNumIterations(); }

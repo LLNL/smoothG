@@ -82,7 +82,7 @@ public:
     const DFSDataCollector& GetDFSDataCollector() const { return collector_; }
     const MixedMatrix& GetMixedMatrix() const { return *mixed_system_; }
 
-    void ShowError(const Vector& sol, bool verbose, bool dist=true);
+    void ShowError(const Vector& sol, bool verbose, bool reorder);
 };
 
 FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
@@ -119,6 +119,7 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     ParMixedBilinearForm bVarf(&(*collector_.hdiv_fes_), &(*collector_.l2_fes_));
 
     mVarf.AddDomainIntegrator(new VectorFEMassIntegrator);
+    mVarf.ComputeElementMatrices();
     mVarf.Assemble();
     mVarf.EliminateEssentialBC(ess_bdr, u_, fform);
     mVarf.Finalize();
@@ -127,11 +128,11 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     bVarf.AddDomainIntegrator(new VectorFEDivergenceIntegrator);
     bVarf.Assemble();
     bVarf.SpMat() *= -1.0;
-    bVarf.EliminateTrialDofs(ess_bdr, u_, gform);
     bVarf.Finalize();
+    mfem::SparseMatrix D_tmp(bVarf.SpMat());
+    bVarf.EliminateTrialDofs(ess_bdr, u_, gform);
     B_.Reset(bVarf.ParallelAssemble());
 
-    mfem::SparseMatrix D_tmp(bVarf.SpMat());
     auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh_);
     auto vertex_edge = TableToMatrix(mesh_.ElementToFaceTable());
     auto& edge_trueedge = *(collector_.hdiv_fes_.get()->Dof_TrueDof_Matrix()); //TODO: for higher order this doesn't work!
@@ -195,11 +196,6 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     rhs_ = 0.0;
     Vector block0_view(rhs_.GetData(), M_->NumRows());
     Vector block1_view(rhs_.GetData()+M_->NumRows(), B_->NumRows());
-
-    Vector reordered_fform(fform);
-    edge_reoder_mapT.Mult(fform, reordered_fform);
-    fform = reordered_fform;
-
     fform.ParallelAssemble(block0_view);
     gform.ParallelAssemble(block1_view);
 
@@ -208,6 +204,9 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     block1_view.SetDataAndSize(hybrid_rhs_.GetData()+fform.Size(), gform.Size());
     block0_view = fform;
     block1_view = gform;
+    Vector reordered_item(fform);
+    edge_reoder_mapT.MultTranspose(block0_view, reordered_item);
+    block0_view = reordered_item;
 
     ess_data_.SetSize(M_->NumRows()+B_->NumRows());
     ess_data_ = 0.0;
@@ -218,7 +217,8 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     hybrid_ess_data_ = 0.0;
     block0_view.SetDataAndSize(hybrid_ess_data_.GetData(), u_.Size());
     block0_view = u_;
-
+    edge_reoder_mapT.MultTranspose(block0_view, reordered_item);
+    block0_view = reordered_item;
 
     int order_quad = max(2, 2*order+1);
     for (int i=0; i < Geometry::NumGeom; ++i)
@@ -227,21 +227,10 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     }
 }
 
-void FEDarcyProblem::ShowError(const Vector &sol, bool verbose, bool dist)
+void FEDarcyProblem::ShowError(const Vector &sol, bool verbose, bool reorder)
 {
-    if (dist)
-    {
-        u_.Distribute(Vector(sol.GetData(), M_->NumRows()));
-        p_.Distribute(Vector(sol.GetData()+M_->NumRows(), B_->NumRows()));
-    }
-    else
-    {
-        cout<<"yoyoy111\n";
-        Vector blk0(sol.GetData(), M_->NumRows());
-        mixed_system_->GetGraph().EdgeReorderMap().MultTranspose(blk0, u_);
-        cout<<"yoyoy\n";
-        p_ = Vector(sol.GetData()+M_->NumRows(), B_->NumRows());
-    }
+    u_.Distribute(Vector(sol.GetData(), M_->NumRows()));
+    p_.Distribute(Vector(sol.GetData()+M_->NumRows(), B_->NumRows()));
 
     double err_u  = u_.ComputeL2Error(ucoeff_, irs_);
     double norm_u = ComputeGlobalLpNorm(2, ucoeff_, mesh_, irs_);
@@ -329,21 +318,13 @@ int main(int argc, char *argv[])
         setup_time[&bdp] = chrono.RealTime();
 
         ResetTimer();
-        HybridSolver hybrid(mgL, &ess_bdr, 20);
-//        setup_time[&hybrid] = chrono.RealTime();
-        const Vector& hrhs = darcy.GetHRHS();
-        Vector sol = darcy.GetHBC();
-        ResetTimer();
-        hybrid.Mult(hrhs, sol);
-        if (verbose) cout << "  solve time: " << chrono.RealTime() << "s.\n";
-        if (verbose) cout << "  iteration count: "
-                          << hybrid.GetNumIterations() <<"\n";
-        if (show_error) darcy.ShowError(sol, verbose, false);
+        HybridSolver hybrid(mgL, &ess_bdr);
+        setup_time[&hybrid] = chrono.RealTime();
 
         std::map<const DarcySolver*, std::string> solver_to_name;
         solver_to_name[&dfs] = "Divergence free";
         solver_to_name[&bdp] = "Block-diagonal-preconditioned MINRES";
-//	solver_to_name[&hybrid] = "Hybridization";
+        solver_to_name[&hybrid] = "Hybridization";
 
         for (const auto& solver_pair : solver_to_name)
         {
@@ -361,7 +342,7 @@ int main(int argc, char *argv[])
             if (verbose) cout << "  solve time: " << chrono.RealTime() << "s.\n";
             if (verbose) cout << "  iteration count: "
                               << solver->GetNumIterations() <<"\n";
-            if (show_error) darcy.ShowError(sol, verbose);
+            if (show_error) darcy.ShowError(sol, verbose, name == "Hybridization");
         }
     }
 

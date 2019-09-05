@@ -35,8 +35,9 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const SAAMGeParam* saamge_param)
     :
     MixedLaplacianSolver(mgL.GetComm(), mgL.BlockOffsets(), mgL.CheckW()),
-    DarcySolver(mgL.GetD().NumCols(), mgL.GetD().NumRows()),
+    DarcySolver(mgL.BlockTrueOffsets()[1], mgL.GetD().NumRows()),
     mgL_(mgL),
+    cg_(comm_),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
@@ -752,12 +753,9 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
         sli.Mult(zeros, diagonal_scaling_);
     }
 
-    for (int i = 0; i < diagonal_scaling_.Size(); ++i)
+    for (int ess_true_mult : ess_true_multipliers_)
     {
-        if (diagonal_scaling_[i]==0.0)
-        {
-            diagonal_scaling_[i]=1.0;
-        }
+        diagonal_scaling_[ess_true_mult]=1.0;
     }
 
     if (num_multiplier_dofs_ == mgL_.GetGraph().NumEdges())
@@ -838,7 +836,6 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
     }
     H_elim_.reset(H_->EliminateRowsCols(ess_true_multipliers_));
 
-//    if(myid_==0)GetDiag(*H_).Print();
     if (std::abs(rescale_iter_) > 0 && !saamge_param_)
     {
         ComputeScaledHybridSystem(*H_);
@@ -902,6 +899,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
         }
         solver->SetPreconditioner(*prec_);
     }
+
     if (myid_ == 0 && print_level_ > 0)
         std::cout << "  Timing: Preconditioner for hybridized system"
                   " constructed in " << chrono.RealTime() << "s. \n";
