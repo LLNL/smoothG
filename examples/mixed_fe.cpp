@@ -138,14 +138,14 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
     u_.ParallelProject(ess_data_block0);
 
    mfem::SparseMatrix D_tmp(bVarf.SpMat());
-   auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh);
-   auto vertex_edge = TableToMatrix(mesh.ElementToFaceTable());
-   auto& edge_trueedge = *(collector_.hdiv_fes_.get()->Dof_TrueDof_Matrix());
+   auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh_);
+   auto vertex_edge = TableToMatrix(mesh_.ElementToFaceTable());
+   auto& edge_trueedge = *(collector_.hdiv_fes_.get()->Dof_TrueDof_Matrix()); //TODO: for higher order this doesn't work!
    Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
 
    std::vector<mfem::DenseMatrix> M_el(graph.NumVertices());
    mfem::Array<int> vdofs, reordered_edges, original_edges;
-   for (int i = 0; i < mesh.GetNE(); ++i)
+   for (int i = 0; i < mesh_.GetNE(); ++i)
    {
        mVarf.ComputeElementMatrix(i, M_el[i]);
 
@@ -195,7 +195,7 @@ FEDarcyProblem::FEDarcyProblem(Mesh& mesh, int num_refines, int order,
    mixed_system_.reset(new MixedMatrix(std::move(graph_space), std::move(mbuilder),
                                        std::move(D), std::move(W), std::move(const_rep),
                                        std::move(vertex_sizes), std::move(P_pwc)));
-
+   mixed_system_->SetEssDofs(ess_bdr);
 
     int order_quad = max(2, 2*order+1);
     for (int i=0; i < Geometry::NumGeom; ++i)

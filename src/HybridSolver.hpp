@@ -194,8 +194,6 @@ private:
                                   const mfem::BlockVector& rhs) const;
 
     mfem::SparseMatrix Agg_multiplier_;
-    mfem::SparseMatrix Agg_vertexdof_;
-    mfem::SparseMatrix Agg_edgedof_;
 
     mfem::Array<int> edgedof_is_shared_;
 

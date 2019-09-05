@@ -170,7 +170,9 @@ void HybridSolver::CreateMultiplierRelations(
 
 void HybridSolver::CheckSharing()
 {
-    auto edgedof_Agg = smoothg::Transpose(Agg_edgedof_);
+    const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
+
+    auto edgedof_Agg = smoothg::Transpose(Agg_edgedof);
     edgedof_is_shared_.SetSize(edgedof_Agg.NumRows());
     for (int i = 0; i < edgedof_Agg.NumRows(); ++i)
     {
@@ -330,7 +332,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         if (scaling_size > 0)
         {
             mfem::DenseMatrix CCT(nlocal_multiplier);
-            MultSparseDense(Cloc, ClocT, CCT);
+            MultSparseDense(C_[iAgg], ClocT, CCT);
             mfem::Vector CCT_diag_local;
             CCT.GetDiag(CCT_diag_local);
 
@@ -339,7 +341,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
             Dloc.MultTranspose(one, DTone);
 
             mfem::Vector CDT1_local(nlocal_multiplier);
-            Cloc.Mult(DTone, CDT1_local);
+            C_[iAgg].Mult(DTone, CDT1_local);
 
             for (int i = 0; i < nlocal_multiplier; ++i)
             {
@@ -362,6 +364,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         for (int i = 0; i < diagonal_scaling_.Size(); ++i)
         {
             diagonal_scaling_[i] = CDT1_global[i] / CCT_diag_global[i];
+            if (diagonal_scaling_[i] == 0.0) diagonal_scaling_[i] = 1.0;
         }
     }
 
@@ -373,6 +376,9 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     const std::vector<mfem::DenseMatrix>& N_el)
 {
     mfem::SparseMatrix H_proc(num_multiplier_dofs_);
+
+    const auto& Agg_vertexdof = mgL_.GetGraphSpace().VertexToVDof();
+    const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
 
     MinvN_.resize(Minv_.size());
     CMinvNAinv_.resize(Minv_.size());
@@ -387,8 +393,8 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     {
         // Extracting the size and global numbering of local dof
         mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
-        GetTableRow(Agg_vertexdof_, iAgg, local_vertexdof);
-        GetTableRow(Agg_edgedof_, iAgg, local_edgedof);
+        GetTableRow(Agg_vertexdof, iAgg, local_vertexdof);
+        GetTableRow(Agg_edgedof, iAgg, local_edgedof);
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
 
         const int nlocal_vertexdof = local_vertexdof.Size();
@@ -581,6 +587,8 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
                                 mfem::Vector& HybridRHS) const
 {
     const mfem::Vector& OriginalRHS_block2(OriginalRHS.GetBlock(1));
+    const auto& Agg_vertexdof = mgL_.GetGraphSpace().VertexToVDof();
+    const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
 
     HybridRHS = 0.;
 
@@ -589,8 +597,8 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         // Extracting the size and global numbering of local dof
-        GetTableRow(Agg_vertexdof_, iAgg, local_vertexdof);
-        GetTableRow(Agg_edgedof_, iAgg, local_edgedof);
+        GetTableRow(Agg_vertexdof, iAgg, local_vertexdof);
+        GetTableRow(Agg_edgedof, iAgg, local_edgedof);
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
 
         int nlocal_vertexdof = local_vertexdof.Size();
@@ -649,6 +657,9 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
 void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                            mfem::BlockVector& RecoveredSol) const
 {
+    const auto& Agg_vertexdof = mgL_.GetGraphSpace().VertexToVDof();
+    const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
+
     // Recover the solution of the original system from multiplier mu, i.e.,
     // [u;p] = [f;g] - [M B^T;B 0]^-1[C 0]^T * mu
     // This procedure is done locally in each element
@@ -662,8 +673,8 @@ void HybridSolver::RecoverOriginalSolution(const mfem::Vector& HybridSol,
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         // Extracting the size and global numbering of local dof
-        GetTableRow(Agg_vertexdof_, iAgg, local_vertexdof);
-        GetTableRow(Agg_edgedof_, iAgg, local_edgedof);
+        GetTableRow(Agg_vertexdof, iAgg, local_vertexdof);
+        GetTableRow(Agg_edgedof, iAgg, local_edgedof);
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
 
         int nlocal_vertexdof = local_vertexdof.Size();
@@ -986,6 +997,9 @@ void HybridSolver::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
 mfem::Vector HybridSolver::MakeInitialGuess(const mfem::BlockVector& sol,
                                             const mfem::BlockVector& rhs) const
 {
+    const auto& Agg_vertexdof = mgL_.GetGraphSpace().VertexToVDof();
+    const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
+
     mfem::Vector mu(num_multiplier_dofs_);
     mu = 0.0;
 
@@ -994,8 +1008,8 @@ mfem::Vector HybridSolver::MakeInitialGuess(const mfem::BlockVector& sol,
     for (int i = 0; i < nAggs_; ++i)
     {
         // Extracting the size and global numbering of local dof
-        GetTableRow(Agg_vertexdof_, i, local_vertexdof);
-        GetTableRow(Agg_edgedof_, i, local_edgedof);
+        GetTableRow(Agg_vertexdof, i, local_vertexdof);
+        GetTableRow(Agg_edgedof, i, local_edgedof);
         GetTableRow(Agg_multiplier_, i, local_multiplier);
 
         rhs.GetSubVector(local_edgedof, g_loc);
