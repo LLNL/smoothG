@@ -50,6 +50,13 @@ public:
                const std::vector<mfem::DenseMatrix>& edge_traces,
                const std::vector<mfem::DenseMatrix>& vertex_targets);
 
+    /**
+       @brief Constructor for spaces associated with mixed finite elements
+    */
+    GraphSpace(Graph graph,
+               const mfem::ParFiniteElementSpace& hdiv_fes,
+               const mfem::ParFiniteElementSpace &l2_fes);
+
     /// Default constructor
     GraphSpace() = default;
 

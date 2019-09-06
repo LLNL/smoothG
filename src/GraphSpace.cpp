@@ -83,6 +83,42 @@ GraphSpace::GraphSpace(Graph graph,
     Init();
 }
 
+GraphSpace::GraphSpace(Graph graph,
+                       const mfem::ParFiniteElementSpace& hdiv_fes,
+                       const mfem::ParFiniteElementSpace& l2_fes)
+    : graph_(std::move(graph)),
+      vertex_vdof_(TableToMatrix(l2_fes.GetElementToDofTable())),
+      edge_edof_(graph_.NumEdges(), hdiv_fes.GetNDofs()),
+      vertex_edof_(TableToMatrix(hdiv_fes.GetElementToDofTable())),
+      edof_trueedof_(Copy(*hdiv_fes.Dof_TrueDof_Matrix()))
+{
+    std::cout<<"size v_e"<<vertex_edof_.Width()<< " "<<edge_edof_.Width()<<"\n";
+    mfem::Array<int> dofs;
+    for (int i = 0; i < const_cast<mfem::ParFiniteElementSpace&>(hdiv_fes).GetParMesh()->GetNFaces(); ++i)
+    {
+        hdiv_fes.GetFaceVDofs(i, dofs);
+        mfem::FiniteElementSpace::AdjustVDofs(dofs);
+        for (int dof : dofs)
+            edge_edof_.Set(i, dof, 1.0);
+    }
+    edge_edof_.Finalize();
+vertex_vdof_.Print();
+    mfem::Array<int> vertex_edof_j(vertex_edof_.GetJ(), vertex_edof_.NumNonZeroElems());
+    mfem::FiniteElementSpace::AdjustVDofs(vertex_edof_j);
+    vertex_edof_.SetWidth(hdiv_fes.GetNDofs());
+
+    if (graph_.HasBoundary())
+    {
+        auto edof_edge = smoothg::Transpose(edge_edof_);
+        auto tmp = smoothg::Mult(edof_edge, graph_.EdgeToBdrAtt());
+        edof_bdratt_.Swap(tmp);
+    }
+
+    GenerateOffsets(edof_trueedof_->GetComm(), vertex_edof_.NumCols(), edof_starts_);
+
+    Init();
+}
+
 GraphSpace::GraphSpace(GraphSpace&& other) noexcept
 {
     swap(*this, other);

@@ -131,7 +131,7 @@ void HybridSolver::CreateMultiplierRelations(
     // Constructing the relation table (in SparseMatrix format) between edge
     // dof and multiplier dof. For every edge dof that is associated with a
     // face, a Lagrange multiplier dof associated with the edge dof is created
-    num_multiplier_dofs_ = face_edgedof.Width();
+    num_multiplier_dofs_ = face_edgedof.NumNonZeroElems();
 
     const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
     const int num_edofs = Agg_edgedof.Width();
@@ -142,8 +142,8 @@ void HybridSolver::CreateMultiplierRelations(
     std::copy_n(face_edgedof.GetJ(), num_multiplier_dofs_, j_mult_edof);
     double* data_mult_edof = new double[num_multiplier_dofs_];
     std::fill_n(data_mult_edof, num_multiplier_dofs_, 1.0);
-    mfem::SparseMatrix mult_edof(i_mult_edof, j_mult_edof,data_mult_edof,
-                                 num_edofs, num_multiplier_dofs_);
+    mfem::SparseMatrix mult_edof(i_mult_edof, j_mult_edof, data_mult_edof,
+                                 num_multiplier_dofs_, num_edofs);
 
     mfem::SparseMatrix edof_mult = smoothg::Transpose(mult_edof);
     multiplier_to_edof_.Append(mult_edof.GetJ(), num_multiplier_dofs_);
@@ -357,7 +357,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         for (int i = 0; i < diagonal_scaling_.Size(); ++i)
         {
             diagonal_scaling_[i] = CDT1_global[i] / CCT_diag_global[i];
-//            if (diagonal_scaling_[i] == 0.0) diagonal_scaling_[i] = 1.0;
+//            if (std::abs(diagonal_scaling_[i]) < 1e-16) diagonal_scaling_[i] = 1.0;
         }
     }
 
@@ -750,7 +750,7 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
         diagonal_scaling_[ess_true_mult]=1.0;
     }
 
-    if (num_multiplier_dofs_ == mgL_.GetGraph().NumEdges())
+//    if (num_multiplier_dofs_ == mgL_.GetGraph().NumEdges())
     {
         auto Scale = VectorToMatrix(diagonal_scaling_);
         mfem::HypreParMatrix pScale(comm_, H.N(), H.GetColStarts(), &Scale);
@@ -854,7 +854,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
         {
             BuildSpectralAMGePreconditioner();
         }
-        else if (num_multiplier_dofs_ == mgL_.GetGraph().NumEdges())
+        else if (true)//num_multiplier_dofs_ == mgL_.GetGraph().NumEdges())
         {
             auto temp_prec = make_unique<mfem::HypreBoomerAMG>(*H_);
             temp_prec->SetPrintLevel(0);
