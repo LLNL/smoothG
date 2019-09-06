@@ -54,9 +54,13 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
             }
     }
 
-    int max_num = offset == 1 ? max_evects_ : ceil(single_vec.Size() * (double)max_evects_ / 100.0);// (max_evects_+1) /2;
+//    double times = is_boundary ? 5. : 1.;
+    int max_num = offset == 1 ? max_evects_ : ceil(single_vec.Size() * (double)max_evects_ * 2. / 100.0);// (max_evects_+1)/2; //
 
     sz = std::min(std::min(max_num - 1, single_vec.Size() - 1), sz);
+
+//    sz = is_boundary ? single_vec.Size() - 1 : sz;
+
     out.SetSize(single_vec.Size(), sz + 1);
     Concatenate(single_vec, vectors, out);
 }
@@ -834,6 +838,7 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
     int capacity;
     mfem::Vector PV_sigma;
     mfem::Vector** shared_constant = CollectConstant(constant_rep_, agg_vdof);
+    LocalEigenSolver eig(max_evects_, 1.0);
     for (int iface = 0; iface < nfaces; ++iface)
     {
         int num_iface_edofs = face_edof.RowSize(iface);
@@ -952,7 +957,42 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
             else // boundary face
             {
                 PV_sigma_on_face.SetSize(num_iface_edofs);
-                PV_sigma_on_face = 1.;
+//                PV_sigma_on_face = 0.;
+
+                bool is_ess_bdr = mgL_.GetEssDofs()[face_edof.GetRowColumns(iface)[0]];
+
+                if (is_ess_bdr || true)
+                {
+                    PV_sigma_on_face = 1.;
+                }
+                else
+                {
+                    int num_iface_edofs = face_edof.RowSize(iface);
+                    mfem::Array<int> face_edofs(num_iface_edofs);
+                    std::iota(face_edofs.begin(), face_edofs.end(), 0);
+
+                    auto M_f = ExtractRowAndColumns(shared_Mloc_f[0], face_edofs, face_edofs, col_map_);
+
+                    eig.Compute(M_f, local_edge_trace_targets[iface]);
+//                    mfem::Vector M_diag;
+//                    shared_Mloc_f[0].GetDiag(M_diag);
+//                    auto scale = SparseIdentity(num_iface_edofs);
+
+//                    for (int l = 0; l < num_iface_edofs; ++l)
+//                    {
+//                        scale.ScaleRow(l, M_diag[l]);
+//                    }
+
+//                    Full(scale, local_edge_trace_targets[iface]);
+
+//                    SVD_Calculator svd;
+//                    mfem::Vector sing_val;
+//                    svd.Compute(local_edge_trace_targets[iface], sing_val);
+//                    local_edge_trace_targets[iface].SetSize(num_iface_edofs, std::min(max_evects_, num_iface_edofs));
+//if (hey == 0 )M_f.Print();hey++;
+                    delete [] shared_sigma_f;
+                    continue;
+                }
             }
 
             // add PV vector to other vectors and orthogonalize

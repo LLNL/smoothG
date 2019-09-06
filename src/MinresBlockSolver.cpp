@@ -155,8 +155,8 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
                                 : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
 
-    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-12);
-    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-15);
+//    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-12);
+//    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-15);
 
     // debug
     {

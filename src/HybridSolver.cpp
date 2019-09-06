@@ -576,7 +576,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
         InvRescaleVector(diagonal_scaling_, trueMu_);
     }
 
-    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&gmres_)
+    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&cg_)
                                 : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
 
     // solve the parallel global hybridized system
@@ -584,8 +584,8 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     chrono.Clear();
     chrono.Start();
 
-    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-15);
-    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-18);
+//    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-12);
+//    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-15);
 
     solver->Mult(trueHrhs_, trueMu_);
 
@@ -666,9 +666,15 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
                                 mfem::Vector& HybridRHS) const
 {
-    const mfem::Vector& OriginalRHS_block2(OriginalRHS.GetBlock(1));
+    const mfem::Vector& OriginalRHS_block1(OriginalRHS.GetBlock(1));
     const auto& Agg_vertexdof = mgL_.GetGraphSpace().VertexToVDof();
     const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
+
+    mfem::Vector mean_correction(edof_shared_mean_->NumRows());
+    edof_shared_mean_->Mult(OriginalRHS.GetBlock(0), mean_correction);
+
+    mfem::Vector CorrectedRHS_block0(edof_shared_mean_->NumCols());
+    mgL_.GetGraphSpace().EDofToTrueEDof().Mult(mean_correction, CorrectedRHS_block0);
 
     HybridRHS = 0.;
 
@@ -687,8 +693,8 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
 
         // Compute local contribution to the RHS of the hybrid system
         // CM^{-1} g - CM^{-1}D^T A^{-1} (DM^{-1} g - f)
-        OriginalRHS_block2.GetSubVector(local_vertexdof, f_loc);
-        OriginalRHS.GetSubVector(local_edgedof, g_loc);
+        OriginalRHS_block1.GetSubVector(local_vertexdof, f_loc);
+        CorrectedRHS_block0.GetSubVector(local_edgedof, g_loc);
         for (int i = 0; i < nlocal_edgedof; ++i)
         {
             if (edgedof_is_shared_[local_edgedof[i]])
@@ -954,7 +960,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
     }
     nnz_ = H_->NNZ();
 
-    auto solver = is_symmetric_ ? dynamic_cast<mfem::IterativeSolver*>(&gmres_)
+    auto solver = is_symmetric_ ? dynamic_cast<mfem::IterativeSolver*>(&cg_)
                                 : dynamic_cast<mfem::IterativeSolver*>(&gmres_);
     solver->SetOperator(*H_);
 
@@ -1093,6 +1099,12 @@ void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
 
     }
     BuildParallelSystemAndSolver(H_proc);
+
+    gmres_.SetPrintLevel(print_level_);
+    gmres_.SetMaxIter(max_num_iter_);
+    gmres_.SetRelTol(rtol_);
+    gmres_.SetAbsTol(atol_);
+    gmres_.SetKDim(100);
 
     if (myid_ == 0 && print_level_ > 0)
     {
