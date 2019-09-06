@@ -546,7 +546,7 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
             return NULL; /* error: A_offd and B_offd have different dimensions */
         }
         /* copy A_cmap -> C_cmap */
-        C_cmap = hypre_TAlloc(HYPRE_Int, A_cmap_size);
+        C_cmap = hypre_TAlloc(HYPRE_Int, A_cmap_size, HYPRE_MEMORY_HOST_ACT);
         for (im = 0; im < A_cmap_size; im++)
         {
             C_cmap[im] = A_cmap[im];

@@ -80,6 +80,7 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     Mprec_.reset(new mfem::HypreDiagScale(*M));
     Sprec_.reset(new mfem::HypreBoomerAMG(*schur_block_));
     Sprec_->SetPrintLevel(0);
+    schur_block_->EliminateZeroRows();
 
     prec_.SetDiagonalBlock(0, Mprec_.get());
     prec_.SetDiagonalBlock(1, Sprec_.get());
