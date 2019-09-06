@@ -134,30 +134,22 @@ void HybridSolver::CreateMultiplierRelations(
     num_multiplier_dofs_ = face_edgedof.Width();
 
     const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
-    const int num_edge_dofs = Agg_edgedof.Width();
+    const int num_edofs = Agg_edgedof.Width();
 
-    int* i_edgedof_multiplier = new int[num_edge_dofs + 1];
-    std::iota(i_edgedof_multiplier,
-              i_edgedof_multiplier + num_multiplier_dofs_ + 1, 0);
-    std::fill_n(i_edgedof_multiplier + num_multiplier_dofs_ + 1,
-                num_edge_dofs - num_multiplier_dofs_,
-                i_edgedof_multiplier[num_multiplier_dofs_]);
+    int* i_mult_edof = new int[num_multiplier_dofs_ + 1]();
+    std::iota(i_mult_edof, i_mult_edof + num_multiplier_dofs_ + 1, 0);
+    int* j_mult_edof = new int[num_multiplier_dofs_];
+    std::copy_n(face_edgedof.GetJ(), num_multiplier_dofs_, j_mult_edof);
+    double* data_mult_edof = new double[num_multiplier_dofs_];
+    std::fill_n(data_mult_edof, num_multiplier_dofs_, 1.0);
+    mfem::SparseMatrix mult_edof(i_mult_edof, j_mult_edof,data_mult_edof,
+                                 num_edofs, num_multiplier_dofs_);
 
-    int* j_edgedof_multiplier = new int[num_multiplier_dofs_];
-    std::iota(j_edgedof_multiplier,
-              j_edgedof_multiplier + num_multiplier_dofs_, 0);
-    double* data_edgedof_multiplier = new double[num_multiplier_dofs_];
-    std::fill_n(data_edgedof_multiplier, num_multiplier_dofs_, 1.0);
-    mfem::SparseMatrix edgedof_multiplier(
-        i_edgedof_multiplier, j_edgedof_multiplier,
-        data_edgedof_multiplier, num_edge_dofs, num_multiplier_dofs_);
-    mfem::SparseMatrix mult_edof(smoothg::Transpose(edgedof_multiplier) );
+    mfem::SparseMatrix edof_mult = smoothg::Transpose(mult_edof);
+    multiplier_to_edof_.Append(mult_edof.GetJ(), num_multiplier_dofs_);
 
-    mfem::Array<int> j_array(mult_edof.GetJ(), mult_edof.NumNonZeroElems());
-    j_array.Copy(multiplier_to_edof_);
-
-    mfem::SparseMatrix Agg_m_tmp(smoothg::Mult(Agg_edgedof, edgedof_multiplier));
-    Agg_multiplier_.Swap(Agg_m_tmp);
+    mfem::SparseMatrix Agg_mult(smoothg::Mult(Agg_edgedof, edof_mult));
+    Agg_multiplier_.Swap(Agg_mult);
 
     GenerateOffsets(comm_, num_multiplier_dofs_, multiplier_start_);
 
