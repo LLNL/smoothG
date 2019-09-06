@@ -692,8 +692,11 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         {
             // Nothing for boundary face because AggExt_sigma is not in boundary
             GetTableRow(face_edof, iface, iface_edofs);
-            face_sigma_tmp.SetSize(iface_edofs.Size() ,1);
-            edge_bc.GetSubVector(iface_edofs, face_sigma_tmp.Data());
+            if (edge_bc.Size())
+            {
+                face_sigma_tmp.SetSize(iface_edofs.Size() ,1);
+                edge_bc.GetSubVector(iface_edofs, face_sigma_tmp.Data());
+            }
         }
         else if (num_iface_edofs > 1)
         {
