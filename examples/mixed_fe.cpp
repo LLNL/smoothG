@@ -272,23 +272,6 @@ int main(int argc, char *argv[])
             cout << "System assembled in " << chrono.RealTime() << "s.\n";
         }
 
-
-        MinresBlockSolver minres(darcy.GetMixedMatrix(), &ess_bdr);
-        const Vector& rhs = darcy.GetRHS();
-        Vector sol = darcy.GetBC();
-        Array<int> offsets(3);
-        offsets = 0; offsets[1] = M.NumRows(); offsets[2] = offsets[1]+B.NumRows();
-        BlockVector blk_sol(sol.GetData(), offsets);
-        BlockVector blk_rhs(rhs.GetData(), offsets);
-
-        ResetTimer();
-        minres.Mult(blk_rhs, blk_sol);
-
-        if (verbose) cout << "  solve time: " << chrono.RealTime() << "s.\n";
-        if (verbose) cout << "  iteration count: "
-                          << minres.GetNumIterations() <<"\n";
-        if (show_error) darcy.ShowError(sol, verbose);
-
         std::map<const DarcySolver*, double> setup_time;
         std::map<const DarcySolver*, std::string> solver_to_name;
 
