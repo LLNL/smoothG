@@ -92,9 +92,8 @@ GraphSpace::GraphSpace(Graph graph,
       vertex_edof_(TableToMatrix(hdiv_fes.GetElementToDofTable())),
       edof_trueedof_(Copy(*hdiv_fes.Dof_TrueDof_Matrix()))
 {
-    std::cout<<"size v_e"<<vertex_edof_.Width()<< " "<<edge_edof_.Width()<<"\n";
     mfem::Array<int> dofs;
-    for (int i = 0; i < const_cast<mfem::ParFiniteElementSpace&>(hdiv_fes).GetParMesh()->GetNFaces(); ++i)
+    for (int i = 0; i < graph_.NumEdges(); ++i)
     {
         hdiv_fes.GetFaceVDofs(i, dofs);
         mfem::FiniteElementSpace::AdjustVDofs(dofs);
@@ -102,7 +101,7 @@ GraphSpace::GraphSpace(Graph graph,
             edge_edof_.Set(i, dof, 1.0);
     }
     edge_edof_.Finalize();
-vertex_vdof_.Print();
+
     mfem::Array<int> vertex_edof_j(vertex_edof_.GetJ(), vertex_edof_.NumNonZeroElems());
     mfem::FiniteElementSpace::AdjustVDofs(vertex_edof_j);
     vertex_edof_.SetWidth(hdiv_fes.GetNDofs());

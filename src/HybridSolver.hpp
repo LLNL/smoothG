@@ -233,11 +233,12 @@ private:
     mutable std::vector<mfem::Vector> Minv_g_;
     mutable std::vector<mfem::Vector> local_rhs_;
 
-    mfem::Array<int> ess_true_multipliers_;
-    mfem::Array<int> multiplier_to_edof_;
-    mfem::Array<int> ess_true_mult_to_edof_;
-    mfem::Array<HYPRE_Int> multiplier_start_;
     mfem::Array<bool> mult_on_bdr_;
+    mfem::Array<int> ess_true_multipliers_;
+    mfem::Array<int> ess_true_mult_to_edof_;
+    mfem::Array<int> ess_edofs_list_;
+    mfem::Array<int> multiplier_to_edof_;
+    mfem::Array<HYPRE_Int> multiplier_start_;
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;

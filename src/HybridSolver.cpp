@@ -136,7 +136,7 @@ void HybridSolver::CreateMultiplierRelations(
     const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
     const int num_edofs = Agg_edgedof.Width();
 
-    int* i_mult_edof = new int[num_multiplier_dofs_ + 1]();
+    int* i_mult_edof = new int[num_multiplier_dofs_ + 1];
     std::iota(i_mult_edof, i_mult_edof + num_multiplier_dofs_ + 1, 0);
     int* j_mult_edof = new int[num_multiplier_dofs_];
     std::copy_n(face_edgedof.GetJ(), num_multiplier_dofs_, j_mult_edof);
@@ -380,12 +380,12 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     col_marker = -1;
 
     mfem::DenseMatrix DlocT, Aloc, CMinv, CMinvN, DMinvCT, CMDADMC;
+    mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
 
     mfem::DenseMatrixInverse Aloc_solver;
     for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
     {
         // Extracting the size and global numbering of local dof
-        mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
         GetTableRow(Agg_vertexdof, iAgg, local_vertexdof);
         GetTableRow(Agg_edgedof, iAgg, local_edgedof);
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
@@ -561,6 +561,11 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     multiplier_d_td_->Mult(trueMu_, Mu_);
     RecoverOriginalSolution(Mu_, Sol);
 
+    for (int edof : ess_edofs_list_)
+    {
+        Sol[edof] = Rhs[edof];
+    }
+
     if (!W_is_nonzero_ && remove_one_dof_)
     {
         Orthogonalize(Sol.GetBlock(1));
@@ -584,6 +589,10 @@ void HybridSolver::RHSTransform(const mfem::BlockVector& OriginalRHS,
     const auto& Agg_edgedof = mgL_.GetGraphSpace().VertexToEDof();
 
     HybridRHS = 0.;
+//    for (int i = 0; i < ess_edofs_list_.Size(); ++i)
+//    {
+//        HybridRHS[ess_edof_to_mult_[i]] = -OriginalRHS[ess_edofs_list_[i]];
+//    }HybridRHS.Print();
 
     mfem::Vector f_loc, g_loc, CMinv_g_loc, DMinv_g_loc, rhs_loc_help;
     mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
@@ -909,17 +918,23 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
     {
         ess_true_multipliers_.Reserve(edof_bdrattr.NumNonZeroElems());
         ess_true_mult_to_edof_.Reserve(edof_bdrattr.NumNonZeroElems());
+        ess_edofs_list_.Reserve(edof_bdrattr.NumNonZeroElems());
         for (int i = 0; i < num_multiplier_dofs_; ++i)
         {
+            int edof = multiplier_to_edof_[i];
             // natural BC for H(div) dof <=> essential BC for multiplier dof
-            if (edof_bdrattr.RowSize(i))
+            if (edof_bdrattr.RowSize(edof))
             {
                 mult_on_bdr_[i] = true;
-                if (ess_edofs_[i] == 0)
+                if (ess_edofs_[edof])
+                {
+                    ess_edofs_list_.Append(edof);
+                }
+                else
                 {
                     GetTableRow(mult_truemult, i, true_multiplier);
                     ess_true_multipliers_.Append(true_multiplier);
-                    ess_true_mult_to_edof_.Append(i);
+                    ess_true_mult_to_edof_.Append(edof);
                 }
             }
         }
@@ -931,7 +946,7 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
         GetTableRow(mult_truemult, 0, true_multiplier);
         assert(true_multiplier.Size() == 1);
         ess_true_multipliers_.Append(true_multiplier);
-        ess_true_mult_to_edof_.Append(0);
+        ess_true_mult_to_edof_.Append(multiplier_to_edof_[0]);
     }
 }
 

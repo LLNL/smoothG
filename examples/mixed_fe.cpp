@@ -126,77 +126,52 @@ FEDarcyProblem::FEDarcyProblem(Mesh* mesh, int num_refines, int order,
     bVarf.Assemble();
     bVarf.SpMat() *= -1.0;
     bVarf.Finalize();
-    mfem::SparseMatrix D_tmp(bVarf.SpMat());
+    SparseMatrix D = bVarf.SpMat();
     bVarf.EliminateTrialDofs(ess_bdr, u_, gform);
     B_.Reset(bVarf.ParallelAssemble());
 
-//    if (order == 0)
+    RT_FECollection RT0_fec(0, mesh_.Dimension());
+    ParFiniteElementSpace RT0_fes(&mesh_, &RT0_fec);
+
+    auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh_);
+    auto vertex_edge = TableToMatrix(mesh_.ElementToFaceTable());
+    auto& edge_trueedge = *(RT0_fes.Dof_TrueDof_Matrix());
+    Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
+    GraphSpace graph_space(std::move(graph), *collector_.hdiv_fes_, *collector_.l2_fes_);
+
+    std::vector<mfem::DenseMatrix> M_el(graph_space.GetGraph().NumVertices());
+    mfem::Array<int> vdofs;
+    for (int i = 0; i < mesh_.GetNE(); ++i)
     {
-        RT_FECollection RT0_fec(0, mesh_.Dimension());
-        ParFiniteElementSpace RT0_fes(&mesh_, &RT0_fec);
+        mVarf.ComputeElementMatrix(i, M_el[i]);
 
-        auto edge_bdratt = GenerateBoundaryAttributeTable(&mesh_);
-        auto vertex_edge = TableToMatrix(mesh_.ElementToFaceTable());
-        auto& edge_trueedge = *(RT0_fes.Dof_TrueDof_Matrix()); //TODO: for higher order this doesn't work!
-        Graph graph(vertex_edge, edge_trueedge, mfem::Vector(), &edge_bdratt);
-        GraphSpace graph_space(std::move(graph), *collector_.hdiv_fes_, *collector_.l2_fes_);
-
-        std::vector<mfem::DenseMatrix> M_el(graph_space.GetGraph().NumVertices());
-        mfem::Array<int> vdofs, reordered_edges, original_edges;
-        for (int i = 0; i < mesh_.GetNE(); ++i)
+        DenseMatrix sign_fix(M_el[i].NumRows());
+        collector_.hdiv_fes_.get()->GetElementVDofs(i, vdofs);
+        for (int j = 0; j < sign_fix.NumRows(); ++j)
         {
-            mVarf.ComputeElementMatrix(i, M_el[i]);
+            sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
+        }
 
-            DenseMatrix sign_fix(M_el[i].NumRows());
-            collector_.hdiv_fes_.get()->GetElementVDofs(i, vdofs);
-            for (int j = 0; j < sign_fix.NumRows(); ++j)
-            {
-                sign_fix(j, j) = vdofs[j] < 0 ? -1.0 : 1.0;
-            }
-
-            mfem::DenseMatrix help(sign_fix);
-            mfem::Mult(M_el[i], sign_fix, help);
-            mfem::Mult(sign_fix, help, M_el[i]);
-
-//            GetTableRow(graph.VertexToEdge(), i, reordered_edges);
-//            GetTableRow(vertex_edge, i, original_edges);
-//            mfem::DenseMatrix local_reorder_map(reordered_edges.Size());
-//            for (int j = 0; j < reordered_edges.Size(); ++j)
-//            {
-//                int reordered_edge = reordered_edges[j];
-//                int original_edge = graph.EdgeReorderMap().GetRowColumns(reordered_edge)[0];
-//                int original_local = original_edges.Find(original_edge);
-//                assert(original_local != -1);
-//                local_reorder_map(original_local, j) = 1;
-//            }
-
-//            mfem::Mult(M_el[i], local_reorder_map, help);
-//            local_reorder_map.Transpose();
-//            mfem::Mult(local_reorder_map, help, M_el[i]);
-        }cout<<"yoyoy2\n";
-        auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), graph_space.VertexToEDof());
-
-//        auto edge_reoder_mapT = smoothg::Transpose(graph.EdgeReorderMap());
-        mfem::SparseMatrix D = D_tmp;//smoothg::Mult(D_tmp, edge_reoder_mapT);
-
-        mfem::SparseMatrix W;
-        mfem::Vector const_rep(graph_space.VertexToVDof().NumCols());
-        const_rep = 1.0 / std::sqrt(collector_.l2_fes_->GlobalTrueVSize());
-
-        mfem::Vector vertex_sizes(graph_space.GetGraph().NumVertices());
-        vertex_sizes = 1.0;
-
-        mfem::SparseMatrix P_pwc = SparseIdentity(const_rep.Size());
-
-//        mfem::Vector edge_bc(graph_space.VertexToEDof().NumCols());
-//        edge_bc = u_;
-cout<<"yoyoy3\n";
-        mixed_system_.reset(new MixedMatrix(std::move(graph_space), std::move(mbuilder),
-                                            std::move(D), std::move(W), std::move(const_rep),
-                                            std::move(vertex_sizes), std::move(P_pwc)));
-        mixed_system_->SetEssDofs(ess_bdr);
-        mixed_system_->BuildM();cout<<"yoyoy4\n";
+        mfem::DenseMatrix help(sign_fix);
+        mfem::Mult(M_el[i], sign_fix, help);
+        mfem::Mult(sign_fix, help, M_el[i]);
     }
+    auto mbuilder = make_unique<ElementMBuilder>(std::move(M_el), graph_space.VertexToEDof());
+
+    mfem::SparseMatrix W;
+    mfem::Vector const_rep(graph_space.VertexToVDof().NumCols());
+    const_rep = 1.0 / std::sqrt(collector_.l2_fes_->GlobalTrueVSize());
+
+    mfem::Vector vertex_sizes(graph_space.GetGraph().NumVertices());
+    vertex_sizes = 1.0;
+
+    mfem::SparseMatrix P_pwc = SparseIdentity(const_rep.Size());
+
+    mixed_system_.reset(new MixedMatrix(std::move(graph_space), std::move(mbuilder),
+                                        std::move(D), std::move(W), std::move(const_rep),
+                                        std::move(vertex_sizes), std::move(P_pwc)));
+    mixed_system_->SetEssDofs(ess_bdr);
+    mixed_system_->BuildM();
 
     rhs_.SetSize(M_->NumRows()+B_->NumRows());
     rhs_ = 0.0;
@@ -226,26 +201,6 @@ void FEDarcyProblem::ShowError(const Vector &sol, bool verbose)
     double norm_u = ComputeGlobalLpNorm(2, ucoeff_, mesh_, irs_);
     double err_p  = p_.ComputeL2Error(pcoeff_, irs_);
     double norm_p = ComputeGlobalLpNorm(2, pcoeff_, mesh_, irs_);
-
-    {
-        int num_procs, myid;
-        MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-        MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-       char vishost[] = "localhost";
-       int  visport   = 19916;
-       socketstream u_sock(vishost, visport);
-       u_sock << "parallel " << num_procs << " " << myid << "\n";
-       u_sock.precision(8);
-       u_sock << "solution\n" << mesh_ << p_ << "window_title 'Primal variable S'"
-              << endl;
-
-       MPI_Barrier(mesh_.GetComm());
-       socketstream sigma_sock(vishost, visport);
-       sigma_sock << "parallel " << num_procs << " " << myid << "\n";
-       sigma_sock.precision(8);
-       sigma_sock << "solution\n" << mesh_ << u_ << "window_title 'Flux sigma'"
-                  << endl;
-    }
 
     if (!verbose) return;
     cout << "\n|| u_h - u_ex || / || u_ex || = " << err_u / norm_u << "\n";
@@ -294,7 +249,7 @@ int main(int argc, char *argv[])
 
     Array<int> ess_bdr(mesh->bdr_attributes.Max());
     ess_bdr = 0;
-//    ess_bdr[1] = 1;
+    ess_bdr[1] = 1;
 
     IterSolveParameters param;
     DFSParameters dfs_param;
@@ -340,21 +295,17 @@ int main(int argc, char *argv[])
         ResetTimer();
         DivFreeSolver dfs(M, B, collector.hcurl_fes_.get(), collector.GetData());
         setup_time[&dfs] = chrono.RealTime();
-//        solver_to_name[&dfs] = "Divergence free";
+        solver_to_name[&dfs] = "Divergence free";
 
         ResetTimer();
         BDPMinresSolver bdp(M, B, param);
         setup_time[&bdp] = chrono.RealTime();
-//        solver_to_name[&bdp] = "Block-diagonal-preconditioned MINRES";
+        solver_to_name[&bdp] = "Block-diagonal-preconditioned MINRES";
 
-        unique_ptr<HybridSolver> hybrid;
-//        if (order == 0)
-        {
-            ResetTimer();
-            hybrid.reset(new HybridSolver(darcy.GetMixedMatrix(), &ess_bdr, 0));
-            setup_time[hybrid.get()] = chrono.RealTime();
-            solver_to_name[hybrid.get()] = "Hybridization";
-        }
+        ResetTimer();
+        HybridSolver hybrid(darcy.GetMixedMatrix(), &ess_bdr, -1);
+        setup_time[&hybrid] = chrono.RealTime();
+        solver_to_name[&hybrid] = "Hybridization";
 
         for (const auto& solver_pair : solver_to_name)
         {
