@@ -941,7 +941,7 @@ void HybridSolver::CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr)
     }
 
     // In case of normal graph Laplacian, eliminate one multiplier
-    if (!ess_true_multipliers_.Size() && !W_is_nonzero_ && myid_ == 0)
+    if (remove_one_dof_ && !W_is_nonzero_ && myid_ == 0)
     {
         GetTableRow(mult_truemult, 0, true_multiplier);
         assert(true_multiplier.Size() == 1);

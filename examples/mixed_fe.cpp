@@ -44,6 +44,10 @@ double pFun_ex(const Vector & x);
 void fFun(const Vector & x, Vector & f);
 double gFun(const Vector & x);
 double f_natural(const Vector & x);
+void sigmaFun_ex(const Vector& xt, Vector& sigma);
+double sFun_ex(const Vector& xt);
+void kFun(const Vector& xt, DenseMatrix& k);
+double spacetime_fFun(const Vector& xt);
 
 //     Assemble the finite element matrices for the Darcy problem
 //
@@ -59,17 +63,17 @@ class FEDarcyProblem
     OperatorPtr B_;
     Vector rhs_;
     Vector ess_data_;
-    ParGridFunction u_;
     ParGridFunction p_;
-    ParMesh mesh_;
-    VectorFunctionCoefficient ucoeff_;
+    ParGridFunction u_;
+    ParMesh& mesh_;
     FunctionCoefficient pcoeff_;
+    VectorFunctionCoefficient ucoeff_;
     DFSDataCollector collector_;
     const IntegrationRule *irs_[Geometry::NumGeom];
     unique_ptr<MixedMatrix> mixed_system_;
 public:
-    FEDarcyProblem(Mesh* mesh, int num_refines, int order,
-                 Array<int>& ess_bdr, DFSParameters param); // TODO: better design
+    FEDarcyProblem(ParMesh& mesh, int num_refines, int order, bool spacetime,
+                   Array<int>& ess_bdr, DFSParameters param); // TODO: better design
 
     HypreParMatrix& GetM() { return *M_.As<HypreParMatrix>(); }
     HypreParMatrix& GetB() { return *B_.As<HypreParMatrix>(); }
@@ -78,15 +82,15 @@ public:
     const DFSDataCollector& GetDFSDataCollector() const { return collector_; }
     const MixedMatrix& GetMixedMatrix() const { return *mixed_system_; }
 
-    void ShowError(const Vector& sol, bool verbose);
+    void ShowError(const Vector& sol, bool spacetime, bool verbose);
 };
 
-FEDarcyProblem::FEDarcyProblem(Mesh* mesh, int num_refines, int order,
+FEDarcyProblem::FEDarcyProblem(ParMesh &mesh, int num_refines, int order, bool spacetime,
                                Array<int>& ess_bdr, DFSParameters dfs_param)
-    : mesh_(MPI_COMM_WORLD, *mesh), ucoeff_(mesh_.Dimension(), uFun_ex),
-      pcoeff_(pFun_ex), collector_(order, num_refines, &mesh_, ess_bdr, dfs_param)
+    : mesh_(mesh), pcoeff_(pFun_ex),
+      ucoeff_(mesh_.Dimension(), spacetime ? sigmaFun_ex : uFun_ex),
+      collector_(order, num_refines, &mesh_, ess_bdr, dfs_param)
 {
-    delete mesh;
     for (int l = 0; l < num_refines; l++)
     {
         mesh_.UniformRefinement();
@@ -97,6 +101,8 @@ FEDarcyProblem::FEDarcyProblem(Mesh* mesh, int num_refines, int order,
     VectorFunctionCoefficient fcoeff(mesh_.Dimension(), fFun);
     FunctionCoefficient fnatcoeff(f_natural);
     FunctionCoefficient gcoeff(gFun);
+    MatrixFunctionCoefficient kcoeff(mesh_.Dimension(), kFun);
+    FunctionCoefficient st_fcoeff(spacetime_fFun);
 
     u_.SetSpace(collector_.hdiv_fes_.get());
     p_.SetSpace(collector_.l2_fes_.get());
@@ -104,18 +110,26 @@ FEDarcyProblem::FEDarcyProblem(Mesh* mesh, int num_refines, int order,
     u_.ProjectBdrCoefficientNormal(ucoeff_, ess_bdr);
 
     ParLinearForm fform(collector_.hdiv_fes_.get());
-    fform.AddDomainIntegrator(new VectorFEDomainLFIntegrator(fcoeff));
-    fform.AddBoundaryIntegrator(new VectorFEBoundaryFluxLFIntegrator(fnatcoeff));
-    fform.Assemble();
-
     ParLinearForm gform(collector_.l2_fes_.get());
-    gform.AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
-    gform.Assemble();
-
     ParBilinearForm mVarf(collector_.hdiv_fes_.get());
     ParMixedBilinearForm bVarf(&(*collector_.hdiv_fes_), &(*collector_.l2_fes_));
 
-    mVarf.AddDomainIntegrator(new VectorFEMassIntegrator);
+    if (spacetime)
+    {
+        gform.AddDomainIntegrator(new DomainLFIntegrator(st_fcoeff));
+        mVarf.AddDomainIntegrator(new VectorFEMassIntegrator(kcoeff));
+    }
+    else
+    {
+        fform.AddDomainIntegrator(new VectorFEDomainLFIntegrator(fcoeff));
+        fform.AddBoundaryIntegrator(new VectorFEBoundaryFluxLFIntegrator(fnatcoeff));
+        gform.AddDomainIntegrator(new DomainLFIntegrator(gcoeff));
+        mVarf.AddDomainIntegrator(new VectorFEMassIntegrator);
+    }
+
+    fform.Assemble();
+    gform.Assemble();
+
     mVarf.ComputeElementMatrices();
     mVarf.Assemble();
     mVarf.EliminateEssentialBC(ess_bdr, u_, fform);
@@ -124,7 +138,7 @@ FEDarcyProblem::FEDarcyProblem(Mesh* mesh, int num_refines, int order,
 
     bVarf.AddDomainIntegrator(new VectorFEDivergenceIntegrator);
     bVarf.Assemble();
-    bVarf.SpMat() *= -1.0;
+    if (!spacetime) bVarf.SpMat() *= -1.0;
     bVarf.Finalize();
     SparseMatrix D = bVarf.SpMat();
     bVarf.EliminateTrialDofs(ess_bdr, u_, gform);
@@ -192,19 +206,18 @@ FEDarcyProblem::FEDarcyProblem(Mesh* mesh, int num_refines, int order,
     }
 }
 
-void FEDarcyProblem::ShowError(const Vector &sol, bool verbose)
+void FEDarcyProblem::ShowError(const Vector &sol, bool spacetime, bool verbose)
 {
     u_.Distribute(Vector(sol.GetData(), M_->NumRows()));
+    double err  = u_.ComputeL2Error(ucoeff_, irs_);
+    double norm = ComputeGlobalLpNorm(2, ucoeff_, mesh_, irs_);
+    if (verbose) cout << "\n|| u_h - u || / || u || = " << err / norm << "\n";
+    if (spacetime) return;
+
     p_.Distribute(Vector(sol.GetData()+M_->NumRows(), B_->NumRows()));
-
-    double err_u  = u_.ComputeL2Error(ucoeff_, irs_);
-    double norm_u = ComputeGlobalLpNorm(2, ucoeff_, mesh_, irs_);
-    double err_p  = p_.ComputeL2Error(pcoeff_, irs_);
-    double norm_p = ComputeGlobalLpNorm(2, pcoeff_, mesh_, irs_);
-
-    if (!verbose) return;
-    cout << "\n|| u_h - u_ex || / || u_ex || = " << err_u / norm_u << "\n";
-    cout << "|| p_h - p_ex || / || p_ex || = " << err_p / norm_p << "\n";
+    err  = p_.ComputeL2Error(pcoeff_, irs_);
+    norm = ComputeGlobalLpNorm(2, pcoeff_, mesh_, irs_);
+    if (verbose) cout << "|| p_h - p || / || p || = " << err / norm << "\n";
 }
 
 int main(int argc, char *argv[])
@@ -223,6 +236,7 @@ int main(int argc, char *argv[])
     int order = 0;
     int num_refines = 2;
     bool use_tet_mesh = false;
+    bool spacetime = false;
     bool show_error = false;
     OptionsParser args(argc, argv);
     args.AddOption(&order, "-o", "--order",
@@ -231,6 +245,8 @@ int main(int argc, char *argv[])
                    "Number of parallel refinement steps.");
     args.AddOption(&use_tet_mesh, "-tet", "--tet-mesh", "-hex", "--hex-mesh",
                    "Use a tetrahedral or hexahedral mesh (on unit cube).");
+    args.AddOption(&spacetime, "-st", "--spacetime", "-no-st", "--no-spacetime",
+                   "Solve spacetime problem or normal Darcy flow.");
     args.AddOption(&show_error, "-se", "--show-error", "-no-se", "--no-show-error",
                    "Show or not show approximation error.");
     args.Parse();
@@ -249,18 +265,33 @@ int main(int argc, char *argv[])
 
     Array<int> ess_bdr(mesh->bdr_attributes.Max());
     ess_bdr = 0;
-    ess_bdr[1] = 1;
+    ess_bdr[0] = 1;
 
     IterSolveParameters param;
+    param.max_iter = 100000;
     DFSParameters dfs_param;
     dfs_param.MG_type = order > 0 && use_tet_mesh ? AlgebraicMG : GeometricMG;
     dfs_param.B_has_nullity_one = (ess_bdr.Sum() == ess_bdr.Size());
     if (order > 0 && use_tet_mesh) dfs_param.ml_particular = false;
 
+    int num_procs_x = static_cast<int>(std::sqrt(num_procs) + 0.5);
+    while (num_procs % num_procs_x)
+        num_procs_x -= 1;
+
+    Array<int> np_xyz(mesh->SpaceDimension());
+    np_xyz[0] = num_procs_x;
+    np_xyz[1] = num_procs / num_procs_x;
+    np_xyz[2] = 1;
+    assert(np_xyz[0] * np_xyz[1] == num_procs);
+
+    Array<int> partition(mesh->CartesianPartitioning(np_xyz), mesh->GetNE());
+
     string line = "\n*******************************************************\n";
     {
+        ParMesh pmesh(MPI_COMM_WORLD, *mesh, partition);
+        delete mesh;
         ResetTimer();
-        FEDarcyProblem darcy(mesh, num_refines, order, ess_bdr, dfs_param);
+        FEDarcyProblem darcy(pmesh, num_refines, order, spacetime, ess_bdr, dfs_param);
         HypreParMatrix& M = darcy.GetM();
         HypreParMatrix& B = darcy.GetB();
         const DFSDataCollector& collector = darcy.GetDFSDataCollector();
@@ -272,8 +303,8 @@ int main(int argc, char *argv[])
             cout << "System assembled in " << chrono.RealTime() << "s.\n";
         }
 
-        std::map<const DarcySolver*, double> setup_time;
-        std::map<const DarcySolver*, std::string> solver_to_name;
+        map<const DarcySolver*, double> setup_time;
+        map<const DarcySolver*, std::string> solver_to_name;
 
         ResetTimer();
         DivFreeSolver dfs(M, B, collector.hcurl_fes_.get(), collector.GetData());
@@ -287,6 +318,7 @@ int main(int argc, char *argv[])
 
         ResetTimer();
         HybridSolver hybrid(darcy.GetMixedMatrix(), &ess_bdr, -1);
+        hybrid.SetMaxIter(100000);
         setup_time[&hybrid] = chrono.RealTime();
         solver_to_name[&hybrid] = "Hybridization";
 
@@ -306,7 +338,7 @@ int main(int argc, char *argv[])
             if (verbose) cout << "  solve time: " << chrono.RealTime() << "s.\n";
             if (verbose) cout << "  iteration count: "
                               << solver->GetNumIterations() <<"\n";
-            if (show_error) darcy.ShowError(sol, verbose);
+            if (show_error) darcy.ShowError(sol, spacetime, verbose);
         }
     }
     if (verbose) cout << line << "\n";
@@ -370,4 +402,50 @@ double gFun(const Vector & x)
 double f_natural(const Vector & x)
 {
     return (-pFun_ex(x));
+}
+
+void bFun(const Vector& xt, Vector& b)
+{
+    b.SetSize(xt.Size());
+    b = 0.;
+
+    b(0) = sin(xt(0)*M_PI)*cos(xt(1)*M_PI);
+    b(1) = -sin(xt(1)*M_PI)*cos(xt(0)*M_PI);
+    b(2) = 1.;
+}
+
+void sigmaFun_ex(const Vector& xt, Vector& sigma)
+{
+    Vector b;
+    bFun(xt, b);
+    sigma.SetSize(xt.Size());
+    sigma(xt.Size()-1) = sFun_ex(xt);
+    for (int i = 0; i < xt.Size()-1; i++)
+        sigma(i) = b(i) * sigma(xt.Size()-1);
+}
+
+double sFun_ex(const Vector& xt)
+{
+    double t = xt(xt.Size()-1);
+    return sin(t)*exp(t)*xt(0)*xt(1);
+}
+
+void kFun(const Vector& xt, DenseMatrix& k)
+{
+    int nDim = xt.Size();
+    Vector b;
+    bFun(xt,b);
+
+    double bTbInv = (-1.0/(b*b));
+    k.Diag(1.0,nDim);
+    AddMult_a_VVt(bTbInv,b,k);
+}
+
+double spacetime_fFun(const Vector& xt)
+{
+    double t = xt(xt.Size()-1);
+    Vector b;
+    bFun(xt, b);
+    return (cos(t)*exp(t)+sin(t)*exp(t))*xt(0)*xt(1)
+           +b(0)*sin(t)*exp(t)*xt(1) + b(1)*sin(t)*exp(t)*xt(0);
 }

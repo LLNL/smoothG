@@ -12,7 +12,7 @@ enum MG_Type { AlgebraicMG, GeometricMG };
 struct IterSolveParameters
 {
     int print_level = 0;
-    int max_iter = 500;
+    int max_iter = 10000;
     double abs_tol = 1e-12;
     double rel_tol = 1e-9;
     bool iter_mode = false;
