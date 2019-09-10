@@ -17,6 +17,11 @@
 This essentially translates the config.mk file from MFEM
 into a out.cmake file to import the dependencies that MFEM
 uses into our configuration process.
+
+This was originally written to divide libraries/includes into
+'packages' that were understandable by a human. At some point
+we gave up on that and just threw everything into a pile of
+include and link flags.
 """
 from __future__ import print_function
 from __future__ import division
@@ -86,7 +91,7 @@ def parse_packages(filename="config.mk", verbose=False):
                      "linkpaths": [],
                      "libraries": []}]
     includes = []
-    status = "begin"  # switch *from* library to rpath triggers new package
+    status = "begin"
     found_ext_libs = False
     with open(filename, "r") as fd:
         print("parsemk.py: Found config file", filename)

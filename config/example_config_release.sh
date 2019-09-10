@@ -32,6 +32,8 @@ rm CMakeCache.txt
 rm -rf CMakeFiles
 
 cmake \
+    -DADOPT_MFEM_DEPENDENCIES=ON \
+    \
     -DMFEM_DIR=/path/to/the/directory/where/mfem/is/installed \
     -DSPE10_DIR=/path/to/the/directory/where/spe_perm.dat/is/located \
     \
