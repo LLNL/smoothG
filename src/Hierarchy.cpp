@@ -162,11 +162,11 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
 {
     assert(level >= 1 && level < NumLevels());
     Psigma_[level - 1].Mult(x.GetBlock(0), y.GetBlock(0));
-    Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
+//    Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
 
-//    auto tmp = PWConstProject(level, x.GetBlock(1));
-//    auto tmp2 = PWConstInterpolate(level, tmp);
-//    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
+    auto tmp = PWConstProject(level, x.GetBlock(1));
+    auto tmp2 = PWConstInterpolate(level, tmp);
+    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
 //    y.GetBlock(0) = 0.0;
 }
 

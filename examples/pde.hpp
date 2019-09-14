@@ -1215,7 +1215,7 @@ void SPE10Problem::MakeRHS()
 
         rhs_u_ = 0.0;
 
-        double rhs_mult = -0.0025;
+        double rhs_mult = -0.025;
         if (myid_ == 0)
         {
             std::cout << "\nRHS multiplier = " << rhs_mult << "\n";

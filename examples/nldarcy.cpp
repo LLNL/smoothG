@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
     const char* problem_name = "spe10";
     args.AddOption(&problem_name, "-mp", "--model-problem",
                    "Model problem (spe10, egg, lognormal, richard)");
-    const char* perm_file = "spe_perm_rescaled.dat";
+    const char* perm_file = "spe_perm_rescaled_eggscale.dat";
     args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
     int dim = 2;
     args.AddOption(&dim, "-d", "--dim",
@@ -270,8 +270,8 @@ int main(int argc, char* argv[])
     }
     else
     {
-        coarsening_factors[0] = 10;
-        coarsening_factors[1] = 22;
+        coarsening_factors[0] = 5;
+        coarsening_factors[1] = 10;
         coarsening_factors.Last() = dim == 3 ? 2 : 10;
         if (myid == 0)
         {
@@ -344,7 +344,7 @@ int main(int argc, char* argv[])
         nlmg.Solve(rhs, sol_nlmg);
         timings.Append(nlmg.GetTiming());
     }
-    timings.Print(std::cout, timings.Size());
+    if (myid == 0) timings.Print(std::cout, timings.Size());
 
 //    auto coarse_rhs = hierarchy.Restrict(0, rhs);
 ////    auto coarse_rhs2 = hierarchy.Restrict(1, coarse_rhs);
@@ -461,7 +461,7 @@ LevelSolver::LevelSolver(Hierarchy& hierarchy, int level, mfem::Vector Z_vector,
     hierarchy_.SetPrintLevel(level_, 0);
 //    hierarchy_.SetAbsTol(level_, 0);
     hierarchy_.SetMaxIter(level_, 200);
-    bt_tol_ = level ? 1e3 : 1e4;
+    bt_tol_ = level ? 5 : 5;
     k_max_ = 4;
     if (myid_ == 0)
     {
@@ -682,10 +682,10 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
         }
     }
 
-    if (k_max_ > 0 )
+    if (k_max_ > 0 &&interlopate)
         resid_norm_ = ResidualNorm(x, rhs);
 
-    while (k < k_max_  && resid_norm_ > prev_resid_norm)
+    while (k < k_max_ &&interlopate&& resid_norm_ > prev_resid_norm)
     {
         double backtracking_resid_norm = resid_norm_;
 
@@ -871,7 +871,7 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
         solvers_[level].SetPrintLevel(-1);
 //        solvers_[level].SetMaxIter(level < num_levels_ - 1 || level == 0 ? 1 : 50);
 
-//        const int num_relax = (level < num_levels_ - 1 || level == 0 ? 1 : 50);
+//        const int num_relax = (level < num_levels_ - 1 || level == 0 ? 1 : 3);
         const int num_relax = level == 0 ? 1 : 3;
         if (myid_ == 0) std::cout << "  Number of smoothing: " << num_relax << "\n";
 
