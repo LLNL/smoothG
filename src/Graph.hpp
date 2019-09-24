@@ -127,8 +127,24 @@ public:
     /// Swap two graphs
     friend void swap(Graph& lhs, Graph& rhs) noexcept;
 
+    /// Set coordinates of vertices
+    void SetVertexCoordinates(mfem::DenseMatrix coordinates)
+    {
+        assert(coordinates.NumCols() == NumVertices());
+        coordinates_ = std::move(coordinates);
+    }
+
+    /// This "disaggregates" each vertex of the current graph into 3 vertices,
+    /// resulting in a new graph (TODO: make it work in parallel)
+    Graph Disaggregate() const;
+    Graph Disaggregate(const std::string& filename) const;
+    Graph Disaggregate(const mfem::DenseMatrix& coordinates_) const;
+
     /// Read global vector from file, then distribute to local vector
     mfem::Vector ReadVertexVector(const std::string& filename) const;
+
+    /// Each line in input file contains coordinate of a vertex
+    void ReadCoordinates(const std::string& filename);
 
     /// Assemble global vector from local vector, then write to file
     void WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const;
@@ -141,6 +157,7 @@ public:
     const mfem::HypreParMatrix& EdgeToTrueEdgeToEdge() const { return *edge_trueedge_edge_; }
     const mfem::HypreParMatrix& VertexToTrueEdge() const { return *vertex_trueedge_; }
     const std::vector<mfem::Vector>& EdgeWeight() const { return split_edge_weight_; }
+    const mfem::DenseMatrix& Coordinates() const { return coordinates_; }
     const mfem::SparseMatrix& EdgeToBdrAtt() const { return edge_bdratt_; }
     const mfem::Array<HYPRE_Int>& VertexStarts() const { return vertex_starts_; }
     const mfem::Array<HYPRE_Int>& EdgeStarts() const { return edge_starts_; }
@@ -187,6 +204,7 @@ private:
     std::vector<mfem::Vector> split_edge_weight_;
     mfem::SparseMatrix edge_bdratt_; // edge to "boundary attribute"
 
+    mfem::DenseMatrix coordinates_;
     mfem::SparseMatrix edge_vertex_local_;
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge_;
     std::unique_ptr<mfem::HypreParMatrix> vertex_trueedge_;

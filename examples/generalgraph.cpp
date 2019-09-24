@@ -65,6 +65,9 @@ int main(int argc, char* argv[])
     const char* weight_filename = "";
     args.AddOption(&weight_filename, "-w", "--weight",
                    "File to load for graph edge weights.");
+    const char* coord_filename = "";
+    args.AddOption(&coord_filename, "-c", "--coordinate",
+                   "File to load for graph vertex coordinates.");
     bool metis_agglomeration = false;
     args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
@@ -93,6 +96,9 @@ int main(int argc, char* argv[])
     int isolate = -1;
     args.AddOption(&isolate, "--isolate", "--isolate",
                    "Isolate a single vertex (for debugging so far).");
+    int num_refine = 0;
+    args.AddOption(&num_refine, "-r", "--num-refine",
+                   "Number of graph refinement (disaggregation)");
 
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
@@ -148,12 +154,22 @@ int main(int argc, char* argv[])
 
     Graph graph(comm, global_vertex_edge, edge_weight);
 
+    if (std::strlen(coord_filename))
+    {
+        graph.ReadCoordinates(coord_filename);
+    }
+
+    for (int i = 0; i < num_refine; ++i)
+    {
+        graph = graph.Disaggregate();
+    }
+
     /// [Partitioning]
     mfem::Array<int> partitioning;
     if (metis_agglomeration || generate_graph || num_procs > 1)
     {
         MetisGraphPart(graph.VertexToEdge(), partitioning,
-                       num_partitions / num_procs, isolate);
+                       graph.NumVertices() / upscale_param.coarse_factor, isolate);
     }
     else
     {
@@ -179,6 +195,7 @@ int main(int argc, char* argv[])
         if (generate_graph || generate_fiedler)
         {
             fine_rhs.GetBlock(1) = ComputeFiedlerVector(fine_mgL);
+//            fine_mgL.GetGraph().WriteVertexVector(fine_rhs.GetBlock(1), "fiedler_paper.txt");
         }
         else
         {
@@ -204,6 +221,16 @@ int main(int argc, char* argv[])
         {
             graph.WriteVertexVector(fine_rhs.GetBlock(1), FiedlerFileName);
         }
+
+//        std::ofstream graphfile_ref("vertex_edge_refined");
+//        fine_mgL.GetGraph().VertexToEdge().PrintCSR2(graphfile_ref);
+//        std::ofstream coordfile_ref("coordinates_refined.txt");
+//        coordfile_ref << fine_mgL.GetGraph().NumVertices() << " " << 2 << "\n";
+//        mfem::DenseMatrix coord(fine_mgL.GetGraph().Coordinates(), 't');
+//        coord.PrintMatlab(coordfile_ref);
+//        for (int l = 0; l < upscale_param.max_levels; ++l)
+//            fine_mgL.GetGraph().WriteVertexVector(sol[l].GetBlock(1), "sol_"+std::to_string(l)+".txt");
+
     }
 
     MPI_Finalize();

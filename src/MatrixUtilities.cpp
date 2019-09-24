@@ -1041,7 +1041,7 @@ LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
     M_is_diag_ = IsDiag(M);
     if (M_is_diag_)
     {
-        const mfem::Vector M_diag(M.GetData(), M.Height());
+        const mfem::Vector M_diag(const_cast<double*>(M.GetData()), M.Height());
         Init(M_diag, D);
     }
     else

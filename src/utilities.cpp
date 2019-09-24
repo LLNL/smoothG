@@ -89,7 +89,7 @@ void GetTableRow(
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
     assert(size >= 0);
-    J.MakeRef(mat.GetJ() + begin, size);
+    J.MakeRef(const_cast<int*>(mat.GetJ()) + begin, size);
 }
 
 /// instead of a reference, get a copy
@@ -99,9 +99,8 @@ void GetTableRowCopy(
     const int begin = mat.GetI()[rownum];
     const int end = mat.GetI()[rownum + 1];
     const int size = end - begin;
-    mfem::Array<int> temp;
-    temp.MakeRef(mat.GetJ() + begin, size);
-    temp.Copy(J);
+    J.SetSize(size);
+    std::copy_n(mat.GetJ() + begin, size, J.GetData());
 }
 
 void FiniteVolumeMassIntegrator::AssembleElementMatrix(
@@ -482,8 +481,8 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat)
 {
     std::set<unsigned> cols;
-    int* mat_j = mat.GetJ();
-    int* end = mat_j + mat.NumNonZeroElems();
+    const int* mat_j = mat.GetJ();
+    const int* end = mat_j + mat.NumNonZeroElems();
     for (; mat_j != end; mat_j++)
     {
         cols.insert(*mat_j);
