@@ -299,7 +299,7 @@ double CompareError(MPI_Comm comm, const mfem::Vector& numer, const mfem::Vector
     mfem::Vector diff = denom;
     diff -= numer;
 
-    const double error = mfem::ParNormlp(diff, 2, comm) / ParNormlp(denom, 2, comm);
+    const double error = mfem::ParNormlp(diff, 2, comm) / mfem::ParNormlp(denom, 2, comm);
 
     return error;
 }

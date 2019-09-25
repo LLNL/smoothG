@@ -25,28 +25,24 @@ def read_graph(graph_file):
     return nx.from_scipy_sparse_matrix(adjacency_mat)
 
 def convert_binary(node_value):
+    node_color_value = ['r'] * len(node_value)
     for i in range(len(node_value)):
-        node_value[i] = 1 if node_value[i] > 0.0 else 0
-    return node_value
+        node_color_value[i] = 'b' if node_value[i] > 0.0 else 'y'
+    return node_color_value
 
 def main(argv):
-    print(argv[0])
     graph = read_graph(argv[0])
     pos = np.loadtxt(argv[1])[1:]
-    node_value = convert_binary(np.loadtxt(argv[2]))
-
-    # return
+    node_color_value = convert_binary(np.loadtxt(argv[2]))
     plt.figure(figsize=(10,10))
-    nx.draw_networkx_edges(graph,pos,alpha=0.1)
+    nx.draw_networkx_edges(graph,pos,alpha=0.08)
     nx.draw_networkx_nodes(graph,pos,
-                           node_size=.01,
-                           node_color=node_value,
-                           cmap=plt.cm.RdYlGn)
+                           node_size=0.02,
+                           node_color=node_color_value)
+                           # cmap=plt.cm.RdYlGn)
 
     plt.axis('off')
     plt.show()
 
-
 if __name__ == "__main__":
-    #assert(sys.argv > 0)
     exit(main(sys.argv[1:]))

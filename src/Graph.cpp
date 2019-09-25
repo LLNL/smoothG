@@ -351,139 +351,83 @@ void Graph::SplitEdgeWeight(const mfem::Vector& edge_weight_local)
     }
 }
 
-Graph Graph::Disaggregate() const
+mfem::SparseMatrix DisaggregateVertex(const mfem::SparseMatrix& vertex_edge)
 {
-    auto coordinates_ref = const_cast<mfem::DenseMatrix&>(coordinates_);
-    const int num_verts_new = NumEdges() * 2;
-    int num_edges_new = NumEdges();
+    const int num_verts_new = vertex_edge.NumCols() * 2;
 
-    int* vert_edge_i = new int[num_verts_new + 1]();
-    int new_vert_count = 0;
-    for (int i = 0; i < NumVertices(); i++)
+    int* I = new int[num_verts_new + 1]();
+    for (int i = 0; i < vertex_edge.NumRows(); i++)
     {
-        int num_edges_local = vertex_edge_local_.RowSize(i);
-        if (num_edges_local > 2)
+        const int num_edges = vertex_edge.RowSize(i);
+        const int num_neighbors = num_edges > 2 ? 3 : num_edges;
+        const int offset = vertex_edge.GetI()[i];
+
+        for (int j = 0; j < num_edges; j++)
         {
-            for (int j = 0; j < num_edges_local; j++)
-            {
-                vert_edge_i[new_vert_count + 1] = vert_edge_i[new_vert_count] + 3;
-                new_vert_count++;
-            }
-            num_edges_new += num_edges_local;
-        }
-        else if (num_edges_local == 2)
-        {
-            // In this case only one additional edge is created
-            vert_edge_i[new_vert_count+1] = vert_edge_i[new_vert_count]+2;
-            vert_edge_i[new_vert_count+2] = vert_edge_i[new_vert_count+1]+2;
-            new_vert_count += 2;
-            num_edges_new++;
-        }
-        else
-        {
-            vert_edge_i[new_vert_count+1] = vert_edge_i[new_vert_count]+1;
-            new_vert_count++;
+            I[offset + j + 1] = I[offset + j] + num_neighbors;
         }
     }
-    assert(new_vert_count == num_verts_new);
+
+    const int nnz = I[num_verts_new];
+    int *J = new int[nnz];
+    mfem::Array<int> edges;
+
+    int num_edges_new = vertex_edge.NumCols();
+    for (int i = 0; i < vertex_edge.NumRows(); i++)
+    {
+        GetTableRow(vertex_edge, i, edges);
+        const int num_edges = edges.Size();
+
+        // The last guy will go back to the beginning if num_edges > 2
+        for (int j = 0; j < num_edges; j++)
+        {
+            if (num_edges > 1) *(J++) = num_edges_new + (num_edges > 2 ? j : 0);
+            if (num_edges > 2) *(J++) = num_edges_new + (j + 1) % num_edges;
+            *(J++) = edges[j];
+        }
+        num_edges_new += num_edges > 2 ? num_edges : num_edges - 1;
+    }
+
+    double * Data = new double[nnz];
+    std::fill_n(Data, nnz, 1.0);
+    return mfem::SparseMatrix (I, J -= nnz, Data, num_verts_new, num_edges_new);
+}
+
+Graph Graph::Disaggregate() const
+{
+    Graph disaggregated_graph(GetComm(), DisaggregateVertex(vertex_edge_local_));
+    if (coordinates_.NumCols() == 0) return disaggregated_graph;
+
+    const int num_verts_new = NumEdges() * 2;
 
     mfem::DenseMatrix coordinates_new(coordinates_.NumRows(), num_verts_new);
     mfem::Vector coord_new, coord_old_myself;
+    mfem::Array<int> edges, verts;
 
-    int *offset, *vert_edge_j = new int[num_edges_new * 2];
-    const int *local_edges, *local_verts;
+    int new_vert_count = 0;
 
-    new_vert_count = 0;
-    num_edges_new = NumEdges();
     for (int i = 0; i < NumVertices(); i++)
     {
-        int num_edges_local = vertex_edge_local_.RowSize(i);
-        local_edges = vertex_edge_local_.GetRowColumns(i);
-        coordinates_ref.GetColumnReference(i, coord_old_myself);
+        GetTableRow(vertex_edge_local_, i, edges);
 
-        offset = vert_edge_j + vert_edge_i[new_vert_count];
-        if (num_edges_local > 2)
+        const double relative_distance_to_old = edges.Size() > 1 ? 0.25 : 0.0;
+        coordinates_.GetColumn(i, coord_old_myself);
+        coord_old_myself *= 1.0 - relative_distance_to_old;
+
+        for (int edge : edges)
         {
-            for (int j = 0; j < num_edges_local-1; j++)
-            {
-                // find out the coordinate of the new vertex
-                local_verts = EdgeToVertex().GetRowColumns(*local_edges);
-                if (*local_verts == i)
-                    local_verts++;
+            GetTableRow(EdgeToVertex(), edge, verts);
+            const int vert_neighbor = verts[0] == i ? verts[1] : verts[0];
 
-                coordinates_new.GetColumnReference(new_vert_count++, coord_new);
-                coordinates_.GetColumn(*local_verts, coord_new);
-                coord_new *= 0.25;
-                coord_new.Add(0.75, coord_old_myself);
-
-                // fill in the vertex to edge table
-                *(offset++) = num_edges_new+j;
-                *(offset++) = num_edges_new+j+1;
-                *(offset++) = *(local_edges++);
-            }
-
-            // find out the coordinate of the new vertex
-            local_verts = edge_vertex_local_.GetRowColumns(*local_edges);
-            if (*local_verts == i)
-                local_verts++;
-
-            coordinates_new.GetColumnReference(new_vert_count, coord_new);
-            coordinates_.GetColumn(*local_verts, coord_new);
-            coord_new *= 0.25;
-            coord_new.Add(0.75, coord_old_myself);
-
-            // fill in the vertex to edge table
-            // For the last guy, it will go back to the beginning
-            *(offset++) = num_edges_new+num_edges_local-1;
-            *(offset++) = num_edges_new;
-            *(offset++) = *(local_edges++);
-            new_vert_count++;
-
-            num_edges_new += num_edges_local;
-        }
-        else if (num_edges_local == 2)
-        {
-            for (int j = 0; j < 2; j++)
-            {
-                // find out the coordinate of the new vertex
-                local_verts = edge_vertex_local_.GetRowColumns(*local_edges);
-                if (*local_verts == i)
-                    local_verts++;
-
-                coordinates_new.GetColumnReference(new_vert_count, coord_new);
-                coordinates_.GetColumn(*local_verts, coord_new);
-
-                coord_new *= 0.25;
-                coord_new.Add(0.75, coord_old_myself);
-
-                // fill in the vertex to edge table
-                *(offset++) = num_edges_new;
-                *(offset++) = *(local_edges++);
-                new_vert_count ++;
-            }
-            num_edges_new++;
-        }
-        else
-        {
-            // find out the coordinate of the new vertex
-            coordinates_new.GetColumnReference(new_vert_count, coord_new);
-            coordinates_.GetColumn(i, coord_new);
-
-            // fill in the vertex to edge table
-            vert_edge_j[vert_edge_i[new_vert_count]] = *local_edges;
-            new_vert_count++;
+            coordinates_new.GetColumnReference(new_vert_count++, coord_new);
+            coordinates_.GetColumn(vert_neighbor, coord_new);
+            coord_new *= relative_distance_to_old;
+            coord_new += coord_old_myself;
         }
     }
     assert(new_vert_count == num_verts_new);
 
-    double * vert_edge_data = new double[num_edges_new * 2];
-    std::fill_n(vert_edge_data, num_edges_new * 2, 1.0);
-    mfem::SparseMatrix vert_edge_new(vert_edge_i, vert_edge_j, vert_edge_data,
-                                     num_verts_new, num_edges_new);
-
-    Graph disaggregated_graph(GetComm(), vert_edge_new);
     disaggregated_graph.SetVertexCoordinates(std::move(coordinates_new));
-
     return disaggregated_graph;
 }
 

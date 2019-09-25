@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
         if (generate_graph || generate_fiedler)
         {
             fine_rhs.GetBlock(1) = ComputeFiedlerVector(fine_mgL);
-//            fine_mgL.GetGraph().WriteVertexVector(fine_rhs.GetBlock(1), "fiedler_paper.txt");
+            fine_mgL.GetGraph().WriteVertexVector(fine_rhs.GetBlock(1), "fiedler_paper_r2.txt");
         }
         else
         {
@@ -222,14 +222,14 @@ int main(int argc, char* argv[])
             graph.WriteVertexVector(fine_rhs.GetBlock(1), FiedlerFileName);
         }
 
-//        std::ofstream graphfile_ref("vertex_edge_refined");
-//        fine_mgL.GetGraph().VertexToEdge().PrintCSR2(graphfile_ref);
-//        std::ofstream coordfile_ref("coordinates_refined.txt");
-//        coordfile_ref << fine_mgL.GetGraph().NumVertices() << " " << 2 << "\n";
-//        mfem::DenseMatrix coord(fine_mgL.GetGraph().Coordinates(), 't');
-//        coord.PrintMatlab(coordfile_ref);
-//        for (int l = 0; l < upscale_param.max_levels; ++l)
-//            fine_mgL.GetGraph().WriteVertexVector(sol[l].GetBlock(1), "sol_"+std::to_string(l)+".txt");
+        std::ofstream graphfile_ref("vertex_edge_refined.txt");
+        fine_mgL.GetGraph().VertexToEdge().PrintCSR2(graphfile_ref);
+        std::ofstream coordfile_ref("coordinates_refined.txt");
+        coordfile_ref << fine_mgL.GetGraph().NumVertices() << " " << 2 << "\n";
+        mfem::DenseMatrix coord(fine_mgL.GetGraph().Coordinates(), 't');
+        coord.PrintMatlab(coordfile_ref);
+        for (int l = 0; l < upscale_param.max_levels; ++l)
+            fine_mgL.GetGraph().WriteVertexVector(sol[l].GetBlock(1), "sol_"+std::to_string(l)+".txt");
 
     }
 
@@ -280,7 +280,7 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
         // Adding identity to A so that it is non-singular
         mfem::SparseMatrix diag = GetDiag(*A);
         for (int i = 0; i < diag.Width(); i++)
-            diag(i, i) += 1.0;
+            diag(i, i) += 0.1;
     }
 
     mfem::HypreBoomerAMG prec(*A);
@@ -303,11 +303,11 @@ mfem::Vector ComputeFiedlerVector(const MixedMatrix& mixed_laplacian)
     // First eigenvalue of A+I should be 1 (graph Laplacian has a 1D null space)
     if (!use_w)
     {
-        converged &= std::abs(evals[0] - 1.0) < 1e-8;
+        converged &= std::abs(evals[0] - 0.1) < 1e-8;
     }
 
     // Second eigenvalue of A+I should be greater than 1 for connected graphs
-    converged &= std::abs(evals[1] - 1.0) > 1e-8;
+    converged &= std::abs(evals[1] - 0.1) > 1e-8;
 
     int myid;
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
