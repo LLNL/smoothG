@@ -92,6 +92,19 @@ public:
                                    SliceOrientation orientation = NONE,
                                    int slice = -1);
 
+    /**
+       This fakes a field that is uniform but anistoropic, with given
+       horizontal and vertical permeabilities.
+
+       (the typical use case they are more like *covariances* than
+       permeabilities, but this class doesn't know about that.
+    */
+    InversePermeabilityCoefficient(MPI_Comm comm,
+                                   const mfem::Array<int>& N,
+                                   const mfem::Vector& h,
+                                   double horizontal_perm,
+                                   double vertical_perm);
+
     virtual void Eval(mfem::Vector& V, mfem::ElementTransformation& T,
                       const mfem::IntegrationPoint& ip)
     {
@@ -102,6 +115,9 @@ public:
 
     /// Inverse of Frobenius norm of the inverse permeability
     double InvNorm2(const mfem::Vector& x);
+
+    std::vector<double>& GetRawInversePermeability() { return inverse_permeability_; }
+
 private:
     void ReadPermeabilityFile(const std::string& fileName,
                               const mfem::Array<int>& max_N);
@@ -142,6 +158,38 @@ InversePermeabilityCoefficient::InversePermeabilityCoefficient(
         return;
     }
     ReadPermeabilityFile(comm, file_name, max_N);
+}
+
+InversePermeabilityCoefficient::InversePermeabilityCoefficient(
+    MPI_Comm comm, const mfem::Array<int>& N,
+    const mfem::Vector& h,
+    double horizontal_perm, double vertical_perm)
+    :
+    mfem::VectorCoefficient(3),
+    h_(h),
+    slice_(-1),
+    orientation_(NONE),
+    N_slice_(N[0] * N[1]),
+    N_all_(N_slice_ * N[2]),
+    inverse_permeability_(3 * N_all_)
+{
+    N.Copy(N_);
+
+    double* ip = inverse_permeability_.data();
+    for (int l = 0; l < 3; l++)
+    {
+        for (int k = 0; k < N_[2]; k++)
+        {
+            for (int j = 0; j < N_[1]; j++)
+            {
+                for (int i = 0; i < N_[0]; i++)
+                {
+                    *ip = (l == 2) ? (1.0 / vertical_perm) : (1.0 / horizontal_perm);
+                    ip++;
+                }
+            }
+        }
+    }
 }
 
 void InversePermeabilityCoefficient::ReadPermeabilityFile(const std::string& fileName,
@@ -506,6 +554,12 @@ public:
     */
     Graph GetFVGraph(bool use_local_weight = false);
 
+    /// return unweighted graph, for example to use with PDESampler
+    Graph GetUnweightedGraph(bool use_local_weight = false);
+
+    /// returns weights on edge space
+    const mfem::Vector& GetWeight() { return weight_; }
+
     /// Getter for vertex-block right hand side
     const mfem::Vector& GetVertexRHS() const
     {
@@ -545,8 +599,10 @@ protected:
     void BuildReservoirGraph();
     void InitGraph();
     void ComputeGraphWeight(bool unit_weight = false);
-    void CartPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
-    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
+    void CartPart(const mfem::Array<int>& coarsening_factor,
+                  mfem::Array<int>& partitioning) const;
+    void MetisPart(const mfem::Array<int>& coarsening_factor,
+                   mfem::Array<int>& partitioning) const;
 
     unique_ptr<mfem::ParMesh> pmesh_;
 
@@ -605,6 +661,16 @@ Graph DarcyProblem::GetFVGraph(bool use_local_weight)
         return Graph(vertex_edge_, edge_trueedge, local_weight_, &edge_bdratt_);
     }
     return Graph(vertex_edge_, edge_trueedge, weight_, &edge_bdratt_);
+}
+
+Graph DarcyProblem::GetUnweightedGraph(bool use_local_weight)
+{
+    assert(use_local_weight == false); // not implemented
+
+    const mfem::HypreParMatrix& edge_trueedge = *sigma_fes_->Dof_TrueDof_Matrix();
+    mfem::Vector temp_weight(weight_.Size());
+    temp_weight = 1.0;
+    return Graph(vertex_edge_, edge_trueedge, temp_weight, &edge_bdratt_);
 }
 
 void DarcyProblem::BuildReservoirGraph()
@@ -815,6 +881,52 @@ void DarcyProblem::Partition(bool metis_parition,
 /**
    @brief Construct finite volume problem on the SPE10 data set
 */
+class DirichletBCDarcyProblem : public DarcyProblem
+{
+public:
+    /**
+       @brief Constructor
+       @param ess_attr marker for boundary attributes where essential edge
+              condition is imposed
+    */
+    DirichletBCDarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& ess_attr);
+
+private:
+    void MakeRHS();
+};
+
+DirichletBCDarcyProblem::DirichletBCDarcyProblem(const mfem::ParMesh& pmesh,
+                                                 const mfem::Array<int>& ess_attr)
+    : DarcyProblem(pmesh.GetComm(), pmesh.Dimension(), ess_attr)
+{
+    pmesh_ = make_unique<mfem::ParMesh>(pmesh, false);
+    InitGraph();
+    kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
+    ComputeGraphWeight();
+    MakeRHS();
+}
+
+void DirichletBCDarcyProblem::MakeRHS()
+{
+    mfem::Array<int> nat_negative_one(ess_attr_.Size());
+    nat_negative_one = 0;
+    nat_negative_one[pmesh_->Dimension() - 2] = 1;
+
+    mfem::ConstantCoefficient negative_one(-1.0);
+    mfem::RestrictedCoefficient pinflow_coeff(negative_one, nat_negative_one);
+
+    mfem::LinearForm g(sigma_fes_.get());
+    g.AddBoundaryIntegrator(
+        new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
+    g.Assemble();
+    rhs_sigma_ = g;
+
+    rhs_u_ = 0.0;
+}
+
+/**
+   @brief Construct finite volume problem on the SPE10 data set
+*/
 class SPE10Problem : public DarcyProblem
 {
 public:
@@ -827,31 +939,39 @@ public:
        @param metis_parition whether to call METIS/Cartesian partitioner
        @param ess_attr marker for boundary attributes where essential edge
               condition is imposed
-       @param unit_weight whether set edge weight as unit weight (1.0)
+       @param unit_weight ignore permFile and set perms to 1
+              (note well this means something different in DarcyProblem!)
     */
     SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
                  int slice, bool metis_parition,
-                 const mfem::Array<int>& ess_attr, bool unit_weight = false);
+                 const mfem::Array<int>& ess_attr, bool unit_weight = false,
+                 double anisotropy = 1.0);
 
     /// Setup a vector that equals initial_val in half of the domain (in y-direction)
     /// and -initial_val in the other half
     mfem::Vector InitialCondition(double initial_val) const;
 
+    mfem::Vector& GetRawInversePermeability() { return inverse_permeability_; }
+
 private:
     void SetupMeshAndCoeff(const char* permFile, int nDimensions,
-                           int spe10_scale, bool metis_partition, int slice);
+                           int spe10_scale, bool metis_partition, int slice,
+                           bool unit_weight, double anisotropy);
     unique_ptr<mfem::ParMesh> MakeParMesh(mfem::Mesh& mesh, bool metis_partition);
     void MakeRHS();
 
     unique_ptr<GCoefficient> source_coeff_;
+    mfem::Vector inverse_permeability_;
 };
 
 SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
                            int slice, bool metis_parition,
-                           const mfem::Array<int>& ess_attr, bool unit_weight)
+                           const mfem::Array<int>& ess_attr, bool unit_weight,
+                           double anisotropy)
     : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
 {
-    SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice);
+    SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice,
+                      unit_weight, anisotropy);
 
     if (myid_ == 0)
     {
@@ -861,12 +981,15 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
     }
 
     InitGraph();
-    ComputeGraphWeight(unit_weight);
+    // TODO FIXME: unit_weight is the wrong name for what I am doing here
+    // ComputeGraphWeight(unit_weight);
+    ComputeGraphWeight();
     MakeRHS();
 }
 
 void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
-                                     int spe10_scale, bool metis_partition, int slice)
+                                     int spe10_scale, bool metis_partition, int slice,
+                                     bool unit_weight, double anisotropy)
 {
     mfem::Array<int> max_N(3);
     max_N[0] = 60;
@@ -890,7 +1013,29 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
 
     using IPC = InversePermeabilityCoefficient;
     IPC::SliceOrientation orient = nDimensions == 2 ? IPC::XY : IPC::NONE;
-    kinv_vector_ = make_unique<IPC>(comm_, permFile, N, max_N, h, orient, slice);
+    std::unique_ptr<IPC> ip_kinv_vector;
+    if (unit_weight)
+    {
+        ip_kinv_vector = make_unique<IPC>(comm_, "", N, max_N, h, orient, slice);
+    }
+    else if (anisotropy != 1.0)
+    {
+        ip_kinv_vector = make_unique<IPC>(comm_, N, h, 1.0, 0.001);
+    }
+    else
+    {
+        ip_kinv_vector = make_unique<IPC>(comm_, permFile, N, max_N, h, orient, slice);
+    }
+
+    const auto s_ip = ip_kinv_vector->GetRawInversePermeability();
+    // below we are reading only the x-direction permeabilities,
+    // ie horizontal perms, to get a scalar mean for the PDE sampler
+    inverse_permeability_.SetSize((int) s_ip.size() / 3);
+    for (int i = 0; i < inverse_permeability_.Size(); ++i)
+    {
+        inverse_permeability_(i) = s_ip[i];
+    }
+    kinv_vector_ = std::move(ip_kinv_vector);
 
     mfem::Array<int> coarsening_factor(nDimensions);
     coarsening_factor = 10;
@@ -907,10 +1052,17 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     {
         mfem::Mesh mesh(N[0], N[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
         pmesh_ = MakeParMesh(mesh, metis_partition);
-        return;
     }
-    mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
-    pmesh_ = MakeParMesh(mesh, metis_partition);
+    else
+    {
+        mfem::Mesh mesh(N[0], N[1], N[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
+        pmesh_ = MakeParMesh(mesh, metis_partition);
+    }
+    {
+        std::ofstream fd("out.mesh");
+        pmesh_->Print(fd);
+    }
+
 }
 
 unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
