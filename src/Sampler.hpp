@@ -150,6 +150,15 @@ public:
 
     mfem::Vector GetLogCoefficientForVisualization(int level);
 
+    void SetHierarchyTols(double rel_tol, double abs_tol=-1.0)
+    {
+        hierarchy_.SetRelTol(rel_tol);
+        if (abs_tol >= 0.0)
+        {
+            hierarchy_.SetAbsTol(abs_tol);
+        }
+    }
+
     const Hierarchy& GetHierarchy() const { return hierarchy_; }
 
 private:
