@@ -36,7 +36,8 @@ enum EisenstatWalker { TaylorResidual, NonlinearResidual };
 class NonlinearSolver
 {
 public:
-    NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag);
+    NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type,
+                    std::string tag, double initial_linear_tol);
 
     // Solve R(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
@@ -103,6 +104,45 @@ protected:
 
 enum Cycle { V_CYCLE, FMG, CASCADIC };
 
+struct NLMGParameter
+{
+    Cycle cycle = V_CYCLE;
+    SolveType solve_type = Newton;
+    int max_num_backtrack = 4;
+    double diff_tol = 5;
+    double coarse_diff_tol = 5;
+    int num_relax_fine = 1;
+    int num_relax_middle = 1;
+    int num_relax_coarse = 1;
+    double initial_linear_tol = 1e-8;
+
+    void RegisterInOptionsParser(mfem::OptionsParser& args)
+    {
+//        int cycle_int = 0;
+//        int solve_type_int = 0;
+//        args.AddOption(&cycle_int, "--cycle", "--mg-cycle",
+//                       "Multigrid cycle: V-cycle (0), FMG (1), CASCADIC (2) ");
+//        args.AddOption(&solve_type_int, "--solve-type", "--nonlinear-solve-type",
+//                       "Nonlinear solver type: Newton (0), Picard (1)");
+        args.AddOption(&max_num_backtrack, "--num-backtrack", "--max-num-backtrack",
+                       "Maximum number of backtracking steps.");
+        args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
+                       "Tolerance for solution change in fine level.");
+        args.AddOption(&coarse_diff_tol, "--coarse-diff-tol", "--coarse-diff-tol",
+                       "Tolerance for solution change in coarse level.");
+        args.AddOption(&num_relax_fine, "--num-relax-fine", "--num-relax-fine",
+                       "Number of relaxation in fine level.");
+        args.AddOption(&num_relax_middle, "--num-relax-middle", "--num-relax-middle",
+                       "Number of relaxation in intermediate levels.");
+        args.AddOption(&num_relax_coarse, "--num-relax-coarse", "--num-relax-coarse",
+                       "Number of relaxation in coarse level.");
+        args.AddOption(&initial_linear_tol, "--init-linear-tol", "--init-linear-tol",
+                       "Initial tol for linear solve inside nonlinear iterations.");
+//        cycle = static_cast<Cycle>(cycle_int);
+//        solve_type = static_cast<SolveType>(solve_type_int);
+    }
+};
+
 /**
    @brief Nonlinear multigrid using full approximation scheme and nonlinear relaxation.
 
@@ -113,7 +153,7 @@ class NonlinearMG : public NonlinearSolver
 {
 public:
     // the time dependent operators gets updated during solving
-    NonlinearMG(MPI_Comm comm, int size, int num_levels, SolveType solve_type, Cycle cycle);
+    NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
 protected:

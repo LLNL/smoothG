@@ -23,9 +23,10 @@
 namespace smoothg
 {
 
-NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type, std::string tag)
+NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type,
+                                 std::string tag, double initial_linear_tol)
     : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(1e-8)
+      linear_tol_criterion_(NonlinearResidual), linear_tol_(initial_linear_tol)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -121,10 +122,10 @@ void NonlinearSolver::UpdateLinearSolveTol()
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, SolveType solve_type, Cycle cycle)
-    : NonlinearSolver(comm, size, solve_type, "Nonlinear MG"), cycle_(cycle),
-      num_levels_(num_levels), rhs_(num_levels_), sol_(num_levels_), help_(num_levels_),
-      residual_norms_(num_levels)
+NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param)
+    : NonlinearSolver(comm, size, param.solve_type, "Nonlinear MG", param.initial_linear_tol),
+      cycle_(param.cycle), num_levels_(num_levels), rhs_(num_levels_),
+      sol_(num_levels_), help_(num_levels_), residual_norms_(num_levels)
 { }
 
 void NonlinearMG::Mult(const mfem::Vector& x, mfem::Vector& Rx)
