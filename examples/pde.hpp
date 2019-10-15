@@ -992,7 +992,7 @@ public:
     /// and -initial_val in the other half
     mfem::Vector InitialCondition(double initial_val) const;
 
-private:
+protected:
     void SetupMeshAndCoeff(const char* permFile, int nDimensions,
                            int spe10_scale, bool metis_partition, int slice);
     unique_ptr<mfem::ParMesh> MakeParMesh(mfem::Mesh& mesh, bool metis_partition);
