@@ -31,174 +31,118 @@ using namespace smoothg;
 
 enum WellType { Injector, Producer };
 enum WellDirection { X = 0, Y, Z };
-constexpr double ft = 0.3048;
+constexpr double ft = 0.3048;          // 1 ft = 0.3048 meter
 
-class Well
+struct Well
 {
-public:
-    Well(const WellType type,
-         const double value,
-         const std::vector<int>& cell_indices,
-         const std::vector<double>& permeabilities,
-         const std::vector<double>& cell_sizes,
-         const std::vector<double>& r_e,
-         const double r_w = 0.01,
-         const double density = 1.0,
-         const double viscosity = 1.0);
-
-    WellType GetType() const { return type_; }
-    double GetValue() const { return value_; }
-    int GetNumberOfCells() const { return cell_indices_.size(); }
-    const std::vector<int>& GetWellCells() const { return cell_indices_; }
-    const std::vector<double>& GetWellCoeff() const { return well_coefficients_; }
-
-private:
-    WellType type_;
-
-    // For injectors, value_ is the total injection rate of the well
-    // For producers, value_ is the bottom hole pressure
-    double value_;
-    WellDirection direction_;
-    std::vector<int> cell_indices_; // cells that belong to this well
-    std::vector<double> well_coefficients_;
+    WellType type; // injector or producer
+    double value; // injector: total inject rate, producer: bottom hole pressure
+    std::vector<int> cells; // indices of cells that belong to this well
+    std::vector<double> coeffs; // transmissibility from well to cells
 };
-
-Well::Well(const WellType type,
-           const double value,
-           const std::vector<int>& cell_indices,
-           const std::vector<double>& permeabilities,
-           const std::vector<double>& cell_sizes,
-           const std::vector<double>& r_e,
-           const double r_w,
-           const double density,
-           const double viscosity)
-    : type_(type), value_(value), cell_indices_(cell_indices)
-{
-    const unsigned int num_well_cells = cell_indices_.size();
-    well_coefficients_.resize(num_well_cells);
-
-    assert(permeabilities.size() == num_well_cells);
-    assert(cell_sizes.size() == num_well_cells);
-    assert(r_e.size() == num_well_cells);
-
-    for (unsigned int i = 0; i < num_well_cells; ++i)
-    {
-        double numerator = 2 * M_PI * density * permeabilities[i] * cell_sizes[i];
-        double denominator = viscosity * std::log(r_e[i] / r_w);
-        well_coefficients_[i] = numerator / denominator;
-    }
-}
 
 class WellManager
 {
 public:
-    WellManager(mfem::Mesh& mesh,
-                mfem::VectorCoefficient& perm_inv_coeff)
-        :
-        mesh_(&mesh),
-        perm_inv_coeff_(&perm_inv_coeff),
-        num_producers_(0),
-        num_injectors_(0)
-    { }
+    WellManager(mfem::Mesh& mesh, mfem::VectorCoefficient& perm_inv_coeff)
+        : mesh_(mesh), ir_(mfem::IntRules.Get(mesh_.GetElementType(0), 1)),
+          ip_(ir_.IntPoint(0)), perm_inv_coeff_(perm_inv_coeff),
+          dim_(mesh_.Dimension()), dir_vec(dim_), perp_dir_vec1_(dim_),
+          perp_dir_vec2_(dim_), num_producers_(0), num_injectors_(0) { }
 
     void AddWell(const WellType type,
                  const double value,
-                 const std::vector<int>& cell_indices,
+                 const std::vector<int>& cells,
                  const WellDirection direction = WellDirection::Z,
                  const double r_w = 0.01,
                  const double density = 1.0,
                  const double viscosity = 1.0);
 
     const std::vector<Well>& GetWells() { return wells_; }
-
-    int GetNumProducers() { return num_producers_; }
-    int GetNumInjectors() { return num_injectors_; }
 private:
-    void ComputeWellCoefficient();
+    void SetDirectionVectors(int dir, int perp_dir1, int perp_dir2);
 
-    mfem::Mesh* mesh_;
-    mfem::VectorCoefficient* perm_inv_coeff_;
+    mfem::Mesh& mesh_;
+    const mfem::IntegrationRule& ir_;
+    const mfem::IntegrationPoint& ip_;
+    mfem::VectorCoefficient& perm_inv_coeff_;
+
+    const int dim_;
+    mfem::Vector dir_vec;
+    mfem::Vector perp_dir_vec1_;
+    mfem::Vector perp_dir_vec2_;
 
     int num_producers_;
     int num_injectors_;
 
     std::vector<Well> wells_;
-
-    WellManager() : mesh_(nullptr), perm_inv_coeff_(nullptr) {}
 };
+
+void WellManager::SetDirectionVectors(int dir, int perp_dir1, int perp_dir2)
+{
+    dir_vec = perp_dir_vec1_ = perp_dir_vec2_ = 0.0;
+    dir_vec[dir] = perp_dir_vec1_[perp_dir1] = perp_dir_vec2_[perp_dir2] = 1.0;
+}
 
 void WellManager::AddWell(const WellType type,
                           const double value,
-                          const std::vector<int>& cell_indices,
+                          const std::vector<int>& cells,
                           const WellDirection direction,
                           const double r_w,
                           const double density,
                           const double viscosity)
 {
-    const int nDim = mesh_->Dimension();
-    assert (nDim == 3 || (nDim == 2 && direction == WellDirection::Z) );
+    assert (dim_ == 3 || (dim_ == 2 && direction == WellDirection::Z));
 
-    const int num_well_cells = cell_indices.size();
-    std::vector<double> permeabilities(num_well_cells);
-    std::vector<double> cell_sizes(num_well_cells);
-    std::vector<double> r_e(num_well_cells);
+    const unsigned int num_well_cells = cells.size();
     mfem::Vector perm_inv;
 
-    // directions other than the direction of the well
-    int perp_dir1 = (direction + 1) % 3;
-    int perp_dir2 = (direction + 2) % 3;
+    // directions perpendicular to the direction of the well
+    const int perp_dir1 = (direction + 1) % 3;
+    const int perp_dir2 = (direction + 2) % 3;
 
-    // Find out the size of the well cells
-    mfem::Vector dir_vec(nDim), perp_dir_vec1(nDim), perp_dir_vec2(nDim);
-    if (nDim == 2)
+    auto EquivalentRadius = [&](int cell_index)
     {
-        std::fill(cell_sizes.begin(), cell_sizes.end(), 2.0 * ft);
-    }
-    else
+        double perp_h1 = mesh_.GetElementSize(cell_index, perp_dir_vec1_);
+        double perp_h2 = mesh_.GetElementSize(cell_index, perp_dir_vec2_);
+        double p2_to_p1 = perm_inv[perp_dir1] / perm_inv[perp_dir2];
+        double p1_to_p2 = perm_inv[perp_dir2] / perm_inv[perp_dir1];
+        double numerator = 0.28 * sqrt(sqrt(p2_to_p1) * perp_h1 * perp_h1 +
+                                       sqrt(p1_to_p2) * perp_h2 * perp_h2);
+        return numerator / (pow(p2_to_p1, 0.25) + pow(p1_to_p2, 0.25));
+    };
+
+    auto EquivalentRadius2 = [&](int cell_index, double p1_inv, double p2_inv)
     {
-        dir_vec = 0.0;
-        dir_vec[direction] = 1.0;
+        double h1 = mesh_.GetElementSize(cell_index, perp_dir_vec1_);
+        double h2 = mesh_.GetElementSize(cell_index, perp_dir_vec2_);
+        double numerator = 0.28 * sqrt(p1_inv * h1 * h1 + p2_inv * h2 * h2);
+        return numerator / (sqrt(p1_inv) + sqrt(p1_inv));
+    };
 
-        for (int i = 0; i < num_well_cells; i++)
-            cell_sizes[i] = mesh_->GetElementSize(cell_indices[i], dir_vec);
-    }
-
-    perp_dir_vec1 = 0.0;
-    perp_dir_vec1[perp_dir1] = 1.0;
-
-    perp_dir_vec2 = 0.0;
-    perp_dir_vec2[perp_dir2] = 1.0;
-
-    const auto& ir = mfem::IntRules.Get(mesh_->GetElementType(0), 1);
-    const mfem::IntegrationPoint& ip = ir.IntPoint(0);
-
-    // Find out the effective permeability and equivalent radius of the cells
-    for (int i = 0; i < num_well_cells; i++)
+    auto WellCoefficient = [&](double effect_perm, double cell_size, double r_e)
     {
-        auto Tr = mesh_->GetElementTransformation(cell_indices[i]);
-        Tr->SetIntPoint (&ip);
-        perm_inv_coeff_->Eval(perm_inv, *Tr, ip);
+        double numerator = 2 * M_PI * density * effect_perm * cell_size;
+        return numerator / (viscosity * std::log(r_e / r_w));
+    };
 
-        permeabilities[i] = 1. / sqrt(perm_inv[perp_dir1] * perm_inv[perp_dir2]);
+    wells_.push_back({type, value, cells, std::vector<double>(num_well_cells)});
 
-        double perp_h1 = mesh_->GetElementSize(cell_indices[i], perp_dir_vec1);
-        double perp_h2 = mesh_->GetElementSize(cell_indices[i], perp_dir_vec2);
+    for (unsigned int i = 0; i < num_well_cells; i++)
+    {
+        auto Tr = mesh_.GetElementTransformation(cells[i]);
+        Tr->SetIntPoint(&ip_);
+        perm_inv_coeff_.Eval(perm_inv, *Tr, ip_);
 
-        double numerator = 0.28 * sqrt(sqrt(perm_inv[perp_dir1] / perm_inv[perp_dir2]) * perp_h1 * perp_h1 +
-                                       sqrt(perm_inv[perp_dir2] / perm_inv[perp_dir1]) * perp_h2 * perp_h2);
-        double denominator = pow(perm_inv[perp_dir1] / perm_inv[perp_dir2], 0.25) +
-                             pow(perm_inv[perp_dir2] / perm_inv[perp_dir1], 0.25);
-        r_e[i] = numerator / denominator;
+        auto effect_perm = 1. / sqrt(perm_inv[perp_dir1] * perm_inv[perp_dir2]);
+        auto size = dim_ == 2 ? 2.0 * ft : mesh_.GetElementSize(cells[i], dir_vec);
+        auto r_e = EquivalentRadius(cells[i]);
+        assert(fabs(r_e - EquivalentRadius2(cells[i], perm_inv[perp_dir1], perm_inv[perp_dir2]))<1e-12);
+        wells_.back().coeffs[i] = WellCoefficient(effect_perm, size, r_e);
     }
-
-    wells_.emplace_back(type, value, cell_indices, permeabilities,
-                        cell_sizes, r_e, r_w, density, viscosity);
 
     num_producers_ += (type == WellType::Producer);
     num_injectors_ += (type == WellType::Injector);
-
-
-
 }
 
 unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
@@ -300,7 +244,7 @@ void RemoveWellDofs(const std::vector<Well>& well_list,
 {
     int num_well_cells = 0;
     for (const auto& well : well_list)
-        num_well_cells += well.GetNumberOfCells();
+        num_well_cells += well.cell_indices.size();
 
     offset.SetSize(3);
     offset[0] = 0;
@@ -325,12 +269,12 @@ void MakeWellMaps(const std::vector<Well>& well_list,
 {
     int num_well_cells = 0;
     for (auto& well : well_list)
-        num_well_cells += well.GetNumberOfCells();
+        num_well_cells += well.cell_indices.size();
 
     int num_injectors = 0;
     for (const auto& well : well_list)
     {
-        num_injectors += (well.GetType() == WellType::Injector);
+        num_injectors += (well.type == WellType::Injector);
     }
 
     no_well_offset.SetSize(3);
@@ -415,7 +359,7 @@ void ExtendEdgeBoundaryattr(const std::vector<Well>& well_list,
     const int old_nedges = edge_boundaryattr.Height();
     int num_well_cells = 0;
     for (auto& well : well_list)
-        num_well_cells += well.GetNumberOfCells();
+        num_well_cells += well.cell_indices.size();
 
     int* new_i = new int[old_nedges + num_well_cells + 1];
     std::copy_n(edge_boundaryattr.GetI(), old_nedges + 1, new_i);
@@ -444,7 +388,7 @@ void AddEdgeBoundary(const std::vector<Well>& well_list,
 
     for (Well& well : well_list)
     {
-        int num_well_cells_i = well.GetNumberOfCells();
+        int num_well_cells_i = well.cell_indices.size();
         num_well_cells += num_well_cells_i;
         new_nnz += num_well_cells_i;
     }
@@ -466,9 +410,9 @@ void AddEdgeBoundary(const std::vector<Well>& well_list,
 
     for (const Well& well : well_list)
     {
-        int num_cells = well.GetNumberOfCells();
+        int num_cells = well.cell_indices.size();
 
-        if (well.GetType() == WellType::Producer)
+        if (well.type == WellType::Producer)
         {
             for (int j = 0; j < num_cells; ++j)
             {
@@ -694,12 +638,12 @@ Graph TwoPhase::CombineReservoirAndWell()
     const std::vector<Well>& well_list = well_manager_->GetWells();
     int num_well_cells = 0;
     for (const auto& well : well_list)
-        num_well_cells += well.GetNumberOfCells();
+        num_well_cells += well.cell_indices.size();
 
     int num_injectors = 0;
     for (const auto& well : well_list)
     {
-        num_injectors += (well.GetType() == WellType::Injector);
+        num_injectors += (well.type == WellType::Injector);
     }
 
     const int num_reservoir_cells = vertex_edge_.Height();
@@ -734,16 +678,16 @@ Graph TwoPhase::CombineReservoirAndWell()
     int injector_counter = 0;
     for (unsigned int i = 0; i < well_list.size(); i++)
     {
-        const auto& well_cells = well_list[i].GetWellCells();
-        const auto& well_coeff = well_list[i].GetWellCoeff();
+        const auto& well_cells = well_list[i].cell_indices;
+        const auto& well_coeff = well_list[i].well_coefficients;
 
-        if (well_list[i].GetType() == WellType::Producer)
+        if (well_list[i].type == WellType::Producer)
         {
             for (unsigned int j = 0; j < well_cells.size(); j++)
             {
                 new_vertex_edge.Add(well_cells[j], edge_counter, 1.0);
                 new_weight[edge_counter] = well_coeff[j];
-                new_rhs_sigma[edge_counter] = well_list[i].GetValue();
+                new_rhs_sigma[edge_counter] = well_list[i].value;
 
                 auto& local_weight_j = local_weight_[well_cells[j]];
                 mfem::Vector new_local_weight_j(local_weight_j.Size() + 1);
@@ -778,7 +722,7 @@ Graph TwoPhase::CombineReservoirAndWell()
 
                 edge_counter++;
             }
-            new_rhs_u[num_reservoir_cells + injector_counter] = -1.0 * well_list[i].GetValue();
+            new_rhs_u[num_reservoir_cells + injector_counter] = -1.0 * well_list[i].value;
             injector_counter++;
         }
     }
