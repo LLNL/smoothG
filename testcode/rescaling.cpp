@@ -127,7 +127,7 @@ int main(int argc, char* argv[])
         pmesh->SetAttribute(i, i + 1);
     }
     auto vertex_edge = TableToMatrix(pmesh->ElementToFaceTable());
-    auto edge_bdratt = GenerateBoundaryAttributeTable(pmesh.get());
+    auto edge_bdratt = GenerateEdgeToBoundary(*pmesh);
 
     mfem::RT_FECollection sigmafec(0, pmesh->SpaceDimension());
     mfem::ParFiniteElementSpace sigmafespace(pmesh.get(), &sigmafec);

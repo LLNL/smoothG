@@ -481,8 +481,10 @@ mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat);
 /// @return "off diagonal block" of a HypreParMatrix
 mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 
+/// @return Number of nonzeros of mat
 int NNZ(const mfem::SparseMatrix& mat);
 
+/// @return Frobenius norm of mat
 double FroNorm(const mfem::SparseMatrix& mat);
 
 } // namespace smoothg
