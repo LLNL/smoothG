@@ -517,7 +517,7 @@ public:
        @param use_local_weight whether to store "element" weight
        @return weighted graph associated with the finite volume problem
     */
-    virtual Graph GetFVGraph(bool use_local_weight = false);
+    Graph GetFVGraph(bool use_local_weight = false);
 
     /// Getter for vertex-block right hand side
     const mfem::Vector& GetVertexRHS() const { return rhs_u_; }
@@ -566,41 +566,41 @@ protected:
     }
     void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 
-    unique_ptr<mfem::ParMesh> pmesh_;
+    MPI_Comm comm_;
+    int myid_;
+    int num_procs_;
 
     mfem::Array<int> num_procs_xyz_;
+    unique_ptr<mfem::ParMesh> pmesh_;
+
     mfem::RT_FECollection sigma_fec_;
     mfem::L2_FECollection u_fec_;
     unique_ptr<mfem::ParFiniteElementSpace> sigma_fes_;
     unique_ptr<mfem::ParFiniteElementSpace> u_fes_;
 
-    mfem::GridFunction coeff_gf_;
-
-    mfem::SparseMatrix vertex_edge_;
-    mfem::SparseMatrix edge_bdr_;
-
-    mfem::Vector weight_;
-    std::vector<mfem::Vector> local_weight_;
-
     unique_ptr<mfem::VectorCoefficient> kinv_vector_;
     unique_ptr<mfem::Coefficient> kinv_scalar_;
+
+    mfem::GridFunction coeff_gf_;
 
     mfem::Vector rhs_sigma_;
     mfem::Vector rhs_u_;
 
-    mfem::Array<int> ess_attr_;
-
-    mutable mfem::ParGridFunction u_fes_gf_;
-
     mutable int iso_vert_count_;
 
-    MPI_Comm comm_;
-    int myid_;
-    int num_procs_;
+    const double ft_ = 0.3048;          // 1 ft = 0.3048 meter
+
+    mfem::Array<int> ess_attr_;
+
+    mfem::SparseMatrix vertex_edge_;
+    mfem::Vector weight_;
+    std::vector<mfem::Vector> local_weight_;
+    const mfem::HypreParMatrix* edge_trueedge_;
+    mfem::SparseMatrix edge_bdr_;
 };
 
 DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
-    : sigma_fec_(0, dim), u_fec_(0, dim), comm_(comm)
+    : comm_(comm), sigma_fec_(0, dim), u_fec_(0, dim)
 {
     MPI_Comm_size(comm_, &num_procs_);
     MPI_Comm_rank(comm_, &myid_);
@@ -619,26 +619,21 @@ DarcyProblem::DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& e
 
 Graph DarcyProblem::GetFVGraph(bool use_local_weight)
 {
-    const auto& edge_trueedge = *sigma_fes_->Dof_TrueDof_Matrix();
     if (use_local_weight && local_weight_.size() > 0)
     {
-        return Graph(vertex_edge_, edge_trueedge, local_weight_, &edge_bdr_);
+        return Graph(vertex_edge_, *edge_trueedge_, local_weight_, &edge_bdr_);
     }
-    return Graph(vertex_edge_, edge_trueedge, weight_, &edge_bdr_);
+    return Graph(vertex_edge_, *edge_trueedge_, weight_, &edge_bdr_);
 }
 
 void DarcyProblem::BuildReservoirGraph()
 {
-    mfem::SparseMatrix edge_bdr = GenerateEdgeToBoundary(*pmesh_);
-    edge_bdr_.Swap(edge_bdr);
+    auto& v_e_table = pmesh_->Dimension() == 2 ? pmesh_->ElementToEdgeTable()
+                                               : pmesh_->ElementToFaceTable();
+    vertex_edge_ = TableToMatrix(v_e_table);
+    edge_trueedge_ = sigma_fes_->Dof_TrueDof_Matrix();
+    edge_bdr_ = GenerateEdgeToBoundary(*pmesh_);
     assert(edge_bdr_.NumCols() == ess_attr_.Size());
-
-    const mfem::Table& v_e_table = pmesh_->Dimension() == 2 ? pmesh_->ElementToEdgeTable()
-                                   : pmesh_->ElementToFaceTable();
-    mfem::SparseMatrix v_e = TableToMatrix(v_e_table);
-    vertex_edge_.Swap(v_e);
-
-
 }
 
 void DarcyProblem::InitGraph()
@@ -702,7 +697,7 @@ int yo=0;
 void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min,
                             double range_max, const std::string& caption, int coef) const
 {
-    u_fes_gf_.MakeRef(u_fes_.get(), vec.GetData());
+    mfem::ParGridFunction u_fes_gf(u_fes_.get(), vec.GetData());
 
     const char vishost[] = "localhost";
     const int  visport   = 19916;
@@ -711,7 +706,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
     vis_v.precision(8);
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
-    vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
+    vis_v << "solution\n" << *pmesh_ << u_fes_gf;
     vis_v << "window_size 900 800\n";//800 250
     vis_v << "window_title 'vertex space unknown'\n";
     vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
@@ -805,10 +800,10 @@ void DarcyProblem::VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec, doubl
 
 void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const
 {
-    u_fes_gf_.MakeRef(u_fes_.get(), vec.GetData());
+    mfem::ParGridFunction u_fes_gf(u_fes_.get(), vec.GetData());
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
-    vis_v << "solution\n" << *pmesh_ << u_fes_gf_;
+    vis_v << "solution\n" << *pmesh_ << u_fes_gf;
 
     vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]\n";
 //    vis_v << "keys c\n"; // colorbar
@@ -824,7 +819,7 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const
 
 void DarcyProblem::SaveFigure(const mfem::Vector& sol, const std::string& name) const
 {
-    u_fes_gf_.MakeRef(u_fes_.get(), sol.GetData());
+    mfem::ParGridFunction u_fes_gf(u_fes_.get(), sol.GetData());
     {
         std::stringstream filename;
         filename << name << ".mesh";
@@ -835,7 +830,7 @@ void DarcyProblem::SaveFigure(const mfem::Vector& sol, const std::string& name) 
         std::stringstream filename;
         filename << name << ".gridfunction";
         std::ofstream out(filename.str().c_str());
-        u_fes_gf_.Save(out);
+        u_fes_gf.Save(out);
     }
 }
 

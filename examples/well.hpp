@@ -28,15 +28,14 @@ using std::make_shared;
 
 using namespace smoothg;
 
-enum WellType { Injector, Producer };
+enum WellType { Injector = 0x01, Producer = 0x02, Any = 0x03 };
 enum WellDirection { X = 0, Y, Z };
-constexpr double ft = 0.3048;          // 1 ft = 0.3048 meter
 
 struct Well
 {
     WellType type; // injector or producer
     double value; // injector: total inject rate, producer: bottom hole pressure
-    std::vector<int> cells; // cells in matrix that contain this well
+    std::vector<int> cells; // cells in reservoir that contain this well
     std::vector<double> well_indices; // well indices of well cells
 };
 
@@ -47,7 +46,7 @@ public:
         : mesh_(mesh), ir_(mfem::IntRules.Get(mesh_.GetElementType(0), 1)),
           ip_(ir_.IntPoint(0)), perm_inv_coeff_(perm_inv_coeff),
           dim_(mesh_.Dimension()), dir_vec_(dim_), perp_dir_vec1_(dim_),
-          perp_dir_vec2_(dim_), num_well_cells_(0) { }
+          perp_dir_vec2_(dim_) { }
 
     void AddWell(const WellType type,
                  const double value,
@@ -57,9 +56,8 @@ public:
 
     const std::vector<Well>& GetWells() const { return wells_; }
 
-    int NumWellCells() const { return num_well_cells_; }
-    int NumWellCells(WellType type) const;
-    int NumWells(WellType type) const;
+    int NumWellCells(WellType type = Any) const;
+    int NumWells(WellType type = Any) const;
 private:
     void SetDirectionVectors(int dir, int perp_dir1, int perp_dir2);
 
@@ -74,7 +72,6 @@ private:
     mfem::Vector perp_dir_vec2_;
 
     std::vector<Well> wells_;
-    int num_well_cells_;
 };
 
 int WellManager::NumWellCells(WellType type) const
@@ -82,7 +79,7 @@ int WellManager::NumWellCells(WellType type) const
     int num_well_cells = 0;
     for (const Well& well : wells_)
     {
-        num_well_cells += well.type == type ? well.cells.size() : 0;
+        num_well_cells += well.type & type ? well.cells.size() : 0;
     }
     return num_well_cells;
 }
@@ -90,7 +87,7 @@ int WellManager::NumWellCells(WellType type) const
 int WellManager::NumWells(WellType type) const
 {
     int num_wells = 0;
-    for (const Well& well : wells_) { num_wells += (well.type == type); }
+    for (const Well& well : wells_) { num_wells += well.type & type ? 1 : 0; }
     return num_wells;
 }
 
@@ -121,7 +118,7 @@ void WellManager::AddWell(const WellType type,
         double numerator = 0.28 * sqrt(k22 * h1 * h1 + k11 * h2 * h2);
         double equiv_radius = numerator / (sqrt(k11) + sqrt(k22));
 
-        double h3 = dim_ < 3 ? 2 * ft : mesh_.GetElementSize(cell, dir_vec_);
+        double h3 = dim_ < 3 ? 1.0 : mesh_.GetElementSize(cell, dir_vec_);
         return 2 * M_PI * h3 * sqrt(k11 * k22) / std::log(equiv_radius / r_w);
     };
 
@@ -141,7 +138,6 @@ void WellManager::AddWell(const WellType type,
     }
 
     wells_.push_back({type, value, cells, well_indices});
-    num_well_cells_ += cells.size();
 }
 
 unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
@@ -239,22 +235,18 @@ public:
              int slice, bool metis_parition, const mfem::Array<int>& ess_attr,
              int well_height, double inject_rate, double bottom_hole_pressure);
 
-    virtual Graph GetFVGraph(bool use_local_weight) override;
-
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
 private:
     // Set up well model (Peaceman's five-spot pattern)
-    void SetPeaceman(int well_height, double inject_rate, double bot_hole_pres);
+    void SetWells(int well_height, double inject_rate, double bot_hole_pres);
+    void CombineReservoirAndWellModel();
 
     mfem::SparseMatrix ExtendVertexEdge(const mfem::SparseMatrix& vert_edge);
-    mfem::Vector AppendWellIndex(const mfem::Vector& weight);
-    std::vector<mfem::Vector> AppendWellIndex(const std::vector<mfem::Vector>& loc_weight);
-    mfem::Vector AppendProducerRHS(const mfem::Vector& rhs_sigma);
-    mfem::Vector AppendInjectorRHS(const mfem::Vector& rhs_u);
-
-    // extend edge_bdr_ by adding new boundary for production wells edges
     mfem::SparseMatrix ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr);
+    mfem::Vector AppendWellData(const mfem::Vector& vec, WellType type);
+    std::vector<mfem::Vector> AppendWellIndex(const std::vector<mfem::Vector>& loc_weight);
 
+    unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
     WellManager well_manager_;
 };
 
@@ -264,28 +256,29 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
     : SPE10Problem(perm_file, dim, spe10_scale, slice, metis_parition, ess_attr),
       well_manager_(*pmesh_, *kinv_vector_)
 {
-    SetPeaceman(well_height, inject_rate, bottom_hole_pressure);
-
     rhs_sigma_ = 0.0;
     rhs_u_ = 0.0;
+
+    SetWells(well_height, inject_rate, bottom_hole_pressure);
+    CombineReservoirAndWellModel();
 }
 
-void TwoPhase::SetPeaceman(int well_height, double inject_rate, double bhp)
+void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 {
     const int num_wells = 5;
     std::vector<std::vector<int>> well_cells(num_wells);
 
-    const double max_x = 365.76 - ft;
-    const double max_y = 670.56 - ft;
+    const double max_x = 365.76 - ft_;
+    const double max_y = 670.56 - ft_;
 
     mfem::DenseMatrix point(pmesh_->Dimension(), num_wells);
-    point = ft;
+    point = ft_;
     point(0, 1) = max_x;
     point(1, 2) = max_y;
     point(0, 3) = max_x;
     point(1, 3) = max_y;
-    point(0, 4) = ((max_x + ft) / 2.0) + ft;
-    point(1, 4) = ((max_y + ft) / 2.0) + ft;
+    point(0, 4) = ((max_x + ft_) / 2.0) + ft_;
+    point(1, 4) = ((max_y + ft_) / 2.0) + ft_;
 
     for (int j = 0; j < well_height; ++j)
     {
@@ -297,7 +290,7 @@ void TwoPhase::SetPeaceman(int well_height, double inject_rate, double bhp)
         {
             assert(ids[i] >= 0); // TODO: parallel
             well_cells[i].push_back(ids[i]);
-            if (pmesh_->Dimension() == 3) point(2, i) += 2.0 * ft; // next layer
+            if (pmesh_->Dimension() == 3) point(2, i) += 2.0 * ft_;// next layer
         }
     }
 
@@ -342,23 +335,6 @@ mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edg
     return ext_vert_edge;
 }
 
-mfem::Vector TwoPhase::AppendWellIndex(const mfem::Vector& weight)
-{
-    const int num_edges = weight.Size() + well_manager_.NumWellCells();
-
-    mfem::Vector new_weight(num_edges);
-    std::copy_n(weight_.GetData(), weight.Size(), new_weight.GetData());
-
-    double* data_ptr = new_weight.GetData() + weight.Size();
-    for (const Well& well : well_manager_.GetWells())
-    {
-        std::copy_n(well.well_indices.data(), well.cells.size(), data_ptr);
-        data_ptr += well.cells.size();
-    }
-
-    return new_weight;
-}
-
 std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vector>& loc_weight)
 {
     std::vector<mfem::Vector> new_loc_weight;
@@ -388,34 +364,28 @@ std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vect
     return new_loc_weight;
 }
 
-mfem::Vector TwoPhase::AppendProducerRHS(const mfem::Vector& rhs_sigma)
+mfem::Vector TwoPhase::AppendWellData(const mfem::Vector& vec, WellType type)
 {
-    mfem::Vector new_rhs_sigma(rhs_sigma.Size() + well_manager_.NumWellCells());
-    std::copy_n(rhs_sigma_.GetData(), rhs_sigma.Size(), new_rhs_sigma.GetData());
+    int append_size = type & Producer ? well_manager_.NumWellCells()
+                                      : well_manager_.NumWells(Injector);
 
-    double* data_ptr = new_rhs_sigma.GetData() + rhs_sigma.Size();
-    for (const Well& well : well_manager_.GetWells())
+    mfem::Vector combined_vec(vec.Size() + append_size);
+    std::copy_n(vec.GetData(), vec.Size(), combined_vec.GetData());
+
+    double* data = combined_vec.GetData() + vec.Size();
+    for (const Well& w : well_manager_.GetWells())
     {
-        double value = well.type == Producer ? well.value : 0.0;
-        std::fill_n(data_ptr, well.cells.size(), value);
-        data_ptr += well.cells.size();
+        const int size = w.cells.size();
+        switch (type)
+        {
+        case Any: std::copy_n(w.well_indices.data(), size, data); break;
+        case Injector: if (w.type == type) *(data++) = -1.0 * w.value; break;
+        case Producer: std::fill_n(data, size, w.type == type ? w.value : 0.0);
+        }
+        data += type & Producer ? size : 0;
     }
 
-    return new_rhs_sigma;
-}
-
-mfem::Vector TwoPhase::AppendInjectorRHS(const mfem::Vector& rhs_u)
-{
-    mfem::Vector new_rhs_u(rhs_u.Size() + well_manager_.NumWells(Injector));
-    std::copy_n(rhs_u.GetData(), rhs_u.Size(), new_rhs_u.GetData());
-
-    double* data_ptr = new_rhs_u.GetData() + rhs_u.Size();
-    for (const Well& well : well_manager_.GetWells())
-    {
-        if (well.type == Injector) *(data_ptr++) = -1.0 * well.value;
-    }
-
-    return new_rhs_u;
+    return combined_vec;
 }
 
 mfem::SparseMatrix TwoPhase::ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr)
@@ -453,30 +423,23 @@ mfem::SparseMatrix TwoPhase::ExtendEdgeBoundary(const mfem::SparseMatrix& edge_b
     return mfem::SparseMatrix(I, J, Data, num_edges, bdr);
 }
 
-Graph TwoPhase::GetFVGraph(bool use_local_weight)
+void TwoPhase::CombineReservoirAndWellModel()
 {
-    weight_ = AppendWellIndex(weight_);
-    local_weight_ = AppendWellIndex(local_weight_);
     vertex_edge_ = ExtendVertexEdge(vertex_edge_);
-    rhs_sigma_ = AppendProducerRHS(rhs_sigma_);
-    rhs_u_ = AppendInjectorRHS(rhs_u_);
-
-    const int num_well_cells = well_manager_.NumWellCells();
-    auto& old_edge_trueedge = *sigma_fes_->Dof_TrueDof_Matrix();
-    auto edge_trueedge = ConcatenateIdentity(old_edge_trueedge, num_well_cells);
-
+    local_weight_ = AppendWellIndex(local_weight_);
+    weight_ = AppendWellData(weight_, Any);
     edge_bdr_ = ExtendEdgeBoundary(edge_bdr_);
+
+    rhs_sigma_ = AppendWellData(rhs_sigma_, Producer);
+    rhs_u_ = AppendWellData(rhs_u_, Injector);
+
+    combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
+                                                  well_manager_.NumWellCells());
+    edge_trueedge_ = combined_edge_trueedge_.get();
 
     mfem::Array<int> producer_attr(well_manager_.NumWells(Producer));
     producer_attr = 0;                // treat producer as "natural boundary"
     ess_attr_.Append(producer_attr);
-
-    if (use_local_weight && local_weight_.size() > 0)
-    {
-        return Graph(vertex_edge_, *edge_trueedge, local_weight_, &edge_bdr_);
-    }
-
-    return Graph(vertex_edge_, *edge_trueedge, weight_, &edge_bdr_);
 }
 
 void TwoPhase::PrintMeshWithPartitioning(mfem::Array<int>& partition)
