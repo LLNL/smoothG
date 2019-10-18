@@ -525,6 +525,8 @@ public:
     /// Getter for edge-block right hand side
     const mfem::Vector& GetEdgeRHS() const { return rhs_sigma_; }
 
+    const mfem::Array<int>& EssentialAttribute() const {return ess_attr_; }
+
     /// Volume of a cell in the mesh (assuming all cells have the same volume)
     double CellVolume() const { return pmesh_->GetElementVolume(0); }
 

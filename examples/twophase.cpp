@@ -87,39 +87,19 @@ int main(int argc, char* argv[])
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    int max_evects = 4;
-    args.AddOption(&max_evects, "-m", "--max-evects",
-                   "Maximum eigenvectors per aggregate.");
-    double spect_tol = 1.0;
-    args.AddOption(&spect_tol, "-t", "--spect-tol",
-                   "Spectral tolerance for eigenvalue problems.");
-    bool metis_agglomeration = false;
-    args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
+    bool use_metis = true;
+    args.AddOption(&use_metis, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of geometric).");
     int spe10_scale = 5;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10.");
-    bool hybridization = false;
-    args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                   "--no-hybridization", "Enable hybridization.");
-    bool dual_target = true;
-    args.AddOption(&dual_target, "-du", "--dual-target", "-no-du",
-                   "--no-dual-target", "Use dual graph Laplacian in trace generation.");
-    bool scaled_dual = true;
-    args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
-                   "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
-    bool energy_dual = true;
-    args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
-                   "--no-energy-dual", "Use energy matrix in trace generation.");
     double delta_t = 1.0;
     args.AddOption(&delta_t, "-dt", "--delta-t", "Time step.");
     double total_time = 1000.0;
     args.AddOption(&total_time, "-time", "--total-time", "Total time to step.");
     int vis_step = 0;
     args.AddOption(&vis_step, "-vs", "--vis-step", "Step size for visualization.");
-    int write_step = 0;
-    args.AddOption(&write_step, "-ws", "--write-step", "Step size for writing data to file.");
     int well_height = 1;
     args.AddOption(&well_height, "-wh", "--well-height", "Well Height.");
     double inject_rate = 0.3;
@@ -127,12 +107,8 @@ int main(int argc, char* argv[])
     double bottom_hole_pressure = 175.0;
     args.AddOption(&bottom_hole_pressure, "-bhp", "--bottom-hole-pressure",
                    "Bottom Hole Pressure.");
-    double well_shift = 1.0;
-    args.AddOption(&well_shift, "-wsh", "--well-shift", "Shift well from corners");
-    int nz = 15;
-    args.AddOption(&nz, "-nz", "--num-z", "Num of slices in z direction for 3d run.");
-    int coarsening_factor = 10;
-    args.AddOption(&coarsening_factor, "-cf", "--coarsen-factor", "Coarsening factor");
+    UpscaleParameters upscale_param;
+    upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
     {
@@ -148,26 +124,15 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    const int nbdr = 6;
-    mfem::Array<int> ess_attr(nbdr);
+    mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
     ess_attr = 1;
 
     // Setting up finite volume discretization problem
-    bool use_metis = true;
-    TwoPhase flow_problem(perm_file, dim, spe10_scale, slice, use_metis, ess_attr,
+    TwoPhase fv_problem(perm_file, dim, spe10_scale, slice, use_metis, ess_attr,
                           well_height, inject_rate, bottom_hole_pressure);
 
-    Graph graph = flow_problem.GetFVGraph(true);
-    auto& rhs_sigma_fine = flow_problem.GetEdgeRHS();
-    auto& rhs_u_fine = flow_problem.GetVertexRHS();
-    auto& well_list = flow_problem.GetWells();
-
-//    int num_producer = 0;
-//    for (auto& well : well_list)
-//    {
-//        if (well.type == WellType::Producer)
-//            num_producer++;
-//    }
+    Graph graph = fv_problem.GetFVGraph(true);
+    auto& combined_ess_attr = fv_problem.EssentialAttribute();
 
 //    // add one boundary attribute for edges connecting production wells to reservoir
 //    int total_num_producer;
@@ -187,43 +152,47 @@ int main(int argc, char* argv[])
     mfem::Array<int> geo_coarsening_factor(3);
     geo_coarsening_factor[0] = 5;
     geo_coarsening_factor[1] = 5;
-    geo_coarsening_factor[2] = dim == 3 ? 1 : nz;
+    if (dim == 3) geo_coarsening_factor[2] = 2;
 //    spe10problem.CartPart(partition, nz, geo_coarsening_factor, well_vertices);
 
-    // Create Upscaler and Solve
-//    Hierarchy hierarchy(comm, vertex_edge, local_weight, partition, edge_d_td,
-//                        edge_bdr_att, ess_attr, spect_tol, max_evects,
-//                        dual_target, scaled_dual, energy_dual, hybridization, false);
-//    hierarchy.PrintInfo();
-//    hierarchy.ShowSetupTime();
-//    hierarchy.MakeFineSolver();
+    Upscale hierarchy(graph, upscale_param, nullptr, &combined_ess_attr);
+    hierarchy.PrintInfo();
 
-//    mfem::BlockVector rhs_fine(fvupscale.GetFineBlockVector());
-//    rhs_fine.GetBlock(0) = rhs_sigma_fine;
-//    rhs_fine.GetBlock(1) = rhs_u_fine;
-//    mfem::BlockVector rhs_coarse = fvupscale.Restrict(rhs_fine);
+    mfem::BlockVector rhs_fine(hierarchy.BlockOffsets(0));
+    rhs_fine.GetBlock(0) = fv_problem.GetEdgeRHS();
+    rhs_fine.GetBlock(1) = fv_problem.GetVertexRHS();
+
+
+    mfem::BlockVector sol = hierarchy.Solve(0, rhs_fine);
+    hierarchy.ShowSolveInfo(0);
+    mfem::socketstream sout;
+    fv_problem.VisSetup(sout, sol.GetBlock(1));
+
+    std::cout<<"norm = "<<sol.GetBlock(1).Norml2()<<"\n";
+
+//    mfem::BlockVector rhs_coarse = hierarchy.Restrict(rhs_fine);
 
     // Fine scale transport based on fine flux
 //    auto S_fine = TwoPhaseFlow(
-//                flow_problem, fvupscale, rhs_fine, delta_t, total_time, vis_step,
+//                fv_problem, hierarchy, rhs_fine, delta_t, total_time, vis_step,
 //                Fine, Fine, "saturation based on fine scale upwind", CoarseAdv::Upwind);
 
 //    // Fine scale transport based on upscaled flux
 //    auto S_upscaled = TwoPhaseFlow(
-//                spe10problem, fvupscale, rhs_coarse, delta_t, total_time, vis_step,
+//                fv_problem, hierarchy, rhs_coarse, delta_t, total_time, vis_step,
 //                Coarse, Fine, "saturation based on coarse scale upwind", CoarseAdv::Upwind);
 
 //    // Coarse scale transport based on upscaled flux
 //    auto S_coarse = TwoPhaseFlow(
-//                spe10problem, fvupscale, rhs_coarse, delta_t, total_time, vis_step,
+//                fv_problem, hierarchy, rhs_coarse, delta_t, total_time, vis_step,
 //                Coarse, Coarse, "saturation based on coarse scale upwind", CoarseAdv::Upwind);
 
 //    auto S_coarse2 = TwoPhaseFlow(
-//                flow_problem, fvupscale, rhs_coarse, delta_t, total_time, vis_step,
+//                fv_problem, hierarchy, rhs_coarse, delta_t, total_time, vis_step,
 //                Coarse, Coarse, "saturation based on RAP", CoarseAdv::RAP);
 
 //    auto S_coarse3 = TwoPhaseFlow(
-//                spe10problem, fvupscale, rhs_coarse, delta_t, total_time, vis_step,
+//                fv_problem, fvupscale, rhs_coarse, delta_t, total_time, vis_step,
 //                Coarse, Coarse, "saturation based on fastRAP", CoarseAdv::FastRAP);
 
 ////    double sat_err = CompareError(comm, S_upscaled, S_fine);
