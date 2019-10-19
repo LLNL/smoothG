@@ -266,7 +266,7 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
 void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 {
     const int num_wells = 5;
-    std::vector<std::vector<int>> well_cells(num_wells);
+    std::vector<std::vector<int>> cells(num_wells);
 
     const double max_x = 365.76 - ft_;
     const double max_y = 670.56 - ft_;
@@ -288,17 +288,17 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 
         for (int i = 0; i < num_wells; ++i)
         {
-            assert(ids[i] >= 0); // TODO: parallel
-            well_cells[i].push_back(ids[i]);
-            if (pmesh_->Dimension() == 3) point(2, i) += 2.0 * ft_;// next layer
+            if (ids[i] >= 0) { cells[i].push_back(ids[i]); }
+            if (pmesh_->Dimension() == 3) { point(2, i) += 2.0 * ft_; }
         }
     }
 
-    for (int i = 0; i < num_wells - 1; ++i)
+    for (int i = 0; i < num_wells; ++i)
     {
-        well_manager_.AddWell(Producer, bhp, well_cells[i]);
+        WellType type = (i == num_wells - 1) ? Injector : Producer;
+        double value = (i == num_wells - 1) ? inject_rate : bhp;
+        if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
     }
-    well_manager_.AddWell(Injector, inject_rate, well_cells.back());
 }
 
 
@@ -325,7 +325,7 @@ mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edg
     {
         for (auto& cell : well.cells)
         {
-            if (well.type == Injector) ext_vert_edge.Add(vert, edge, 1.0);
+            if (well.type == Injector) { ext_vert_edge.Add(vert, edge, 1.0); }
             ext_vert_edge.Add(cell, edge++, 1.0);
         }
         vert += (well.type == Injector);

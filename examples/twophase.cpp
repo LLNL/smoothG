@@ -162,13 +162,14 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(0) = fv_problem.GetEdgeRHS();
     rhs_fine.GetBlock(1) = fv_problem.GetVertexRHS();
 
-
     mfem::BlockVector sol = hierarchy.Solve(0, rhs_fine);
     hierarchy.ShowSolveInfo(0);
+
     mfem::socketstream sout;
     fv_problem.VisSetup(sout, sol.GetBlock(1));
 
-    std::cout<<"norm = "<<sol.GetBlock(1).Norml2()<<"\n";
+    double norm = mfem::ParNormlp(sol.GetBlock(1), 2, comm);
+    if (myid == 0) std::cout<<"norm = "<< norm <<"\n";
 
 //    mfem::BlockVector rhs_coarse = hierarchy.Restrict(rhs_fine);
 
