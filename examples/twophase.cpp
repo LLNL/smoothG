@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
     TwoPhase fv_problem(perm_file, dim, spe10_scale, slice, use_metis, ess_attr,
                           well_height, inject_rate, bottom_hole_pressure);
 
-    Graph graph = fv_problem.GetFVGraph(true);
+    Graph graph = fv_problem.GetFVGraph();
     auto& combined_ess_attr = fv_problem.EssentialAttribute();
 
 //    // add one boundary attribute for edges connecting production wells to reservoir

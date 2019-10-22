@@ -455,7 +455,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         // Compute Aloc = DMinvN = Dloc * Minv * N
         MultSparseDense(Dloc, MinvN_i, Aloc);
 
-        if (mgL_.GetW().Width())
+        if (mgL_.GetW().NumCols())
         {
             mfem::DenseMatrix Wloc(nlocal_vertexdof, nlocal_vertexdof);
             auto& W_ref = const_cast<mfem::SparseMatrix&>(mgL_.GetW());

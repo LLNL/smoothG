@@ -505,7 +505,6 @@ mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentit
     std::vector<int> sharedentity_to_entity;
     sharedentity_to_entity.reserve(entity_is_shared.NumNonZeroElems());
 
-
     std::map<int, int> trueentity_map;
     for (int entity = 0; entity < entity_trueentity.NumRows(); ++entity)
     {
@@ -555,6 +554,13 @@ double Min(const mfem::Vector& vec, MPI_Comm comm)
     double global_min, local_min = vec.Min();
     MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, comm);
     return global_min;
+}
+
+bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm)
+{
+    bool global_value;
+    MPI_Allreduce(&local_value, &global_value, 1, MPI::BOOL, op, comm);
+    return global_value;
 }
 
 } // namespace smoothg

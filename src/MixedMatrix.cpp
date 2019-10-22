@@ -137,40 +137,32 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
 
 mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
 {
-    const mfem::SparseMatrix& vertex_edge = graph.VertexToEdge();
-    const mfem::HypreParMatrix& edge_trueedge = graph.EdgeToTrueEdge();
+    const mfem::SparseMatrix edge_is_owned = GetDiag(graph.EdgeToTrueEdge());
 
-    // Nonzero row of edge_owned means the edge is owned by the local proc
-    mfem::SparseMatrix edge_owned;
-    edge_trueedge.GetDiag(edge_owned);
+    mfem::SparseMatrix DT(graph.EdgeToVertex());
 
-    mfem::SparseMatrix graphDT(smoothg::Transpose(vertex_edge));
+    // Change the second entries of each row with two nonzeros to -1
+    // If the edge is shared, change the nonzero to -1 if the edge is also owned
+    int* DT_i = DT.GetI();
+    double* DT_data = DT.GetData();
 
-    // Change the second entries of each row with two nonzeros to 1
-    // Change the only entry in the row corresponding to a shared edge that
-    // is not owned by the local processor to -1
-    int* graphDT_i = graphDT.GetI();
-    double* graphDT_data = graphDT.GetData();
-
-    for (int j = 0; j < graphDT.Height(); j++)
+    for (int j = 0; j < DT.NumRows(); j++)
     {
-        const int row_size = graphDT.RowSize(j);
+        const int row_size = DT.RowSize(j);
         assert(row_size == 1 || row_size == 2);
-
-        graphDT_data[graphDT_i[j]] = 1.;
 
         if (row_size == 2)
         {
-            graphDT_data[graphDT_i[j] + 1] = -1.;
+            DT_data[DT_i[j]] = 1.;
+            DT_data[DT_i[j] + 1] = -1.;
         }
-        else if (edge_owned.RowSize(j) == 0)
+        else
         {
-            assert(row_size == 1);
-            graphDT_data[graphDT_i[j]] = -1.;
+            DT_data[DT_i[j]] = edge_is_owned.RowSize(j) ? 1. : -1.;
         }
     }
 
-    return smoothg::Transpose(graphDT);
+    return smoothg::Transpose(DT);
 }
 
 void MixedMatrix::SetEssDofs(const mfem::Array<int>& ess_attr)

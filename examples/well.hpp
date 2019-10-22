@@ -164,18 +164,16 @@ unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
     MPI_Comm_size(comm, &num_procs);
     MPI_Comm_rank(comm, &myid_);
 
-    int col_diff = col_starts[0] - pmat.ColPart()[0];
-
     int global_num_cols = pmat.GetGlobalNumCols();
     mfem::Array<int> col_change(global_num_cols);
     col_change = 0;
 
     for (int i = pmat.ColPart()[0]; i < pmat.ColPart()[1]; ++i)
     {
-        col_change[i] = col_diff;
+        col_change[i] = col_starts[0] - pmat.ColPart()[0];
     }
 
-    mfem::Array<int> col_remap(global_num_cols);
+    mfem::Array<int> col_remap(global_num_cols); //maybe not needed?
     col_remap = 0;
 
     MPI_Scan(col_change, col_remap, global_num_cols, HYPRE_MPI_INT, MPI_SUM, comm);
@@ -366,8 +364,8 @@ std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vect
 
 mfem::Vector TwoPhase::AppendWellData(const mfem::Vector& vec, WellType type)
 {
-    int append_size = type & Producer ? well_manager_.NumWellCells()
-                                      : well_manager_.NumWells(Injector);
+    const int append_size = type & Producer ? well_manager_.NumWellCells()
+                                            : well_manager_.NumWells(Injector);
 
     mfem::Vector combined_vec(vec.Size() + append_size);
     std::copy_n(vec.GetData(), vec.Size(), combined_vec.GetData());

@@ -216,10 +216,10 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::
 double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
 
-// Rescale vec by scaling: vec = diag(scaling) * vec
+/// Rescale vec by scaling: vec = diag(scaling) * vec
 void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 
-// Rescale vec by scaling: vec = diag(scaling)^{-1} * vec
+/// Rescale vec by scaling: vec = diag(scaling)^{-1} * vec
 void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 
 /**
@@ -232,13 +232,21 @@ void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
+/// @return Column indices of non-zero columns of input matrix
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 
+/// @return Entity to reordered entity map based on trueentity ordering
 mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
                                     const mfem::HypreParMatrix& entity_trueentity_entity);
 
+/// @return Global maximum of absolute value of entries of input vector
 double AbsMax(const mfem::Vector& vec, MPI_Comm comm);
+
+/// @return Global minimum of entries of input vector
 double Min(const mfem::Vector& vec, MPI_Comm comm);
+
+/// @return Global value of MPI_Allreduce of MPI operation op on local_value
+bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm);
 
 } // namespace smoothg
 
