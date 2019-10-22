@@ -140,90 +140,64 @@ void WellManager::AddWell(const WellType type,
     wells_.push_back({type, value, cells, well_indices});
 }
 
-unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
-    const mfem::HypreParMatrix& pmat, const int id_size)
+enum AppendType { IOTA, FILL };
+
+template<typename T>
+T* Append(const T* in, int in_size, int append_size, T value, AppendType type)
 {
-    MPI_Comm comm = pmat.GetComm();
+    T* out = new T[in_size + append_size];
+    std::copy_n(in, in_size, out);
+    if (type == FILL) { std::fill_n(out + in_size, append_size, value); }
+    else { std::iota(out + in_size, out + in_size + append_size, value); }
+    return out;
+}
+
+unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
+    const mfem::HypreParMatrix& mat, const int id_size)
+{
+    MPI_Comm comm = mat.GetComm();
 
     mfem::SparseMatrix diag, offd;
     HYPRE_Int* old_colmap;
-    pmat.GetDiag(diag);
-    pmat.GetOffd(offd, old_colmap);
-
-    const int num_rows = diag.NumRows() + id_size;
-    const int num_cols_diag = diag.NumCols() + id_size;
-    const int nnz_diag = NNZ(diag) + id_size;
-
-    mfem::Array<HYPRE_Int> row_starts, col_starts;
-    mfem::Array<HYPRE_Int>* starts[2] = {&row_starts, &col_starts};
-    HYPRE_Int sizes[2] = {num_rows, num_cols_diag};
-    GenerateOffsets(comm, 2, sizes, starts);
-
-    int myid_;
-    int num_procs;
-    MPI_Comm_size(comm, &num_procs);
-    MPI_Comm_rank(comm, &myid_);
-
-    int global_num_cols = pmat.GetGlobalNumCols();
-    mfem::Array<int> col_change(global_num_cols);
-    col_change = 0;
-
-    for (int i = pmat.ColPart()[0]; i < pmat.ColPart()[1]; ++i)
-    {
-        col_change[i] = col_starts[0] - pmat.ColPart()[0];
-    }
-
-    mfem::Array<int> col_remap(global_num_cols); //maybe not needed?
-    col_remap = 0;
-
-    MPI_Scan(col_change, col_remap, global_num_cols, HYPRE_MPI_INT, MPI_SUM, comm);
-    MPI_Bcast(col_remap, global_num_cols, HYPRE_MPI_INT, num_procs - 1, comm);
+    mat.GetDiag(diag);
+    mat.GetOffd(offd, old_colmap);
 
     // Append identity matrix diagonally to the bottom left of diag
-    int* diag_i = new int[num_rows + 1];
-    std::copy_n(diag.GetI(), diag.NumRows() + 1, diag_i);
-    std::iota(diag_i + diag.NumRows(), diag_i + num_rows + 1, diag_i[diag.NumRows()]);
-
-    int* diag_j = new int[nnz_diag];
-    std::copy_n(diag.GetJ(), NNZ(diag), diag_j);
-
-    for (int i = 0; i < id_size; i++)
-    {
-        diag_j[NNZ(diag) + i] = diag.NumCols() + i;
-    }
-
-    double* diag_data = new double[nnz_diag];
-    std::copy_n(diag.GetData(), NNZ(diag), diag_data);
-    std::fill_n(diag_data + NNZ(diag), id_size, 1.0);
+    int* d_i = Append(diag.GetI(), diag.NumRows() + 1, id_size, NNZ(diag) + 1, IOTA);
+    int* d_j = Append(diag.GetJ(), NNZ(diag), id_size, diag.NumCols(), IOTA);
+    double* d_data = Append(diag.GetData(), NNZ(diag), id_size, 1.0, FILL);
 
     // Append zero matrix to the bottom of offd
-    int* offd_i = new int[num_rows + 1];
-    std::copy_n(offd.GetI(), offd.NumRows() + 1, offd_i);
-    std::fill_n(offd_i + offd.NumRows() + 1, id_size, offd_i[offd.NumRows()]);
+    int* o_i = Append(offd.GetI(), offd.NumRows() + 1, id_size, NNZ(offd), FILL);
+    int* o_j = Append(offd.GetJ(), NNZ(offd), 0, 0, FILL);
+    double* o_data = Append(offd.GetData(), NNZ(offd), 0, 0.0, FILL);
 
-    int* offd_j = new int[NNZ(offd)];
-    std::copy_n(offd.GetJ(), NNZ(offd), offd_j);
+    mfem::Array<HYPRE_Int> row_starts, col_starts;
+    GenerateOffsets(comm, diag.NumRows() + id_size, row_starts);
+    GenerateOffsets(comm, diag.NumCols() + id_size, col_starts);
 
-    double* offd_data = new double[NNZ(offd)];
-    std::copy_n(offd.GetData(), NNZ(offd), offd_data);
+    const int old_start = mat.ColPart()[0];
+    mfem::Array<int> col_change(mat.N());
+    col_change = 0;
+    std::fill_n(col_change + old_start, mat.NumCols(), col_starts[0] - old_start);
 
-    HYPRE_Int* colmap = new HYPRE_Int[offd.NumCols()]();
-    std::copy_n(old_colmap, offd.NumCols(), colmap);
+    mfem::Array<int> col_remap(mat.N());
+    MPI_Allreduce(col_change, col_remap, mat.N(), HYPRE_MPI_INT, MPI_SUM, comm);
 
+    HYPRE_Int* colmap = new HYPRE_Int[offd.NumCols()];
     for (int i = 0; i < offd.NumCols(); ++i)
     {
-        colmap[i] += col_remap[colmap[i]];
+        colmap[i] = old_colmap[i] + col_remap[old_colmap[i]];
     }
 
-    auto out = make_unique<mfem::HypreParMatrix>(
-                   comm, row_starts.Last(), col_starts.Last(),
-                   row_starts, col_starts, diag_i, diag_j, diag_data,
-                   offd_i, offd_j, offd_data, offd.NumCols(), colmap);
+    auto out = new mfem::HypreParMatrix(comm, row_starts.Last(), col_starts.Last(),
+                                        row_starts, col_starts, d_i, d_j, d_data,
+                                        o_i, o_j, o_data, offd.NumCols(), colmap);
 
     out->CopyRowStarts();
     out->CopyColStarts();
 
-    return out;
+    return unique_ptr<mfem::HypreParMatrix>(out);
 }
 
 class TwoPhase : public SPE10Problem
@@ -298,7 +272,6 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
         if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
     }
 }
-
 
 mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edge)
 {

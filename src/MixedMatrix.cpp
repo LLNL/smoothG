@@ -142,23 +142,21 @@ mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
     mfem::SparseMatrix DT(graph.EdgeToVertex());
 
     // Change the second entries of each row with two nonzeros to -1
-    // If the edge is shared, change the nonzero to -1 if the edge is also owned
-    int* DT_i = DT.GetI();
+    // If the edge is shared, change the nonzero to -1 if the edge is not owned
     double* DT_data = DT.GetData();
-
-    for (int j = 0; j < DT.NumRows(); j++)
+    for (int i = 0; i < DT.NumRows(); ++i)
     {
-        const int row_size = DT.RowSize(j);
+        const int row_size = DT.RowSize(i);
         assert(row_size == 1 || row_size == 2);
 
         if (row_size == 2)
         {
-            DT_data[DT_i[j]] = 1.;
-            DT_data[DT_i[j] + 1] = -1.;
+            *(DT_data++) = 1.;
+            *(DT_data++) = -1.;
         }
         else
         {
-            DT_data[DT_i[j]] = edge_is_owned.RowSize(j) ? 1. : -1.;
+            *(DT_data++) = edge_is_owned.RowSize(i) ? 1. : -1.;
         }
     }
 
