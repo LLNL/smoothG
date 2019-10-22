@@ -275,35 +275,41 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 
 mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edge)
 {
-    const int num_edges = vert_edge.NumCols() + well_manager_.NumWellCells();
-    const int num_verts = vert_edge.NumRows() + well_manager_.NumWells(Injector);
+    const int num_well_cells = well_manager_.NumWellCells();
+    const int num_injector_cells = well_manager_.NumWellCells(Injector);
 
-    // TODO: new local numbering may not match local numbering in local weight
-    mfem::SparseMatrix ext_vert_edge(num_verts, num_edges);
-    for (int i = 0; i < vert_edge.NumRows(); ++i)
-    {
-        for (int j = 0; j < vert_edge.RowSize(i); ++j)
-        {
-            ext_vert_edge.Add(i, vert_edge.GetRowColumns(i)[j], 1.0);
-        }
-    }
+    int num_edges = vert_edge.NumCols();         // number of reservoir faces
+    int num_verts = vert_edge.NumRows();         // number of reservoir cells
 
-    int edge = vert_edge.NumCols();         // number of reservoir faces
-    int vert = vert_edge.NumRows();         // number of reservoir cells
+    int* I = new int[num_verts + well_manager_.NumWells(Injector) + 1]();
+    int* J = new int[NNZ(vert_edge) + num_well_cells + num_injector_cells];
 
-    // Adding connection between reservoir and well to the graph
     for (const Well& well : well_manager_.GetWells())
     {
-        for (auto& cell : well.cells)
-        {
-            if (well.type == Injector) { ext_vert_edge.Add(vert, edge, 1.0); }
-            ext_vert_edge.Add(cell, edge++, 1.0);
-        }
-        vert += (well.type == Injector);
+        for (int cell : well.cells) { I[cell + 1] = 1; }
     }
-    ext_vert_edge.Finalize();
 
-    return ext_vert_edge;
+    for (int i = 0; i < vert_edge.NumRows(); ++i)
+    {
+        I[i + 1] += I[i] + vert_edge.RowSize(i);
+        std::copy_n(vert_edge.GetRowColumns(i), vert_edge.RowSize(i), J + I[i]);
+    }
+
+    for (const Well& well : well_manager_.GetWells())
+    {
+        if (well.type == Injector)
+        {
+            I[num_verts + 1] = I[num_verts] + well.cells.size();
+            std::iota(J + I[num_verts], J + I[num_verts + 1], num_edges);
+            num_verts++;
+        }
+        for (int cell : well.cells) { J[I[cell + 1] - 1] = num_edges++; }
+    }
+
+    double* Data = new double[I[num_verts]];
+    std::fill_n(Data, I[num_verts], 1.0);
+
+    return mfem::SparseMatrix(I, J, Data, num_verts, num_edges);
 }
 
 std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vector>& loc_weight)
