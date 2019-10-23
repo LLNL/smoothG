@@ -35,26 +35,48 @@
 
 using namespace smoothg;
 
-/** A time-dependent operator for the right-hand side of the ODE. The semi-discrete
-    equation of dS/dt + div(vF(S)) = b is M dS/dt + K F(S) = b, where M and K are
-    the mass and advection matrices, F is a nonlinear function, and b describes the
-    influx source. This can be written as a general ODE, dS/dt = M^{-1} (b - K F(S)),
-    and this class is used to evaluate the right-hand side. */
-class FV_Evolution : public mfem::TimeDependentOperator
+struct EvolveParamenters
 {
-private:
-    mfem::HypreParMatrix K_ref_;
+    double T = 1.0;    // Total time
+    double dt = 1.0;   // Time step size
+    int vis_step = 0;
+    bool is_explicit = true;
+};
+
+/**
+   This computes dS/dt that solves W dS/dt + K F(S) = b, which is the
+   semi-discrete form of dS/dt + div(vF(S)) = b, where W and K are the mass
+   and advection matrices F is a nonlinear function b is the influx source.
+ */
+class Transport : public mfem::TimeDependentOperator
+{
+    const Graph& graph_;
+    unique_ptr<mfem::HypreParMatrix> e_te_v_;
+    unique_ptr<mfem::HypreParMatrix> K_;
     mfem::Vector W_diag_;
-    const mfem::Vector& b_;
-    mutable mfem::Vector FS_;
+    mfem::Vector b_;
 public:
-    FV_Evolution(const mfem::SparseMatrix& W, const mfem::Vector& b);
-    void UpdateK(const mfem::HypreParMatrix& K) { K_ref_.MakeRef(K); }
+    Transport(const Graph& graph, const mfem::SparseMatrix& W, const mfem::Vector& b);
+    void UpdateK(const mfem::Vector& flux);
+    // y = W^{-1} (b - K F(x))
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
 };
 
-void TotalMobility(const mfem::Vector& S, mfem::Vector& LamS);
-void FractionalFlow(const mfem::Vector& S, mfem::Vector& FS);
+class TwoPhaseSolver
+{
+    const EvolveParamenters& param_;
+    const TwoPhase& problem_;
+    Hierarchy& hierarchy_;
+    unique_ptr<Transport> transport_;
+    unique_ptr<mfem::ODESolver> ode_solver_;
+public:
+    TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
+                   const EvolveParamenters& param);
+    mfem::Vector Solve(const mfem::Vector& initial_guess);
+};
+
+mfem::Vector TotalMobility(const mfem::Vector& S);
+mfem::Vector FractionalFlow(const mfem::Vector& S);
 
 int main(int argc, char* argv[])
 {
@@ -67,36 +89,30 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
+    EvolveParamenters evolve_param;
     mfem::OptionsParser args(argc, argv);
     const char* perm_file = "spe_perm.dat";
-    args.AddOption(&perm_file, "-p", "--perm",
-                   "SPE10 permeability file data.");
+    args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
     int dim = 3;
-    args.AddOption(&dim, "-d", "--dim",
-                   "Dimension of the physical space.");
+    args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
     int slice = 0;
-    args.AddOption(&slice, "-s", "--slice",
-                   "Slice of SPE10 data to take for 2D run.");
+    args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
     bool use_metis = true;
-    args.AddOption(&use_metis, "-ma", "--metis-agglomeration",
-                   "-nm", "--no-metis-agglomeration",
-                   "Use Metis as the partitioner (instead of geometric).");
-    int spe10_scale = 5;
-    args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
-                   "Scale of problem, 1=small, 5=full SPE10.");
-    double delta_t = 1.0;
-    args.AddOption(&delta_t, "-dt", "--delta-t", "Time step.");
-    double total_time = 1000.0;
-    args.AddOption(&total_time, "-time", "--total-time", "Total time to step.");
-    int vis_step = 0;
-    args.AddOption(&vis_step, "-vs", "--vis-step", "Step size for visualization.");
+    args.AddOption(&use_metis, "-ma", "--metis", "-nm", "--no-metis",
+                   "Use Metis for partitioning (instead of geometric).");
     int well_height = 1;
     args.AddOption(&well_height, "-wh", "--well-height", "Well Height.");
     double inject_rate = 0.3;
     args.AddOption(&inject_rate, "-ir", "--inject-rate", "Injector rate.");
-    double bottom_hole_pressure = 175.0;
-    args.AddOption(&bottom_hole_pressure, "-bhp", "--bottom-hole-pressure",
-                   "Bottom Hole Pressure.");
+    double bhp = 175.0;
+    args.AddOption(&bhp, "-bhp", "--bottom-hole-pressure", "Bottom Hole Pressure.");
+    args.AddOption(&evolve_param.dt, "-dt", "--delta-t", "Time step.");
+    args.AddOption(&evolve_param.T, "-time", "--total-time", "Total time to step.");
+    args.AddOption(&evolve_param.vis_step, "-vs", "--vis-step",
+                   "Step size for visualization.");
+    args.AddOption(&evolve_param.is_explicit, "-explicit", "--explicit",
+                   "-implicit", "--implicit", "Use forward or backward Euler.");
+
     UpscaleParameters upscale_param;
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
@@ -118,23 +134,27 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     // Setting up finite volume discretization problem
-    TwoPhase fv_problem(perm_file, dim, spe10_scale, slice, false, ess_attr,
-                          well_height, inject_rate, bottom_hole_pressure);
+    TwoPhase problem(perm_file, dim, 5, slice, false, ess_attr,
+                     well_height, inject_rate, bhp);
 
-    Graph graph = fv_problem.GetFVGraph(true);
-    auto& combined_ess_attr = fv_problem.EssentialAttribute();
-
-    mfem::Array<int> geo_coarsening_factor(dim);
-    geo_coarsening_factor[0] = 5;
-    geo_coarsening_factor[1] = 5;
-    if (dim == 3) { geo_coarsening_factor[2] = 2; }
-//    spe10problem.CartPart(partition, nz, geo_coarsening_factor, well_vertices);
-
-    Hierarchy hierarchy(graph, upscale_param, nullptr, &combined_ess_attr);
+    Hierarchy hierarchy(problem.GetFVGraph(true), upscale_param,
+                        nullptr, &problem.EssentialAttribute());
     hierarchy.PrintInfo();
 
     // Fine scale transport based on fine flux
-    auto S_fine = fv_problem.Solve(hierarchy, delta_t, total_time, vis_step);
+    TwoPhaseSolver solver(problem, hierarchy, evolve_param);
+
+    mfem::Vector initial_value(problem.GetVertexRHS().Size());
+    initial_value = 0.0;
+
+    mfem::StopWatch chrono;
+    chrono.Start();
+    mfem::Vector S_fine = solver.Solve(initial_value);
+
+    if (myid == 0)
+    {
+        std::cout << "Time stepping done in " << chrono.RealTime() << "s.\n";
+    }
 
     double norm = mfem::ParNormlp(S_fine, 2, comm);
     if (myid == 0) { std::cout<<"|| S || = "<< norm <<"\n"; }
@@ -142,33 +162,31 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-FV_Evolution::FV_Evolution(const mfem::SparseMatrix& W, const mfem::Vector& b)
-    : mfem::TimeDependentOperator(W.NumRows()), b_(b), FS_(W.NumRows())
+Transport::Transport(const Graph& graph, const mfem::SparseMatrix& W, const mfem::Vector& b)
+    : mfem::TimeDependentOperator(b.Size()), graph_(graph), b_(b)
 {
+    const mfem::HypreParMatrix& e_te_e = graph_.EdgeToTrueEdgeToEdge();
+    e_te_v_ = ParMult(e_te_e, graph_.EdgeToVertex(), graph_.VertexStarts());
     W.GetDiag(W_diag_); // assume W is diagonal
 }
 
-void FV_Evolution::Mult(const mfem::Vector& x, mfem::Vector& y) const
+void Transport::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
-    // y = W^{-1} (b - K F(x))
     y = b_;
-    FractionalFlow(x, FS_);
-    K_ref_.Mult(-1.0, FS_, 1.0, y);
+    K_->Mult(-1.0, FractionalFlow(x), 1.0, y);
     InvRescaleVector(W_diag_, y);
 }
 
-mfem::HypreParMatrix* Advection(const mfem::Vector& flux, const Graph& graph)
+void Transport::UpdateK(const mfem::Vector& flux)
 {
-    const mfem::HypreParMatrix& e_te_e = graph.EdgeToTrueEdgeToEdge();
-    const mfem::SparseMatrix& e_v = graph.EdgeToVertex();
-    auto e_te_v = ParMult(e_te_e, e_v, graph.VertexStarts());
-    const mfem::SparseMatrix e_te_v_offd = GetOffd(*e_te_v);
-    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+    const mfem::SparseMatrix& e_v = graph_.EdgeToVertex();
+    const mfem::SparseMatrix e_te_v_offd = GetOffd(*e_te_v_);
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph_.EdgeToTrueEdge());
 
-    mfem::SparseMatrix diag(graph.NumVertices(), graph.NumVertices());
-    mfem::SparseMatrix offd(graph.NumVertices(), e_te_v_offd.NumCols());
+    mfem::SparseMatrix diag(graph_.NumVertices(), graph_.NumVertices());
+    mfem::SparseMatrix offd(graph_.NumVertices(), e_te_v_offd.NumCols());
 
-    for (int i = 0; i < graph.NumEdges(); ++i)
+    for (int i = 0; i < graph_.NumEdges(); ++i)
     {
         const double flux_0 = (fabs(flux(i)) - flux(i)) / 2;
         const double flux_1 = (fabs(flux(i)) + flux(i)) / 2;
@@ -204,119 +222,97 @@ mfem::HypreParMatrix* Advection(const mfem::Vector& flux, const Graph& graph)
     offd.Finalize(0);
 
     mfem::Array<int> starts;
-    GenerateOffsets(graph.GetComm(), graph.NumVertices(), starts);
+    GenerateOffsets(graph_.GetComm(), graph_.NumVertices(), starts);
 
     HYPRE_Int* col_map = new HYPRE_Int[e_te_v_offd.NumCols()];
-    std::copy_n(GetColMap(*e_te_v), e_te_v_offd.NumCols(), col_map);
+    std::copy_n(GetColMap(*e_te_v_), e_te_v_offd.NumCols(), col_map);
 
-    auto out = new mfem::HypreParMatrix(graph.GetComm(), e_te_v->N(), e_te_v->N(),
-                                        starts, starts, &diag, &offd, col_map);
+    K_.reset(new mfem::HypreParMatrix(graph_.GetComm(), e_te_v_->N(), e_te_v_->N(),
+                                      starts, starts, &diag, &offd, col_map));
 
     // Adjust ownership and copy starts arrays
-    out->CopyRowStarts();
-    out->CopyColStarts();
-    out->SetOwnerFlags(3, 3, 1);
+    K_->CopyRowStarts();
+    K_->CopyColStarts();
+    K_->SetOwnerFlags(3, 3, 1);
     diag.LoseData();
     offd.LoseData();
-
-    return out;
 }
 
-mfem::Vector TwoPhase::Solve(Hierarchy& hierarchy, double delta_t,
-                             double total_time, int vis_step)
+TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
+                               const EvolveParamenters& param)
+    : param_(param), problem_(problem), hierarchy_(hierarchy)
 {
-    mfem::StopWatch chrono;
-
-    const Graph& graph = hierarchy.GetMatrix(0).GetGraph();
-
-    mfem::BlockVector p_rhs(hierarchy.BlockOffsets(0));
-    p_rhs.GetBlock(0) = GetEdgeRHS();
-    p_rhs.GetBlock(1) = GetVertexRHS();
-
-    mfem::Vector influx = GetVertexRHS();
-    std::string full_caption = "Fine scale ";
-
-    mfem::SparseMatrix W = SparseIdentity(graph.NumVertices());
-    W *= CellVolume();
-
-    influx *= -1.0;
-    mfem::Vector S = influx;
-    S = 0.0;
-
-    mfem::Vector total_mobility = S;
-    mfem::BlockVector flow_sol(p_rhs);
-
-    chrono.Clear();
-    MPI_Barrier(graph.GetComm());
-    chrono.Start();
-
-    mfem::Vector S_vis;
-    S_vis.SetDataAndSize(S.GetData(), S.Size());
-
-    mfem::socketstream sout;
-    if (vis_step) { VisSetup(sout, S_vis, 0.0, 1.0, full_caption); }
-
-    double time = 0.0;
-
-    FV_Evolution adv(W, influx);
-    adv.SetTime(time);
-
-    mfem::ForwardEulerSolver ode_solver;
-    ode_solver.Init(adv);
-
-    unique_ptr<mfem::HypreParMatrix> Adv;
-
-    mfem::Vector flux;
-
-    bool done = false;
-    for (int ti = 0; !done; )
+    if (param_.is_explicit)
     {
-        TotalMobility(S, total_mobility);
-        hierarchy.RescaleCoefficient(0, total_mobility);
-        hierarchy.Solve(0, p_rhs, flow_sol);
-
-        flux.SetDataAndSize(flow_sol.GetData(), flow_sol.BlockSize(0));
-
-        Adv.reset(Advection(flux, graph));
-        adv.UpdateK(*Adv);
-
-        double dt_real = std::min(delta_t, total_time - time);
-        ode_solver.Step(S, time, dt_real);
-        ti++;
-
-        done = (time >= total_time - 1e-8 * delta_t);
-
-        if (myid_ == 0)
-        {
-            std::cout << "time step: " << ti << ", time: " << time << "\r";//std::endl;
-        }
-        if (vis_step && (done || ti % vis_step == 0))
-        {
-            VisUpdate(sout, S_vis);
-        }
+        ode_solver_.reset(new mfem::ForwardEulerSolver());
+    }
+    else
+    {
+        ode_solver_.reset(new mfem::BackwardEulerSolver());
     }
 
-    MPI_Barrier(graph.GetComm());
-    if (myid_ == 0)
+    mfem::Vector influx = problem.GetVertexRHS();
+    influx *= -1.0;
+    mfem::SparseMatrix W = SparseIdentity(influx.Size()) *= problem.CellVolume();
+    transport_.reset(new Transport(hierarchy.GetGraph(0), W, influx));
+    ode_solver_->Init(*transport_);
+}
+
+mfem::Vector TwoPhaseSolver::Solve(const mfem::Vector& initial_value)
+{
+    int myid;
+    MPI_Comm_rank(hierarchy_.GetComm(), &myid);
+
+    mfem::BlockVector p_rhs(hierarchy_.BlockOffsets(0));
+    p_rhs.GetBlock(0) = problem_.GetEdgeRHS();
+    p_rhs.GetBlock(1) = problem_.GetVertexRHS();
+
+    mfem::Vector S = initial_value;
+
+    mfem::socketstream sout;
+    if (param_.vis_step) { problem_.VisSetup(sout, S, 0.0, 1.0, "Fine scale"); }
+
+    double time = 0.0;
+    bool done = false;
+    for (int step = 1; !done; step++)
     {
-        std::cout << "Time stepping done in " << chrono.RealTime() << "s.\n";
+        hierarchy_.RescaleCoefficient(0, TotalMobility(S));
+        mfem::BlockVector flow_sol = hierarchy_.Solve(0, p_rhs);
+        transport_->UpdateK(flow_sol.GetBlock(0));
+
+        double dt_real = std::min(param_.dt, param_.T - time);
+        ode_solver_->Step(S, time, dt_real);
+
+        done = (time >= param_.T - 1e-8 * param_.dt);
+
+        if (myid == 0)
+        {
+            std::cout << "time step: " << step << ", time: " << time << "\r";
+        }
+        if (param_.vis_step && (done || step % param_.vis_step == 0))
+        {
+            problem_.VisUpdate(sout, S);
+        }
     }
 
     return S;
 }
 
-void TotalMobility(const mfem::Vector& S, mfem::Vector& LamS)
+mfem::Vector TotalMobility(const mfem::Vector& S)
 {
+    mfem::Vector LamS(S.Size());
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
         LamS(i)  = S_w * S_w + S_o * S_o / 5.0;
     }
+    return LamS;
 }
 
-void FractionalFlow(const mfem::Vector& S, mfem::Vector& FS)
+mfem::Vector FractionalFlow(const mfem::Vector& S)
 {
+    mfem::Vector FS(S.Size());
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
@@ -324,4 +320,5 @@ void FractionalFlow(const mfem::Vector& S, mfem::Vector& FS)
         double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
         FS(i) = S_w * S_w / Lam_S;
     }
+    return FS;
 }

@@ -107,9 +107,12 @@ public:
     /// to a vector in vertex space of that level. Mostly used for visualization
     mfem::Vector PWConstInterpolate(int level, const mfem::Vector& x) const;
 
-    // Get Mixed System
+    /// Get Mixed System
     MixedMatrix& GetMatrix(int level);
     const MixedMatrix& GetMatrix(int level) const;
+
+    /// Get graph
+    const Graph& GetGraph(int level) const { return GetMatrix(level).GetGraph(); }
 
     /// Show Hierarchy Information
     void PrintInfo(std::ostream& out = std::cout) const;
