@@ -354,9 +354,9 @@ int main(int argc, char* argv[])
         }
 
         mfem::socketstream sout;
-        fv_problem->VisSetup2(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "coarse flux");
+//        fv_problem->VisSetup2(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "coarse flux");
         fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "coarse pressure");
-        fv_problem->VisSetup2(sout, sol_nlmg2.GetBlock(0), 0.0, 0.0, "fine flux");
+//        fv_problem->VisSetup2(sout, sol_nlmg2.GetBlock(0), 0.0, 0.0, "fine flux");
         fv_problem->VisSetup(sout, sol_nlmg2.GetBlock(1), 0.0, 0.0, "fine pressure");
         if (problem == "richard")
             sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";

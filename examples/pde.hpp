@@ -688,12 +688,12 @@ void DarcyProblem::ComputeGraphWeight(bool unit_weight)
 void DarcyProblem::PrintMeshWithPartitioning(mfem::Array<int>& partition)
 {
     std::stringstream fname;
-    fname << "mesh0.mesh." << std::setfill('0') << std::setw(6) << myid_;
+    fname << "mesh0.with_parts." << std::setfill('0') << std::setw(6) << myid_;
     std::ofstream ofid(fname.str().c_str());
     ofid.precision(8);
     pmesh_->PrintWithPartitioning(partition.GetData(), ofid, 1);
 }
-int yo=0;
+
 void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min,
                             double range_max, const std::string& caption, int coef) const
 {
@@ -701,15 +701,15 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
 
     const char vishost[] = "localhost";
     const int  visport   = 19916;
-    if (yo==0)
-    {vis_v.open(vishost, visport);yo=0;}
+
+    vis_v.open(vishost, visport);
     vis_v.precision(8);
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf;
-    vis_v << "window_size 900 800\n";//800 250
+    vis_v << "window_size 650 800\n";// 900 800
     vis_v << "window_title 'vertex space unknown'\n";
-    vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
+    vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
     if (range_max > range_min)
     {
         vis_v << "valuerange " << range_min << " " << range_max << "\n";
@@ -719,15 +719,14 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
     {
         vis_v << "view 0 0\n"; // view from top
         vis_v << "keys jl\n";  // turn off perspective and light
-//        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]\n";
+        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
     }
     else
     {
         vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
     }
 
-        vis_v << "keys c\n"; // colorbar
+    vis_v << "keys c\n"; // colorbar
 
     if (coef)
     {
@@ -741,59 +740,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double
 
     MPI_Barrier(comm_);
 
-    vis_v << "keys S\n";         //Screenshot
-
-    MPI_Barrier(comm_);
-}
-
-void DarcyProblem::VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min,
-                             double range_max, const std::string& caption, int coef) const
-{
-    mfem::ParGridFunction gf(sigma_fes_.get(), vec.GetData());
-
-    const char vishost[] = "localhost";
-    const int  visport   = 19916;
-    if (yo==0)
-    {vis_v.open(vishost, visport);yo=0;}
-    vis_v.precision(8);
-
-    vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
-    vis_v << "solution\n" << *pmesh_ << gf;
-    vis_v << "window_size 900 800\n";//800 250
-    vis_v << "window_title 'vertex space unknown'\n";
-    vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
-    if (range_max > range_min)
-    {
-        vis_v << "valuerange " << range_min << " " << range_max << "\n";
-    }
-
-    if (pmesh_->SpaceDimension() == 2)
-    {
-        vis_v << "view 0 0\n"; // view from top
-        vis_v << "keys jl\n";  // turn off perspective and light
-//        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]\n";
-    }
-    else
-    {
-        vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
-    }
-
-        vis_v << "keys c\n"; // colorbar
-
-    if (coef)
-    {
-        vis_v << "keys fL\n";  // smoothing and logarithmic scale
-    }
-
-    if (!caption.empty())
-    {
-        vis_v << "plot_caption '" << caption << "'\n";
-    }
-
-    MPI_Barrier(comm_);
-
-    vis_v << "keys S\n";         //Screenshot
+//    vis_v << "keys S\n";         //Screenshot
 
     MPI_Barrier(comm_);
 }
@@ -805,14 +752,9 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec) const
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *pmesh_ << u_fes_gf;
 
-    vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]\n";
-//    vis_v << "keys c\n"; // colorbar
-//    vis_v << "autoscale on\n"; // update value-range; keep mesh-extents fixed
-//    vis_v << "keys c\n"; // colorbar
-
     MPI_Barrier(comm_);
 
-    vis_v << "keys S\n";         //Screenshot
+//    vis_v << "keys S\n";         //Screenshot
 
     MPI_Barrier(comm_);
 }

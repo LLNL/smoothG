@@ -193,7 +193,6 @@ unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
     auto out = new mfem::HypreParMatrix(comm, row_starts.Last(), col_starts.Last(),
                                         row_starts, col_starts, d_i, d_j, d_data,
                                         o_i, o_j, o_data, offd.NumCols(), colmap);
-
     out->CopyRowStarts();
     out->CopyColStarts();
 
@@ -207,7 +206,8 @@ public:
              int slice, bool metis_parition, const mfem::Array<int>& ess_attr,
              int well_height, double inject_rate, double bottom_hole_pressure);
 
-    void PrintMeshWithPartitioning(mfem::Array<int>& partition);
+    mfem::Vector Solve(Hierarchy& hierarchy, double delta_t,
+                       double total_time, int vis_step);
 private:
     // Set up well model (Peaceman's five-spot pattern)
     void SetWells(int well_height, double inject_rate, double bot_hole_pres);
@@ -278,8 +278,8 @@ mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edg
     const int num_well_cells = well_manager_.NumWellCells();
     const int num_injector_cells = well_manager_.NumWellCells(Injector);
 
-    int num_edges = vert_edge.NumCols();         // number of reservoir faces
     int num_verts = vert_edge.NumRows();         // number of reservoir cells
+    int num_edges = vert_edge.NumCols();         // number of reservoir faces
 
     int* I = new int[num_verts + well_manager_.NumWells(Injector) + 1]();
     int* J = new int[NNZ(vert_edge) + num_well_cells + num_injector_cells];
@@ -316,15 +316,14 @@ std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vect
 {
     std::vector<mfem::Vector> new_loc_weight;
     new_loc_weight.reserve(loc_weight.size() + well_manager_.NumWells(Injector));
-    for (const auto& loc_w : loc_weight) new_loc_weight.push_back(loc_w);
+    for (const auto& loc_w : loc_weight) { new_loc_weight.push_back(loc_w); }
 
     for (const Well& well : well_manager_.GetWells())
     {
-        const auto& cells = well.cells;
-        for (unsigned int j = 0; j < cells.size(); j++)
+        for (unsigned int j = 0; j < well.cells.size(); j++)
         {
-            const mfem::Vector& loc_w = loc_weight[cells[j]];
-            mfem::Vector& new_loc_w = new_loc_weight[cells[j]];
+            const mfem::Vector& loc_w = loc_weight[well.cells[j]];
+            mfem::Vector& new_loc_w = new_loc_weight[well.cells[j]];
             new_loc_w.SetSize(loc_w.Size() + 1);
             std::copy_n(loc_w.GetData(), loc_w.Size(), new_loc_w.GetData());
             new_loc_w[loc_w.Size()] = well.well_indices[j];
@@ -332,7 +331,7 @@ std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vect
 
         if (well.type == Injector)
         {
-            mfem::Vector new_loc_w(cells.size());
+            mfem::Vector new_loc_w(well.cells.size());
             new_loc_w = 1e10;//INFINITY; // Not sure if this is ok
             new_loc_weight.push_back(new_loc_w);
         }
@@ -417,13 +416,4 @@ void TwoPhase::CombineReservoirAndWellModel()
     mfem::Array<int> producer_attr(well_manager_.NumWells(Producer));
     producer_attr = 0;                // treat producer as "natural boundary"
     ess_attr_.Append(producer_attr);
-}
-
-void TwoPhase::PrintMeshWithPartitioning(mfem::Array<int>& partition)
-{
-    std::stringstream fname;
-    fname << "mesh.with_parts." << std::setfill('0') << std::setw(6) << myid_;
-    std::ofstream ofid(fname.str().c_str());
-    ofid.precision(8);
-    pmesh_->PrintWithPartitioning(partition.GetData(), ofid, 1);
 }
