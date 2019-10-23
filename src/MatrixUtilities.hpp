@@ -476,10 +476,13 @@ void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
 std::unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat);
 
 /// @return "diagonal block" of a HypreParMatrix
-mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat);
+const mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat);
 
 /// @return "off diagonal block" of a HypreParMatrix
-mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
+const mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
+
+/// @return column map for off diagonal block
+const HYPRE_Int* GetColMap(const mfem::HypreParMatrix& mat);
 
 /// @return Number of nonzeros of mat
 int NNZ(const mfem::SparseMatrix& mat);

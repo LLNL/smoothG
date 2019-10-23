@@ -44,11 +44,11 @@ class FV_Evolution : public mfem::TimeDependentOperator
 {
 private:
     mfem::HypreParMatrix K_ref_;
-    mfem::Vector Minv_;
+    mfem::Vector W_diag_;
     const mfem::Vector& b_;
     mutable mfem::Vector FS_;
 public:
-    FV_Evolution(const mfem::SparseMatrix& M, const mfem::Vector& b);
+    FV_Evolution(const mfem::SparseMatrix& W, const mfem::Vector& b);
     void UpdateK(const mfem::HypreParMatrix& K) { K_ref_.MakeRef(K); }
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
 };
@@ -142,78 +142,60 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-FV_Evolution::FV_Evolution(const mfem::SparseMatrix& M, const mfem::Vector& b)
-    : mfem::TimeDependentOperator(M.Height()), b_(b)
+FV_Evolution::FV_Evolution(const mfem::SparseMatrix& W, const mfem::Vector& b)
+    : mfem::TimeDependentOperator(W.NumRows()), b_(b), FS_(W.NumRows())
 {
-    M.GetDiag(Minv_); // assume M is diagonal
-    for (int i = 0; i < Minv_.Size(); i++)
-    {
-        Minv_(i) = 1.0 / Minv_(i);
-    }
-    FS_.SetSize(M.Height());
+    W.GetDiag(W_diag_); // assume W is diagonal
 }
 
 void FV_Evolution::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
-    // y = M^{-1} (b - K F(x))
+    // y = W^{-1} (b - K F(x))
     y = b_;
     FractionalFlow(x, FS_);
     K_ref_.Mult(-1.0, FS_, 1.0, y);
-    RescaleVector(Minv_, y);
+    InvRescaleVector(W_diag_, y);
 }
 
 mfem::HypreParMatrix* Advection(const mfem::Vector& flux, const Graph& graph)
 {
-    const int num_verts = graph.NumVertices();
-
     const mfem::HypreParMatrix& e_te_e = graph.EdgeToTrueEdgeToEdge();
     const mfem::SparseMatrix& e_v = graph.EdgeToVertex();
     auto e_te_v = ParMult(e_te_e, e_v, graph.VertexStarts());
+    const mfem::SparseMatrix e_te_v_offd = GetOffd(*e_te_v);
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
 
-    mfem::SparseMatrix e_te_v_offd, e_te_diag;
-    HYPRE_Int* elem_map;
-    e_te_v->GetOffd(e_te_v_offd, elem_map);
-    graph.EdgeToTrueEdge().GetDiag(e_te_diag);
+    mfem::SparseMatrix diag(graph.NumVertices(), graph.NumVertices());
+    mfem::SparseMatrix offd(graph.NumVertices(), e_te_v_offd.NumCols());
 
-    HYPRE_Int* col_map = new HYPRE_Int[e_te_v_offd.NumCols()];
-    std::copy_n(elem_map, e_te_v_offd.NumCols(), col_map);
-
-    mfem::SparseMatrix diag(num_verts, num_verts);
-    mfem::SparseMatrix offd(num_verts, e_te_v_offd.NumCols());
-
-    for (int f = 0; f < graph.NumEdges(); ++f)
+    for (int i = 0; i < graph.NumEdges(); ++i)
     {
-        const double flux_0 = (fabs(flux(f)) - flux(f)) / 2;
-        const double flux_1 = (fabs(flux(f)) + flux(f)) / 2;
+        const double flux_0 = (fabs(flux(i)) - flux(i)) / 2;
+        const double flux_1 = (fabs(flux(i)) + flux(i)) / 2;
 
-        if (e_v.RowSize(f) == 2) // facet is interior
+        if (e_v.RowSize(i) == 2) // edge is interior
         {
-            const int* elems = e_v.GetRowColumns(f);
-            diag.Set(elems[0], elems[1], -flux_1);
-            diag.Add(elems[1], elems[1], flux_1);
-            diag.Set(elems[1], elems[0], -flux_0);
-            diag.Add(elems[0], elems[0], flux_0);
+            const int* verts = e_v.GetRowColumns(i);
+            diag.Set(verts[0], verts[1], -flux_1);
+            diag.Add(verts[1], verts[1], flux_1);
+            diag.Set(verts[1], verts[0], -flux_0);
+            diag.Add(verts[0], verts[0], flux_0);
         }
         else
         {
-            const int diag_v = e_v.GetRowColumns(f)[0];
+            assert(e_v.RowSize(i) == 1);
+            const int diag_v = e_v.GetRowColumns(i)[0];
+            const bool edge_is_owned = e_te_diag.RowSize(i);
+            const bool edge_is_shared = e_te_v_offd.RowSize(i);
+            assert(edge_is_owned || edge_is_shared);
 
-            if (e_te_v_offd.RowSize(f) > 0) // facet is shared
+            diag.Add(diag_v, diag_v, edge_is_owned ? flux_0 : flux_1);
+
+            if (edge_is_shared) // edge is shared
             {
-                assert(e_te_v_offd.RowSize(f) == 1);
-                const int offd_v = e_te_v_offd.GetRowColumns(f)[0];
-                const bool f_is_owned = e_te_diag.RowSize(f);
-                offd.Set(diag_v, offd_v, f_is_owned ? -flux_1 : -flux_0);
-                diag.Add(diag_v, diag_v, f_is_owned ? flux_0 : flux_1);
-            }
-            else if (e_v.RowSize(f) == 1) // global boundary
-            {
-                diag.Add(diag_v, diag_v, flux_0);
-            }
-            else
-            {
-                assert(e_v.RowSize(f) == 0);
-                assert(e_te_v_offd.RowSize(f) == 0);
+                assert(e_te_v_offd.RowSize(i) == 1);
+                const int offd_v = e_te_v_offd.GetRowColumns(i)[0];
+                offd.Set(diag_v, offd_v, edge_is_owned ? -flux_1 : -flux_0);
             }
         }
     }
@@ -222,7 +204,10 @@ mfem::HypreParMatrix* Advection(const mfem::Vector& flux, const Graph& graph)
     offd.Finalize(0);
 
     mfem::Array<int> starts;
-    GenerateOffsets(graph.GetComm(), num_verts, starts);
+    GenerateOffsets(graph.GetComm(), graph.NumVertices(), starts);
+
+    HYPRE_Int* col_map = new HYPRE_Int[e_te_v_offd.NumCols()];
+    std::copy_n(GetColMap(*e_te_v), e_te_v_offd.NumCols(), col_map);
 
     auto out = new mfem::HypreParMatrix(graph.GetComm(), e_te_v->N(), e_te_v->N(),
                                         starts, starts, &diag, &offd, col_map);
@@ -240,31 +225,19 @@ mfem::HypreParMatrix* Advection(const mfem::Vector& flux, const Graph& graph)
 mfem::Vector TwoPhase::Solve(Hierarchy& hierarchy, double delta_t,
                              double total_time, int vis_step)
 {
+    mfem::StopWatch chrono;
+
     const Graph& graph = hierarchy.GetMatrix(0).GetGraph();
 
     mfem::BlockVector p_rhs(hierarchy.BlockOffsets(0));
     p_rhs.GetBlock(0) = GetEdgeRHS();
     p_rhs.GetBlock(1) = GetVertexRHS();
 
-    mfem::SparseMatrix vertex_edge;
-    mfem::HypreParMatrix edge_d_td;
-    mfem::Vector influx;
-    std::string full_caption;
+    mfem::Vector influx = GetVertexRHS();
+    std::string full_caption = "Fine scale ";
 
-    {
-        vertex_edge.MakeRef(graph.VertexToEdge());
-        edge_d_td.MakeRef(graph.EdgeToTrueEdge());
-        influx = GetVertexRHS();
-        full_caption = "Fine scale ";
-    }
-
-    int myid;
-    MPI_Comm_rank(edge_d_td.GetComm(), &myid);
-
-    mfem::StopWatch chrono;
-
-    mfem::SparseMatrix M = SparseIdentity(graph.NumVertices());
-    M *= CellVolume();
+    mfem::SparseMatrix W = SparseIdentity(graph.NumVertices());
+    W *= CellVolume();
 
     influx *= -1.0;
     mfem::Vector S = influx;
@@ -274,138 +247,60 @@ mfem::Vector TwoPhase::Solve(Hierarchy& hierarchy, double delta_t,
     mfem::BlockVector flow_sol(p_rhs);
 
     chrono.Clear();
-    MPI_Barrier(edge_d_td.GetComm());
+    MPI_Barrier(graph.GetComm());
     chrono.Start();
 
     mfem::Vector S_vis;
-//    if (S_level == Fine)
-    {
-        S_vis.SetDataAndSize(S.GetData(), S.Size());
-    }
+    S_vis.SetDataAndSize(S.GetData(), S.Size());
 
     mfem::socketstream sout;
-    if (vis_step)
-    {
-//        if (S_level == Coarse)
-//        {
-//            up.Interpolate(S, S_vis);
-//        }
-        VisSetup(sout, S_vis, 0.0, 1.0, full_caption);
-//        setup = false;
-    }
+    if (vis_step) { VisSetup(sout, S_vis, 0.0, 1.0, full_caption); }
 
     double time = 0.0;
 
-    FV_Evolution adv(M, influx);
+    FV_Evolution adv(W, influx);
     adv.SetTime(time);
 
     mfem::ForwardEulerSolver ode_solver;
     ode_solver.Init(adv);
 
-//    std::vector<mfem::Vector> sats(well_vertices.Size(), mfem::Vector(total_time / delta_t + 2));
-//    for (unsigned int i = 0; i < sats.size(); i++)
-//    {
-//        sats[i] = 0.0;
-//    }
-
     unique_ptr<mfem::HypreParMatrix> Adv;
-    mfem::BlockVector upscaled_flow_sol(hierarchy.BlockOffsets(0));
-    mfem::Vector upscaled_total_mobility;
 
-    {
-        upscaled_total_mobility.SetSize(hierarchy.GetMatrix(0).NumVDofs());
-    }
     mfem::Vector flux;
 
     bool done = false;
     for (int ti = 0; !done; )
     {
-//        if (p_level == Fine)
-        {
-            TotalMobility(S, total_mobility);
-            hierarchy.RescaleCoefficient(0, total_mobility);
-            hierarchy.Solve(0, p_rhs, flow_sol);
-//            up.ShowFineSolveInfo();
-        }
+        TotalMobility(S, total_mobility);
+        hierarchy.RescaleCoefficient(0, total_mobility);
+        hierarchy.Solve(0, p_rhs, flow_sol);
 
-        {
-            flux.SetDataAndSize(flow_sol.GetData(), flow_sol.BlockSize(0));
-        }
+        flux.SetDataAndSize(flow_sol.GetData(), flow_sol.BlockSize(0));
 
-//        if (coarse_Adv == CoarseAdv::Upwind)
-//        {
-//            Adv = DiscreteAdvection(normal_flux, vertex_edge, edge_d_td);
-//        }
-//        else if (coarse_Adv == CoarseAdv::RAP)
-//        {
-//            auto Adv_f = DiscreteAdvection(normal_flux, vertex_edge, edge_d_td);
-//            auto PuT = smoothg::Transpose(up.GetPu());
-
-//            mfem::Array<int> starts;
-//            GenerateOffsets(edge_d_td.GetComm(), PuT.Height(), starts);
-
-//            unique_ptr<mfem::HypreParMatrix> PAdv_f(Adv_f->LeftDiagMult(PuT, starts));
-//            unique_ptr<mfem::HypreParMatrix> Adv_fP(PAdv_f->Transpose());
-//            unique_ptr<mfem::HypreParMatrix> AdvT(Adv_fP->LeftDiagMult(PuT, starts));
-//            Adv.reset(AdvT->Transpose());
-//        }
-//        else
-        {
-            Adv.reset(Advection(flux, graph));
-        }
+        Adv.reset(Advection(flux, graph));
         adv.UpdateK(*Adv);
 
         double dt_real = std::min(delta_t, total_time - time);
         ode_solver.Step(S, time, dt_real);
         ti++;
-//std::cout<<"S norm = "<<S.Norml2()<<"\n";
-        //        for (unsigned int i = 0; i < sats.size(); i++)
-        //        {
-        //            if (level == Coarse)
-        //            {
-        //                up.Interpolate(S, S_vis);
-        //                sats[i](ti) = S_vis(well_vertices[i]);
-        //            }
-        //            else
-        //            {
-        //                sats[i](ti) = S(well_vertices[i]);
-        //            }
-        //        }
 
         done = (time >= total_time - 1e-8 * delta_t);
 
-        if (myid == 0)
+        if (myid_ == 0)
         {
             std::cout << "time step: " << ti << ", time: " << time << "\r";//std::endl;
         }
         if (vis_step && (done || ti % vis_step == 0))
         {
-//            if (S_level == Coarse)
-//            {
-//                up.Interpolate(S, S_vis);
-//            }
             VisUpdate(sout, S_vis);
         }
     }
-    MPI_Barrier(edge_d_td.GetComm());
-    if (myid == 0)
+
+    MPI_Barrier(graph.GetComm());
+    if (myid_ == 0)
     {
         std::cout << "Time stepping done in " << chrono.RealTime() << "s.\n";
-//        std::cout << "Size of discrete saturation space: " << Adv->N() << "\n";
     }
-
-//    if (S_level == Coarse)
-//    {
-//        up.Interpolate(S, S_vis);
-//        S = S_vis;
-//    }
-
-//    for (unsigned int i = 0; i < sats.size(); i++)
-//    {
-//        std::ofstream ofs("sat_prod_" + std::to_string(i) + "_" + std::to_string(myid)
-//                          + "_" + std::to_string(option) + ".txt");
-//        sats[i].Print(ofs, 1);
-//    }
 
     return S;
 }

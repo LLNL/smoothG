@@ -1271,19 +1271,24 @@ unique_ptr<mfem::HypreParMatrix> Copy(const mfem::HypreParMatrix& mat)
     return copy;
 }
 
-mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat)
+const mfem::SparseMatrix GetDiag(const mfem::HypreParMatrix& mat)
 {
     mfem::SparseMatrix diag;
     mat.GetDiag(diag);
     return diag;
 }
 
-mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
+const mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
 {
     HYPRE_Int* col_map;
     mfem::SparseMatrix offd;
     mat.GetOffd(offd, col_map);
     return offd;
+}
+
+const HYPRE_Int* GetColMap(const mfem::HypreParMatrix& mat)
+{
+    return ((hypre_ParCSRMatrix*)mat)->col_map_offd;
 }
 
 int NNZ(const mfem::SparseMatrix& mat)
