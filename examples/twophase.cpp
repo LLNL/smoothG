@@ -53,8 +53,6 @@ public:
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
 };
 
-std::unique_ptr<mfem::HypreParMatrix> Advection(const mfem::Vector& flux, const Graph& graph);
-
 void TotalMobility(const mfem::Vector& S, mfem::Vector& LamS);
 void FractionalFlow(const mfem::Vector& S, mfem::Vector& FS);
 
@@ -164,39 +162,33 @@ void FV_Evolution::Mult(const mfem::Vector& x, mfem::Vector& y) const
     RescaleVector(Minv_, y);
 }
 
-std::unique_ptr<mfem::HypreParMatrix> Advection(const mfem::Vector& flux, const Graph& graph)
+mfem::HypreParMatrix* Advection(const mfem::Vector& flux, const Graph& graph)
 {
-    MPI_Comm comm = graph.GetComm();
-    const int num_elems_diag = graph.NumVertices();
-    const int num_facets = graph.NumEdges();
+    const int num_verts = graph.NumVertices();
 
     const mfem::HypreParMatrix& e_te_e = graph.EdgeToTrueEdgeToEdge();
     const mfem::SparseMatrix& e_v = graph.EdgeToVertex();
-    auto facet_truefacet_elem = ParMult(e_te_e, e_v, graph.VertexStarts());
+    auto e_te_v = ParMult(e_te_e, e_v, graph.VertexStarts());
 
-    mfem::SparseMatrix f_tf_e_diag, f_tf_e_offd, f_tf_diag;
+    mfem::SparseMatrix e_te_v_offd, e_te_diag;
     HYPRE_Int* elem_map;
-    facet_truefacet_elem->GetDiag(f_tf_e_diag);
-    facet_truefacet_elem->GetOffd(f_tf_e_offd, elem_map);
-    graph.EdgeToTrueEdge().GetDiag(f_tf_diag);
+    e_te_v->GetOffd(e_te_v_offd, elem_map);
+    graph.EdgeToTrueEdge().GetDiag(e_te_diag);
 
-    HYPRE_Int* col_map = new HYPRE_Int[f_tf_e_offd.Width()];
-    std::copy_n(elem_map, f_tf_e_offd.Width(), col_map);
+    HYPRE_Int* col_map = new HYPRE_Int[e_te_v_offd.NumCols()];
+    std::copy_n(elem_map, e_te_v_offd.NumCols(), col_map);
 
-    mfem::SparseMatrix diag(num_elems_diag, num_elems_diag);
-    mfem::SparseMatrix offd(num_elems_diag, f_tf_e_offd.Width());
+    mfem::SparseMatrix diag(num_verts, num_verts);
+    mfem::SparseMatrix offd(num_verts, e_te_v_offd.NumCols());
 
-    mfem::Array<int> facedofs;
-
-    for (int f = 0; f < num_facets; ++f)
+    for (int f = 0; f < graph.NumEdges(); ++f)
     {
         const double flux_0 = (fabs(flux(f)) - flux(f)) / 2;
         const double flux_1 = (fabs(flux(f)) + flux(f)) / 2;
 
-        if (f_tf_e_diag.RowSize(f) == 2) // facet is interior
+        if (e_v.RowSize(f) == 2) // facet is interior
         {
-            const int* elems = f_tf_e_diag.GetRowColumns(f);
-
+            const int* elems = e_v.GetRowColumns(f);
             diag.Set(elems[0], elems[1], -flux_1);
             diag.Add(elems[1], elems[1], flux_1);
             diag.Set(elems[1], elems[0], -flux_0);
@@ -204,32 +196,24 @@ std::unique_ptr<mfem::HypreParMatrix> Advection(const mfem::Vector& flux, const 
         }
         else
         {
-            const int diag_elem = f_tf_e_diag.GetRowColumns(f)[0];
+            const int diag_v = e_v.GetRowColumns(f)[0];
 
-            if (f_tf_e_offd.RowSize(f) > 0) // facet is shared
+            if (e_te_v_offd.RowSize(f) > 0) // facet is shared
             {
-                assert(f_tf_e_offd.RowSize(f) == 1);
-                const int offd_elem = f_tf_e_offd.GetRowColumns(f)[0];
-
-                if (f_tf_diag.RowSize(f) > 0) // facet is owned by local proc
-                {
-                    offd.Set(diag_elem, offd_elem, -flux_1);
-                    diag.Add(diag_elem, diag_elem, flux_0);
-                }
-                else // facet is owned by the neighbor proc
-                {
-                    diag.Add(diag_elem, diag_elem, flux_1);
-                    offd.Set(diag_elem, offd_elem, -flux_0);
-                }
+                assert(e_te_v_offd.RowSize(f) == 1);
+                const int offd_v = e_te_v_offd.GetRowColumns(f)[0];
+                const bool f_is_owned = e_te_diag.RowSize(f);
+                offd.Set(diag_v, offd_v, f_is_owned ? -flux_1 : -flux_0);
+                diag.Add(diag_v, diag_v, f_is_owned ? flux_0 : flux_1);
             }
-            else if (f_tf_e_diag.RowSize(f) == 1) // global boundary
+            else if (e_v.RowSize(f) == 1) // global boundary
             {
-                diag.Add(diag_elem, diag_elem, flux_0);
+                diag.Add(diag_v, diag_v, flux_0);
             }
             else
             {
-                assert(f_tf_e_diag.RowSize(f) == 0);
-                assert(f_tf_e_offd.RowSize(f) == 0);
+                assert(e_v.RowSize(f) == 0);
+                assert(e_te_v_offd.RowSize(f) == 0);
             }
         }
     }
@@ -237,22 +221,20 @@ std::unique_ptr<mfem::HypreParMatrix> Advection(const mfem::Vector& flux, const 
     diag.Finalize(0);
     offd.Finalize(0);
 
-    mfem::Array<int> elem_starts;
-    GenerateOffsets(comm, num_elems_diag, elem_starts);
+    mfem::Array<int> starts;
+    GenerateOffsets(graph.GetComm(), num_verts, starts);
 
-    int num_elems = elem_starts.Last();
-    auto out = new mfem::HypreParMatrix(comm, num_elems, num_elems, elem_starts,
-                                        elem_starts, &diag, &offd, col_map);
+    auto out = new mfem::HypreParMatrix(graph.GetComm(), e_te_v->N(), e_te_v->N(),
+                                        starts, starts, &diag, &offd, col_map);
 
     // Adjust ownership and copy starts arrays
     out->CopyRowStarts();
     out->CopyColStarts();
     out->SetOwnerFlags(3, 3, 1);
-
     diag.LoseData();
     offd.LoseData();
 
-    return unique_ptr<mfem::HypreParMatrix>(out);
+    return out;
 }
 
 mfem::Vector TwoPhase::Solve(Hierarchy& hierarchy, double delta_t,
@@ -369,7 +351,7 @@ mfem::Vector TwoPhase::Solve(Hierarchy& hierarchy, double delta_t,
 //        }
 //        else
         {
-            Adv = Advection(flux, graph);
+            Adv.reset(Advection(flux, graph));
         }
         adv.UpdateK(*Adv);
 
