@@ -43,23 +43,51 @@ struct EvolveParamenters
     bool is_explicit = true;
 };
 
+mfem::Vector TotalMobility(const mfem::Vector& S);
+mfem::Vector FractionalFlow(const mfem::Vector& S);
+mfem::Vector dFdS(const mfem::Vector& S);
+
 /**
-   This computes dS/dt that solves W dS/dt + K F(S) = b, which is the
-   semi-discrete form of dS/dt + div(vF(S)) = b, where W and K are the mass
+   This computes dS/dt that solves W dS/dt + Adv F(S) = b, which is the
+   semi-discrete form of dS/dt + div(vF(S)) = b, where W and Adv are the mass
    and advection matrices F is a nonlinear function b is the influx source.
  */
 class Transport : public mfem::TimeDependentOperator
 {
     const Graph& graph_;
     unique_ptr<mfem::HypreParMatrix> e_te_v_;
-    unique_ptr<mfem::HypreParMatrix> K_;
+    unique_ptr<mfem::HypreParMatrix> Adv_;
     mfem::Vector W_diag_;
     mfem::Vector b_;
 public:
     Transport(const Graph& graph, const mfem::SparseMatrix& W, const mfem::Vector& b);
-    void UpdateK(const mfem::Vector& flux);
-    // y = W^{-1} (b - K F(x))
+    void UpdateAdvection(const mfem::Vector& flux);
+    MPI_Comm GetComm() const { return graph_.GetComm(); }
+    const mfem::HypreParMatrix& GetAdvection() const { return *Adv_; }
+    const mfem::Vector& GetW() const { return W_diag_; }
+
+    // y = W^{-1} (b - Adv F(x))
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
+
+    // k solves k = W^{-1} (b - Adv F(x + dt * k))
+    virtual void ImplicitSolve(const double dt, const mfem::Vector& x, mfem::Vector& k);
+};
+
+class NLTransportSolver : public NonlinearSolver
+{
+    const Transport& op_;
+    double dt_;
+    mfem::Array<int> ess_dofs_;
+
+    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
+    mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const { return vec; }
+    const mfem::Array<int>& GetEssDofs() const { return ess_dofs_; }
+public:
+    NLTransportSolver(const Transport& op, double dt)
+        : NonlinearSolver(op.GetComm(), op.NumRows(), Newton, "", 1e-6),
+          op_(op), dt_(dt) { }
+
+    void Mult(const mfem::Vector& x, mfem::Vector& Rx);
 };
 
 class TwoPhaseSolver
@@ -74,9 +102,6 @@ public:
                    const EvolveParamenters& param);
     mfem::Vector Solve(const mfem::Vector& initial_guess);
 };
-
-mfem::Vector TotalMobility(const mfem::Vector& S);
-mfem::Vector FractionalFlow(const mfem::Vector& S);
 
 int main(int argc, char* argv[])
 {
@@ -173,11 +198,22 @@ Transport::Transport(const Graph& graph, const mfem::SparseMatrix& W, const mfem
 void Transport::Mult(const mfem::Vector& x, mfem::Vector& y) const
 {
     y = b_;
-    K_->Mult(-1.0, FractionalFlow(x), 1.0, y);
+    Adv_->Mult(-1.0, FractionalFlow(x), 1.0, y);
     InvRescaleVector(W_diag_, y);
 }
 
-void Transport::UpdateK(const mfem::Vector& flux)
+void Transport::ImplicitSolve(const double dt, const mfem::Vector& x, mfem::Vector& k)
+{
+    NLTransportSolver solver(*this, dt);
+    solver.SetPrintLevel(-1);
+    mfem::Vector rhs(x);
+    rhs /= dt;
+    solver.Solve(rhs, k);
+    k /= dt;
+    k -= rhs;
+}
+
+void Transport::UpdateAdvection(const mfem::Vector& flux)
 {
     const mfem::SparseMatrix& e_v = graph_.EdgeToVertex();
     const mfem::SparseMatrix e_te_v_offd = GetOffd(*e_te_v_);
@@ -227,15 +263,49 @@ void Transport::UpdateK(const mfem::Vector& flux)
     HYPRE_Int* col_map = new HYPRE_Int[e_te_v_offd.NumCols()];
     std::copy_n(GetColMap(*e_te_v_), e_te_v_offd.NumCols(), col_map);
 
-    K_.reset(new mfem::HypreParMatrix(graph_.GetComm(), e_te_v_->N(), e_te_v_->N(),
-                                      starts, starts, &diag, &offd, col_map));
+    Adv_.reset(new mfem::HypreParMatrix(graph_.GetComm(), e_te_v_->N(), e_te_v_->N(),
+                                        starts, starts, &diag, &offd, col_map));
 
     // Adjust ownership and copy starts arrays
-    K_->CopyRowStarts();
-    K_->CopyColStarts();
-    K_->SetOwnerFlags(3, 3, 1);
+    Adv_->CopyRowStarts();
+    Adv_->CopyColStarts();
+    Adv_->SetOwnerFlags(3, 3, 1);
     diag.LoseData();
     offd.LoseData();
+}
+
+void NLTransportSolver::Mult(const mfem::Vector& x, mfem::Vector& Rx)
+{
+    mfem::Vector y;
+    op_.Mult(x, y);
+    Rx = x;
+    Rx /= dt_;
+    Rx -= y;
+}
+
+void NLTransportSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+{
+    mfem::Array<int> starts(3);
+    starts[0] = op_.GetAdvection().GetColStarts()[0];
+    starts[1] = op_.GetAdvection().GetColStarts()[1];
+    starts[2] = op_.GetAdvection().GetGlobalNumCols();
+
+    auto A = ParMult(op_.GetAdvection(), SparseDiag(dFdS(sol)), starts);
+    A->InvScaleRows(op_.GetW());
+    GetDiag(*A).Add(1. / dt_, SparseIdentity(rhs.Size()));
+
+    mfem::HypreBoomerAMG solver(*A);
+    solver.SetPrintLevel(-1);
+    mfem::GMRESSolver gmres(op_.GetComm());
+    gmres.SetOperator(*A);
+    gmres.SetPreconditioner(solver);
+    gmres.SetMaxIter(500);
+    gmres.SetRelTol(1e-6);
+
+    mfem::Vector delta_sol(sol.Size());
+    delta_sol = 0.0;
+    gmres.Mult(residual_, delta_sol);
+    sol -= delta_sol;
 }
 
 TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
@@ -278,7 +348,7 @@ mfem::Vector TwoPhaseSolver::Solve(const mfem::Vector& initial_value)
     {
         hierarchy_.RescaleCoefficient(0, TotalMobility(S));
         mfem::BlockVector flow_sol = hierarchy_.Solve(0, p_rhs);
-        transport_->UpdateK(flow_sol.GetBlock(0));
+        transport_->UpdateAdvection(flow_sol.GetBlock(0));
 
         double dt_real = std::min(param_.dt, param_.T - time);
         ode_solver_->Step(S, time, dt_real);
@@ -322,3 +392,17 @@ mfem::Vector FractionalFlow(const mfem::Vector& S)
     }
     return FS;
 }
+
+mfem::Vector dFdS(const mfem::Vector& S)
+{
+    mfem::Vector out(S.Size());
+    for (int i = 0; i < S.Size(); i++)
+    {
+        double S_w = S(i);
+        double S_o = 1.0 - S_w;
+        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+        out(i) = 0.4 * (S_w - S_w * S_w) / (Lam_S * Lam_S);
+    }
+    return out;
+}
+
