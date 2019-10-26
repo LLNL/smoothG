@@ -62,6 +62,7 @@ class Transport : public mfem::TimeDependentOperator
 public:
     Transport(const Graph& graph, const mfem::SparseMatrix& W, const mfem::Vector& b);
     void UpdateAdvection(const mfem::Vector& flux);
+    void UpdateAdvection2(const MixedMatrix& mgL, const mfem::Vector& flux);
     MPI_Comm GetComm() const { return graph_.GetComm(); }
     const mfem::HypreParMatrix& GetAdvection() const { return *Adv_; }
     const mfem::Vector& GetW() const { return W_diag_; }
@@ -122,7 +123,7 @@ int main(int argc, char* argv[])
     args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
-    bool use_metis = true;
+    bool use_metis = false;
     args.AddOption(&use_metis, "-ma", "--metis", "-nm", "--no-metis",
                    "Use Metis for partitioning (instead of geometric).");
     int well_height = 1;
@@ -159,7 +160,7 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     // Setting up finite volume discretization problem
-    TwoPhase problem(perm_file, dim, 5, slice, false, ess_attr,
+    TwoPhase problem(perm_file, dim, 5, slice, use_metis, ess_attr,
                      well_height, inject_rate, bhp);
 
     Hierarchy hierarchy(problem.GetFVGraph(true), upscale_param,
@@ -274,6 +275,43 @@ void Transport::UpdateAdvection(const mfem::Vector& flux)
     offd.LoseData();
 }
 
+void Transport::UpdateAdvection2(const MixedMatrix& mgL, const mfem::Vector& flux)
+{
+    const mfem::SparseMatrix& e_v = graph_.EdgeToVertex();
+    const mfem::SparseMatrix e_te_v_offd = GetOffd(*e_te_v_);
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph_.EdgeToTrueEdge());
+
+    mfem::SparseMatrix upwind(graph_.NumEdges(), graph_.NumVertices());
+
+    for (int i = 0; i < graph_.NumEdges(); ++i)
+    {
+        if (e_v.RowSize(i) == 2) // edge is interior
+        {
+            const int upwind_vert = flux(i) <= 0.0 ? 0 : 1;
+            upwind.Set(i, e_v.GetRowColumns(i)[upwind_vert], -flux(i));
+        }
+        else
+        {
+            assert(e_v.RowSize(i) == 1);
+            const bool edge_is_owned = e_te_diag.RowSize(i);
+
+            if ((flux(i) <= 0.0 && edge_is_owned) || (flux(i) > 0.0 && !edge_is_owned))
+            {
+                upwind.Set(i, e_v.GetRowColumns(i)[0], -flux(i));
+            }
+        }
+    }
+    upwind.Finalize();
+
+    const GraphSpace& space = mgL.GetGraphSpace();
+    unique_ptr<mfem::HypreParMatrix> D(mgL.MakeParallelD(mgL.GetD()));
+    auto U = ParMult(space.TrueEDofToEDof(), upwind, space.VDofStarts());
+
+    Adv_.reset(mfem::ParMult(D.get(), U.get()));
+    Adv_->CopyRowStarts();
+    Adv_->CopyColStarts();
+}
+
 void NLTransportSolver::Mult(const mfem::Vector& x, mfem::Vector& Rx)
 {
     mfem::Vector y;
@@ -348,7 +386,8 @@ mfem::Vector TwoPhaseSolver::Solve(const mfem::Vector& initial_value)
     {
         hierarchy_.RescaleCoefficient(0, TotalMobility(S));
         mfem::BlockVector flow_sol = hierarchy_.Solve(0, p_rhs);
-        transport_->UpdateAdvection(flow_sol.GetBlock(0));
+//        transport_->UpdateAdvection(flow_sol.GetBlock(0));
+        transport_->UpdateAdvection2(hierarchy_.GetMatrix(0), flow_sol.GetBlock(0));
 
         double dt_real = std::min(param_.dt, param_.T - time);
         ode_solver_->Step(S, time, dt_real);
