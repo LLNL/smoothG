@@ -355,7 +355,7 @@ mfem::Vector TwoPhase::AppendWellData(const mfem::Vector& vec, WellType type)
         switch (type)
         {
         case Any: std::copy_n(w.well_indices.data(), size, data); break;
-        case Injector: if (w.type == type) *(data++) = -1.0 * w.value; break;
+        case Injector: if (w.type == type) *(data++) = w.value; break;
         case Producer: std::fill_n(data, size, w.type == type ? w.value : 0.0);
         }
         data += type & Producer ? size : 0;
