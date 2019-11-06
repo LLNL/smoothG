@@ -37,7 +37,7 @@ using namespace smoothg;
 
 struct EvolveParamenters
 {
-    double T = 1.0;    // Total time
+    double total_time = 1.0;    // Total time
     double dt = 1.0;   // Time step size
     int vis_step = 0;
     bool is_explicit = true;
@@ -52,43 +52,49 @@ mfem::Vector dFdS(const mfem::Vector& S);
    semi-discrete form of dS/dt + div(vF(S)) = b, where W and Adv are the mass
    and advection matrices, F is a nonlinear function, b is the influx source.
  */
-class TwoPhaseSolver : public mfem::ODESolver, NonlinearSolver
+class TwoPhaseSolver
 {
     const EvolveParamenters& param_;
     const TwoPhase& problem_;
     Hierarchy& hierarchy_;
 
-    mfem::Vector b_;
-    unique_ptr<mfem::HypreParMatrix> Adv_;
-    mfem::Vector W_diag_;
-    unique_ptr<mfem::HypreParMatrix> e_te_v_;
+    mfem::BlockVector source_;
+    unique_ptr<mfem::HypreParMatrix> Winv_D_;
 
-    double dt_;
-    mfem::Array<int> ess_dofs_;
-    mfem::Array<int> starts_;
-    mfem::GMRESSolver gmres_;
-
-    mfem::Vector dxdt_;
-
-    void UpdateAdvection(const mfem::Vector& flux);
+    mfem::SparseMatrix BuildUpwindFlux(const mfem::Vector& flux) const;
 
     // k = W^{-1} (b - Adv F(x))
-    void ExplicitSolve(const mfem::Vector& x, mfem::Vector& k) const;
+    mfem::Vector ExplicitSolve(const mfem::BlockVector& x) const;
 
-    // k solves k = W^{-1} (b - Adv F(x + dt * k))
-    void ImplicitSolve(const double dt, const mfem::Vector& x, mfem::Vector& k);
+    // k solves k = W^{-1} (b - Adv F(x + dt * k)) at t_{n+1} = t_n + dt
+    mfem::Vector ImplicitSolve(const double dt, const mfem::BlockVector& x);
 
-    // For nonlinear solve
+public:
+    TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
+                   const EvolveParamenters& param);
+
+    void Step(mfem::BlockVector& x, double& t, double& dt);
+    mfem::BlockVector Solve(const mfem::BlockVector& initial_value);
+};
+
+class ImplicitTimeStepSolver : public NonlinearSolver
+{
+    mfem::Array<int> ess_dofs_;
+    double dt_;
+    unique_ptr<mfem::HypreParMatrix> Winv_Adv_;
+    const mfem::Array<int>& starts_;
+    mfem::GMRESSolver gmres_;
+
+    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) override;
     virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
     mfem::Vector AssembleTrueVector(const mfem::Vector& v) const override { return v; }
     const mfem::Array<int>& GetEssDofs() const override { return ess_dofs_; }
 
 public:
-    TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
-                   const EvolveParamenters& param);
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) override;
-    virtual void Step(mfem::Vector& x, double& t, double& dt) override;
-    mfem::Vector Solve(const mfem::Vector& initial_guess);
+    ImplicitTimeStepSolver(const mfem::HypreParMatrix& Winv_Adv,
+                           const mfem::SparseMatrix& U,
+                           const mfem::Array<int>& starts,
+                           const double dt);
 };
 
 int main(int argc, char* argv[])
@@ -120,7 +126,8 @@ int main(int argc, char* argv[])
     double bhp = 175.0;
     args.AddOption(&bhp, "-bhp", "--bottom-hole-pressure", "Bottom Hole Pressure.");
     args.AddOption(&evolve_param.dt, "-dt", "--delta-t", "Time step.");
-    args.AddOption(&evolve_param.T, "-time", "--total-time", "Total time to step.");
+    args.AddOption(&evolve_param.total_time, "-time", "--total-time",
+                   "Total time to step.");
     args.AddOption(&evolve_param.vis_step, "-vs", "--vis-step",
                    "Step size for visualization.");
     args.AddOption(&evolve_param.is_explicit, "-explicit", "--explicit",
@@ -157,19 +164,19 @@ int main(int argc, char* argv[])
     // Fine scale transport based on fine flux
     TwoPhaseSolver solver(problem, hierarchy, evolve_param);
 
-    mfem::Vector initial_value(problem.GetVertexRHS().Size());
+    mfem::BlockVector initial_value(problem.BlockOffsets());
     initial_value = 0.0;
 
     mfem::StopWatch chrono;
     chrono.Start();
-    mfem::Vector S_fine = solver.Solve(initial_value);
+    mfem::BlockVector S_fine = solver.Solve(initial_value);
 
     if (myid == 0)
     {
         std::cout << "Time stepping done in " << chrono.RealTime() << "s.\n";
     }
 
-    double norm = mfem::ParNormlp(S_fine, 2, comm);
+    double norm = mfem::ParNormlp(S_fine.GetBlock(2), 2, comm);
     if (myid == 0) { std::cout<<"|| S || = "<< norm <<"\n"; }
 
     return EXIT_SUCCESS;
@@ -177,24 +184,26 @@ int main(int argc, char* argv[])
 
 TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
                                const EvolveParamenters& param)
-    : NonlinearSolver(hierarchy.GetComm(), hierarchy.GetGraph(0).NumVertices(), Newton, "", 1e-6),
-      param_(param), problem_(problem), hierarchy_(hierarchy),
-      b_(problem.GetVertexRHS()), W_diag_(b_.Size()), starts_(3),
-      gmres_(hierarchy_.GetComm()), dxdt_(b_.Size())
+    : param_(param), problem_(problem), hierarchy_(hierarchy), source_(problem.BlockOffsets())
 {
-    const Graph& graph = hierarchy_.GetGraph(0);
-    const mfem::HypreParMatrix& e_te_e = graph.EdgeToTrueEdgeToEdge();
-    e_te_v_ = ParMult(e_te_e, graph.EdgeToVertex(), graph.VertexStarts());
-    W_diag_ = problem.CellVolume(); // assume W is diagonal
+    auto Winv = SparseIdentity(source_.BlockSize(2));
+    Winv *= 1. / problem.CellVolume(); // assume W is diagonal
 
-    gmres_.SetMaxIter(500);
-    gmres_.SetRelTol(1e-9);
+    const MixedMatrix& system = hierarchy_.GetMatrix(0);
+    const GraphSpace& space = system.GetGraphSpace();
+    unique_ptr<mfem::HypreParMatrix> D(system.MakeParallelD(system.GetD()));
+    auto tmp(ParMult(Winv, *D, space.VDofStarts()));
+    Winv_D_.reset(mfem::ParMult(tmp.get(), &space.TrueEDofToEDof()));
+
+    source_.GetBlock(0) = problem_.GetEdgeRHS();
+    source_.GetBlock(1) = problem_.GetVertexRHS();
+    Winv.Mult(problem_.GetVertexRHS(), source_.GetBlock(2));
 }
 
-void TwoPhaseSolver::UpdateAdvection(const mfem::Vector& flux)
+mfem::SparseMatrix TwoPhaseSolver::BuildUpwindFlux(const mfem::Vector& flux) const
 {
-    const MixedMatrix& mixed_matrix = hierarchy_.GetMatrix(0);
-    const Graph& graph = hierarchy_.GetGraph(0);
+    const GraphSpace& space = hierarchy_.GetMatrix(0).GetGraphSpace();
+    const Graph& graph = space.GetGraph();
     const mfem::SparseMatrix& e_v = graph.EdgeToVertex();
     const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
 
@@ -218,101 +227,74 @@ void TwoPhaseSolver::UpdateAdvection(const mfem::Vector& flux)
             }
         }
     }
-    upwind.Finalize(0);
+    upwind.Finalize(); // TODO: use sparsity pattern of DT and update the values
 
-    // TODO: put this in setup
-    const GraphSpace& space = mixed_matrix.GetGraphSpace();
-    unique_ptr<mfem::HypreParMatrix> D(mixed_matrix.MakeParallelD(mixed_matrix.GetD()));
-    auto U = ParMult(space.TrueEDofToEDof(), upwind, space.VDofStarts());
-
-    Adv_.reset(mfem::ParMult(D.get(), U.get()));
+    return upwind;
 }
 
-void TwoPhaseSolver::ExplicitSolve(const mfem::Vector& x, mfem::Vector& k) const
+mfem::Vector TwoPhaseSolver::ExplicitSolve(const mfem::BlockVector& x) const
 {
-    k = b_;
-    Adv_->Mult(-1.0, FractionalFlow(x), 1.0, k);
-    InvRescaleVector(W_diag_, k);
+    hierarchy_.RescaleCoefficient(0, TotalMobility(x.GetBlock(2)));
+    mfem::BlockVector flow_rhs(source_.GetData(), hierarchy_.BlockOffsets(0));
+    mfem::BlockVector flow_sol = hierarchy_.Solve(0, flow_rhs);
+
+    mfem::Vector dxdt(source_.GetBlock(2));
+    mfem::SparseMatrix U = BuildUpwindFlux(flow_sol.GetBlock(0));
+    mfem::Vector upwind_flux(x.GetBlock(0).Size());
+    upwind_flux = 0.0;
+    U.Mult(FractionalFlow(x.GetBlock(2)), upwind_flux);
+    Winv_D_->Mult(-1.0, upwind_flux, 1.0, dxdt);
+    return dxdt;
 }
 
-void TwoPhaseSolver::ImplicitSolve(const double dt, const mfem::Vector& x, mfem::Vector& k)
+mfem::Vector TwoPhaseSolver::ImplicitSolve(const double dt, const mfem::BlockVector& x)
 {
-    dt_ = dt;
-    NonlinearSolver::SetPrintLevel(-1);
-    mfem::Vector rhs(x);
-    rhs /= dt;
-    NonlinearSolver::Solve(rhs, k);
-    k /= dt;
-    k -= rhs;
+    hierarchy_.RescaleCoefficient(0, TotalMobility(x.GetBlock(2)));
+    mfem::BlockVector flow_rhs(source_.GetData(), hierarchy_.BlockOffsets(0));
+    mfem::BlockVector flow_sol = hierarchy_.Solve(0, flow_rhs);
+
+
+    mfem::SparseMatrix U = BuildUpwindFlux(flow_sol.GetBlock(0));
+    auto& starts = hierarchy_.GetGraph(0).VertexStarts();
+    ImplicitTimeStepSolver implicit_step_solver(*Winv_D_, U, starts, dt);
+    implicit_step_solver.SetPrintLevel(-1);
+
+    mfem::Vector dxdt(x.GetBlock(2));
+    mfem::Vector rhs(source_.GetBlock(2));
+    rhs.Add(1. / dt, x.GetBlock(2));
+    implicit_step_solver.Solve(rhs, dxdt);
+
+    dxdt -= x.GetBlock(2);
+    dxdt /= dt;
+
+    return dxdt;
 }
 
-void TwoPhaseSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+void TwoPhaseSolver::Step(mfem::BlockVector& x, double& t, double& dt)
 {
-    const Graph& graph = hierarchy_.GetGraph(0);
-    auto A = ParMult(*Adv_, SparseDiag(dFdS(sol)), graph.VertexStarts());
-    A->InvScaleRows(W_diag_);
-    GetDiag(*A).Add(1. / dt_, SparseIdentity(rhs.Size()));
-
-    mfem::HypreBoomerAMG solver(*A);
-    solver.SetPrintLevel(-1);
-    gmres_.SetOperator(*A);
-    gmres_.SetPreconditioner(solver);
-
-    mfem::Vector delta_sol(sol.Size());
-    delta_sol = 0.0;
-    gmres_.Mult(residual_, delta_sol);
-    sol -= delta_sol;
-}
-
-void TwoPhaseSolver::Mult(const mfem::Vector& x, mfem::Vector& Rx)
-{
-    mfem::Vector y;
-    ExplicitSolve(x, y);
-    Rx = x;
-    Rx /= dt_;
-    Rx -= y;
-}
-
-void TwoPhaseSolver::Step(mfem::Vector& x, double& t, double& dt)
-{
-    if (param_.is_explicit)
-    {
-        ExplicitSolve(x, dxdt_);
-    }
-    else
-    {
-        ImplicitSolve(dt, x, dxdt_); // solve for k: k = f(x + dt*k, t + dt)
-    }
-    x.Add(dt, dxdt_);
+    x.GetBlock(2).Add(dt, param_.is_explicit ? ExplicitSolve(x) : ImplicitSolve(dt, x));
     t += dt;
 }
 
-mfem::Vector TwoPhaseSolver::Solve(const mfem::Vector& initial_value)
+mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& initial_value)
 {
     int myid;
     MPI_Comm_rank(hierarchy_.GetComm(), &myid);
 
-    mfem::BlockVector p_rhs(hierarchy_.BlockOffsets(0));
-    p_rhs.GetBlock(0) = problem_.GetEdgeRHS();
-    p_rhs.GetBlock(1) = problem_.GetVertexRHS();
-
-    mfem::Vector S = initial_value;
+    mfem::BlockVector x = initial_value;
 
     mfem::socketstream sout;
-    if (param_.vis_step) { problem_.VisSetup(sout, S, 0.0, 1.0, "Fine scale"); }
+    if (param_.vis_step) { problem_.VisSetup(sout, x.GetBlock(2), 0.0, 1.0, "Fine scale"); }
 
     double time = 0.0;
     bool done = false;
     for (int step = 1; !done; step++)
     {
-        hierarchy_.RescaleCoefficient(0, TotalMobility(S));
-        mfem::BlockVector flow_sol = hierarchy_.Solve(0, p_rhs);
-        UpdateAdvection(flow_sol.GetBlock(0));
 
-        double dt_real = std::min(param_.dt, param_.T - time);
-        Step(S, time, dt_real);
+        double dt_real = std::min(param_.dt, param_.total_time - time);
+        Step(x, time, dt_real);
 
-        done = (time >= param_.T - 1e-8 * param_.dt);
+        done = (time >= param_.total_time - 1e-8 * param_.dt);
 
         if (myid == 0)
         {
@@ -320,11 +302,44 @@ mfem::Vector TwoPhaseSolver::Solve(const mfem::Vector& initial_value)
         }
         if (param_.vis_step && (done || step % param_.vis_step == 0))
         {
-            problem_.VisUpdate(sout, S);
+            problem_.VisUpdate(sout, x.GetBlock(2));
         }
     }
 
-    return S;
+    return x;
+}
+
+ImplicitTimeStepSolver::ImplicitTimeStepSolver(const mfem::HypreParMatrix& Winv_D,
+                                               const mfem::SparseMatrix& U,
+                                               const mfem::Array<int>& starts,
+                                               const double dt)
+    : NonlinearSolver(Winv_D.GetComm(), U.NumCols(), Newton, "", 1e-6), dt_(dt),
+      Winv_Adv_(ParMult(Winv_D, U, starts)), starts_(starts), gmres_(Winv_D.GetComm())
+{
+    gmres_.SetMaxIter(500);
+    gmres_.SetRelTol(1e-9);
+}
+
+void ImplicitTimeStepSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+{
+    auto A = ParMult(*Winv_Adv_, SparseDiag(dFdS(sol)), starts_);
+    GetDiag(*A).Add(1.0 / dt_, SparseIdentity(A->NumRows()));
+
+    mfem::HypreBoomerAMG solver(*A);
+    solver.SetPrintLevel(-1);
+    gmres_.SetOperator(*A);
+    gmres_.SetPreconditioner(solver);
+
+    mfem::Vector delta_sol(rhs.Size());
+    delta_sol = 0.0;
+    gmres_.Mult(residual_, delta_sol);
+    sol -= delta_sol;
+}
+
+void ImplicitTimeStepSolver::Mult(const mfem::Vector& x, mfem::Vector& Rx)
+{
+    Rx = x;
+    Winv_Adv_->Mult(1.0, FractionalFlow(x), 1.0 / dt_, Rx);
 }
 
 mfem::Vector TotalMobility(const mfem::Vector& S)

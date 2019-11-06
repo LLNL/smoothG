@@ -482,8 +482,8 @@ void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_e
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat)
 {
     std::set<unsigned> cols;
-    int* mat_j = const_cast<int*>(mat.GetJ());
-    int* end = mat_j + mat.NumNonZeroElems();
+    const int* mat_j = mat.GetJ();
+    const int* end = mat_j + mat.NumNonZeroElems();
     for (; mat_j != end; mat_j++)
     {
         cols.insert(*mat_j);

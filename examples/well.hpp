@@ -94,7 +94,8 @@ int WellManager::NumWells(WellType type) const
 void WellManager::SetDirectionVectors(int dir, int perp_dir1, int perp_dir2)
 {
     dir_vec_ = perp_dir_vec1_ = perp_dir_vec2_ = 0.0;
-    dir_vec_[dir] = perp_dir_vec1_[perp_dir1] = perp_dir_vec2_[perp_dir2] = 1.0;
+    dir_vec_[dim_ == 3 ? dir : 0] = 1.0;
+    perp_dir_vec1_[perp_dir1] = perp_dir_vec2_[perp_dir2] = 1.0;
 }
 
 void WellManager::AddWell(const WellType type,
@@ -206,8 +207,7 @@ public:
              int slice, bool metis_parition, const mfem::Array<int>& ess_attr,
              int well_height, double inject_rate, double bottom_hole_pressure);
 
-    mfem::Vector Solve(Hierarchy& hierarchy, double delta_t,
-                       double total_time, int vis_step);
+    const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
 private:
     // Set up well model (Peaceman's five-spot pattern)
     void SetWells(int well_height, double inject_rate, double bot_hole_pres);
@@ -220,19 +220,25 @@ private:
 
     unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
     WellManager well_manager_;
+    mfem::Array<int> block_offsets_;
 };
 
 TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
                    bool metis_parition, const mfem::Array<int>& ess_attr,
                    int well_height, double inject_rate, double bottom_hole_pressure)
     : SPE10Problem(perm_file, dim, spe10_scale, slice, metis_parition, ess_attr),
-      well_manager_(*pmesh_, *kinv_vector_)
+      well_manager_(*pmesh_, *kinv_vector_), block_offsets_(4)
 {
     rhs_sigma_ = 0.0;
     rhs_u_ = 0.0;
 
     SetWells(well_height, inject_rate, bottom_hole_pressure);
     CombineReservoirAndWellModel();
+
+    block_offsets_[0] = 0;
+    block_offsets_[1] = vertex_edge_.NumCols();
+    block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
+    block_offsets_[3] = block_offsets_[2] + vertex_edge_.NumRows();
 }
 
 void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
