@@ -128,11 +128,6 @@ NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter 
       sol_(num_levels_), help_(num_levels_), residual_norms_(num_levels)
 { }
 
-void NonlinearMG::Mult(const mfem::Vector& x, mfem::Vector& Rx)
-{
-    Mult(0, x, Rx);
-}
-
 void NonlinearMG::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
     rhs_[0].SetDataAndSize(rhs.GetData(), rhs.Size());

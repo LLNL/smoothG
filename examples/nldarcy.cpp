@@ -113,8 +113,6 @@ private:
 
     const mfem::Array<int>& Offsets(int level) const;
 
-    virtual const mfem::Array<int>& GetEssDofs() const { return GetEssDofs(0); }
-
     virtual void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
                               mfem::Vector& x, mfem::Vector& dx)
     {

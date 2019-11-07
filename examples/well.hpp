@@ -423,3 +423,5 @@ void TwoPhase::CombineReservoirAndWellModel()
     producer_attr = 0;                // treat producer as "natural boundary"
     ess_attr_.Append(producer_attr);
 }
+
+

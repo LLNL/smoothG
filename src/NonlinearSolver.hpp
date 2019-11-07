@@ -65,12 +65,11 @@ public:
     ///@}
 protected:
     double ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs);
+    void UpdateLinearSolveTol();
 
     virtual void IterationStep(const mfem::Vector& x, mfem::Vector& y) = 0;
 
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
-
-    void UpdateLinearSolveTol();
 
     virtual const mfem::Array<int>& GetEssDofs() const = 0;
 
@@ -155,13 +154,15 @@ public:
     // the time dependent operators gets updated during solving
     NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param);
 
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
+    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) { Mult(0, x, Rx); }
 protected:
     void FAS_Cycle(int level);
 
     virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
 
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
+
+    virtual const mfem::Array<int>& GetEssDofs() const { return GetEssDofs(0); }
 
     /// Evaluates the action of the operator out = A[level](in)
     virtual void Mult(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
@@ -183,7 +184,6 @@ protected:
 
     virtual void BackTracking(int level, const mfem::Vector &rhs, double prev_resid_norm,
                               mfem::Vector& x, mfem::Vector& dx) = 0;
-
 
     virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec_dof) const = 0;
     virtual const mfem::Array<int>& GetEssDofs(int level) const = 0;
