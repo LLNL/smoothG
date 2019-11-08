@@ -1313,4 +1313,11 @@ double FroNorm(const mfem::SparseMatrix& mat)
     return norm;
 }
 
+mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A)
+{
+    mfem::HypreBoomerAMG* A_prec = new mfem::HypreBoomerAMG(A);
+    A_prec->SetPrintLevel(0);
+    return A_prec;
+}
+
 } // namespace smoothg

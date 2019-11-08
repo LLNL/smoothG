@@ -495,6 +495,8 @@ int NNZ(const mfem::SparseMatrix& mat);
 /// @return Frobenius norm of mat
 double FroNorm(const mfem::SparseMatrix& mat);
 
+mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */
