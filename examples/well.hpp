@@ -277,6 +277,12 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
         double value = (i == num_wells - 1) ? inject_rate : bhp;
         if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
     }
+
+//    for (int i = 0; i < num_wells; ++i)
+//    {
+//        double value = (i == num_wells - 1) ? 1e6 : 1e5;
+//        if (cells[i].size()) { well_manager_.AddWell(Producer, value, cells[i]); }
+//    }
 }
 
 mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edge)

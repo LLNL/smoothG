@@ -46,6 +46,7 @@ struct EvolveParamenters
 };
 
 mfem::Vector TotalMobility(const mfem::Vector& S);
+mfem::Vector dTMinv_dS(const mfem::Vector& S);
 mfem::Vector FractionalFlow(const mfem::Vector& S);
 mfem::Vector dFdS(const mfem::Vector& S);
 
@@ -247,7 +248,7 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
       source_(problem.BlockOffsets()), step_converged_(true)
 {
     auto Winv = SparseIdentity(source_.BlockSize(2));
-    Winv *= 1. / problem.CellVolume(); // assume W is diagonal
+    Winv *= 1. / problem.CellVolume() / 0.3; // assume W is diagonal
 
     const MixedMatrix& system = hierarchy_.GetMatrix(0);
     const GraphSpace& space = system.GetGraphSpace();
@@ -525,7 +526,7 @@ std::vector<mfem::DenseMatrix> CoupledStepSolver::Build_dMdS(const mfem::BlockVe
     mfem::Vector sigma_loc, Msigma_vec;
     mfem::DenseMatrix proj_pwc_loc;
 
-    mfem::Vector dFdS_vec = dFdS(x.GetBlock(2));
+    mfem::Vector dTMinv_dS_vec = dTMinv_dS(x.GetBlock(2));
 
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
@@ -541,7 +542,7 @@ std::vector<mfem::DenseMatrix> CoupledStepSolver::Build_dMdS(const mfem::BlockVe
         proj_pwc_loc.SetSize(1, local_vdofs.Size());
         proj_pwc_loc = 0.0;
         proj_pwc.GetSubMatrix(vert, local_vdofs, proj_pwc_loc);
-        proj_pwc_loc *= dFdS_vec[i];
+        proj_pwc_loc *= dTMinv_dS_vec[i];
 
         out[i].SetSize(local_edofs.Size(), local_vdofs.Size());
         mfem::Mult(Msigma_loc, proj_pwc_loc, out[i]);
@@ -575,38 +576,78 @@ void ImplicitTransportStepSolver::IterationStep(const mfem::Vector& rhs, mfem::V
 mfem::Vector TotalMobility(const mfem::Vector& S)
 {
     mfem::Vector LamS(S.Size());
-    for (int i = 0; i < S.Size(); i++)
-    {
-        double S_w = S(i);
-        double S_o = 1.0 - S_w;
-        LamS(i)  = S_w * S_w + S_o * S_o / 5.0;
-    }
+    LamS = 1000.;
     return LamS;
+}
+
+mfem::Vector dTMinv_dS(const mfem::Vector& S)
+{
+    mfem::Vector out(S.Size());
+    out = 0.0;
+    return out;
 }
 
 mfem::Vector FractionalFlow(const mfem::Vector& S)
 {
-    mfem::Vector FS(S.Size());
-    for (int i = 0; i < S.Size(); i++)
-    {
-        double S_w = S(i);
-        double S_o = 1.0 - S_w;
-        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-        FS(i) = S_w * S_w / Lam_S;
-    }
+    mfem::Vector FS(S);
     return FS;
 }
 
 mfem::Vector dFdS(const mfem::Vector& S)
 {
     mfem::Vector out(S.Size());
-    for (int i = 0; i < S.Size(); i++)
-    {
-        double S_w = S(i);
-        double S_o = 1.0 - S_w;
-        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-        out(i) = 0.4 * (S_w - S_w * S_w) / (Lam_S * Lam_S);
-    }
+    out = 1.0;
     return out;
 }
 
+//mfem::Vector TotalMobility(const mfem::Vector& S)
+//{
+//    mfem::Vector LamS(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        LamS(i)  = S_w * S_w + S_o * S_o / 5.0;
+//    }
+//    return LamS;
+//}
+
+//mfem::Vector dTMinv_dS(const mfem::Vector& S)
+//{
+//    mfem::Vector out(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        out(i)  = 2.0 * (S_w - S_o / 5.0);
+//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+//        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
+//    }
+//    return out;
+//}
+
+//mfem::Vector FractionalFlow(const mfem::Vector& S)
+//{
+//    mfem::Vector FS(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+//        FS(i) = S_w * S_w / Lam_S;
+//    }
+//    return FS;
+//}
+
+//mfem::Vector dFdS(const mfem::Vector& S)
+//{
+//    mfem::Vector out(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+//        out(i) = 0.4 * (S_w - S_w * S_w) / (Lam_S * Lam_S);
+//    }
+//    return out;
+//}
