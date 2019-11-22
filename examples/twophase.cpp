@@ -144,9 +144,6 @@ int main(int argc, char* argv[])
     args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
-    bool use_metis = false;
-    args.AddOption(&use_metis, "-ma", "--metis", "-nm", "--no-metis",
-                   "Use Metis for partitioning (instead of geometric).");
     int well_height = 1;
     args.AddOption(&well_height, "-wh", "--well-height", "Well Height.");
     double inject_rate = 0.3;
@@ -184,11 +181,18 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     // Setting up finite volume discretization problem
+    bool use_metis = true;
     TwoPhase problem(perm_file, dim, 5, slice, use_metis, ess_attr,
                      well_height, inject_rate, bhp);
 
+    mfem::Array<int> part;
+    mfem::Array<int> coarsening_factors(1);
+    coarsening_factors = upscale_param.coarse_factor;
+    problem.Partition(use_metis, coarsening_factors, part);
+    upscale_param.num_iso_verts = problem.NumIsoVerts();
+
     Hierarchy hierarchy(problem.GetFVGraph(true), upscale_param,
-                        nullptr, &problem.EssentialAttribute());
+                        &part, &problem.EssentialAttribute());
     hierarchy.PrintInfo();
 
     // Fine scale transport based on fine flux

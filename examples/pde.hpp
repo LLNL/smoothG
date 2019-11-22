@@ -564,7 +564,7 @@ protected:
         }
         MetisPart(coarsening_factor, partitioning);
     }
-    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
+    virtual void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 
     MPI_Comm comm_;
     int myid_;
@@ -802,7 +802,7 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
 
     iso_vert_count_ = 0;
 //    for (int k = 0; k < num_nat_attr; k++)
-//    if (false)
+    if (false)
     {
         if (myid_ == 0)
         {
@@ -1000,7 +1000,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim, int spe10_s
 //    IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
 //    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
     mfem::Vector constant(dim);
-    constant = 1.0e15;
+    constant = 1.0e10;
     kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
 
 

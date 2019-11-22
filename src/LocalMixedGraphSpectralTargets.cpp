@@ -690,20 +690,20 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
         assert(1 <= num_neighbor_aggs && num_neighbor_aggs <= 2);
         const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
 
-        mfem::DenseMatrix face_sigma_tmp;
+        mfem::DenseMatrix face_sigma;
 
         // restrict local sigmas in ExtAgg_sigma to the coarse face
         if (face_IsShared.RowSize(iface) == 0 && num_neighbor_aggs == 1)
         {
             // Nothing for boundary face because AggExt_sigma is not in boundary
-            face_sigma_tmp.SetSize(num_iface_edofs, 0);
+            face_sigma.SetSize(num_iface_edofs, 0);
         }
         else if (num_iface_edofs > 1)
         {
             int total_vects = 0;
             for (int i = 0; i < num_neighbor_aggs; ++i)
                 total_vects += ExtAgg_sigmaT[neighbor_aggs[i]].Height();
-            face_sigma_tmp.SetSize(total_vects, num_iface_edofs);
+            face_sigma.SetSize(total_vects, num_iface_edofs);
 
             // loop over all neighboring aggregates, collect traces
             // of eigenvectors from both sides into face_sigma
@@ -715,18 +715,18 @@ void LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
 
                 const mfem::DenseMatrix& sigmaT(ExtAgg_sigmaT[agg]);
                 ExtractColumns(sigmaT, ext_loc_edofs, iface_edofs,
-                               col_map_, face_sigma_tmp, start);
+                               col_map_, face_sigma, start);
                 start += sigmaT.Height();
             }
 
-            face_sigma_tmp = mfem::DenseMatrix(face_sigma_tmp, 't');
-            assert(!face_sigma_tmp.CheckFinite());
+            face_sigma = mfem::DenseMatrix(face_sigma, 't');
+            assert(!face_sigma.CheckFinite());
         }
         else // only 1 dof on face
         {
-            face_sigma_tmp.SetSize(num_iface_edofs, 0);
+            face_sigma.SetSize(num_iface_edofs, 0);
         }
-        sec_trace.ReduceSend(iface, face_sigma_tmp);
+        sec_trace.ReduceSend(iface, face_sigma);
     }
     mfem::DenseMatrix** shared_sigma = sec_trace.Collect();
 

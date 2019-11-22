@@ -99,6 +99,7 @@ void SharedEntityCommunication<mfem::SparseMatrix>::CopyData(
     mfem::SparseMatrix& copyto, const mfem::SparseMatrix& copyfrom)
 {
     mfem::SparseMatrix copyto_tmp(copyfrom, true);
+    copyto_tmp.Finalize();
     copyto.Swap(copyto_tmp);
 }
 

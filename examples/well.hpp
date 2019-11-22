@@ -183,6 +183,7 @@ unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
     std::fill_n(col_change + old_start, mat.NumCols(), col_starts[0] - old_start);
 
     mfem::Array<int> col_remap(mat.N());
+    col_remap = 0;
     MPI_Allreduce(col_change, col_remap, mat.N(), HYPRE_MPI_INT, MPI_SUM, comm);
 
     HYPRE_Int* colmap = new HYPRE_Int[offd.NumCols()];
@@ -212,6 +213,7 @@ private:
     // Set up well model (Peaceman's five-spot pattern)
     void SetWells(int well_height, double inject_rate, double bot_hole_pres);
     void CombineReservoirAndWellModel();
+    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 
     mfem::SparseMatrix ExtendVertexEdge(const mfem::SparseMatrix& vert_edge);
     mfem::SparseMatrix ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr);
@@ -430,4 +432,27 @@ void TwoPhase::CombineReservoirAndWellModel()
     ess_attr_.Append(producer_attr);
 }
 
+void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const
+{
+    mfem::SparseMatrix scaled_vert_edge(vertex_edge_);
+    mfem::Vector weight_sqrt(weight_);
+    for (int i = 0; i < weight_.Size(); ++i)
+    {
+        weight_sqrt[i] = std::sqrt(weight_[i]);
+    }
+    scaled_vert_edge.ScaleColumns(weight_sqrt);
+
+    int metis_coarsening_factor = 1;
+    for (const auto factor : coarsening_factor)
+        metis_coarsening_factor *= factor;
+
+    std::vector<std::vector<int>> iso_verts;
+    iso_vert_count_ = well_manager_.NumWells(Injector);
+    for (int i = 0; i < iso_vert_count_; ++i)
+    {
+        iso_verts.push_back(std::vector<int>(1, pmesh_->GetNE() + i));
+    }
+
+    PartitionAAT(scaled_vert_edge, partitioning, metis_coarsening_factor, iso_verts);
+}
 
