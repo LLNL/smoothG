@@ -57,19 +57,21 @@ mfem::Vector dFdS(const mfem::Vector& S);
  */
 class TwoPhaseSolver
 {
+    const int level_;
     const EvolveParamenters& param_;
     const TwoPhase& problem_;
     Hierarchy& hierarchy_;
 
     mfem::BlockVector source_;
     unique_ptr<mfem::HypreParMatrix> Winv_D_;
+    int nonlinear_iter_;
     bool step_converged_;
 
     // update saturation block only
     void TransportStep(const double dt, mfem::BlockVector& x);
 public:
     TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
-                   const EvolveParamenters& param);
+                   const int level, const EvolveParamenters& param);
 
     void Step(const double dt, mfem::BlockVector& x);
     mfem::BlockVector Solve(const mfem::BlockVector& init_val);
@@ -196,7 +198,7 @@ int main(int argc, char* argv[])
     hierarchy.PrintInfo();
 
     // Fine scale transport based on fine flux
-    TwoPhaseSolver solver(problem, hierarchy, evolve_param);
+    TwoPhaseSolver solver(problem, hierarchy, 0, evolve_param);
 
     mfem::BlockVector initial_value(problem.BlockOffsets());
     initial_value = 0.0;
@@ -247,9 +249,9 @@ mfem::SparseMatrix BuildUpwindPattern(const Graph& graph, const mfem::Vector& fl
 }
 
 TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
-                               const EvolveParamenters& param)
-    : param_(param), problem_(problem), hierarchy_(hierarchy),
-      source_(problem.BlockOffsets()), step_converged_(true)
+                               const int level, const EvolveParamenters& param)
+    : level_(level), param_(param), problem_(problem), hierarchy_(hierarchy),
+      source_(problem.BlockOffsets()), nonlinear_iter_(0), step_converged_(true)
 {
     auto Winv = SparseIdentity(source_.BlockSize(2));
     Winv *= 1. / problem.CellVolume() / 0.3; // assume W is diagonal
@@ -307,6 +309,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         }
     }
 
+    if (myid == 0)
+    {
+        std::cout << "Total nonlinear iterations: " << nonlinear_iter_ << "\n";
+    }
+
     return x;
 }
 
@@ -322,6 +329,7 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
         rhs.GetBlock(2).Add(1. / dt, x.GetBlock(2));
         solver.Solve(rhs, x);
         step_converged_ = solver.IsConverged();
+        nonlinear_iter_ += solver.GetNumIterations();
     }
     else // sequential: solve for flux and pressure first, and then saturation
     {
@@ -361,6 +369,7 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
         rhs.Add(1. / dt, x.GetBlock(2));
         solver.Solve(rhs, x.GetBlock(2));
         step_converged_ = solver.IsConverged();
+        nonlinear_iter_ += solver.GetNumIterations();
     }
 }
 
