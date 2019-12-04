@@ -169,13 +169,11 @@ int main(int argc, char* argv[])
 
     LinearPartition partition(graph, num_partitions);
 
-    std::vector<mfem::DenseMatrix> local_edge_traces;
-    std::vector<mfem::DenseMatrix> local_spectral_vertex_targets;
-
     DofAggregate dof_agg(partition.graph_topology_, mgL.GetGraphSpace());
     const Graph& coarse_graph = partition.coarse_graph_;
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    localtargets.Compute(local_edge_traces, local_spectral_vertex_targets);
+    auto local_spectral_vertex_targets = localtargets.ComputeVertexTargets();
+    auto local_edge_traces = localtargets.ComputeEdgeTargets(local_spectral_vertex_targets);
 
     if (local_spectral_vertex_targets.size() != (unsigned int) num_partitions)
         throw std::logic_error(

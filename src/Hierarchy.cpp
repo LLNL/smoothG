@@ -77,11 +77,15 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
-    std::vector<mfem::DenseMatrix> edge_traces;
-    std::vector<mfem::DenseMatrix> vertex_targets;
-
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    localtargets.Compute(edge_traces, vertex_targets);
+    auto vertex_targets = localtargets.ComputeVertexTargets();
+
+    auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
+
+//    for (auto& target : vertex_targets)
+//    {
+//        target.SetSize(target.NumRows(), 1);
+//    }
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 
@@ -115,12 +119,6 @@ void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& 
 {
     assert(level >= 0 && level < NumLevels());
     solvers_[level]->Solve(x, y);
-
-//    if (level)
-//    {
-//    auto tmp = PWConstProject(level, y.GetBlock(1));
-//    y.GetBlock(1) = PWConstInterpolate(level, tmp);
-//    }
 }
 
 mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
@@ -162,11 +160,11 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
 {
     assert(level >= 1 && level < NumLevels());
     Psigma_[level - 1].Mult(x.GetBlock(0), y.GetBlock(0));
-//    Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
-
-    auto tmp = PWConstProject(level, x.GetBlock(1));
-    auto tmp2 = PWConstInterpolate(level, tmp);
-    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
+    Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
+//y.GetBlock(0) = 0.0;
+//    auto tmp = PWConstProject(level, x.GetBlock(1));
+//    auto tmp2 = PWConstInterpolate(level, tmp);
+//    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
 //    y.GetBlock(0) = 0.0;
 }
 

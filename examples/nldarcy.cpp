@@ -214,7 +214,7 @@ int main(int argc, char* argv[])
     mg_param.solve_type = use_newton ? Newton : Picard;
 
     // Setting up finite volume discretization problem
-    double use_metis = false;
+    double use_metis = true;
     std::string problem(problem_name);
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
     ess_attr = 0;
@@ -302,11 +302,11 @@ int main(int argc, char* argv[])
     Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr);
     hierarchy.PrintInfo();
 
-    if (upscale_param.hybridization)
-    {
-        hierarchy.SetRelTol(1e-8);
-        hierarchy.SetAbsTol(1e-15);
-    }
+//    if (upscale_param.hybridization)
+//    {
+//        hierarchy.SetRelTol(1e-12);
+//        hierarchy.SetAbsTol(1e-15);
+//    }
 
     mfem::BlockVector rhs(hierarchy.GetMatrix(0).BlockOffsets());
 //    if (problem != "lognormal")
@@ -325,15 +325,19 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol_nlmg2(rhs);
     sol_nlmg2 = 0.0;
 
-//    EllipticNLMG nlmg(hierarchy, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
-    EllipticNLMG nlmg(hierarchy, Z_fine, mg_param);
+
+    Upscale upscale(std::move(hierarchy));
+    auto& hierarchy_ = upscale.GetHierarchy();
+
+
+    EllipticNLMG nlmg(hierarchy_, Z_fine, mg_param);
     nlmg.SetPrintLevel(1);
     nlmg.SetMaxIter(150);
-//    nlmg.SetRelTol(1e-14);
-//    nlmg.SetAbsTol(1e-8);
-//hierarchy.SetPrintLevel(1);
 
-    std::vector<double> alpha_choices{0.1, 0.4, 1.6, 6.4, 25.6};
+
+//    std::vector<double> alpha_choices{ 1.0, 10., 100., 1000. };
+    std::vector<double> alpha_choices{ 0.1, 0.2, 0.4, 0.8, 1.6 };
+//    std::vector<double> alpha_choices{ 0.1, 0.4, 1.6, 6.4 };
     mfem::Array<double> timings;
     timings.Reserve(alpha_choices.size());
     for (auto& alpha_ : alpha_choices)
@@ -343,91 +347,72 @@ int main(int argc, char* argv[])
         sol_nlmg = 0.0;
         nlmg.Solve(rhs, sol_nlmg);
         timings.Append(nlmg.GetTiming());
+
+//        std::vector<mfem::BlockVector> rhs_;
+//        std::vector<mfem::BlockVector> sol_;
+//        rhs_.reserve(hierarchy_.NumLevels());
+//        sol_.reserve(hierarchy_.NumLevels());
+
+//        rhs_.push_back(rhs);
+//        sol_.emplace_back(hierarchy_.BlockOffsets(0));
+//        for (int i = 0; i < upscale_param.max_levels - 1; ++i)
+//        {
+//            rhs_.emplace_back(hierarchy_.BlockOffsets(i + 1));
+//            sol_.emplace_back(hierarchy_.BlockOffsets(i + 1));
+//            hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
+//            sol_.back() = 0.0;
+//        }
+
+//        for (int l = upscale_param.max_levels - 1; l >= 0; l--)
+//        {
+//            auto solver_l = nlmg.GetLevelSolver(l);
+
+//            if (l == 0)
+//            {
+//                sol_[l] = 0.0;
+//    //            sol_[l].GetBlock(0) = sol_nlmg.GetBlock(0);
+//    //              sol_[l] = hierarchy_.Project(0, sol_nlmg);
+
+//    //            hierarchy_.SetPrintLevel(1);
+//    //            hierarchy_.SetMaxIter(1000);
+//                sol_[l] = hierarchy_.Interpolate(1, sol_[1]);
+//    //            sol_[l].GetBlock(0) = 0.0;
+////                sol_[l].GetBlock(0) = sol_nlmg.GetBlock(0);
+
+//            }
+
+//            solver_l.Solve(rhs_[l], sol_[l]);
+
+//            for (int i = l; i > 0; --i)
+//            {
+//                hierarchy_.Interpolate(i, sol_[i], sol_[i - 1]);
+//            }
+
+//    //        if (l > 0)
+//            {
+//                upscale.ShowErrors(sol_[0], sol_nlmg, 0);
+//    //            sol_[0] -= sol_nlmg;
+//            }
+//    //        else { sol_nlmg = sol_[0]; }
+
+////            if (visualization && l == 0)
+//            {
+//                mfem::socketstream sout;
+//                fv_problem->VisSetup2(sout, sol_[0].GetBlock(0), 0.0, 0.0, "level "+std::to_string(l));
+//                fv_problem->VisSetup(sout, sol_[0].GetBlock(1), 0.0, 4.5, "level "+std::to_string(l));
+//                if (problem == "richard")
+//                    sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
+//            }
+//        }
+
     }
     if (myid == 0) timings.Print(std::cout, timings.Size());
 
-//    auto coarse_rhs = hierarchy.Restrict(0, rhs);
-////    auto coarse_rhs2 = hierarchy.Restrict(1, coarse_rhs);
-
-//    mfem::BlockVector coarse_sol(coarse_rhs);
-//    coarse_sol = 0.0;
-
-//    LevelSolver& level_solver = nlmg.GetLevelSolver(1);
-//    level_solver.SetPrintLevel(1);
-//    level_solver.SetMaxIter(50);
-//    level_solver.Solve(coarse_rhs, coarse_sol);
-
-////    auto coarse_sol = hierarchy.Interpolate(2, coarse_sol2);
-//    sol_nlmg = hierarchy.Interpolate(1, coarse_sol);
-
-//    auto sol_pwc = hierarchy.PWConstProject(1, coarse_sol.GetBlock(1));
-//    hierarchy.GetAggVert(0).MultTranspose(sol_pwc, sol_nlmg.GetBlock(1));
-
-//    sol_nlmg2.GetBlock(1) = sol_nlmg.GetBlock(1);
-
-////    sol_nlmg2 = sol_nlmg;
-//    nlmg.GetLevelSolver(0).SetPrintLevel(1);
-//    nlmg.GetLevelSolver(0).SetMaxIter(20);
-////    hierarchy.SetPrintLevel(1);
-//    nlmg.GetLevelSolver(0).Solve(rhs, sol_nlmg2);
-////sol_nlmg = hierarchy.Interpolate(1, coarse_sol);
-//    Upscale upscale(std::move(hierarchy));
-//    upscale.ShowErrors(sol_nlmg, sol_nlmg2, 0);
-
-//    sol_nlmg2 -= sol_nlmg;
-//    for (int i = 0; i < sol_nlmg2.BlockSize(1); ++i)
-//        sol_nlmg2.GetBlock(1)[i] = std::fabs(sol_nlmg2.GetBlock(1)[i]);
-//    double diff = mfem::ParNormlp(sol_nlmg2.GetBlock(1), 2, comm);
-//    double norm = mfem::ParNormlp(sol_nlmg.GetBlock(1), 2, comm);
-
-//    if (myid ==0)
-//    std::cout<<"|| sol - sol_c || = "<<diff/norm<<"\n";
 
 
 
-//        {
-
-//        auto& pmesh_ = fv_problem->GetMesh();
-//        auto& coeff_gf_ = fv_problem->GetGF();
-
-//            mfem::Array<int> vertices;
-//            for (int i = 0; i < pmesh_.GetNE(); ++i)
-//            {
-//                pmesh_.GetElement(i)->GetVertices(vertices);
-//                mfem::Vector center(3);
-//                center = 0.0;
-//                for (int index = 0; index < 3; ++index)
-//                {
-//                    for (auto& vertex : vertices)
-//                    {
-//                        center[index] += pmesh_.GetVertex(vertex)[index];
-//                    }
-//                    center[index] /= vertices.Size();
-//                }
-//                coeff_gf_[i] = fv_problem->GetCoeff().InvNorm2(center) * std::exp(alpha * std::fabs(sol_nlmg2.GetBlock(1)[i]));
-//            }
-
-//            mfem::socketstream soc;
-//            fv_problem->VisSetup(soc, coeff_gf_, 0., 0., "", 1);
-//    }
-
-//    upscale_param.hybridization = false;
-//    Hierarchy hierarchy2(std::move(graph), upscale_param, &partitioning, &ess_attr);
 
 
-//    EllipticNLMG nlmg2(hierarchy2, Z_fine, V_CYCLE, use_newton ? Newton : Picard, std::move(b));
-//    nlmg2.SetPrintLevel(1);
-//    nlmg2.SetMaxIter(2);
-//    nlmg2.Solve(rhs, sol_nlmg2);
-
-//        sol_nlmg2 -= sol_nlmg;
-////        for (int i = 0; i < sol_nlmg2.BlockSize(1); ++i)
-////            sol_nlmg2.GetBlock(1)[i] = std::fabs(sol_nlmg2.GetBlock(1)[i]);
-//        double diff = mfem::ParNormlp(sol_nlmg2.GetBlock(1), 2, comm);
-//        double norm = mfem::ParNormlp(sol_nlmg.GetBlock(1), 2, comm);
-
-//        if (myid ==0)
-//        std::cout<<"|| sol - sol_c || = "<<diff/norm<<"\n";
 
 
     if (visualization)
@@ -440,8 +425,8 @@ int main(int argc, char* argv[])
         mfem::socketstream sout;
         fv_problem->VisSetup2(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "coarse flux");
         fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "coarse pressure");
-        fv_problem->VisSetup2(sout, sol_nlmg2.GetBlock(0), 0.0, 0.0, "fine flux");
-        fv_problem->VisSetup(sout, sol_nlmg2.GetBlock(1), 0.0, 0.0, "fine pressure");
+//        fv_problem->VisSetup2(sout, sol_nlmg2.GetBlock(0), 0.0, 0.0, "fine flux");
+//        fv_problem->VisSetup(sout, sol_nlmg2.GetBlock(1), 0.0, 0.0, "fine pressure");
         if (problem == "richard")
             sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
     }
@@ -635,25 +620,14 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
 
     print_help++;
 
-    // check percentage change and enforce it to be under 20 percent
+    mfem::BlockVector block_dx(dx.GetData(), offsets_);
+//    mfem::BlockVector block_x(x.GetData(), offsets_);
+//    mfem::BlockVector block_r(residual_.GetData(), offsets_);
+
+    // check percentage change and enforce it to be under certain percent
     if (!interlopate)
     {
-//        double persentage_treshold = .5;
-//        mfem::Vector true_dx = AssembleTrueVector(dx);
-//        mfem::Vector true_x = AssembleTrueVector(x);
-//        true_x += true_dx;
-
-//        double x_norm = mfem::ParNormlp(true_x, 2, comm_);
-//        x_norm = x_norm == 0.0 ? prev_resid_norm : x_norm;
-//        double relative_change = mfem::ParNormlp(true_dx, 2, comm_) / x_norm;
-
-//        std::cout << "  relative_change =  " << relative_change <<"\n";
-//        if (relative_change > persentage_treshold)
-
-        mfem::BlockVector block_dx(dx.GetData(), offsets_);
-
         auto delta_p = hierarchy_.PWConstProject(level_, block_dx.GetBlock(1));
-        delta_p *= -1.;
 
         double max_change_threshold = std::log(diff_tol_);
         double max_pressure_change = AbsMax(delta_p, comm_);
@@ -665,7 +639,7 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
 //            if (myid_ ==0)
 //            {
 //                std::cout << "  Level " << level_ <<":\n";
-////                std::cout << "  \trelative_change =  " << relative_change <<"\n";
+//                std::cout << "  \trelative_change =  " << relative_change <<"\n";
 //                std::cout << "  \tmax_pressure_change =  " << max_pressure_change <<"\n";
 //            }
 
@@ -674,20 +648,32 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
         }
     }
 
-    if (max_num_backtrack_ > 0 && interlopate)
+    if (max_num_backtrack_ > 0)
         resid_norm_ = ResidualNorm(x, rhs);
 
-    while (k < max_num_backtrack_ && interlopate && resid_norm_ > prev_resid_norm)
+    while (k < max_num_backtrack_ && resid_norm_ > prev_resid_norm)
     {
         double backtracking_resid_norm = resid_norm_;
+
+//        double blk1_norm = mfem::ParNormlp(block_r.GetBlock(1), 2, comm_);
+//        if (myid_ == 0)std::cout<<"blk 1 resid norm before = "<<blk1_norm<<"\n";
+
+//        block_dx.GetBlock(1) *= 0.5;
+//        block_x.GetBlock(1) += block_dx.GetBlock(1);
 
         dx *= 0.5;
         x += dx;
 
+
         resid_norm_ = ResidualNorm(x, rhs);
+
+
+//        blk1_norm = mfem::ParNormlp(block_r.GetBlock(1), 2, comm_);
+//        if (myid_ == 0)std::cout<<"blk 1 resid norm after = "<<blk1_norm<<"\n";
 
         if (resid_norm_ > 0.9 * backtracking_resid_norm)
         {
+//            block_x.GetBlock(1) -= block_dx.GetBlock(1);
             x -= dx;
             break;
         }
@@ -831,7 +817,8 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
         {
             solvers_.emplace_back(hierarchy, level, std::move(Z_l), param);
         }
-        solvers_[level].SetPrintLevel(-1);
+        solvers_[level].SetPrintLevel(cycle_ == V_CYCLE ? -1 : 0);
+//        solvers_[level].SetRelTol(level == 0 ? 1e-8 : 1e-4);
 
         const int num_relax = level == 0 ? param.num_relax_fine :
                               (level < num_levels_ - 1 ?

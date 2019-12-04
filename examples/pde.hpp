@@ -291,24 +291,20 @@ double InversePermeabilityCoefficient::InvNorm2(const mfem::Vector& x)
 class GCoefficient : public mfem::Coefficient
 {
 public:
-    GCoefficient(double Lx, double Ly, double Lz,
-                 double Hx, double Hy, double Hz);
+    GCoefficient(double Lx, double Ly, double Hx, double Hy);
     double Eval(mfem::ElementTransformation& T,
                 const mfem::IntegrationPoint& ip);
 private:
-    double Lx_, Ly_, Lz_;
-    double Hx_, Hy_, Hz_;
+    double Lx_, Ly_;
+    double Hx_, Hy_;
 };
 
-GCoefficient::GCoefficient(double Lx, double Ly, double Lz,
-                           double Hx, double Hy, double Hz)
+GCoefficient::GCoefficient(double Lx, double Ly, double Hx, double Hy)
     :
     Lx_(Lx),
     Ly_(Ly),
-    Lz_(Lz),
     Hx_(Hx),
-    Hy_(Hy),
-    Hz_(Hz)
+    Hy_(Hy)
 {
 }
 
@@ -879,7 +875,7 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
 
     iso_vert_count_ = 0;
 //    for (int k = 0; k < num_nat_attr; k++)
-//    if (false)
+    if (false)
     {
         if (myid_ == 0)
         {
@@ -962,6 +958,7 @@ private:
 
         double tmp = std::exp((transip[1] + hy_g / 2) / Ly_g - 0.9); // 4.0 480.
         return std::max(tmp, 1.) * const_mult_;//2500;
+//        return tmp > 1. ? const_mult_ : 0.0;
     }
 
     double const_mult_;
@@ -1081,12 +1078,9 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     coarsening_factor = 10;
     coarsening_factor.Last() = nDimensions == 3 ? 2 : 10;
 
-    int Hx = coarsening_factor[0] * h(0);
-    int Hy = coarsening_factor[1] * h(1);
-    int Hz = 1.0;
-    if (nDimensions == 3)
-        Hz = coarsening_factor[2] * h(2);
-    source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Lz, Hx, Hy, Hz);
+    double Hx = coarsening_factor[0] * h(0);
+    double Hy = coarsening_factor[1] * h(1);
+    source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Hx, Hy);
 
     if (nDimensions == 2)
     {

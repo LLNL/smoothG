@@ -155,7 +155,7 @@ private:
 
     void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr);
 
-    void CheckSharing();
+    std::vector<bool> MakeAveragingIndicators();
 
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const mfem::BlockVector& OriginalRHS,
@@ -187,7 +187,7 @@ private:
 
     mfem::SparseMatrix Agg_multiplier_;
 
-    mfem::Array<int> edgedof_is_shared_;
+    std::vector<bool> edof_needs_averaging_;
 
     std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
