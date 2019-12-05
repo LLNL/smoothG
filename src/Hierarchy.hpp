@@ -176,7 +176,11 @@ public:
 
     void DumpDebug(const std::string& prefix) const;
 
-    const mfem::SparseMatrix& GetAggVert(int level) const { return agg_vert[level]; }
+    const mfem::SparseMatrix& GetAggVert(int level) const { return agg_vert_[level]; }
+    const std::vector<mfem::DenseMatrix>& GetTraces(int level) const
+    {
+        return edge_traces_[level];
+    }
 
 private:
     void Coarsen(int level, const UpscaleParameters& param,
@@ -194,12 +198,13 @@ private:
     std::vector<mfem::SparseMatrix> Psigma_;
     std::vector<mfem::SparseMatrix> Pu_;
     std::vector<mfem::SparseMatrix> Proj_sigma_;
+    std::vector<std::vector<mfem::DenseMatrix>> edge_traces_;
 
     double setup_time_;
 
     const mfem::Array<int>* ess_attr_;
 
-    std::vector<mfem::SparseMatrix > agg_vert;
+    std::vector<mfem::SparseMatrix > agg_vert_;
     UpscaleParameters param_;
 };
 

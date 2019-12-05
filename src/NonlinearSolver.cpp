@@ -51,11 +51,11 @@ double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector
 
 void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    if (max_num_iter_ == 1)
-    {
-        IterationStep(rhs, sol);
-    }
-    else
+//    if (max_num_iter_ == 1)
+//    {
+//        IterationStep(rhs, sol);
+//    }
+//    else
     {
         mfem::StopWatch chrono;
         chrono.Start();
@@ -227,8 +227,11 @@ void NonlinearMG::FAS_Cycle(int level)
             Interpolate(level + 1, coarse_sol, help_[level]);
             sol_[level] -= help_[level];
 
-            BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
-                         sol_[level], help_[level]);
+            if (cycle_ == V_CYCLE)
+            {
+                BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
+                             sol_[level], help_[level]);
+            }
 
 //            {
 //                Mult(level, sol_[level], help_[level]);

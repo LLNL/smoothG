@@ -41,13 +41,21 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     MPI_Comm_rank(comm_, &myid_);
 
+    edge_traces_.reserve(param.max_levels);
+    const int num_edges = mixed_system.GetGraph().NumEdges();
+    edge_traces_.emplace_back(num_edges, mfem::DenseMatrix(1));
+    for (int edge = 0; edge < num_edges; ++edge)
+    {
+        edge_traces_[0][edge] = 1.0;
+    }
+
     mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
     if (ess_attr)
         mixed_systems_.back().SetEssDofs(*ess_attr);
     MakeSolver(0, param);
 
-    agg_vert.reserve(param.max_levels - 1);
+    agg_vert_.reserve(param.max_levels - 1);
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
@@ -73,17 +81,22 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
                          topology.Coarsen(mgL.GetGraph(), level ? 8 : param.coarse_factor,
                                           param.num_iso_verts);
 
-    agg_vert.push_back(topology.Agg_vertex_);
+    agg_vert_.push_back(topology.Agg_vertex_);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
-    std::vector<mfem::DenseMatrix> edge_traces;
-    std::vector<mfem::DenseMatrix> vertex_targets;
-
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    localtargets.Compute(edge_traces, vertex_targets);
+    auto vertex_targets = localtargets.ComputeVertexTargets();
 
-    GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
+    edge_traces_.push_back(localtargets.ComputeEdgeTargets(vertex_targets));
+
+//    for (auto& target : vertex_targets)
+//    {
+//        target.SetSize(target.NumRows(), 1);
+//    }
+
+    GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces_.back(),
+                               vertex_targets, std::move(coarse_graph));
 
     Pu_.push_back(graph_coarsen.BuildPVertices());
     Psigma_.push_back(graph_coarsen.BuildPEdges(param.coarse_components));
@@ -115,12 +128,6 @@ void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& 
 {
     assert(level >= 0 && level < NumLevels());
     solvers_[level]->Solve(x, y);
-
-//    if (level)
-//    {
-//    auto tmp = PWConstProject(level, y.GetBlock(1));
-//    y.GetBlock(1) = PWConstInterpolate(level, tmp);
-//    }
 }
 
 mfem::BlockVector Hierarchy::Solve(int level, const mfem::BlockVector& x) const
@@ -162,11 +169,11 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
 {
     assert(level >= 1 && level < NumLevels());
     Psigma_[level - 1].Mult(x.GetBlock(0), y.GetBlock(0));
-//    Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
-
-    auto tmp = PWConstProject(level, x.GetBlock(1));
-    auto tmp2 = PWConstInterpolate(level, tmp);
-    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
+    Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
+//y.GetBlock(0) = 0.0;
+//    auto tmp = PWConstProject(level, x.GetBlock(1));
+//    auto tmp2 = PWConstInterpolate(level, tmp);
+//    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
 //    y.GetBlock(0) = 0.0;
 }
 
@@ -449,16 +456,16 @@ void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coarse_sol,
         (*f)(fine_sol, coeff);
 
         auto& fine_mbuilder = ((ElementMBuilder&)GetMatrix(level - 1).GetMBuilder());
-        auto agg_Ms = fine_mbuilder.BuildAggM(agg_vert[level - 1], coeff);
+        auto agg_Ms = fine_mbuilder.BuildAggM(agg_vert_[level - 1], coeff);
 
         auto& agg_coarse_edof = GetMatrix(level).GetGraphSpace().VertexToEDof();
-        auto agg_fine_edof = smoothg::Mult(agg_vert[level - 1], fine_mbuilder.GetElemEdgeDofTable());
+        auto agg_fine_edof = smoothg::Mult(agg_vert_[level - 1], fine_mbuilder.GetElemEdgeDofTable());
 
         mfem::Array<int> fine_edofs, coarse_edofs, colmap(Psigma_[level - 1].NumCols());
         colmap = -1;
 
-        std::vector<mfem::DenseMatrix> agg_CMs(agg_vert[level - 1].NumRows());
-        for (int a = 0 ; a < agg_vert[level - 1].NumRows(); ++a)
+        std::vector<mfem::DenseMatrix> agg_CMs(agg_vert_[level - 1].NumRows());
+        for (int a = 0 ; a < agg_vert_[level - 1].NumRows(); ++a)
         {
             GetTableRow(agg_fine_edof, a, fine_edofs);
             GetTableRow(agg_coarse_edof, a, coarse_edofs);

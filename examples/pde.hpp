@@ -291,24 +291,20 @@ double InversePermeabilityCoefficient::InvNorm2(const mfem::Vector& x)
 class GCoefficient : public mfem::Coefficient
 {
 public:
-    GCoefficient(double Lx, double Ly, double Lz,
-                 double Hx, double Hy, double Hz);
+    GCoefficient(double Lx, double Ly, double Hx, double Hy);
     double Eval(mfem::ElementTransformation& T,
                 const mfem::IntegrationPoint& ip);
 private:
-    double Lx_, Ly_, Lz_;
-    double Hx_, Hy_, Hz_;
+    double Lx_, Ly_;
+    double Hx_, Hy_;
 };
 
-GCoefficient::GCoefficient(double Lx, double Ly, double Lz,
-                           double Hx, double Hy, double Hz)
+GCoefficient::GCoefficient(double Lx, double Ly, double Hx, double Hy)
     :
     Lx_(Lx),
     Ly_(Ly),
-    Lz_(Lz),
     Hx_(Hx),
-    Hy_(Hy),
-    Hz_(Hz)
+    Hy_(Hy)
 {
 }
 
@@ -885,6 +881,7 @@ private:
 
         double tmp = std::exp((transip[1] + hy_g / 2) / Ly_g - 0.9); // 4.0 480.
         return std::max(tmp, 1.) * const_mult_;//2500;
+//        return tmp > 1. ? const_mult_ : 0.0;
     }
 
     double const_mult_;
@@ -1000,7 +997,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim, int spe10_s
 //    IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
 //    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
     mfem::Vector constant(dim);
-    constant = 1.0e10;
+    constant = 1.0e5;
     kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
 
 
@@ -1008,10 +1005,9 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim, int spe10_s
     coarsening_factor = 10;
     coarsening_factor.Last() = dim == 3 ? 2 : 10;
 
-    const int Hx = coarsening_factor[0] * h(0);
-    const int Hy = coarsening_factor[1] * h(1);
-    const int Hz = dim == 3 ? coarsening_factor[2] * h(2) : 1.0;
-    source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Lz, Hx, Hy, Hz);
+    const double Hx = coarsening_factor[0] * h(0);
+    const double Hy = coarsening_factor[1] * h(1);
+    source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Hx, Hy);
 
     if (dim == 2)
     {

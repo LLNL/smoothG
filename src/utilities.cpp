@@ -309,9 +309,9 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out, bool p
     assert(error_info.size() >= 3);
 
     picojson::object serialize;
-    serialize["finest-p-error"] = picojson::value(error_info[0]);
-    serialize["finest-u-error"] = picojson::value(error_info[1]);
-    serialize["finest-div-error"] = picojson::value(error_info[2]);
+    serialize["relative-vertex-error"] = picojson::value(error_info[0]);
+    serialize["relative-edge-error"] = picojson::value(error_info[1]);
+    serialize["relative-D-edge-error"] = picojson::value(error_info[2]);
 
     if (error_info.size() > 3)
     {

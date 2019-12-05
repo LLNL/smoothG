@@ -133,8 +133,6 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
-upscale.GetHierarchy().SetMaxIter(1, 1000);
-upscale.GetHierarchy().SetPrintLevel(1);
 
     upscale.PrintInfo();
 
