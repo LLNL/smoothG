@@ -110,6 +110,7 @@ class ImplicitTransportStepSolver : public NonlinearSolver
     mfem::GMRESSolver gmres_;
     unique_ptr<mfem::HypreParMatrix> Winv_Adv_;
     mfem::SparseMatrix dt_inv_;
+    const MixedMatrix& darcy_system_;
     const mfem::Array<int>& starts_;
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) override;
@@ -121,10 +122,12 @@ public:
     ImplicitTransportStepSolver(const mfem::HypreParMatrix& Winv_D,
                                 const mfem::SparseMatrix& upwind,
                                 const mfem::Array<int>& starts,
+                                const MixedMatrix& darcy_system,
                                 const double dt)
         : NonlinearSolver(Winv_D.GetComm(), upwind.NumCols(), Newton, "", 1e-6),
           gmres_(Winv_D.GetComm()), Winv_Adv_(ParMult(Winv_D, upwind, starts)),
-          dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt)), starts_(starts)
+          dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt)),
+          darcy_system_(darcy_system), starts_(starts)
     {
         gmres_.SetMaxIter(200);
         gmres_.SetRelTol(1e-9);
@@ -226,31 +229,42 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
-                                      const std::vector<mfem::DenseMatrix>& edge_traces_,
-                                      const mfem::Vector& flux)
+mfem::Vector ComputeFaceFlux(const GraphSpace& graph_space,
+                             const std::vector<mfem::DenseMatrix>& edge_traces_,
+                             const mfem::Vector& flux)
 {
-    const Graph& graph = graph_space.GetGraph();
-    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
     const mfem::SparseMatrix& edge_edof = graph_space.EdgeToEDof();
-    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
-
-    mfem::SparseMatrix upwind_pattern(graph.NumEdges(), graph.NumVertices());
     mfem::Array<int> local_edofs;
     mfem::Vector local_flux;
+    mfem::Vector out(edge_edof.NumRows());
 
-    for (int i = 0; i < graph.NumEdges(); ++i)
+    for (int i = 0; i < edge_edof.NumRows(); ++i)
     {
         GetTableRow(edge_edof, i, local_edofs);
         flux.GetSubVector(local_edofs, local_flux);
 
-        mfem::Vector finer_flux(edge_traces_[i].NumRows());
-        edge_traces_[i].Mult(local_flux, finer_flux);
-        const double flux_i = finer_flux.Sum();
+        mfem::Vector local_finer_flux(edge_traces_[i].NumRows());
+        edge_traces_[i].Mult(local_flux, local_finer_flux);
+        out[i] = local_finer_flux.Sum();
+    }
 
+    return out;
+}
+
+mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
+                                      const mfem::Vector& flux)
+{
+    const Graph& graph = graph_space.GetGraph();
+    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+
+    mfem::SparseMatrix upwind_pattern(graph.NumEdges(), graph.NumVertices());
+
+    for (int i = 0; i < graph.NumEdges(); ++i)
+    {
         if (edge_vert.RowSize(i) == 2) // edge is interior
         {
-            const int upwind_vert = flux_i > 0.0 ? 0 : 1;
+            const int upwind_vert = flux[i] > 0.0 ? 0 : 1;
             upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[upwind_vert], 1.0);
         }
         else
@@ -258,7 +272,7 @@ mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
             assert(edge_vert.RowSize(i) == 1);
             const bool edge_is_owned = e_te_diag.RowSize(i);
 
-            if ((flux_i > 0.0 && edge_is_owned) || (flux_i <= 0.0 && !edge_is_owned))
+            if ((flux[i] > 0.0 && edge_is_owned) || (flux[i] <= 0.0 && !edge_is_owned))
             {
                 upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[0], 1.0);
             }
@@ -418,10 +432,11 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
 
 void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
 {
-    const GraphSpace& space = hierarchy_.GetMatrix(level_).GetGraphSpace();
+    const MixedMatrix& system = hierarchy_.GetMatrix(level_);
     auto& edge_traces = hierarchy_.GetTraces(level_);
-    auto upwind = BuildUpwindPattern(space, edge_traces, x.GetBlock(0));
-    upwind.ScaleRows(x.GetBlock(0));
+    auto flux = ComputeFaceFlux(system.GetGraphSpace(), edge_traces, x.GetBlock(0));
+    auto upwind = BuildUpwindPattern(system.GetGraphSpace(), flux);
+    upwind.ScaleRows(flux);
 
     if (param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
     {
@@ -437,7 +452,7 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
     else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
     {
         auto& starts = hierarchy_.GetGraph(level_).VertexStarts();
-        ImplicitTransportStepSolver solver(*Winv_D_, upwind, starts, dt);
+        ImplicitTransportStepSolver solver(*Winv_D_, upwind, starts, system, dt);
         solver.SetPrintLevel(-1);
 
         mfem::Vector rhs(source_->GetBlock(2));
@@ -504,8 +519,9 @@ void CoupledStepSolver::Mult(const mfem::Vector& x, mfem::Vector& Rx)
 
     blk_Rx.GetBlock(2) = blk_x.GetBlock(2);
 
-    auto upwind = BuildUpwindPattern(darcy_system_.GetGraphSpace(),
+    auto face_flux = ComputeFaceFlux(darcy_system_.GetGraphSpace(),
                                      edge_traces_, blk_x.GetBlock(0));
+    auto upwind = BuildUpwindPattern(darcy_system_.GetGraphSpace(), face_flux);
     upwind.ScaleRows(blk_x.GetBlock(0));
     auto Winv_Adv = ParMult(Winv_D_, upwind, starts_);
     Winv_Adv->Mult(1.0, FractionalFlow(blk_x.GetBlock(2)), dt_inv_(0,0), blk_Rx.GetBlock(2));
@@ -534,7 +550,8 @@ void CoupledStepSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
     }
     dMdS_proc.Finalize();
 
-    auto upwind_pattern = BuildUpwindPattern(space, edge_traces_, blk_sol.GetBlock(0));
+    auto face_flux = ComputeFaceFlux(space, edge_traces_, blk_sol.GetBlock(0));
+    auto upwind_pattern = BuildUpwindPattern(space, face_flux);
     mfem::Vector pattern_FS(blk_sol.BlockSize(0));
     upwind_pattern.Mult(FractionalFlow(blk_sol.GetBlock(2)), pattern_FS);
 
@@ -654,7 +671,10 @@ void ImplicitTransportStepSolver::Mult(const mfem::Vector& x, mfem::Vector& Rx)
 
 void ImplicitTransportStepSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    auto A = ParMult(*Winv_Adv_, SparseDiag(dFdS(sol)), starts_);
+    mfem::Vector S(Winv_Adv_->NumCols());
+    darcy_system_.GetPWConstProj().Mult(sol, S);
+    auto tmp = ParMult(*Winv_Adv_, SparseDiag(dFdS(S)), starts_);
+    auto A = ParMult(*tmp, darcy_system_.GetPWConstProj(), starts_);
     GetDiag(*A) += dt_inv_;
 
     mfem::HypreBoomerAMG solver(*A);
