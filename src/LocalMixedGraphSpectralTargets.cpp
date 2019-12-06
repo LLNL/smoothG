@@ -532,11 +532,11 @@ mfem::Vector LocalMixedGraphSpectralTargets::MakeOneNegOne(
         v2_sum += constant[i] * constant[i];
     }
 
-    double c2 = 1.0 * (v1_sum / v2_sum);
+    double c2 = -1.0 * (v1_sum / v2_sum);
 
     for (int i = 0; i < split; ++i)
     {
-        vect[i] = -constant[i];
+        vect[i] = constant[i];
     }
 
     for (int i = split; i < size; ++i)

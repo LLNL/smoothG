@@ -90,6 +90,7 @@ Graph::Graph(mfem::SparseMatrix edge_vertex_local,
     }
 
     vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
+    edge_vertex_local_.SortColumnIndices();
 }
 
 Graph::Graph(const Graph& other) noexcept
@@ -144,8 +145,8 @@ void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
         edge_bdratt_.Swap(tmp);
     }
 
-    auto edge_vertex_local_tmp = smoothg::Transpose(vertex_edge_local_);
-    edge_vertex_local_.Swap(edge_vertex_local_tmp);
+    edge_vertex_local_ = smoothg::Transpose(vertex_edge_local_);
+    edge_vertex_local_.SortColumnIndices();
 
     edge_starts_.SetSize(3);
     edge_starts_[0] = edge_trueedge.GetRowStarts()[0];

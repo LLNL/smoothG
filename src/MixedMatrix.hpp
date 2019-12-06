@@ -145,11 +145,6 @@ public:
 private:
     void Init();
 
-    /**
-       Helper routine for the constructors of distributed graph. Note well that
-       vertex_edge is assumed undirected (all ones) when it comes in, and we
-       modify it to have -1, 1 in the resulting D_ matrix.
-    */
     mfem::SparseMatrix ConstructD(const Graph& graph) const;
 
     std::unique_ptr<MBuilder> mbuilder_;

@@ -383,7 +383,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                                                   facefdofs[j], col_map_);
             mfem::SparseMatrix MtransferT = smoothg::Transpose(Mtransfer);
 
-            auto& edge_traces_f = const_cast<mfem::DenseMatrix&>(edge_traces_[face]);
+            auto& edge_traces_f = edge_traces_[face];
             int num_traces = edge_traces_f.Width();
             for (int k = 0; k < num_traces; k++)
             {
@@ -392,7 +392,8 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                 const int row = local_facecdofs[nlocal_traces] = facecdofs[k];
                 const int cdof_loc = num_bubbles_i + nlocal_traces;
                 coarse_m_builder_->RegisterRow(i, row, cdof_loc, bubble_counter);
-                edge_traces_f.GetColumnReference(k, trace);
+                edge_traces_f.GetColumn(k, trace);
+                trace *= -1.0;
                 Dtransfer.Mult(trace, local_rhs_trace1);
                 Mtransfer.Mult(trace, local_rhs_trace0);
 
@@ -404,7 +405,6 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                                  -(local_rhs_trace1 * first_vert_target));
                 }
 
-                // instead of doing local_rhs *= -1, we store -trace later
                 if (num_local_edofs)
                 {
                     orthogonalize_from_vector(local_rhs_trace1, one);
@@ -523,8 +523,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
             for (int k = 0; k < facecdofs.Size(); k++)
             {
                 J[ptr] = facecdofs[k];
-                // since we did not do local_rhs *= -1, we store -trace here
-                data[ptr++] = -edge_traces_i(j, k);
+                data[ptr++] = edge_traces_i(j, k);
             }
         }
 
@@ -699,7 +698,6 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
             DT_one_pi_f_PV -= pi_f;
         }
 
-        one_D *= -1.0;
         Q_edge.AddSubMatrix(face_edofs, face_coarse_edofs, Q_i);
     }
 
