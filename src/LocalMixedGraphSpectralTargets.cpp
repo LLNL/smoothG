@@ -54,7 +54,7 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
             }
     }
 
-    sz = std::min(max_evects_ - 1, sz);
+    sz = std::min((offset == 1 ? max_loc_vdofs_ : max_loc_edofs_) - 1, sz);
     out.SetSize(single_vec.Size(), sz + 1);
     Concatenate(single_vec, vectors, out);
 }
@@ -65,7 +65,8 @@ LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     :
     comm_(mgL.GetGraph().GetComm()),
     rel_tol_(param.spect_tol),
-    max_evects_(param.max_evects),
+    max_loc_vdofs_(param.max_evects),
+    max_loc_edofs_(param.max_traces),
     dual_target_(param.dual_target),
     scaled_dual_(param.scaled_dual),
     energy_dual_(param.energy_dual),
@@ -140,8 +141,8 @@ LocalMixedGraphSpectralTargets::DofPermutation(DofType dof_type)
 class MixedBlockEigensystem
 {
 public:
-    MixedBlockEigensystem(
-        int max_evects, double spec_tol, bool scaled_dual, bool energy_dual);
+    MixedBlockEigensystem(int max_evects, int max_traces, double spec_tol,
+                          bool scaled_dual, bool energy_dual);
 
     /// compute eigenvectors of the matrix DM^{-1}D^T + W
     void ComputeEigenvectors(
@@ -163,7 +164,8 @@ private:
         const mfem::SparseMatrix& D,
         const mfem::Vector& M_diag_inv);
 
-    LocalEigenSolver eigs_;
+    LocalEigenSolver vertex_eigs_;
+    LocalEigenSolver edge_eigs_;
     bool use_w_;
     bool M_is_diag_;
     mfem::SparseMatrix DlocT_;
@@ -191,9 +193,10 @@ void MixedBlockEigensystem::CheckMinimalEigenvalue(
 }
 
 MixedBlockEigensystem::MixedBlockEigensystem(
-    int max_evects, double spec_tol, bool scaled_dual, bool energy_dual)
+    int max_evects, int max_traces, double spec_tol, bool scaled_dual, bool energy_dual)
     :
-    eigs_(max_evects, spec_tol),
+    vertex_eigs_(max_evects, spec_tol),
+    edge_eigs_(max_traces, spec_tol),
     scaled_dual_(scaled_dual),
     energy_dual_(energy_dual),
     zero_eigenvalue_threshold_(1.e-8)
@@ -226,13 +229,13 @@ void MixedBlockEigensystem::ComputeEigenvectors(
         {
             DMinvDt_.Add(-1.0, Wloc);
         }
-        eval_min_ = eigs_.Compute(DMinvDt_, evects);
+        eval_min_ = vertex_eigs_.Compute(DMinvDt_, evects);
     }
     else // general M
     {
         assert(!use_w_); // TODO: consider W in eigensolver
         M_inv_.SetOperator(Mloc);
-        eval_min_ = eigs_.BlockCompute(Mloc, Dloc, evects);
+        eval_min_ = vertex_eigs_.BlockCompute(Mloc, Dloc, evects);
     }
 
     if (!use_w_)
@@ -337,7 +340,7 @@ void MixedBlockEigensystem::ComputeEdgeTraces(mfem::DenseMatrix& evects,
 
         // Collect trace samples from eigenvectors of dual graph Laplacian
         auto EES = BuildEdgeEigenSystem(DMinvDt_, Dloc_ref_, Mloc_diag_inv_);
-        eval_min_ = eigs_.Compute(EES, evects);
+        eval_min_ = edge_eigs_.Compute(EES, evects);
 
         CheckMinimalEigenvalue(eval_min_, "edge");
 
@@ -455,7 +458,10 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
     // ---
     // solve eigenvalue problem on each extended aggregate, our (3.1)
     // ---
-    MixedBlockEigensystem mbe(max_evects_, rel_tol_, scaled_dual_, energy_dual_);
+    const bool edge_eigensystem = (dual_target_ && !use_w && max_loc_edofs_ > 1);
+    const int max_evects = std::max(max_loc_vdofs_, edge_eigensystem ? 1 : max_loc_edofs_);
+
+    MixedBlockEigensystem mbe(max_evects, max_loc_edofs_, rel_tol_, scaled_dual_, energy_dual_);
     for (int agg = 0; agg < num_aggs; ++agg)
     {
         // Extract local dofs for extended aggregates that is shared
@@ -511,8 +517,7 @@ void LocalMixedGraphSpectralTargets::ComputeVertexTargets(
         Orthogonalize(evects_restricted, first_evect, 1, local_vertex_targets[agg]);
 
         // Compute edge trace samples (before restriction and SVD)
-        bool no_edge_eigensystem = (!dual_target_ || use_w || max_evects_ == 1);
-        mbe.ComputeEdgeTraces(evects, !no_edge_eigensystem, ExtAgg_sigmaT[agg]);
+        mbe.ComputeEdgeTraces(evects, edge_eigensystem, ExtAgg_sigmaT[agg]);
     }
 }
 
