@@ -64,6 +64,7 @@ struct SAAMGeParam
    @param spect_tol spectral tolerance determines how many eigenvectors to
           keep per aggregate
    @param max_evects maximum number of eigenvectors to keep per aggregate
+   @param max_traces maximum number of edge traces to keep per coarse face
    @param trace_method methods for getting edge trace samples
    @param hybridization use hybridization as solver
    @param coefficient use coarse coefficient rescaling construction
@@ -77,6 +78,7 @@ public:
     int max_levels;
     double spect_tol;
     int max_evects;
+    int max_traces;
     bool dual_target;
     bool scaled_dual;
     bool energy_dual;
@@ -91,6 +93,7 @@ public:
     UpscaleParameters() : max_levels(2),
         spect_tol(0.001),
         max_evects(4),
+        max_traces(4),
         dual_target(false),
         scaled_dual(false),
         energy_dual(false),
@@ -107,7 +110,9 @@ public:
         args.AddOption(&max_levels, "--max-levels", "--max-levels",
                        "Number of levels in multilevel hierarchy");
         args.AddOption(&max_evects, "-m", "--max-evects",
-                       "Maximum eigenvectors per aggregate.");
+                       "Maximum number of eigenvectors per aggregate.");
+        args.AddOption(&max_traces, "-mt", "--max-traces",
+                       "Maximum number of edge traces per coarse face.");
         args.AddOption(&spect_tol, "-t", "--spect-tol",
                        "Spectral tolerance for eigenvalue problems.");
         args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
@@ -242,7 +247,8 @@ private:
     MPI_Comm comm_;
 
     const double rel_tol_;
-    const int max_evects_;
+    const int max_loc_vdofs_;
+    const int max_loc_edofs_;
     const bool dual_target_;
     const bool scaled_dual_;
     const bool energy_dual_;
