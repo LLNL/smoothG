@@ -43,19 +43,16 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
-    if (ess_attr)
-        mixed_systems_.back().SetEssDofs(*ess_attr);
+    if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
     MakeSolver(0, param);
 
     agg_vert.reserve(param.max_levels - 1);
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
-//        param_.max_evects = param.max_evects + level;
         Coarsen(level, param, level ? nullptr : partitioning);
         MakeSolver(level + 1, param);
-        if (ess_attr)
-            mixed_systems_.back().SetEssDofs(*ess_attr);
+        if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
     }
 
     chrono.Stop();
@@ -102,7 +99,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization && level) // Hybridization solver
+    if (param.hybridization) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,

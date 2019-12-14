@@ -95,14 +95,6 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    SAAMGeParam sa_param;
-    sa_param.num_levels = 2;
-    sa_param.first_coarsen_factor = 64;
-    sa_param.first_theta = 1e-3;
-//    sa_param.do_aggregates = false;
-
-//    upscale_param.saamge_param = &sa_param;
-
     mfem::Array<int> coarsening_factors(nDimensions);
     if (metis_agglomeration)
     {
@@ -111,7 +103,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        coarsening_factors = 20;
+        coarsening_factors = 10;
         coarsening_factors.Last() = nDimensions == 3 ? 2 : 10;
     }
 

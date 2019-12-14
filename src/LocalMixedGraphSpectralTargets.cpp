@@ -856,7 +856,6 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
 
             if (num_iface_edofs == 1)
             {
-                // only 1 dof on face
                 PV_sigma_on_face.SetSize(num_iface_edofs);
                 PV_sigma_on_face = 1.; // should inherit something from contant_rep?
             }
@@ -951,7 +950,9 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
 
                 MinvDT_targets.GetColumn(0, PV_sigma_on_face);
 
-                if (!mgL_.GetEssDofs()[face_edof.GetRowColumns(iface)[0]]) // natural boundary
+                // natural boundary
+                const int first_edof = face_edof.GetRowColumns(iface)[0];
+                if (mgL_.GetEssDofs().Size() == 0 || !mgL_.GetEssDofs()[first_edof])
                 {
                     collected_sigma.CopyMN(MinvDT_targets, num_iface_edofs,
                                            vert_targets.NumCols() - 1, 0 , 1);

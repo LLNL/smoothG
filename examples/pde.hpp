@@ -100,8 +100,8 @@ public:
         InversePermeability(transip, V);
     }
 
-    /// Inverse of Frobenius norm of the inverse permeability
-    double InvNorm2(const mfem::Vector& x);
+    /// Frobenius norm of permeability
+    double FroNorm(const mfem::Vector& x);
 private:
     void ReadPermeabilityFile(const std::string& fileName,
                               const mfem::Array<int>& max_N);
@@ -185,32 +185,16 @@ void InversePermeabilityCoefficient::ReadPermeabilityFile(const std::string& fil
     }
 }
 
-void InversePermeabilityCoefficient::ReadPermeabilityFile(MPI_Comm comm,
-                                                          const std::string& fileName,
-                                                          const mfem::Array<int>& max_N)
+void InversePermeabilityCoefficient::ReadPermeabilityFile(
+        MPI_Comm comm, const std::string& fileName, const mfem::Array<int>& max_N)
 {
     int myid;
     MPI_Comm_rank(comm, &myid);
 
-    mfem::StopWatch chrono;
-
-    chrono.Start();
     if (myid == 0)
         ReadPermeabilityFile(fileName, max_N);
-    chrono.Stop();
 
-//    if (myid == 0)
-//        std::cout << "Permeability file read in " << chrono.RealTime() << ".s \n";
-
-    chrono.Clear();
-
-    chrono.Start();
     MPI_Bcast(inverse_permeability_.data(), 3 * N_all_, MPI_DOUBLE, 0, comm);
-    chrono.Stop();
-
-//    if (myid == 0)
-//        std::cout << "Permeability field distributed in " << chrono.RealTime() << ".s \n";
-
 }
 
 void InversePermeabilityCoefficient::BlankPermeability()
@@ -233,57 +217,50 @@ void InversePermeabilityCoefficient::InversePermeability(const mfem::Vector& x,
             k = (int)floor(x[2] / h_[2] / (1. + 3e-16));
             break;
         case XY:
-//            i = N_[0] - 1 - (int)floor(x[0] / h_[0] / (1. + 3e-16));
             i = (int)floor(x[0] / h_[0] / (1. + 3e-16));
             j = (int)floor(x[1] / h_[1] / (1. + 3e-16));
             k = slice_;
             break;
         case XZ:
-            i = N_[0] - 1 - (int)floor(x[0] / h_[0] / (1. + 3e-16));
+            i = (int)floor(x[0] / h_[0] / (1. + 3e-16));
             j = slice_;
-            k = N_[2] - 1 - (int)floor(x[2] / h_[2] / (1. + 3e-16));
+            k = (int)floor(x[2] / h_[2] / (1. + 3e-16));
             break;
         case YZ:
             i = slice_;
             j = (int)floor(x[1] / h_[1] / (1. + 3e-16));
-            k = N_[2] - 1 - (int)floor(x[2] / h_[2] / (1. + 3e-16));
+            k = (int)floor(x[2] / h_[2] / (1. + 3e-16));
             break;
         default:
             mfem::mfem_error("InversePermeabilityCoefficient::InversePermeability");
     }
 
     const int offset = N_slice_ * k + N_[0] * j + i;
-//    double val_inv;
     for (int l = 0; l < vdim; ++l)
     {
         val[l] = inverse_permeability_[offset + N_all_ * l];
-
-        val[l] *= 1e-3; // viscosoity unit
-
-//        val_inv = 1. / val[l];
-//        double k_min(0.0022715), k_max(2e4);
-//        assert(val_inv > k_min);
-//        val_inv = (val_inv - k_min) / (k_max - k_min) * (1. - 1.e-5) + 1.e-5;
-//        assert(val_inv >= 1.e-6);
-
-//        val[l] = 1. / (val_inv / 1e-3);
-//        val[l] = 1. / (val_inv * 9.869233e-16 / 1e-3);
     }
 }
 
-double InversePermeabilityCoefficient::InvNorm2(const mfem::Vector& x)
+double InversePermeabilityCoefficient::FroNorm(const mfem::Vector& x)
 {
     mfem::Vector val(3);
     InversePermeability(x, val);
-    return 1.0 / val.Norml2();
+
+    for (int i = 0; i < val.Size(); ++i)
+    {
+        val[i] = 1.0 / val[i];
+    }
+
+    return val.Norml2();
 }
 
 /**
    @brief A forcing function that is supposed to very roughly represent some wells
    that are resolved on the *coarse* level.
 
-   The forcing function is 1 on the top-left coarse cell, and -1 on the
-   bottom-right coarse cell, and 0 elsewhere.
+   The forcing function is 1 on the top-right coarse cell, and -1 on the
+   bottom-left coarse cell, and 0 elsewhere.
 
    @param Lx length of entire domain in x direction
    @param Hx size in x direction of a coarse cell.
@@ -316,9 +293,9 @@ double GCoefficient::Eval(mfem::ElementTransformation& T,
 
     T.Transform(ip, transip);
 
-    if ((transip(0) < Hx_) && (transip(1) > (Ly_ - Hy_)))
+    if ((transip(0) > (Lx_ - Hx_)) && (transip(1) > (Ly_ - Hy_)))
         return 1.0;
-    else if ((transip(0) > (Lx_ - Hx_)) && (transip(1) < Hy_))
+    else if ((transip(0) < Hx_) && (transip(1) < Hy_))
         return -1.0;
     return 0.0;
 }
@@ -542,8 +519,6 @@ public:
 
     mfem::GridFunction& GetGF() const { return *coeff_gf_; }
 
-
-
     /// Save mesh with partitioning information (GLVis can separate partitions)
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
 
@@ -562,6 +537,8 @@ public:
     /// Construct partitioning array for vertices
     void Partition(bool metis_parition, const mfem::Array<int>& coarsening_factors,
                    mfem::Array<int>& partitioning) const;
+
+    void CoefficientVisualization();
 
     mfem::Vector GetZVector() const;
 protected:
@@ -868,43 +845,7 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
     for (const auto factor : coarsening_factor)
         metis_coarsening_factor *= factor;
 
-    mfem::Array<int> nat_attr(ess_attr_.Size()), nat_edges_marker, iso_verts_marker;
-
-//    int num_nat_attr = ess_attr_.Size() - const_cast<mfem::Array<int>&>(ess_attr_).Sum();
-    std::vector<std::vector<int>> iso_verts;
-
-    iso_vert_count_ = 0;
-//    for (int k = 0; k < num_nat_attr; k++)
-    if (false)
-    {
-        if (myid_ == 0)
-        {
-            std::cout << "Elements on essential boundary are isolated! \n";
-        }
-        for (int i = 0; i < ess_attr_.Size(); ++i)
-        {
-            nat_attr[i] = 1 - ess_attr_[i];
-        }
-        BooleanMult(edge_bdratt_, nat_attr, nat_edges_marker);
-        BooleanMult(vertex_edge_, nat_edges_marker, iso_verts_marker);
-
-//        std::vector<int>iso_verts_i(iso_verts_marker.Sum());
-//        assert(nat_edges_marker.Sum() - iso_verts_i.size() == 0);
-
-        for (int i = 0; i < iso_verts_marker.Size(); ++i)
-        {
-            if (iso_verts_marker[i])
-            {
-//                iso_verts_i[iso_vert_count_++] = i;
-                iso_vert_count_++;
-                iso_verts.push_back(std::vector<int>(1, i));
-            }
-        }
-//        iso_verts.push_back(iso_verts_i);
-    }
-
-//    iso_vert_count_ = 0;
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor, iso_verts);
+    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
 }
 
 void DarcyProblem::Partition(bool metis_parition,
@@ -942,13 +883,35 @@ mfem::Vector DarcyProblem::GetZVector() const
     return Z_vector;
 }
 
+void DarcyProblem::CoefficientVisualization()
+{
+    mfem::Array<int> vertices;
+    for (int i = 0; i < pmesh_->GetNE(); ++i)
+    {
+        pmesh_->GetElement(i)->GetVertices(vertices);
+        mfem::Vector center(pmesh_->Dimension());
+        center = 0.0;
+        for (int index = 0; index < pmesh_->Dimension(); ++index)
+        {
+            for (auto& vertex : vertices)
+            {
+                center[index] += pmesh_->GetVertex(vertex)[index];
+            }
+            center[index] /= vertices.Size();
+        }
+        (*coeff_gf_)[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).FroNorm(center);
+    }
+
+    mfem::socketstream soc;
+    VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
+}
+
 double hy_g, Ly_g;
 
 class FrancoisCoefficient : public mfem::Coefficient
 {
-public:
-    FrancoisCoefficient(double const_mult) : const_mult_(const_mult) { }
-private:
+    double const_mult_;
+
     virtual double Eval(mfem::ElementTransformation &T,
                         const mfem::IntegrationPoint &ip)
     {
@@ -957,11 +920,10 @@ private:
         T.Transform(ip, transip);
 
         double tmp = std::exp((transip[1] + hy_g / 2) / Ly_g - 0.9); // 4.0 480.
-        return std::max(tmp, 1.) * const_mult_;//2500;
-//        return tmp > 1. ? const_mult_ : 0.0;
+        return std::max(tmp, 1.) * const_mult_;
     }
-
-    double const_mult_;
+public:
+    FrancoisCoefficient(double const_mult) : const_mult_(const_mult) { }
 };
 
 /**
@@ -1007,39 +969,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
 {
     SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice);
 
-//    if (myid_ == 0)
-//    {
-//        std::cout << pmesh_->GetNEdges() << " fine edges, "
-//                  << pmesh_->GetNFaces() << " fine faces, "
-//                  << pmesh_->GetNE() << " fine elements\n";
-//    }
-
     InitGraph();
-
-    // coeff visual
-//    {
-//        mfem::Array<int> vertices;
-//        for (int i = 0; i < pmesh_->GetNE(); ++i)
-//        {
-//            pmesh_->GetElement(i)->GetVertices(vertices);
-//            mfem::Vector center(nDimensions);
-//            center = 0.0;
-//            for (int index = 0; index < nDimensions; ++index)
-//            {
-//                for (auto& vertex : vertices)
-//                {
-//                    center[index] += pmesh_->GetVertex(vertex)[index];
-//                }
-//                center[index] /= vertices.Size();
-//            }
-//            (*coeff_gf_)[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).InvNorm2(center)*std::sqrt(2.);
-//        }
-
-//        mfem::socketstream soc;
-//        VisSetup(soc, *coeff_gf_, 0., 0., "", 1);
-//        std::cout<<"max min = "<<coeff_gf_->Max()<<" "<<coeff_gf_->Min()<<"\n";
-//    }
-
 
     ComputeGraphWeight(unit_weight);
     MakeRHS();
@@ -1059,9 +989,9 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
 
     // SPE10 grid cell sizes
     mfem::Vector h(3);
-    h(0) = 365.76 / 60.; // 20.0;
-    h(1) = 670.56 / 220.; // 10.0;
-    h(2) = 51.816 / 85.; // 2.0;
+    h(0) = 20.0; // 365.76 / 60. in meters
+    h(1) = 10.0; // 670.56 / 220. in meters
+    h(2) = 2.0; // 51.816 / 85. in meters
 
     const int Lx = N_[0] * h(0);
     const int Ly = N_[1] * h(1);
@@ -1132,43 +1062,6 @@ void SPE10Problem::CartPart(const mfem::Array<int>& coarsening_factor,
     partitioning.MakeDataOwner();
 
     iso_vert_count_ = 0;
-//    return;
-    // isolate essential boundary
-    if (myid_ == 0)
-    {
-        std::cout << "Elements on essential boundary is isolated! \n";
-    }
-    std::vector<std::vector<int>> iso_verts;
-
-    mfem::Array<int> nat_attr(ess_attr_.Size()), nat_edges_marker, iso_verts_marker;
-
-    {
-        for (int i = 0; i < ess_attr_.Size(); ++i)
-        {
-            nat_attr[i] = 1 - ess_attr_[i];
-        }
-        BooleanMult(edge_bdratt_, nat_attr, nat_edges_marker);
-        BooleanMult(vertex_edge_, nat_edges_marker, iso_verts_marker);
-
-        for (int i = 0; i < iso_verts_marker.Size(); ++i)
-        {
-            if (iso_verts_marker[i])
-            {
-                iso_vert_count_++;
-                iso_verts.push_back(std::vector<int>(1, i));
-            }
-        }
-    }
-
-    int num_partitions = partitioning.Max() + 1;
-    for (auto& partition : iso_verts)
-    {
-        for (auto vertex : partition)
-        {
-            partitioning[vertex] = num_partitions;
-        }
-        num_partitions++;
-    }
 }
 
 void SPE10Problem::MakeRHS()
@@ -1182,43 +1075,43 @@ void SPE10Problem::MakeRHS()
         q.Assemble();
         rhs_u_ = q;
     }
-    else
+    else if (ess_attr_.Size() - ess_attr_.Sum() == 2) // Dirichlet on two sides
     {
-//        mfem::Array<int> nat_one(ess_attr_.Size());
-//        nat_one = 0;
-//        nat_one[pmesh_->Dimension() - 2] = 1;
+        mfem::Array<int> nat_one(ess_attr_.Size());
+        nat_one = 0;
+        nat_one[pmesh_->Dimension() - 2] = 1;
 
-//        mfem::ConstantCoefficient one(1.0);
-//        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
+        mfem::ConstantCoefficient one(1.0);
+        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
 
         mfem::LinearForm g(sigma_fes_.get());
-//        g.AddBoundaryIntegrator(
-//            new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
+        g.AddBoundaryIntegrator(
+                    new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
 
-//        mfem::Array<int> nat_negative_one(ess_attr_.Size());
-//        nat_negative_one = 0;
-//        nat_negative_one[pmesh_->Dimension() == 2 ? 2 : 3] = 1;
+        mfem::Array<int> nat_negative_one(ess_attr_.Size());
+        nat_negative_one = 0;
+        nat_negative_one[pmesh_->Dimension() == 2 ? 2 : 3] = 1;
 
-//        mfem::ConstantCoefficient negative_one(1.0);
-//        mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
-//        g.AddBoundaryIntegrator(
-//            new mfem::VectorFEBoundaryFluxLFIntegrator(poutflow_coeff));
-
+        mfem::ConstantCoefficient negative_one(1.0);
+        mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
+        g.AddBoundaryIntegrator(
+                    new mfem::VectorFEBoundaryFluxLFIntegrator(poutflow_coeff));
         g.Assemble();
         rhs_sigma_ = g;
 
         rhs_u_ = 0.0;
+    }
+    else
+    {
+        mfem::LinearForm g(sigma_fes_.get());
+        g.Assemble();
+        rhs_sigma_ = g;
 
-        double rhs_mult = -0.000025;
-        if (myid_ == 0)
-        {
-            std::cout << "\nRHS multiplier = " << rhs_mult << "\n";
-        }
+        const double rhs_mult = -0.000025;
         FrancoisCoefficient source_coeff(rhs_mult);
         mfem::LinearForm f(u_fes_.get());
         f.AddDomainIntegrator(new mfem::DomainLFIntegrator(source_coeff));
         f.Assemble();
-
         rhs_u_ = f;
     }
 }

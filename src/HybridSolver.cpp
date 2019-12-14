@@ -285,7 +285,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         Mloc_solver.SetOperator(M_el[iAgg]);
         Mloc_solver.GetInverseMatrix(Minv_ref_[iAgg]);
-//        Minv_ref_[iAgg].Symmetrize();
 
         mfem::DenseMatrix& MinvCT_i(MinvCT_[iAgg]);
         mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
@@ -302,7 +301,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         // Compute CMinvCT = Cloc * MinvCT
         Hybrid_el_[iAgg] = smoothg::Mult(C_[iAgg], MinvCT_i);
-//        Hybrid_el_[iAgg].Symmetrize();
 
         // Compute Aloc = DMinvDT = Dloc * MinvDT
         Aloc = smoothg::Mult(Dloc, MinvDT_i);
@@ -321,7 +319,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         // Compute the LU factorization of Aloc and Ainv_ * DMinvCT
         Aloc_solver.SetOperator(Aloc);
         Aloc_solver.GetInverseMatrix(Ainv_i);
-//        Ainv_i.Symmetrize();
         mfem::Mult(Ainv_i, DMinvCT, AinvDMinvCT_i);
 
         // Compute CMinvDTAinvDMinvCT = CMinvDT * AinvDMinvCT_
@@ -331,7 +328,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         if (CMinvDT.Height() > 0 && CMinvDT.Width() > 0)
         {
             mfem::Mult(CMinvDT, AinvDMinvCT_i, CMDADMC);
-//            CMDADMC.Symmetrize();
         }
         else
         {
@@ -340,7 +336,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         // Hybrid_el_ = CMinvCT - CMinvDTAinvDMinvCT
         Hybrid_el_[iAgg] -= CMDADMC;
-//        Hybrid_el_[iAgg].Symmetrize();
 
         // Add contribution of the element matrix to the global system
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, Hybrid_el_[iAgg]);

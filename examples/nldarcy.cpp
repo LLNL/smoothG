@@ -347,73 +347,8 @@ int main(int argc, char* argv[])
         sol_nlmg = 0.0;
         nlmg.Solve(rhs, sol_nlmg);
         timings.Append(nlmg.GetTiming());
-
-//        std::vector<mfem::BlockVector> rhs_;
-//        std::vector<mfem::BlockVector> sol_;
-//        rhs_.reserve(hierarchy_.NumLevels());
-//        sol_.reserve(hierarchy_.NumLevels());
-
-//        rhs_.push_back(rhs);
-//        sol_.emplace_back(hierarchy_.BlockOffsets(0));
-//        for (int i = 0; i < upscale_param.max_levels - 1; ++i)
-//        {
-//            rhs_.emplace_back(hierarchy_.BlockOffsets(i + 1));
-//            sol_.emplace_back(hierarchy_.BlockOffsets(i + 1));
-//            hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
-//            sol_.back() = 0.0;
-//        }
-
-//        for (int l = upscale_param.max_levels - 1; l >= 0; l--)
-//        {
-//            auto solver_l = nlmg.GetLevelSolver(l);
-
-//            if (l == 0)
-//            {
-//                sol_[l] = 0.0;
-//    //            sol_[l].GetBlock(0) = sol_nlmg.GetBlock(0);
-//    //              sol_[l] = hierarchy_.Project(0, sol_nlmg);
-
-//    //            hierarchy_.SetPrintLevel(1);
-//    //            hierarchy_.SetMaxIter(1000);
-//                sol_[l] = hierarchy_.Interpolate(1, sol_[1]);
-//    //            sol_[l].GetBlock(0) = 0.0;
-////                sol_[l].GetBlock(0) = sol_nlmg.GetBlock(0);
-
-//            }
-
-//            solver_l.Solve(rhs_[l], sol_[l]);
-
-//            for (int i = l; i > 0; --i)
-//            {
-//                hierarchy_.Interpolate(i, sol_[i], sol_[i - 1]);
-//            }
-
-//    //        if (l > 0)
-//            {
-//                upscale.ShowErrors(sol_[0], sol_nlmg, 0);
-//    //            sol_[0] -= sol_nlmg;
-//            }
-//    //        else { sol_nlmg = sol_[0]; }
-
-////            if (visualization && l == 0)
-//            {
-//                mfem::socketstream sout;
-//                fv_problem->VisSetup2(sout, sol_[0].GetBlock(0), 0.0, 0.0, "level "+std::to_string(l));
-//                fv_problem->VisSetup(sout, sol_[0].GetBlock(1), 0.0, 4.5, "level "+std::to_string(l));
-//                if (problem == "richard")
-//                    sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
-//            }
-//        }
-
     }
     if (myid == 0) timings.Print(std::cout, timings.Size());
-
-
-
-
-
-
-
 
     if (visualization)
     {
@@ -438,7 +373,7 @@ int main(int argc, char* argv[])
 LevelSolver::LevelSolver(Hierarchy& hierarchy, int level,
                          mfem::Vector Z_vector, NLMGParameter param)
     : NonlinearSolver(hierarchy.GetComm(), hierarchy.BlockOffsets(level)[2],
-                      param.solve_type, param.solve_type? "Picard" : "Newton",
+                      param.solve_type, param.solve_type ? "Picard" : "Newton",
                       param.initial_linear_tol),
       level_(level), hierarchy_(hierarchy), offsets_(hierarchy_.BlockOffsets(level)),
       p_(hierarchy_.NumVertices(level)), kp_(p_.Size()), dkinv_dp_(p_.Size()),

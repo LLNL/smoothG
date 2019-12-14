@@ -30,9 +30,11 @@
 
 using namespace smoothg;
 
+mfem::SparseMatrix MakeWeightedAdjacency(const Graph& graph);
+
 void ShowAggregates(const std::vector<Graph>& graphs,
                     const std::vector<GraphTopology>& topos,
-                    mfem::ParMesh* pmesh);
+                    const mfem::ParMesh& mesh);
 
 int main(int argc, char* argv[])
 {
@@ -45,12 +47,16 @@ int main(int argc, char* argv[])
 
     // program options from command line
     mfem::OptionsParser args(argc, argv);
-    int nDimensions = 2;
-    args.AddOption(&nDimensions, "-d", "--dim",
-                   "Dimension of the physical space.");
-    bool visualization = true;
-    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
-                   "--no-visualization", "Enable visualization.");
+    int dim = 2;
+    int num_levels = 4;
+    int coarsening_factor = dim == 2 ? 8 : 32;
+    bool use_weight = false;
+    args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
+    args.AddOption(&num_levels, "-nl", "--num-levels", "Number of levels.");
+    args.AddOption(&coarsening_factor, "-coarse-factor", "--coarse-factor",
+                   "Coarsening factor.");
+    args.AddOption(&use_weight, "-weight", "--weight", "-no-weight",
+                   "--no-weight", "Use edge weight when generating partition.");
     args.Parse();
     if (!args.Good())
     {
@@ -66,70 +72,59 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    constexpr auto num_levels = 2;
-     int coarsening_factor = nDimensions == 2 ? 8 : 32;
-    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
+    mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
 
-    // Setting up a mesh (2D or 3D SPE10 model)
-    std::unique_ptr<mfem::ParMesh> pmesh;
-    if (nDimensions == 3)
-    {
-        mfem::Mesh mesh(60, 220, 85, mfem::Element::HEXAHEDRON, 1, 1200, 2200, 170);
-        pmesh = make_unique<mfem::ParMesh>(comm, mesh);
-    }
-    else
-    {
-        mfem::Mesh mesh(60, 220, mfem::Element::QUADRILATERAL, 1, 1200, 2200);
-        pmesh = make_unique<mfem::ParMesh>(comm, mesh);
-    }
-
-    // Construct a graph from a finite volume problem defined on the mesh
-    ess_attr = 1;
-    SPE10Problem spe10problem("spe_perm.dat", 3, 5, 0, 1, ess_attr);
-
-    // Build multilevel graph topology
     std::vector<GraphTopology> topologies(num_levels - 1);
-
     std::vector<Graph> graphs;
     graphs.reserve(num_levels);
+
+    // Construct a weighted graph from a finite volume problem defined on a mesh
+    SPE10Problem spe10problem("spe_perm.dat", dim, 5, 0, 1, ess_attr);
     graphs.push_back(spe10problem.GetFVGraph());
 
-    MixedMatrix mm(graphs[0]);
-    mm.BuildM();
-    mfem::SparseMatrix M = mm.GetM();
-    mfem::SparseMatrix v_e = graphs[0].VertexToEdge();
+    // Build multilevel graph topology
+    mfem::SparseMatrix weighted_adjacency = MakeWeightedAdjacency(graphs[0]);
+    int num_parts = weighted_adjacency.NumRows() / (double)(coarsening_factor);
 
-    for (int i = 0; i < num_levels - 1; i++)
+    // Use edge weight to form partition if use_weight == true
+    mfem::Array<int> partition;
+    Partition(weighted_adjacency, partition, std::max(1, num_parts), use_weight);
+    graphs.push_back(topologies[0].Coarsen(graphs[0], partition));
+
+    for (int i = 1; i < num_levels - 1; i++)
     {
-        mfem::Vector w(M.NumRows());
-for (int j = 0; j < M.NumRows(); j++)
-{
-    w[j] = 1./std::sqrt(M(j,j));
-}
-coarsening_factor = 32;
-v_e.ScaleRows(w);
-mfem::Array<int> partitioning;
-PartitionAAT(v_e,partitioning,coarsening_factor);
-
-        graphs.push_back(topologies[i].Coarsen(graphs[i], partitioning));
+        graphs.push_back(topologies[i].Coarsen(graphs[i], coarsening_factor));
     }
 
-    // Visualize aggregates in all levels
-    if (visualization)
-    {
-        ShowAggregates(graphs, topologies, pmesh.get());
-    }
+    ShowAggregates(graphs, topologies, spe10problem.GetMesh());
 
     return EXIT_SUCCESS;
 }
 
+mfem::SparseMatrix MakeWeightedAdjacency(const Graph& graph)
+{
+    MixedMatrix mixed_system(graph);
+    mixed_system.BuildM();
+    mfem::Vector M_diag(mixed_system.GetM().GetData(), mixed_system.NumEDofs());
+    mfem::Vector w(M_diag.Size());
+    for (int j = 0; j < M_diag.Size(); j++)
+    {
+        w[j] = 1.0 / std::sqrt(M_diag[j]);
+    }
+
+    mfem::SparseMatrix e_v = smoothg::Transpose(graph.VertexToEdge());
+    e_v.ScaleRows(w);
+    mfem::SparseMatrix v_e = smoothg::Transpose(e_v);
+    return smoothg::Mult(v_e, e_v);
+}
+
 void ShowAggregates(const std::vector<Graph>& graphs,
                     const std::vector<GraphTopology>& topos,
-                    mfem::ParMesh* pmesh)
+                    const mfem::ParMesh& mesh)
 {
-    mfem::L2_FECollection attr_fec(0, pmesh->SpaceDimension());
-    mfem::ParFiniteElementSpace attr_fespace(pmesh, &attr_fec);
-    mfem::ParGridFunction attr(&attr_fespace);
+    mfem::L2_FECollection fec(0, mesh.SpaceDimension());
+    mfem::ParFiniteElementSpace fespace(const_cast<mfem::ParMesh*>(&mesh), &fec);
+    mfem::ParGridFunction attr(&fespace);
 
     mfem::socketstream sol_sock;
     for (unsigned int i = 0; i < topos.size(); i++)
@@ -148,11 +143,11 @@ void ShowAggregates(const std::vector<Graph>& graphs,
         mfem::SparseMatrix Agg_Agg = AAt(graphs[i + 1].VertexToEdge());
         mfem::Array<int> colors;
         GetElementColoring(colors, Agg_Agg);
-        const int num_colors = std::max(colors.Max() + 1, pmesh->GetNRanks());
+        const int num_colors = std::max(colors.Max() + 1, mesh.GetNRanks());
 
         for (int j = 0; j < vertex_Agg.Height(); j++)
         {
-            attr(j) = (colors[partitioning[j]] + pmesh->GetMyRank()) % num_colors;
+            attr(j) = (colors[partitioning[j]] + mesh.GetMyRank()) % num_colors;
         }
 
         char vishost[] = "localhost";
@@ -161,8 +156,8 @@ void ShowAggregates(const std::vector<Graph>& graphs,
         if (sol_sock.is_open())
         {
             sol_sock.precision(8);
-            sol_sock << "parallel " << pmesh->GetNRanks() << " " << pmesh->GetMyRank() << "\n";
-            if (pmesh->SpaceDimension() == 2)
+            sol_sock << "parallel " << mesh.GetNRanks() << " " << mesh.GetMyRank() << "\n";
+            if (mesh.SpaceDimension() == 2)
             {
                 sol_sock << "fem2d_gf_data_keys\n";
             }
@@ -171,12 +166,12 @@ void ShowAggregates(const std::vector<Graph>& graphs,
                 sol_sock << "fem3d_gf_data_keys\n";
             }
 
-            pmesh->PrintWithPartitioning(partitioning, sol_sock, 0);
+            mesh.PrintWithPartitioning(partitioning, sol_sock, 0);
             attr.Save(sol_sock);
 
             sol_sock << "window_size 500 800\n";
             sol_sock << "window_title 'Level " << i + 1 << " aggregation'\n";
-            if (pmesh->SpaceDimension() == 2)
+            if (mesh.SpaceDimension() == 2)
             {
                 sol_sock << "view 0 0\n"; // view from top
                 sol_sock << "keys jl\n";  // turn off perspective and light
@@ -187,7 +182,7 @@ void ShowAggregates(const std::vector<Graph>& graphs,
             {
                 sol_sock << "keys ]]]]]]]]]]]]]\n";  // increase size
             }
-            MPI_Barrier(pmesh->GetComm());
+            MPI_Barrier(mesh.GetComm());
         }
     }
 }

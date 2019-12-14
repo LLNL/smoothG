@@ -165,8 +165,6 @@ int main(int argc, char* argv[])
     auto& Psigma = hierarchy.GetPsigma(0);
     unique_ptr<mfem::SparseMatrix> coarse_M2(mfem::RAP(Psigma, fine_M2, Psigma));
 
-
-
     auto elem_scale_coarse = hierarchy.Project(0, elem_scale);
     auto projected_elem_scale = hierarchy.Interpolate(1, elem_scale_coarse);
 
@@ -178,7 +176,6 @@ int main(int argc, char* argv[])
     // Assembled rescaled fine and coarse M through direct assembling and RAP (non-const coeff)
     auto fine_M4 = RescaledFineM(sigmafespace, elem_scale, projected_elem_scale);
     unique_ptr<mfem::SparseMatrix> coarse_M4(mfem::RAP(Psigma, fine_M4, Psigma));
-
 
     // Check relative differences measured in Frobenius norm
     bool fine_rescale_fail = (RelativeDiff(comm, fine_M1, fine_M2) > 1e-14);
