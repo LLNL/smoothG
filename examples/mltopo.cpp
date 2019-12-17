@@ -51,12 +51,15 @@ int main(int argc, char* argv[])
     int num_levels = 4;
     int coarsening_factor = dim == 2 ? 8 : 32;
     bool use_weight = false;
+    bool visualization = true;
     args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
     args.AddOption(&num_levels, "-nl", "--num-levels", "Number of levels.");
     args.AddOption(&coarsening_factor, "-coarse-factor", "--coarse-factor",
                    "Coarsening factor.");
     args.AddOption(&use_weight, "-weight", "--weight", "-no-weight",
                    "--no-weight", "Use edge weight when generating partition.");
+    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
+                   "--no-visualization", "Enable visualization.");
     args.Parse();
     if (!args.Good())
     {

@@ -153,6 +153,7 @@ def make_tests():
           "--max-evects", "1",
           "--max-traces", "1",
           "--metis-agglomeration",
+          "--coarse-factor", "100",
           "--perm", spe10_perm_file],
          {"relative-D-edge-error": 0.5640399150429396,
           "relative-vertex-error": 0.17385749780334459,
@@ -166,6 +167,7 @@ def make_tests():
           "--max-evects", "1",
           "--max-traces", "1",
           "--metis-agglomeration",
+          "--coarse-factor", "100",
           "--perm", spe10_perm_file],
          {"relative-D-edge-error": 0.5420467322660617,
           "relative-vertex-error": 0.17088288700278217,
@@ -560,8 +562,8 @@ def make_tests():
           "--max-levels", "3",
           "--coarse-factor", "8",
           "--perm", spe10_perm_file],
-         {"quantity-error-level-1": 0.0024896122289841368,
-          "quantity-error-level-2": 0.0059890529148580261}]
+         {"quantity-error-level-1": 0.0022603778822020588,
+          "quantity-error-level-2": 0.0034320940221200902}]
 
     tests["pardirichlet-hb"] = \
         [["mpirun", "-n", num_procs, "./finitevolume",
@@ -571,8 +573,8 @@ def make_tests():
           "--coarse-factor", "8",
           "--hybridization",
           "--perm", spe10_perm_file],
-         {"quantity-error-level-1": 0.0024896122289841368,
-          "quantity-error-level-2": 0.0059890529148580261}]
+         {"quantity-error-level-1": 0.0022603778822020588,
+          "quantity-error-level-2": 0.0034320940221200902}]
 
     tests["parsamplegraph1"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -724,8 +726,8 @@ def make_tests():
           "--max-levels", "3",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
-         {"p-error-level-1": 0.15983187318775974,
-          "p-error-level-2": 0.34182546133693903}]
+         {"p-error-level-1": 0.15901786208069255,
+          "p-error-level-2": 0.28920183554358542}]
 
     # this is supposed to mimic using --choose-samples, but the choice
     # depends on cpu time, so for reproducibility we fix everything

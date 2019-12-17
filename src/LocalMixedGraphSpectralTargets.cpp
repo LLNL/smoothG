@@ -919,7 +919,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                 solver.Mult(OneNegOne, PV_sigma);
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
             }
-            else if (face_Agg.RowSize(iface) > 1) // interior to processor
+            else
             {
                 // This face is not shared between processors
                 mfem::SparseMatrix& Mloc_0 = shared_Mloc_f[0];
@@ -936,29 +936,22 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                 solver.Mult(OneNegOne, PV_sigma);
 
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
-            }
-            else // boundary face
-            {
-                const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
-                auto& vert_targets = local_vertex_targets[neighbor_aggs[0]];
 
-                auto DlocT = smoothg::Transpose(shared_Dloc_f[0]);
-                mfem::DenseMatrix DT_targets = Mult(DlocT, vert_targets);
-
-                mfem::UMFPackSolver Minv(shared_Mloc_f[0]);
-                mfem::DenseMatrix MinvDT_targets = Mult(Minv, DT_targets);
-
-                MinvDT_targets.GetColumn(0, PV_sigma_on_face);
-
-                // natural boundary
-                const int first_edof = face_edof.GetRowColumns(iface)[0];
-                if (mgL_.GetEssDofs().Size() == 0 || !mgL_.GetEssDofs()[first_edof])
+                const int edof_1st = face_edof.GetRowColumns(iface)[0];
+                const bool ess_bdr = mgL_.GetEssDofs().Size() && mgL_.GetEssDofs()[edof_1st];
+                if (face_Agg.RowSize(iface) == 1 && !ess_bdr) // natrual boundary
                 {
-                    collected_sigma.CopyMN(MinvDT_targets, num_iface_edofs,
-                                           vert_targets.NumCols() - 1, 0 , 1);
-                }
+                    const int* neighbor_aggs = face_Agg.GetRowColumns(iface);
+                    auto& vert_targets = local_vertex_targets[neighbor_aggs[0]];
 
-                PV_sigma_on_face.SetSize(num_iface_edofs);
+                    const mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc_0);
+                    const mfem::UMFPackSolver Minv(Mloc_0);
+                    const mfem::DenseMatrix DT_targets = Mult(DlocT, vert_targets);
+                    const mfem::DenseMatrix MinvDT_targets = Mult(Minv, DT_targets);
+
+                    collected_sigma.CopyMN(MinvDT_targets, num_iface_edofs,
+                                           DT_targets.NumCols() - 1, 0 , 1);
+                }
             }
 
             // add PV vector to other vectors and orthogonalize

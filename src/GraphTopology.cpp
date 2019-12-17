@@ -43,7 +43,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
         iso_verts.push_back(std::vector<int>(1, i));
     }
 
-    PartitionAAT(vert_edge, partitioning, coarsening_factor, std::move(iso_verts));
+    PartitionAAT(vert_edge, partitioning, coarsening_factor, false, std::move(iso_verts));
     return Coarsen(fine_graph, partitioning);
 }
 

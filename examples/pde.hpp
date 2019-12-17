@@ -841,11 +841,10 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
     }
     DivOp.SpMat().ScaleColumns(weight_sqrt);
 
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
-
-    PartitionAAT(DivOp.SpMat(), partitioning, metis_coarsening_factor);
+    const int dim = pmesh_->Dimension();
+    const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
+    const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
+    PartitionAAT(DivOp.SpMat(), partitioning, metis_cf, dim > 2);
 }
 
 void DarcyProblem::Partition(bool metis_parition,

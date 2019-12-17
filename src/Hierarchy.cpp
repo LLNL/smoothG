@@ -67,8 +67,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     GraphTopology topology;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
-                         topology.Coarsen(mgL.GetGraph(), level ? 8 : param.coarse_factor,
-                                          param.num_iso_verts);
+                         topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
 
     agg_vert.push_back(topology.Agg_vertex_);
 
@@ -153,11 +152,6 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
     assert(level >= 1 && level < NumLevels());
     Psigma_[level - 1].Mult(x.GetBlock(0), y.GetBlock(0));
     Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
-//y.GetBlock(0) = 0.0;
-//    auto tmp = PWConstProject(level, x.GetBlock(1));
-//    auto tmp2 = PWConstInterpolate(level, tmp);
-//    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
-//    y.GetBlock(0) = 0.0;
 }
 
 mfem::BlockVector Hierarchy::Interpolate(int level, const mfem::BlockVector& x) const

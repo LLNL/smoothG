@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm_rescaled.dat";
+    const char* permFile = "spe_perm.dat";
     args.AddOption(&permFile, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
