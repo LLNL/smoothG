@@ -155,9 +155,9 @@ def make_tests():
           "--metis-agglomeration",
           "--coarse-factor", "100",
           "--perm", spe10_perm_file],
-         {"relative-D-edge-error": 0.5640399150429396,
-          "relative-vertex-error": 0.17385749780334459,
-          "relative-edge-error": 0.29785869880514693,
+         {"relative-D-edge-error": 0.63485274406150471,
+          "relative-vertex-error": 0.15480723435585672,
+          "relative-edge-error": 0.25645221876785801,
           "operator-complexity": 1.04042908656572}]
 
     tests["fv-metis-mac"] = \
@@ -208,8 +208,8 @@ def make_tests():
           "--energy-dual",
           "--perm", spe10_perm_file],
          {"relative-D-edge-error": (0.0, 1.e-7),
-          "relative-vertex-error": 0.055279347333696799,
-          "relative-edge-error": 0.068336534035533678,
+          "relative-vertex-error": 0.05531441553069754,
+          "relative-edge-error": 0.068870924043507808,
           "operator-complexity": 1.3017591339648173}]
 
     tests["scaled-energy-dual-trace"] = \
@@ -222,8 +222,8 @@ def make_tests():
           "--energy-dual",
           "--perm", spe10_perm_file],
          {"relative-D-edge-error": (0.0, 1.e-7),
-          "relative-vertex-error": 0.055052992284074398,
-          "relative-edge-error": 0.035336370431801843,
+          "relative-vertex-error": 0.055053504716695102,
+          "relative-edge-error": 0.034903738719505632,
           "operator-complexity": 1.3017591339648173}]
 
     tests["fv-ml-4"] = \
@@ -234,10 +234,10 @@ def make_tests():
           "--max-levels", "3",
           "--coarse-factor", "8",
           "--perm", spe10_perm_file],
-         {"relative-D-edge-error": 0.8662426768490944,
-          "relative-vertex-error": 0.091264632420050174,
-          "relative-edge-error": 0.22738497061055957,
-          "operator-complexity": 1.3402831850379118}]
+         {"relative-D-edge-error": 0.82980244867656872,
+          "relative-vertex-error": 0.069590757228569236,
+          "relative-edge-error": 0.14631573149454258,
+          "operator-complexity": 1.3403134236965248}]
 
     tests["samplegraph1"] = \
         [["./generalgraph",
@@ -537,8 +537,8 @@ def make_tests():
           "--energy-dual",
           "--perm", spe10_perm_file],
          {"relative-D-edge-error": (0.0, 1.e-7),
-          "relative-vertex-error": 0.055279347333696799,
-          "relative-edge-error": 0.068336534035533678,
+          "relative-vertex-error": 0.05531441553069754,
+          "relative-edge-error": 0.068870924043507808,
           "operator-complexity": 1.3017591339648173}]
 
     tests["parscaled-energy-dual-trace"] = \
@@ -551,8 +551,8 @@ def make_tests():
           "--energy-dual",
           "--perm", spe10_perm_file],
          {"relative-D-edge-error": (0.0, 1.e-7),
-          "relative-vertex-error": 0.055052992284074398,
-          "relative-edge-error": 0.035336370431801843,
+          "relative-vertex-error": 0.055053504716695102,
+          "relative-edge-error": 0.034903738719505632,
           "operator-complexity": 1.3017591339648173}]
 
     tests["pardirichlet"] = \
