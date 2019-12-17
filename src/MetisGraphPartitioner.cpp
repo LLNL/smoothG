@@ -359,8 +359,8 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
     partitioner.doPartition(w_table, num_parts, partitioning, use_edge_weight);
 }
 
-void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
-                  mfem::Array<int>& partitioning, int coarsening_factor,
+void PartitionAAT(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& partitioning,
+                  int coarsening_factor, bool use_edge_weight,
                   std::vector<std::vector<int>> iso_verts)
 {
     MFEM_ASSERT(coarsening_factor > 1,
@@ -368,9 +368,8 @@ void PartitionAAT(const mfem::SparseMatrix& vertex_edge,
 
     const mfem::SparseMatrix vert_vert = smoothg::AAt(vertex_edge);
     const int nvertices = vert_vert.Height();
-    int num_partitions = (nvertices / (double)(coarsening_factor)) + 0.5;
-    num_partitions = std::max(1, num_partitions);
-    Partition(vert_vert, partitioning, num_partitions, true, std::move(iso_verts));
+    const int num_parts = std::max(1., (nvertices / (double)(coarsening_factor)) + 0.5);
+    Partition(vert_vert, partitioning, num_parts, use_edge_weight, std::move(iso_verts));
 }
 
 } // namespace smoothg
