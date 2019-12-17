@@ -46,9 +46,6 @@ target_link_libraries(qoi smoothg ${TPL_LIBRARIES})
 add_executable(nldarcy nldarcy.cpp)
 target_link_libraries(nldarcy smoothg ${TPL_LIBRARIES})
 
-add_executable(nonconforming nonconforming.cpp)
-target_link_libraries(nonconforming smoothg ${TPL_LIBRARIES})
-
 # add tests
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
     set(SMOOTHG_TEST_PROCS 2)
