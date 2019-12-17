@@ -79,11 +79,6 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
 
-//    for (auto& target : vertex_targets)
-//    {
-//        target.SetSize(target.NumRows(), 1);
-//    }
-
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 
     Pu_.push_back(graph_coarsen.BuildPVertices());

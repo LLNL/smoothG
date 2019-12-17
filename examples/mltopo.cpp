@@ -105,9 +105,9 @@ mfem::SparseMatrix MakeWeightedAdjacency(const Graph& graph)
 {
     MixedMatrix mixed_system(graph);
     mixed_system.BuildM();
-    mfem::Vector M_diag(mixed_system.GetM().GetData(), mixed_system.NumEDofs());
-    mfem::Vector w(M_diag.Size());
-    for (int j = 0; j < M_diag.Size(); j++)
+    const double* M_diag = mixed_system.GetM().GetData();
+    mfem::Vector w(mixed_system.NumEDofs());
+    for (int j = 0; j < mixed_system.NumEDofs(); j++)
     {
         w[j] = 1.0 / std::sqrt(M_diag[j]);
     }

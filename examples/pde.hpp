@@ -993,9 +993,9 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     h(1) = 10.0; // 670.56 / 220. in meters
     h(2) = 2.0; // 51.816 / 85. in meters
 
-    const int Lx = N_[0] * h(0);
-    const int Ly = N_[1] * h(1);
-    const int Lz = N_[2] * h(2);
+    const double Lx = N_[0] * h(0);
+    const double Ly = N_[1] * h(1);
+    const double Lz = N_[2] * h(2);
 
     hy_g = h(1);
     Ly_g = Ly;
@@ -1008,8 +1008,8 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
     coarsening_factor = 10;
     coarsening_factor.Last() = nDimensions == 3 ? 2 : 10;
 
-    double Hx = coarsening_factor[0] * h(0);
-    double Hy = coarsening_factor[1] * h(1);
+    const double Hx = coarsening_factor[0] * h(0);
+    const double Hy = coarsening_factor[1] * h(1);
     source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Hx, Hy);
 
     if (nDimensions == 2)
@@ -1244,35 +1244,8 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
     SetupCoeff();
     ComputeGraphWeight();
 
-//    if (ess_attr_.Find(0) == -1) // Neumann condition on whole boundary
-//    {
-//        rhs_sigma_ = 0.0;
-//        rhs_u_ = -1.0 * CellVolume();
-//    }
-//    else
     {
-//        mfem::Array<int> nat_one(ess_attr_.Size());
-//        nat_one = 0;
-//        nat_one[0] = 1;
-
-//        mfem::ConstantCoefficient one(1.0);
-//        mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
-
         mfem::LinearForm g(sigma_fes_.get());
-//        g.AddBoundaryIntegrator(
-//            new mfem::VectorFEBoundaryFluxLFIntegrator(pinflow_coeff));
-
-
-
-//        mfem::Array<int> nat_negative_one(ess_attr_.Size());
-//        nat_negative_one = 0;
-//        nat_negative_one[1] = 1;
-
-//        mfem::ConstantCoefficient negative_one(-1.0);
-//        mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
-//        g.AddBoundaryIntegrator(
-//                    new mfem::VectorFEBoundaryFluxLFIntegrator(poutflow_coeff));
-
         g.Assemble();
         rhs_sigma_ = g;
 
@@ -1291,24 +1264,6 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
 
         rhs_u_ = f;
     }
-
-//    mfem::Array<int> nat_one(ess_attr_.Size());
-//    nat_one = 0;
-//    nat_one[0] = 1;
-
-
-//    mfem::ParMixedBilinearForm bVarf(sigma_fes_.get(), u_fes_.get());
-//    bVarf.AddDomainIntegrator(new mfem::VectorFEDivergenceIntegrator);
-//    bVarf.Assemble();
-//    bVarf.Finalize();
-
-//    mfem::ParGridFunction flux_gf(sigma_fes_.get());
-//    flux_gf = 0.0;
-
-//    mfem::VectorFunctionCoefficient velocity_coeff(3, VelocityEgg);
-//    flux_gf.ProjectBdrCoefficientNormal(velocity_coeff, nat_one);
-
-//    bVarf.SpMat().AddMult(flux_gf, rhs_u_, 1.0);
 }
 
 void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)

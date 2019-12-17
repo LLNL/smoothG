@@ -51,11 +51,11 @@ double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector
 
 void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-//    if (max_num_iter_ == 1)
-//    {
-//        IterationStep(rhs, sol);
-//    }
-//    else
+    if (max_num_iter_ == 1)
+    {
+        IterationStep(rhs, sol);
+    }
+    else
     {
         mfem::StopWatch chrono;
         chrono.Start();
