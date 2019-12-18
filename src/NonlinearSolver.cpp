@@ -114,9 +114,9 @@ void NonlinearSolver::UpdateLinearSolveTol()
     }
     else // NonlinearResidual
     {
-//        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
+        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
         double ref_norm = solve_type_ == Newton ? prev_resid_norm_ : rhs_norm_;
-        tol = std::pow(resid_norm_ / ref_norm, 1.0);
+        tol = std::pow(resid_norm_ / ref_norm, exponent);
     }
 
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
@@ -168,50 +168,35 @@ void NonlinearMG::FAS_Cycle(int level)
         Mult(level, sol_[level], help_[level]);
         help_[level] -= rhs_[level];
 
+        for (int i = 0; i < GetEssDofs(level).Size(); ++i)
         {
-//            if (level == 0)
-            {
-                for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-                {
-                    if (GetEssDofs(level)[i])
-                        help_[level][i] = 0.0;
-                }
-            }
-
-            mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
-
-            if (level == 0)
-            {
-                resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
-                UpdateLinearSolveTol();
-                prev_resid_norm_ = resid_norm_;
-
-                if (resid_norm_ < adjusted_tol_)
-                {
-                    converged_ = true;
-                    if (level == 0 && myid_ == 0)
-                    {
-                        std::cout<<"V cycle terminated after pre-smoothing\n";
-                    }
-                    return;
-                }
-            }
-            else
-            {
-                residual_norms_[level] = mfem::ParNormlp(true_resid, 2, comm_);
-            }
-
-//            if (myid_==0)
-//            {
-//                double resid_norm = level ? residual_norms_[level] : resid_norm_;
-//                std::cout<<"level "<<level<<": pre-smooth resid = " << resid_norm <<" "<<resid_norm /rhs_norm_<<"\n";
-//            }
+            if (GetEssDofs(level)[i]) { help_[level][i] = 0.0; }
         }
 
-//if (solve_type_ == Picard || (level || resid_norm_ > rhs_norm_*1e-2))
+        mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
 
-        if (level || resid_norm_ > rhs_norm_*(solve_type_ == Picard ? 1e-8 : 1e-4))
-            //if (iter_ == 0)
+        if (level == 0)
+        {
+            resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
+            UpdateLinearSolveTol();
+            prev_resid_norm_ = resid_norm_;
+
+            if (resid_norm_ < adjusted_tol_)
+            {
+                converged_ = true;
+                if (myid_ == 0)
+                {
+                    std::cout << "V cycle terminated after pre-smoothing\n";
+                }
+                return;
+            }
+        }
+        else
+        {
+            residual_norms_[level] = mfem::ParNormlp(true_resid, 2, comm_);
+        }
+
+        if (level || resid_norm_ > rhs_norm_ * (solve_type_ == Picard ? 1e-8 : 1e-4))
         {
             Restrict(level, help_[level], help_[level + 1]);
 
@@ -237,25 +222,6 @@ void NonlinearMG::FAS_Cycle(int level)
                 BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
                              sol_[level], help_[level]);
             }
-
-//            {
-//                Mult(level, sol_[level], help_[level]);
-//                help_[level] -= rhs_[level];
-
-//                for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-//                {
-//                    if (GetEssDofs(level)[i])
-//                        help_[level][i] = 0.0;
-//                }
-
-//                mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
-//                residual_norms_[level] = mfem::ParNormlp(true_resid, 2, comm_);
-
-//                if (myid_==0)
-//                {
-//                    std::cout<<"level "<<level<<": coarse grid correction resid = " << residual_norms_[level] <<"\n";
-//                }
-//            }
         }
 
         // Post-smoothing

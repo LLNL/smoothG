@@ -295,7 +295,7 @@ MixedBlockEigensystem::BuildEdgeEigenSystem(
 }
 
 mfem::DenseMatrix MixedBlockEigensystem::ComputeEdgeTraces(
-        const mfem::DenseMatrix& evects, bool edge_eigensystem)
+    const mfem::DenseMatrix& evects, bool edge_eigensystem)
 {
     mfem::DenseMatrix out;
     if (!edge_eigensystem || !M_is_diag_)
@@ -640,7 +640,7 @@ mfem::SparseMatrix CombineM(const mfem::SparseMatrix& M0,
 }
 
 std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTargets(
-        const std::vector<mfem::DenseMatrix>& local_vertex_targets)
+    const std::vector<mfem::DenseMatrix>& local_vertex_targets)
 {
     const mfem::SparseMatrix& face_Agg = coarse_graph_.EdgeToVertex();
     const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
@@ -950,7 +950,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                     const mfem::DenseMatrix MinvDT_targets = Mult(Minv, DT_targets);
 
                     collected_sigma.CopyMN(MinvDT_targets, num_iface_edofs,
-                                           DT_targets.NumCols() - 1, 0 , 1);
+                                           DT_targets.NumCols() - 1, 0, 1);
                 }
             }
 

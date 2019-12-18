@@ -30,7 +30,6 @@ MetisGraphPartitioner::MetisGraphPartitioner(PartType _part_type)
 {
     METIS_SetDefaultOptions(options_);
     options_[METIS_OPTION_CONTIG] = 1;
-//    options_[METIS_OPTION_MINCONN] = 1;
 }
 
 void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,

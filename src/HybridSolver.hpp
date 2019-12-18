@@ -265,7 +265,6 @@ private:
     mfem::SparseMatrix aux_map_;
     std::unique_ptr<mfem::HypreParMatrix> aux_op_;
     std::unique_ptr<mfem::HypreBoomerAMG> aux_solver_;
-    mfem::GMRESSolver gmres_;
 };
 
 } // namespace smoothg

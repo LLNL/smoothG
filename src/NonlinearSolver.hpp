@@ -27,6 +27,7 @@
 namespace smoothg
 {
 
+/// Linearization type
 enum SolveType { Newton, Picard };
 
 /// Respectively modified from choice 1 and 2 in Eisenstat and Walker, SISC 1996
@@ -118,12 +119,6 @@ struct NLMGParameter
 
     void RegisterInOptionsParser(mfem::OptionsParser& args)
     {
-//        int cycle_int = 0;
-//        int solve_type_int = 0;
-//        args.AddOption(&cycle_int, "--cycle", "--mg-cycle",
-//                       "Multigrid cycle: V-cycle (0), FMG (1), CASCADIC (2) ");
-//        args.AddOption(&solve_type_int, "--solve-type", "--nonlinear-solve-type",
-//                       "Nonlinear solver type: Newton (0), Picard (1)");
         args.AddOption(&max_num_backtrack, "--num-backtrack", "--max-num-backtrack",
                        "Maximum number of backtracking steps.");
         args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
@@ -138,8 +133,6 @@ struct NLMGParameter
                        "Number of relaxation in coarse level.");
         args.AddOption(&initial_linear_tol, "--init-linear-tol", "--init-linear-tol",
                        "Initial tol for linear solve inside nonlinear iterations.");
-//        cycle = static_cast<Cycle>(cycle_int);
-//        solve_type = static_cast<SolveType>(solve_type_int);
     }
 };
 
@@ -181,7 +174,7 @@ protected:
     /// Relaxation on each level
     virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
 
-    virtual void BackTracking(int level, const mfem::Vector &rhs, double prev_resid_norm,
+    virtual void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
                               mfem::Vector& x, mfem::Vector& dx) = 0;
 
 

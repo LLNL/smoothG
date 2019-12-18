@@ -212,7 +212,7 @@ public:
        @return local edge trace targets on each face
     */
     std::vector<mfem::DenseMatrix> ComputeEdgeTargets(
-            const std::vector<mfem::DenseMatrix>& local_vertex_targets);
+        const std::vector<mfem::DenseMatrix>& local_vertex_targets);
 private:
     enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
 
