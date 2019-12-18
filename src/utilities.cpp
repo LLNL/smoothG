@@ -557,4 +557,12 @@ double Min(const mfem::Vector& vec, MPI_Comm comm)
     return global_min;
 }
 
+void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec)
+{
+    for (int i = 0; i < marker.Size(); ++i)
+    {
+        if (marker[i]) { vec[i] = 0.0; }
+    }
+}
+
 } // namespace smoothg

@@ -37,12 +37,7 @@ double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector
     Mult(sol, residual_);
 
     residual_ -= rhs;
-
-    for (int i = 0; i < GetEssDofs().Size(); ++i)
-    {
-        if (GetEssDofs()[i])
-            residual_[i] = 0.0;
-    }
+    SetZeroAtMarker(GetEssDofs(), residual_);
 
     mfem::Vector true_resid = AssembleTrueVector(residual_);
 
@@ -94,8 +89,8 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
         timing_ = chrono.RealTime();
         if (!converged_ && myid_ == 0 && print_level_ >= 0)
         {
-            std::cout << "Warning: " << tag_ << " solver reached maximum "
-                      << "number of iterations!\n";
+            std::cout << "Warning: " << tag_ << " solver reached maximum number "
+                      << "of iterations and took " << timing_ << " seconds!\n\n";
         }
         else if (myid_ == 0 && print_level_ >= 0)
         {
@@ -146,14 +141,7 @@ void NonlinearMG::FAS_Cycle(int level)
     if (level == num_levels_ - 1)
     {
         Solve(level, rhs_[level], sol_[level]);
-
-        {
-            for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-            {
-                if (GetEssDofs(level)[i])
-                    sol_[level][i] = 0.0;
-            }
-        }
+        SetZeroAtMarker(GetEssDofs(level), sol_[level]);
     }
     else
     {
@@ -167,11 +155,7 @@ void NonlinearMG::FAS_Cycle(int level)
         // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
         Mult(level, sol_[level], help_[level]);
         help_[level] -= rhs_[level];
-
-        for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-        {
-            if (GetEssDofs(level)[i]) { help_[level][i] = 0.0; }
-        }
+        SetZeroAtMarker(GetEssDofs(level), help_[level]);
 
         mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
 
