@@ -11,6 +11,7 @@ generated-docs/
 *.in~
 *.md~
 *.swp
+*.DS_Store
 
 GPATH
 GRTAGS

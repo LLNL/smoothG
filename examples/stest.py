@@ -169,9 +169,9 @@ def make_tests():
           "--metis-agglomeration",
           "--coarse-factor", "100",
           "--perm", spe10_perm_file],
-         {"relative-D-edge-error": 0.5420467322660617,
-          "relative-vertex-error": 0.17088288700278217,
-          "relative-edge-error": 0.2031768008190909,
+         {"relative-D-edge-error": 0.5505999771706922,
+          "relative-vertex-error": 0.16109495317744718,
+          "relative-edge-error": 0.27438846301628711,
           "operator-complexity": 1.0398091940641514}]
 
     tests["dual-trace"] = \
@@ -238,6 +238,19 @@ def make_tests():
           "relative-vertex-error": 0.069590757228569236,
           "relative-edge-error": 0.14631573149454258,
           "operator-complexity": 1.3403134236965248}]
+
+    tests["fv-ml-4-mac"] = \
+        [["./finitevolume",
+          "--spect-tol", "1.0",
+          "--slice", "0",
+          "--max-evects", "4",
+          "--max-levels", "3",
+          "--coarse-factor", "8",
+          "--perm", spe10_perm_file],
+         {"relative-D-edge-error": 0.80539906744851109,
+          "relative-vertex-error": 0.096644730987530583,
+          "relative-edge-error": 0.14688172254757564,
+          "operator-complexity": 1.3381135612824215}]
 
     tests["samplegraph1"] = \
         [["./generalgraph",
@@ -565,6 +578,16 @@ def make_tests():
          {"quantity-error-level-1": 0.0022603778822020588,
           "quantity-error-level-2": 0.0034320940221200902}]
 
+    tests["pardirichlet-mac"] = \
+        [["mpirun", "-n", num_procs, "./finitevolume",
+          "--lateral-pressure",
+          "--spect-tol", "1.0",
+          "--max-levels", "3",
+          "--coarse-factor", "8",
+          "--perm", spe10_perm_file],
+         {"quantity-error-level-1": 0.002291327159532812,
+          "quantity-error-level-2": 0.0039259944921827836}]
+
     tests["pardirichlet-hb"] = \
         [["mpirun", "-n", num_procs, "./finitevolume",
           "--lateral-pressure",
@@ -575,6 +598,17 @@ def make_tests():
           "--perm", spe10_perm_file],
          {"quantity-error-level-1": 0.0022603778822020588,
           "quantity-error-level-2": 0.0034320940221200902}]
+
+    tests["pardirichlet-hb-mac"] = \
+        [["mpirun", "-n", num_procs, "./finitevolume",
+          "--lateral-pressure",
+          "--spect-tol", "1.0",
+          "--max-levels", "3",
+          "--coarse-factor", "8",
+          "--hybridization",
+          "--perm", spe10_perm_file],
+         {"quantity-error-level-1": 0.002291327159532812,
+          "quantity-error-level-2": 0.0039259944921827836}]
 
     tests["parsamplegraph1"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -720,6 +754,16 @@ def make_tests():
          {"p-error-level-1": 0.20833920382939719,
           "p-error-level-2": 0.40118441747952621}]
 
+    tests["ml-sampler-mac"] = \
+        [["./sampler",
+          "--num-samples", "1",
+          "--max-levels", "3",
+          "--spect-tol", "1.0",
+          "--max-evects", "1",
+          "--max-traces", "1"],
+         {"p-error-level-1": 0.20833920377622106,
+          "p-error-level-2": 0.39357489172376314}]
+
     tests["ml-sampler4"] = \
         [["./sampler",
           "--num-samples", "1",
@@ -728,6 +772,15 @@ def make_tests():
           "--max-evects", "4"],
          {"p-error-level-1": 0.15901786208069255,
           "p-error-level-2": 0.28920183554358542}]
+
+    tests["ml-sampler4-mac"] = \
+        [["./sampler",
+          "--num-samples", "1",
+          "--max-levels", "3",
+          "--spect-tol", "1.0",
+          "--max-evects", "4"],
+         {"p-error-level-1": 0.15902531435127545,
+          "p-error-level-2": 0.29696652801349377}]
 
     # this is supposed to mimic using --choose-samples, but the choice
     # depends on cpu time, so for reproducibility we fix everything
@@ -744,6 +797,19 @@ def make_tests():
           "correction-variance":5.532948306092317e-05,
           "mlmc-estimate":-0.0059401689449150533}]
 
+    tests["qoi-mac"] = \
+        [["./qoi",
+          "--coarse-factor", "16",
+          "--max-levels", "2",
+          "--fine-samples", "0",
+          "--coarse-samples", "82",
+          "--shared-samples", "18",
+          "--choose-samples", "0",
+          "--seed", "1"],
+         {"coarse-variance":0.00010774720329605776,
+          "correction-variance":1.765201628796675e-05,
+          "mlmc-estimate":-0.010527920345162218}]
+
     tests["qoi-hb"] = \
         [["./qoi",
           "--coarse-factor", "16",
@@ -757,6 +823,20 @@ def make_tests():
          {"coarse-variance":0.00019821590592782775,
           "correction-variance":5.532948306092317e-05,
           "mlmc-estimate":-0.0059401689449150533}]
+
+    tests["qoi-hb-mac"] = \
+        [["./qoi",
+          "--coarse-factor", "16",
+          "--max-levels", "2",
+          "--fine-samples", "0",
+          "--coarse-samples", "82",
+          "--shared-samples", "18",
+          "--choose-samples", "0",
+          "--hybridization",
+          "--seed", "1"],
+         {"coarse-variance":0.00010774720329605776,
+          "correction-variance":1.765201628796675e-05,
+          "mlmc-estimate":-0.010527920345162218}]
 
     tests["qoi-one-level"] = \
         [["./qoi",
