@@ -862,28 +862,16 @@ def make_tests():
     tests["fas-picard"] = \
         [["./nldarcy",
           "--alpha", "1.0",
-          "--coarse-factor", "32",
           "--max-levels", "3",
+          "--coarse-factor", "32",
           "--diff-tol", "5",
           "--coarse-diff-tol", "5",
+          "--num-relax-coarse", "30",
           "--max-traces", "1",
           "--max-evects", "1",
           "--use-picard",
           "--perm", spe10_perm_file],
-         {"nonlinear-iterations":19}]
-
-    tests["fas-picard-2-6"] = \
-        [["./nldarcy",
-          "--alpha", "1.0",
-          "--coarse-factor", "32",
-          "--max-levels", "3",
-          "--diff-tol", "5",
-          "--coarse-diff-tol", "5",
-          "--max-traces", "2",
-          "--max-evects", "6",
-          "--use-picard",
-          "--perm", spe10_perm_file],
-         {"nonlinear-iterations":15}]
+         {"nonlinear-iterations":13}]
 
     tests["fas-newton-one-level"] = \
         [["mpirun", "-n", num_procs, "./nldarcy",
@@ -897,28 +885,16 @@ def make_tests():
     tests["fas-newton"] = \
         [["./nldarcy",
           "--alpha", "1.0",
-          "--coarse-factor", "32",
           "--max-levels", "3",
+          "--coarse-factor", "32",
           "--diff-tol", "5",
           "--coarse-diff-tol", "5",
+          "--num-relax-coarse", "30",
           "--max-traces", "1",
           "--max-evects", "1",
           "--use-newton",
           "--perm", spe10_perm_file],
-         {"nonlinear-iterations":8}]
-
-    tests["fas-newton-2-6"] = \
-        [["./nldarcy",
-          "--alpha", "1.0",
-          "--coarse-factor", "32",
-          "--max-levels", "3",
-          "--diff-tol", "5",
-          "--coarse-diff-tol", "5",
-          "--max-traces", "2",
-          "--max-evects", "6",
-          "--use-newton",
-          "--perm", spe10_perm_file],
-         {"nonlinear-iterations":7}]
+         {"nonlinear-iterations":3}]
 
     if "tux" in platform.node():
         tests["veigenvector"] = \
