@@ -99,7 +99,10 @@ int main(int argc, char* argv[])
         graphs.push_back(topologies[i].Coarsen(graphs[i], coarsening_factor));
     }
 
-    ShowAggregates(graphs, topologies, spe10problem.GetMesh());
+    if (visualization)
+    {
+        ShowAggregates(graphs, topologies, spe10problem.GetMesh());
+    }
 
     return EXIT_SUCCESS;
 }
