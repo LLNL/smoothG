@@ -850,6 +850,76 @@ def make_tests():
          {"correction-variance":0.00017825875122906521,
           "mlmc-estimate":-0.013182028965699699}]
 
+    tests["fas-picard-one-level"] = \
+        [["./nldarcy",
+          "--alpha", "1.0",
+          "--max-levels", "1",
+          "--diff-tol", "5",
+          "--use-picard",
+          "--perm", spe10_perm_file],
+         {"nonlinear-iterations":49}]
+
+    tests["fas-picard"] = \
+        [["./nldarcy",
+          "--alpha", "1.0",
+          "--coarse-factor", "32",
+          "--max-levels", "3",
+          "--diff-tol", "5",
+          "--coarse-diff-tol", "5",
+          "--max-traces", "1",
+          "--max-evects", "1",
+          "--use-picard",
+          "--perm", spe10_perm_file],
+         {"nonlinear-iterations":19}]
+
+    tests["fas-picard-2-6"] = \
+        [["./nldarcy",
+          "--alpha", "1.0",
+          "--coarse-factor", "32",
+          "--max-levels", "3",
+          "--diff-tol", "5",
+          "--coarse-diff-tol", "5",
+          "--max-traces", "2",
+          "--max-evects", "6",
+          "--use-picard",
+          "--perm", spe10_perm_file],
+         {"nonlinear-iterations":15}]
+
+    tests["fas-newton-one-level"] = \
+        [["mpirun", "-n", num_procs, "./nldarcy",
+          "--alpha", "1.0",
+          "--max-levels", "1",
+          "--diff-tol", "5",
+          "--use-newton",
+          "--perm", spe10_perm_file],
+         {"nonlinear-iterations":21}]
+
+    tests["fas-newton"] = \
+        [["./nldarcy",
+          "--alpha", "1.0",
+          "--coarse-factor", "32",
+          "--max-levels", "3",
+          "--diff-tol", "5",
+          "--coarse-diff-tol", "5",
+          "--max-traces", "1",
+          "--max-evects", "1",
+          "--use-newton",
+          "--perm", spe10_perm_file],
+         {"nonlinear-iterations":8}]
+
+    tests["fas-newton-2-6"] = \
+        [["./nldarcy",
+          "--alpha", "1.0",
+          "--coarse-factor", "32",
+          "--max-levels", "3",
+          "--diff-tol", "5",
+          "--coarse-diff-tol", "5",
+          "--max-traces", "2",
+          "--max-evects", "6",
+          "--use-newton",
+          "--perm", spe10_perm_file],
+         {"nonlinear-iterations":7}]
+
     if "tux" in platform.node():
         tests["veigenvector"] = \
             [[memorycheck_command, "--leak-check=full",
