@@ -581,7 +581,7 @@ protected:
 
     mfem::Array<int> ess_attr_;
 
-    mutable int iso_vert_count_;
+    mutable int iso_vert_count_ = 0;
 
     MPI_Comm comm_;
     int myid_;
@@ -1008,8 +1008,6 @@ void SPE10Problem::CartPart(const mfem::Array<int>& coarsening_factor,
 
     partitioning.MakeRef(pmesh_->CartesianPartitioning(nxyz), pmesh_->GetNE());
     partitioning.MakeDataOwner();
-
-    iso_vert_count_ = 0;
 }
 
 void SPE10Problem::MakeRHS()
@@ -1238,7 +1236,7 @@ void EggModel::SetupCoeff()
     h(2) = 4.0;
 
     using IPC = InversePermeabilityCoefficient;
-    kinv_vector_ = make_unique<IPC>(comm_, "egg_perm_rescaled.dat", N, N, h);
+    kinv_vector_ = make_unique<IPC>(comm_, "egg_perm.dat", N, N, h);
 }
 
 // domain = (0, 4000) x (0, 1000) cm

@@ -24,6 +24,8 @@
 
 #include "pde.hpp"
 
+#include "../src/picojson.h"
+
 using namespace smoothg;
 
 using std::unique_ptr;
@@ -147,6 +149,7 @@ void dKinv_dp(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& dk
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
+    picojson::object serialize;
 
     // 1. Initialize MPI
     mpi_session session(argc, argv);
@@ -168,7 +171,7 @@ int main(int argc, char* argv[])
     const char* problem_name = "spe10";
     args.AddOption(&problem_name, "-mp", "--model-problem",
                    "Model problem (spe10, egg, lognormal, richard)");
-    const char* perm_file = "spe_perm_rescaled.dat";
+    const char* perm_file = "spe_perm.dat";
     args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
     int dim = 2;
     args.AddOption(&dim, "-d", "--dim",
@@ -217,34 +220,30 @@ int main(int argc, char* argv[])
     double use_metis = true;
     std::string problem(problem_name);
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
-    ess_attr = 0;
+    ess_attr = 1;
 
     mfem::Vector Z_fine;
     unique_ptr<DarcyProblem> fv_problem;
     if (problem == "spe10")
     {
-        ess_attr = 1;
         ess_attr[dim - 2] = 0;
         fv_problem.reset(new SPE10Problem(perm_file, dim, 5, slice, use_metis, ess_attr));
         alpha = 1.*(1e-3);
     }
     else if (problem == "egg")
     {
-        ess_attr = 1;
         ess_attr[1] = 0;
-
-        use_metis = true;
         fv_problem.reset(new EggModel(num_sr, num_pr, ess_attr));
         alpha = 3.;
     }
     else if (problem == "lognormal")
     {
+        ess_attr = 0;
         fv_problem.reset(new LognormalModel(dim, num_sr, num_pr, correlation, ess_attr));
         alpha = -8e0;
     }
     else if (problem == "richard")
     {
-        ess_attr = 1;
         ess_attr[0] = 0;
         fv_problem.reset(new Richards(num_sr, ess_attr));
         Z_fine = fv_problem->GetZVector();
@@ -263,35 +262,11 @@ int main(int argc, char* argv[])
     Graph graph = fv_problem->GetFVGraph(true);
 
     mfem::Array<int> partitioning;
-    mfem::Array<int> coarsening_factors(dim);
-
-    if (use_metis)
-    {
-        coarsening_factors = 1;
-        coarsening_factors[0] = upscale_param.coarse_factor;
-    }
-    else
-    {
-        coarsening_factors[0] = 10;
-        coarsening_factors[1] = 22;
-        coarsening_factors.Last() = dim == 3 ? 2 : 10;
-        if (myid == 0)
-        {
-            std::cout << "Coarsening factors: " << coarsening_factors[0]
-                      << " x " << coarsening_factors[1];
-            if (dim == 3)
-            {
-                std::cout << " x " << coarsening_factors[2] << "\n";
-            }
-            else
-            {
-                std::cout << "\n";
-            }
-        }
-    }
-
     if (upscale_param.max_levels > 1)
     {
+        mfem::Array<int> coarsening_factors(problem == "egg" ? 3 : dim);
+        coarsening_factors = 1;
+        coarsening_factors[0] = upscale_param.coarse_factor;
         fv_problem->Partition(use_metis, coarsening_factors, partitioning);
         upscale_param.num_iso_verts = fv_problem->NumIsoVerts();
     }
@@ -309,20 +284,11 @@ int main(int argc, char* argv[])
 
     EllipticNLMG nlmg(hierarchy, Z_fine, mg_param);
     nlmg.SetPrintLevel(1);
-    nlmg.SetMaxIter(150);
+    nlmg.SetRelTol(1e-6);
+    nlmg.SetMaxIter(200);
+    nlmg.Solve(rhs, sol_nlmg);
 
-    std::vector<double> alpha_choices{  0.4 };
-    mfem::Array<double> timings;
-    timings.Reserve(alpha_choices.size());
-    for (auto& alpha_ : alpha_choices)
-    {
-        alpha = alpha_;
-        if (myid == 0) std::cout << "alpha = " << alpha << "\n";
-        sol_nlmg = 0.0;
-        nlmg.Solve(rhs, sol_nlmg);
-        timings.Append(nlmg.GetTiming());
-    }
-    if (myid == 0) timings.Print(std::cout, timings.Size());
+    serialize["nonlinear-iterations"] = picojson::value((double)nlmg.GetNumIterations());
 
     if (visualization)
     {
@@ -332,10 +298,15 @@ int main(int argc, char* argv[])
         }
 
         mfem::socketstream sout;
-        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "coarse flux");
-        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "coarse pressure");
+        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "", false, false);
+        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "", false, true);
         if (problem == "richard")
             sout << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]fmm\n";
+    }
+
+    if (myid == 0)
+    {
+        std::cout << picojson::value(serialize).serialize(true) << std::endl;
     }
 
     return EXIT_SUCCESS;
@@ -351,7 +322,7 @@ LevelSolver::LevelSolver(Hierarchy& hierarchy, int level,
       p_(hierarchy_.NumVertices(level)), kp_(p_.Size()), dkinv_dp_(p_.Size()),
       Z_vector_(std::move(Z_vector))
 {
-    hierarchy_.SetPrintLevel(level_, 1);
+    hierarchy_.SetPrintLevel(level_, -1);
     hierarchy_.SetMaxIter(level_, 200);
     diff_tol_ = level ? param.coarse_diff_tol : param.diff_tol;
     max_num_backtrack_ = param.max_num_backtrack;

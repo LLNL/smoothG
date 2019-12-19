@@ -125,7 +125,6 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
-
     upscale.PrintInfo();
 
     mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
@@ -140,7 +139,6 @@ int main(int argc, char* argv[])
     {
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);
-
 
         if (lateral_pressure)
         {
