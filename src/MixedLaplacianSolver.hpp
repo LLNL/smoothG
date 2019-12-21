@@ -46,6 +46,7 @@ public:
        come into and go out of this method.
     */
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    mfem::BlockVector Solve(const mfem::BlockVector& rhs) const;
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
 
     /// Solve the primal form of the graph Laplacian problem (DM^{-1}D^T) sol = rhs

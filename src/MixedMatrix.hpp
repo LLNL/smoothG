@@ -102,7 +102,13 @@ public:
     /// assemble a local vector into true vector
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
 
+    /// Mult mixed system to input vector x with M scale inversely by "element" scale
     void Mult(const mfem::Vector& scale, const mfem::BlockVector& x, mfem::BlockVector& y) const;
+
+    /// Project vertex space vector to average of finest vertices in coarse vertex (aggregate)
+    mfem::Vector PWConstProject(const mfem::Vector& x) const;
+
+    mfem::Vector PWConstInterpolate(const mfem::Vector& x) const;
 
     /// Determine if W block is nonzero
     bool CheckW() const { return W_is_nonzero_; }

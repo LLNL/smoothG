@@ -27,18 +27,29 @@
 namespace smoothg
 {
 
-/// Linearization type
-enum SolveType { Newton, Picard };
+/// Linearization method
+enum Linearization { Newton, Picard };
 
-/// Respectively modified from choice 1 and 2 in Eisenstat and Walker, SISC 1996
-enum EisenstatWalker { TaylorResidual, NonlinearResidual };
+/// Parameter list for abstract nonlinear solver
+struct NLSolverParameters
+{
+    int print_level = 0;
+    int max_num_iter = 50;
+    double rtol = 1e-8;
+    double atol = 1e-10;
+
+    bool check_converge = true;
+    Linearization linearization = Newton;
+    int max_num_backtrack = 0;
+    double diff_tol = -1.0;
+    double init_linear_tol = 1e-8;
+};
 
 /// Iterative solver for nonlinear problems
 class NonlinearSolver
 {
 public:
-    NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type,
-                    std::string tag, double initial_linear_tol);
+    NonlinearSolver(MPI_Comm comm, int size, NLSolverParameters param);
 
     // Solve R(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
@@ -48,14 +59,10 @@ public:
 
     ///@name Set solver parameters
     ///@{
-    void SetPrintLevel(int print_level) { print_level_ = print_level; }
-    void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
-    void SetRelTol(double rtol) { rtol_ = rtol; }
-    void SetAbsTol(double atol) { atol_ = atol; }
-    void SetLinearTolCriterion(EisenstatWalker criterion)
-    {
-        linear_tol_criterion_ = criterion;
-    }
+    void SetPrintLevel(int print_level) { param_.print_level = print_level; }
+    void SetMaxIter(int max_num_iter) { param_.max_num_iter = max_num_iter; }
+    void SetRelTol(double rtol) { param_.rtol = rtol; }
+    void SetAbsTol(double atol) { param_.atol = atol; }
     ///@}
 
     ///@name Get results of iterative solve
@@ -65,21 +72,16 @@ public:
     bool IsConverged() const { return converged_; }
     ///@}
 protected:
+    /// Update linear tolerance based on choice 2 in Eisenstat & Walker, SISC 1996
+    void UpdateLinearSolveTol();
+
     double ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs);
 
     virtual void IterationStep(const mfem::Vector& x, mfem::Vector& y) = 0;
 
     virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
 
-    void UpdateLinearSolveTol();
-
     virtual const mfem::Array<int>& GetEssDofs() const = 0;
-
-    // default nonlinear solver options
-    int print_level_ = 0;
-    int max_num_iter_ = 50;
-    double rtol_ = 1e-8;
-    double atol_ = 1e-10;
 
     int iter_;
     double timing_;
@@ -88,50 +90,52 @@ protected:
     MPI_Comm comm_;
     int myid_;
     int size_;
-    SolveType solve_type_;
+    Linearization linearization_;
     std::string tag_;
 
     mfem::Vector residual_;
 
+    bool check_converge_;
     double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
     double rhs_norm_;
     double resid_norm_;
     double prev_resid_norm_;
-
-    EisenstatWalker linear_tol_criterion_;
     double linear_tol_;
-    double linear_resid_norm_;
+
+    NLSolverParameters param_;
 };
 
-enum Cycle { V_CYCLE, FMG, CASCADIC };
+enum Cycle { V_CYCLE, FMG };
 
-struct NLMGParameter
+struct FASParameters : public NLSolverParameters
 {
     Cycle cycle = V_CYCLE;
-    SolveType solve_type = Newton;
-    int max_num_backtrack = 4;
-    double diff_tol = 5;
-    double coarse_diff_tol = 5;
-    int num_relax_fine = 1;
-    int num_relax_middle = 1;
-    int num_relax_coarse = 1;
-    double initial_linear_tol = 1e-8;
+    NLSolverParameters fine;
+    NLSolverParameters mid;
+    NLSolverParameters coarse;
 
+    /// TODO
     void RegisterInOptionsParser(mfem::OptionsParser& args)
     {
-        args.AddOption(&max_num_backtrack, "--num-backtrack", "--max-num-backtrack",
+        args.AddOption(&fine.max_num_backtrack, "--num-backtrack-fine", "--max-num-backtrack-fine",
                        "Maximum number of backtracking steps.");
-        args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
+        args.AddOption(&mid.max_num_backtrack, "--num-backtrack-mid", "--max-num-backtrack-mid",
+                       "Maximum number of backtracking steps.");
+        args.AddOption(&coarse.max_num_backtrack, "--num-backtrack-coarse", "--max-num-backtrack-coarse",
+                       "Maximum number of backtracking steps.");
+        args.AddOption(&fine.diff_tol, "--diff-tol-fine", "--diff-tol-fine",
                        "Tolerance for solution change in fine level.");
-        args.AddOption(&coarse_diff_tol, "--coarse-diff-tol", "--coarse-diff-tol",
+        args.AddOption(&mid.diff_tol, "--diff-tol-mid", "--diff-tol-mid",
+                       "Tolerance for solution change in intermediate levels.");
+        args.AddOption(&coarse.diff_tol, "--diff-tol-coarse", "--diff-tol-coarse",
                        "Tolerance for solution change in coarse level.");
-        args.AddOption(&num_relax_fine, "--num-relax-fine", "--num-relax-fine",
+        args.AddOption(&fine.max_num_iter, "--num-relax-fine", "--num-relax-fine",
                        "Number of relaxation in fine level.");
-        args.AddOption(&num_relax_middle, "--num-relax-middle", "--num-relax-middle",
+        args.AddOption(&mid.max_num_iter, "--num-relax-mid", "--num-relax-mid",
                        "Number of relaxation in intermediate levels.");
-        args.AddOption(&num_relax_coarse, "--num-relax-coarse", "--num-relax-coarse",
+        args.AddOption(&coarse.max_num_iter, "--num-relax-coarse", "--num-relax-coarse",
                        "Number of relaxation in coarse level.");
-        args.AddOption(&initial_linear_tol, "--init-linear-tol", "--init-linear-tol",
+        args.AddOption(&init_linear_tol, "--init-linear-tol", "--init-linear-tol",
                        "Initial tol for linear solve inside nonlinear iterations.");
     }
 };
@@ -146,7 +150,7 @@ class NonlinearMG : public NonlinearSolver
 {
 public:
     // the time dependent operators gets updated during solving
-    NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param);
+    NonlinearMG(MPI_Comm comm, int size, int num_levels, FASParameters param);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
 protected:
@@ -187,7 +191,7 @@ protected:
     std::vector<mfem::Vector> sol_;
     mutable std::vector<mfem::Vector> help_;
 
-    std::vector<double> residual_norms_;
+    std::vector<double> resid_norms_;
 };
 
 } // namespace smoothg

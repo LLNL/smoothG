@@ -135,6 +135,22 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
     D_.Mult(x.GetBlock(0), y.GetBlock(1));
 }
 
+mfem::Vector MixedMatrix::PWConstProject(const mfem::Vector& x) const
+{
+    mfem::Vector out(GetGraph().NumVertices());
+    P_pwc_.Mult(x, out);
+    return out;
+}
+
+mfem::Vector MixedMatrix::PWConstInterpolate(const mfem::Vector& x) const
+{
+    mfem::Vector scaled_x(x);
+    RescaleVector(vertex_sizes_, scaled_x);
+    mfem::Vector out(NumVDofs());
+    P_pwc_.MultTranspose(scaled_x, out);
+    return out;
+}
+
 mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
 {
     const mfem::SparseMatrix& vertex_edge = graph.VertexToEdge();

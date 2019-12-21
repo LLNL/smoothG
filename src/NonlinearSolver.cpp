@@ -23,10 +23,8 @@
 namespace smoothg
 {
 
-NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type,
-                                 std::string tag, double initial_linear_tol)
-    : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(initial_linear_tol)
+NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, NLSolverParameters param)
+    : comm_(comm), size_(size), tag_("Nonlinear"), residual_(size), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -35,38 +33,29 @@ double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector
 {
     residual_ = 0.0;
     Mult(sol, residual_);
-
     residual_ -= rhs;
     SetZeroAtMarker(GetEssDofs(), residual_);
-
-    mfem::Vector true_resid = AssembleTrueVector(residual_);
-
-    return mfem::ParNormlp(true_resid, 2, comm_);
+    return mfem::ParNormlp(AssembleTrueVector(residual_), 2, comm_);
 }
 
 void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    if (max_num_iter_ == 1)
+    mfem::StopWatch chrono;
+    chrono.Start();
+
+    mfem::Vector zero_vec(sol);
+    zero_vec = 0.0;
+    rhs_norm_ = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
+    adjusted_tol_ = std::max(param_.atol, param_.rtol * rhs_norm_);
+
+    converged_ = false;
+    for (iter_ = 0; iter_ < param_.max_num_iter + 1; iter_++)
     {
-        IterationStep(rhs, sol);
-    }
-    else
-    {
-        mfem::StopWatch chrono;
-        chrono.Start();
-
-        mfem::Vector zero_vec(sol);
-        zero_vec = 0.0;
-        rhs_norm_ = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
-
-        adjusted_tol_ = std::max(atol_, rtol_ * rhs_norm_);
-
-        converged_ = false;
-        for (iter_ = 0; iter_ < max_num_iter_ + 1; iter_++)
+        if (check_converge_)
         {
             resid_norm_ = ResidualNorm(sol, rhs);
 
-            if (myid_ == 0 && print_level_ > 0)
+            if (myid_ == 0 && param_.print_level > 0)
             {
                 double rel_resid = resid_norm_ / rhs_norm_;
                 std::cout << tag_ << " iter " << iter_ << ": rel resid = "
@@ -75,53 +64,43 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
             converged_ = (resid_norm_ < adjusted_tol_);
 
-            if (converged_ || iter_ == max_num_iter_)
-            {
-                break;
-            }
+            if (converged_ || iter_ == param_.max_num_iter) { break; }
 
             UpdateLinearSolveTol();
             prev_resid_norm_ = resid_norm_;
-
-            IterationStep(rhs, sol);
         }
 
-        timing_ = chrono.RealTime();
-        if (!converged_ && myid_ == 0 && print_level_ >= 0)
-        {
-            std::cout << "Warning: " << tag_ << " solver reached maximum number "
-                      << "of iterations and took " << timing_ << " seconds!\n\n";
-        }
-        else if (myid_ == 0 && print_level_ >= 0)
-        {
-            std::cout << tag_ << " solver took " << iter_ << " iterations in "
-                      << timing_ << " seconds.\n\n";
-        }
+        IterationStep(rhs, sol);
+    }
+
+    timing_ = chrono.RealTime();
+    if (!converged_ && myid_ == 0 && param_.print_level >= 0)
+    {
+        std::cout << "Warning: " << tag_ << " solver reached maximum number "
+                  << "of iterations and took " << timing_ << " seconds!\n\n";
+    }
+    else if (myid_ == 0 && param_.print_level >= 0)
+    {
+        std::cout << tag_ << " solver took " << iter_ << " iterations in "
+                  << timing_ << " seconds.\n\n";
     }
 }
 
 void NonlinearSolver::UpdateLinearSolveTol()
 {
-    double tol;
-    if (linear_tol_criterion_ == TaylorResidual)
-    {
-        tol = std::fabs(resid_norm_ - linear_resid_norm_) / prev_resid_norm_;
-    }
-    else // NonlinearResidual
-    {
-        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
-        double ref_norm = solve_type_ == Newton ? prev_resid_norm_ : rhs_norm_;
-        tol = std::pow(resid_norm_ / ref_norm, exponent);
-    }
-
+    double exponent = linearization_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
+    double ref_norm = linearization_ == Newton ? prev_resid_norm_ : rhs_norm_;
+    double tol = std::pow(resid_norm_ / ref_norm, exponent);
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param)
-    : NonlinearSolver(comm, size, param.solve_type, "Nonlinear MG", param.initial_linear_tol),
+NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, FASParameters param)
+    : NonlinearSolver(comm, size, param),
       cycle_(param.cycle), num_levels_(num_levels), rhs_(num_levels_),
-      sol_(num_levels_), help_(num_levels_), residual_norms_(num_levels)
-{ }
+      sol_(num_levels_), help_(num_levels_), resid_norms_(num_levels)
+{
+    tag_ = "Nonlinear MG";
+}
 
 void NonlinearMG::Mult(const mfem::Vector& x, mfem::Vector& Rx)
 {
@@ -146,7 +125,7 @@ void NonlinearMG::FAS_Cycle(int level)
     else
     {
         // Pre-smoothing
-        if (cycle_ == V_CYCLE || cycle_ == CASCADIC)
+        if (cycle_ == V_CYCLE)
         {
             Smoothing(level, rhs_[level], sol_[level]);
         }
@@ -159,11 +138,10 @@ void NonlinearMG::FAS_Cycle(int level)
 
         mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
 
+        resid_norms_[level] = resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
         if (level == 0)
         {
-            resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
             UpdateLinearSolveTol();
-            prev_resid_norm_ = resid_norm_;
 
             if (resid_norm_ < adjusted_tol_)
             {
@@ -174,13 +152,11 @@ void NonlinearMG::FAS_Cycle(int level)
                 }
                 return;
             }
-        }
-        else
-        {
-            residual_norms_[level] = mfem::ParNormlp(true_resid, 2, comm_);
+
+            prev_resid_norm_ = resid_norm_;
         }
 
-        if (level || resid_norm_ > rhs_norm_ * (solve_type_ == Picard ? 1e-8 : 1e-4))
+        if (level || resid_norm_ > rhs_norm_ * (linearization_ == Picard ? 1e-8 : 1e-4))
         {
             Restrict(level, help_[level], help_[level + 1]);
 
@@ -203,7 +179,7 @@ void NonlinearMG::FAS_Cycle(int level)
 
             if (cycle_ == V_CYCLE)
             {
-                BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
+                BackTracking(level, rhs_[level], resid_norms_[level],
                              sol_[level], help_[level]);
             }
         }

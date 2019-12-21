@@ -40,6 +40,14 @@ void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector
     Mult(rhs, sol);
 }
 
+mfem::BlockVector MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs) const
+{
+    mfem::BlockVector sol(rhs);
+    sol = 0.0;
+    Mult(rhs, sol);
+    return sol;
+}
+
 void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
     Mult(rhs, sol);
