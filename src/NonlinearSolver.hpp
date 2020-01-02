@@ -40,7 +40,7 @@ struct NLSolverParameters
 
     bool check_converge = true;
     Linearization linearization = Newton;
-    int max_num_backtrack = 0;
+    int num_backtrack = 0;
     double diff_tol = -1.0;
     double init_linear_tol = 1e-8;
 };
@@ -90,7 +90,6 @@ protected:
     MPI_Comm comm_;
     int myid_;
     int size_;
-    Linearization linearization_;
     std::string tag_;
 
     mfem::Vector residual_;
@@ -109,35 +108,11 @@ enum Cycle { V_CYCLE, FMG };
 
 struct FASParameters : public NLSolverParameters
 {
+    int num_levels = 1;
     Cycle cycle = V_CYCLE;
     NLSolverParameters fine;
     NLSolverParameters mid;
     NLSolverParameters coarse;
-
-    /// TODO
-    void RegisterInOptionsParser(mfem::OptionsParser& args)
-    {
-        args.AddOption(&fine.max_num_backtrack, "--num-backtrack-fine", "--max-num-backtrack-fine",
-                       "Maximum number of backtracking steps.");
-        args.AddOption(&mid.max_num_backtrack, "--num-backtrack-mid", "--max-num-backtrack-mid",
-                       "Maximum number of backtracking steps.");
-        args.AddOption(&coarse.max_num_backtrack, "--num-backtrack-coarse", "--max-num-backtrack-coarse",
-                       "Maximum number of backtracking steps.");
-        args.AddOption(&fine.diff_tol, "--diff-tol-fine", "--diff-tol-fine",
-                       "Tolerance for solution change in fine level.");
-        args.AddOption(&mid.diff_tol, "--diff-tol-mid", "--diff-tol-mid",
-                       "Tolerance for solution change in intermediate levels.");
-        args.AddOption(&coarse.diff_tol, "--diff-tol-coarse", "--diff-tol-coarse",
-                       "Tolerance for solution change in coarse level.");
-        args.AddOption(&fine.max_num_iter, "--num-relax-fine", "--num-relax-fine",
-                       "Number of relaxation in fine level.");
-        args.AddOption(&mid.max_num_iter, "--num-relax-mid", "--num-relax-mid",
-                       "Number of relaxation in intermediate levels.");
-        args.AddOption(&coarse.max_num_iter, "--num-relax-coarse", "--num-relax-coarse",
-                       "Number of relaxation in coarse level.");
-        args.AddOption(&init_linear_tol, "--init-linear-tol", "--init-linear-tol",
-                       "Initial tol for linear solve inside nonlinear iterations.");
-    }
 };
 
 /**

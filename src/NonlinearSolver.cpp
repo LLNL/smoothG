@@ -88,8 +88,8 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
 void NonlinearSolver::UpdateLinearSolveTol()
 {
-    double exponent = linearization_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
-    double ref_norm = linearization_ == Newton ? prev_resid_norm_ : rhs_norm_;
+    double exponent = param_.linearization == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
+    double ref_norm = param_.linearization == Newton ? prev_resid_norm_ : rhs_norm_;
     double tol = std::pow(resid_norm_ / ref_norm, exponent);
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
@@ -156,7 +156,7 @@ void NonlinearMG::FAS_Cycle(int level)
             prev_resid_norm_ = resid_norm_;
         }
 
-        if (level || resid_norm_ > rhs_norm_ * (linearization_ == Picard ? 1e-8 : 1e-4))
+        if (level || resid_norm_ > rhs_norm_ * (param_.linearization == Picard ? 1e-8 : 1e-4))
         {
             Restrict(level, help_[level], help_[level + 1]);
 

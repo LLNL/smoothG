@@ -138,6 +138,9 @@ void dKinv_dp(const mfem::Vector& p, mfem::Vector& dkinv_dp);
 void Kappa(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& kp);
 void dKinv_dp(const mfem::Vector& p, const mfem::Vector& Z_vec, mfem::Vector& dkinv_dp);
 
+void RegisterOptions(FASParameters& param, bool use_vcycle, bool use_newton,
+                     int num_backtrack, double diff_tol);
+
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -156,9 +159,6 @@ int main(int argc, char* argv[])
     upscale_param.spect_tol = 1.0;
     upscale_param.hybridization = true;
     upscale_param.RegisterInOptionsParser(args);
-
-    FASParameters mg_param;
-    mg_param.RegisterInOptionsParser(args);
 
     const char* problem_name = "spe10";
     args.AddOption(&problem_name, "-mp", "--model-problem",
@@ -191,6 +191,20 @@ int main(int argc, char* argv[])
     bool visualization = false;
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
+    int num_backtrack = 4;
+    args.AddOption(&num_backtrack, "--num-backtrack", "--num-backtrack",
+                   "Maximum number of backtracking steps.");
+    double diff_tol = -1.0;
+    args.AddOption(&diff_tol, "--diff-tol", "--diff-tol", "Tolerance for solution change.");
+    FASParameters mg_param;
+    args.AddOption(&mg_param.fine.max_num_iter, "--num-relax-fine", "--num-relax-fine",
+                   "Number of relaxation in fine level.");
+    args.AddOption(&mg_param.mid.max_num_iter, "--num-relax-mid", "--num-relax-mid",
+                   "Number of relaxation in intermediate levels.");
+    args.AddOption(&mg_param.coarse.max_num_iter, "--num-relax-coarse", "--num-relax-coarse",
+                   "Number of relaxation in coarse level.");
+    args.AddOption(&mg_param.init_linear_tol, "--init-linear-tol", "--init-linear-tol",
+                   "Initial tol for linear solve inside nonlinear iterations.");
     args.Parse();
     if (!args.Good())
     {
@@ -205,8 +219,7 @@ int main(int argc, char* argv[])
     {
         args.PrintOptions(std::cout);
     }
-    mg_param.cycle = use_vcycle ? V_CYCLE : FMG;
-    mg_param.linearization = use_newton ? Newton : Picard;
+    RegisterOptions(mg_param, use_vcycle, use_newton, num_backtrack, diff_tol);
 
     // Setting up finite volume discretization problem
     double use_metis = true;
@@ -304,6 +317,22 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
+void RegisterOptions(FASParameters& param, bool use_vcycle, bool use_newton,
+                     int num_backtrack, double diff_tol)
+{
+    param.cycle = use_vcycle ? V_CYCLE : FMG;
+    param.linearization = use_newton ? Newton : Picard;
+    param.fine.linearization = param.linearization;
+    param.mid.linearization = param.linearization;
+    param.coarse.linearization = param.linearization;
+    param.fine.num_backtrack = num_backtrack;
+    param.mid.num_backtrack = num_backtrack;
+    param.coarse.num_backtrack = num_backtrack;
+    param.fine.diff_tol = diff_tol;
+    param.mid.diff_tol = diff_tol;
+    param.coarse.diff_tol = diff_tol;
+}
+
 /// @todo take MixedMatrix only
 LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level,
                          mfem::Vector Z_vector, NLSolverParameters param)
@@ -350,7 +379,7 @@ void LevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
     mfem::BlockVector block_sol(sol.GetData(), offsets_);
     mfem::BlockVector block_rhs(rhs.GetData(), offsets_);
 
-    if (linearization_ == Picard)
+    if (param_.linearization == Picard)
     {
         PicardStep(block_rhs, block_sol);
     }
@@ -443,12 +472,12 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
         }
     }
 
-    if (param_.max_num_backtrack > 0)
+    if (param_.num_backtrack > 0)
     {
         resid_norm_ = ResidualNorm(x, rhs);
     }
 
-    while (k < param_.max_num_backtrack && resid_norm_ > prev_resid_norm)
+    while (k < param_.num_backtrack && resid_norm_ > prev_resid_norm)
     {
         double backtracking_resid_norm = resid_norm_;
 
@@ -554,18 +583,8 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
         help_[level].SetSize(LevelSize(level));
         help_[level] = 0.0;
 
-
-        NLSolverParameters& param_l = level == num_levels_ - 1 ? param.coarse :
-                                      (level == 0 ? param.fine : param.mid);
-
-        if (level == 0)
-        {
-            solvers_.emplace_back(hierarchy.GetMatrix(level), level, std::move(Z_l), param_l);
-        }
-        else
-        {
-            solvers_.emplace_back(hierarchy.GetMatrix(level), level, std::move(Z_l), param_l);
-        }
+        auto& param_l = level ? (level < num_levels_ - 1 ? param.mid : param.coarse) : param.fine;
+        solvers_.emplace_back(hierarchy.GetMatrix(level), level, std::move(Z_l), param_l);
         solvers_[level].SetPrintLevel(cycle_ == V_CYCLE ? -1 : 0);
 
         if (myid_ == 0 && param.print_level > -1)
@@ -574,7 +593,7 @@ EllipticNLMG::EllipticNLMG(Hierarchy& hierarchy, const mfem::Vector& Z_fine,
                       << "smoothing steps: " << param_l.max_num_iter << "\n"
                       << "  Pressure change tol: " << param_l.diff_tol << "\n"
                       << "  Max number of residual-based backtracking: = "
-                      << param_l.max_num_backtrack << "\n";
+                      << param_l.num_backtrack << "\n";
         }
     }
     if (myid_ == 0) std::cout << "\n";
@@ -610,7 +629,7 @@ void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& co
 
 void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
-    double ratio = linearization_ == Newton ? 1e-6 : 1e-2;
+    double ratio = param_.linearization == Newton ? 1e-6 : 1e-2;
     hierarchy_.SetRelTol(level, std::max((level ? ratio : 1.0) * linear_tol_, 1e-8));
 
     solvers_[level].Solve(in, out);
