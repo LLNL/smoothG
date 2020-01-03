@@ -47,7 +47,7 @@ struct Kappa
 };
 
 /**
-   @brief Nonlinear elliptic problem
+   @brief Solver for nonlinear elliptic problem associated with div (K(p) grad p)
 
    Given \f$f \in L^2(\Omega)\f$, \f$k(p)\f$ a differentiable function of p,
    find \f$p\f$ such that \f$-div(k_0k(p)\nabla p) = f\f$.
@@ -55,34 +55,25 @@ struct Kappa
 class LevelSolver : public NonlinearSolver
 {
 public:
-    /**
-       @todo take Kappa(p) as input
-    */
+    /// Constructor
     LevelSolver(const MixedMatrix& mixed_system, int level,
                 Kappa kappa, NLSolverParameters param);
 
-    // Compute Ax = A(x) - b.
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax) override;
+    void Mult(const mfem::Vector& x, mfem::Vector& Ax) override;
 
+    /// Set relative tolerance of solver for linearized problem
     void SetLinearRelTol(double tol) { linear_solver_->SetRelTol(tol); }
 
+    /// Shrink delta x (change in solution) in case of bad step
     void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
                       mfem::Vector& x, mfem::Vector& dx, bool interlopate = false);
 private:
-    mfem::Vector EvalKappa(const mfem::Vector& sol_block1);
-    mfem::Vector EvalKinvDerivative(const mfem::Vector& sol_block1);
     void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p);
-
-    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
-
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const override;
-
-    virtual const mfem::Array<int>& GetEssDofs() const override
-    {
-        return mixed_system_.GetEssDofs();
-    }
+    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
+    mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const override;
+    const mfem::Array<int>& GetEssDofs() const override { return mixed_system_.GetEssDofs(); }
 
     int level_;
     const MixedMatrix& mixed_system_;
@@ -90,7 +81,7 @@ private:
 
     unique_ptr<MixedLaplacianSolver> linear_solver_;
 
-    mfem::Vector p_;         // coefficient vector in piecewise 1 basis
+    mfem::Vector p_;         // projected pressure in piecewise 1 basis
     mfem::Vector kp_;        // kp_ = Kappa(p)
     mfem::Vector dkinv_dp_;  // dkinv_dp_ = d ( Kappa(p)^{-1} ) / dp
 
@@ -98,45 +89,21 @@ private:
     Kappa kappa_;
 };
 
-// nonlinear elliptic hierarchy
-class EllipticNLMG : public NonlinearMG
+// FAS for nonlinear elliptic problem
+class EllipticNLMG : public FAS
 {
 public:
     EllipticNLMG(const Hierarchy& hierarchy_, const Kappa& kappa, FASParameters param);
-
-    void Solve(const mfem::Vector& rhs, mfem::Vector& sol)
-    {
-        NonlinearSolver::Solve(rhs, sol);
-    }
-
-    LevelSolver& GetLevelSolver(int level) { return solvers_[level]; }
 private:
-    virtual void Mult(int level, const mfem::Vector& x, mfem::Vector& Ax);
-    virtual void Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol);
-    virtual void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const;
-    virtual void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const;
-    virtual void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const;
-    virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out);
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
-
-    const mfem::Array<int>& Offsets(int level) const;
-    virtual const mfem::Array<int>& GetEssDofs() const { return GetEssDofs(0); }
-
-    virtual void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
-                              mfem::Vector& x, mfem::Vector& dx)
-    {
-        solvers_[level].BackTracking(rhs, prev_resid_norm, x, dx, true);
-    }
-
-    virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec_dof) const
-    {
-        return hierarchy_.GetMatrix(level).AssembleTrueVector(vec_dof);
-    }
-
-    virtual const mfem::Array<int>& GetEssDofs(int level) const
-    {
-        return hierarchy_.GetMatrix(level).GetEssDofs();
-    }
+    void Mult(int level, const mfem::Vector& x, mfem::Vector& Ax) override;
+    void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
+    void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const override;
+    void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
+    void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) override;
+    void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
+                      mfem::Vector& x, mfem::Vector& dx) override;
+    mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec) const override;
+    const mfem::Array<int>& GetEssDofs(int level) const override;
 
     const Hierarchy& hierarchy_;
     std::vector<LevelSolver> solvers_;
@@ -206,7 +173,7 @@ int main(int argc, char* argv[])
                    "Number of relaxation in intermediate levels.");
     args.AddOption(&mg_param.coarse.max_num_iter, "--num-relax-coarse", "--num-relax-coarse",
                    "Number of relaxation in coarse level.");
-    args.AddOption(&mg_param.init_linear_tol, "--init-linear-tol", "--init-linear-tol",
+    args.AddOption(&mg_param.nl_solve.init_linear_tol, "--init-linear-tol", "--init-linear-tol",
                    "Initial tol for linear solve inside nonlinear iterations.");
     args.Parse();
     if (!args.Good())
@@ -314,11 +281,12 @@ void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
                 int num_backtrack, double diff_tol)
 {
     param.cycle = use_vcycle ? V_CYCLE : FMG;
-    param.linearization = use_newton ? Newton : Picard;
+    param.nl_solve.linearization = use_newton ? Newton : Picard;
+    param.coarse_correct_tol = use_newton ? 1e-4 : 1e-8;
     param.fine.check_converge = false;
-    param.fine.linearization = param.linearization;
-    param.mid.linearization = param.linearization;
-    param.coarse.linearization = param.linearization;
+    param.fine.linearization = param.nl_solve.linearization;
+    param.mid.linearization = param.nl_solve.linearization;
+    param.coarse.linearization = param.nl_solve.linearization;
     param.fine.num_backtrack = num_backtrack;
     param.mid.num_backtrack = num_backtrack;
     param.coarse.num_backtrack = num_backtrack;
@@ -327,7 +295,6 @@ void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
     param.coarse.diff_tol = diff_tol;
 }
 
-/// @todo take MixedMatrix only
 LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level,
                          Kappa kappa, NLSolverParameters param)
     : NonlinearSolver(mixed_system.GetComm(), mixed_system.BlockOffsets()[2], param),
@@ -477,10 +444,8 @@ void LevelSolver::Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p)
 {
     auto& vert_edof = mixed_system_.GetGraphSpace().VertexToEDof();
     auto& vert_vdof = mixed_system_.GetGraphSpace().VertexToVDof();
-
     auto& MB = dynamic_cast<const ElementMBuilder&>(mixed_system_.GetMBuilder());
     auto& M_el = MB.GetElementMatrices();
-
     auto& proj_pwc = const_cast<mfem::SparseMatrix&>(mixed_system_.GetPWConstProj());
 
     dMdp_.resize(M_el.size());
@@ -512,44 +477,42 @@ void LevelSolver::Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p)
 }
 
 EllipticNLMG::EllipticNLMG(const Hierarchy& hierarchy, const Kappa& kappa, FASParameters param)
-    : NonlinearMG(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2], param),
-      hierarchy_(hierarchy)
+    : FAS(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2], param), hierarchy_(hierarchy)
 {
-    std::vector<mfem::Vector> help(num_levels_);
-    solvers_.reserve(num_levels_);
-    for (int level = 0; level < num_levels_; ++level)
+    std::vector<mfem::Vector> help(param.num_levels);
+    solvers_.reserve(param.num_levels);
+    for (int l = 0; l < param.num_levels; ++l)
     {
         Kappa kappa_l(kappa);
         if (kappa.Z.Size())
         {
-            help[level] = level ? hierarchy.Project(level - 1, help[level - 1]) : kappa.Z;
-            kappa_l.Z = hierarchy.PWConstProject(level, help[level]);
+            help[l] = l ? hierarchy.Project(l - 1, help[l - 1]) : kappa.Z;
+            kappa_l.Z = hierarchy.PWConstProject(l, help[l]);
         }
 
-        auto& param_l = level ? (level < num_levels_ - 1 ? param.mid : param.coarse) : param.fine;
-        solvers_.emplace_back(hierarchy.GetMatrix(level), level, std::move(kappa), param_l);
-        solvers_[level].SetPrintLevel(cycle_ == V_CYCLE ? -1 : 0);
+        auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
+        solvers_.emplace_back(hierarchy.GetMatrix(l), l, std::move(kappa_l), param_l);
+        solvers_[l].SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 0);
 
-        if (level > 0)
+        if (l > 0)
         {
-            rhs_[level].SetSize(hierarchy_.GetMatrix(level).NumTotalDofs());
-            sol_[level].SetSize(hierarchy_.GetMatrix(level).NumTotalDofs());
-            rhs_[level] = 0.0;
-            sol_[level] = 0.0;
+            rhs_[l].SetSize(hierarchy_.GetMatrix(l).NumTotalDofs());
+            sol_[l].SetSize(hierarchy_.GetMatrix(l).NumTotalDofs());
+            rhs_[l] = 0.0;
+            sol_[l] = 0.0;
         }
-        help_[level].SetSize(hierarchy_.GetMatrix(level).NumTotalDofs());
-        help_[level] = 0.0;
+        help_[l].SetSize(hierarchy_.GetMatrix(l).NumTotalDofs());
+        help_[l] = 0.0;
 
-        if (myid_ == 0 && param.print_level > -1)
+        if (myid_ == 0 && param.nl_solve.print_level > -1)
         {
-            std::cout << "\nMG level " << level << " parameters:\n  Number of "
+            std::cout << "\nMG level " << l << " parameters:\n  Number of "
                       << "smoothing steps: " << param_l.max_num_iter << "\n"
                       << "  Kappa change tol: " << param_l.diff_tol << "\n"
                       << "  Max number of residual-based backtracking: "
                       << param_l.num_backtrack << "\n";
         }
     }
-    if (myid_ == 0) std::cout << "\n";
 }
 
 void EllipticNLMG::Mult(int level, const mfem::Vector& x, mfem::Vector& Ax)
@@ -557,44 +520,44 @@ void EllipticNLMG::Mult(int level, const mfem::Vector& x, mfem::Vector& Ax)
     solvers_[level].Mult(x, Ax);
 }
 
-void EllipticNLMG::Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol)
-{
-    Smoothing(level, rhs, sol);
-}
-
 void EllipticNLMG::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
 {
-    mfem::BlockVector block_fine(fine.GetData(), Offsets(level));
+    mfem::BlockVector block_fine(fine.GetData(), hierarchy_.BlockOffsets(level));
     coarse = hierarchy_.Restrict(level, block_fine);
 }
 
 void EllipticNLMG::Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const
 {
-    mfem::BlockVector block_coarse(coarse.GetData(), Offsets(level));
+    mfem::BlockVector block_coarse(coarse.GetData(), hierarchy_.BlockOffsets(level));
     fine = hierarchy_.Interpolate(level, block_coarse);
 }
 
 void EllipticNLMG::Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
 {
-    mfem::BlockVector block_fine(fine.GetData(), Offsets(level));
+    mfem::BlockVector block_fine(fine.GetData(), hierarchy_.BlockOffsets(level));
     coarse = hierarchy_.Project(level, block_fine);
 }
 
 void EllipticNLMG::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
-    double ratio = param_.linearization == Newton ? 1e-6 : 1e-2;
-    solvers_[level].SetLinearRelTol(std::max((level ? ratio : 1.0) * linear_tol_, 1e-8));
+    solvers_[level].SetLinearRelTol(linear_tol_);
     solvers_[level].Solve(in, out);
 }
 
-const mfem::Array<int>& EllipticNLMG::Offsets(int level) const
+void EllipticNLMG::BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
+                                mfem::Vector& x, mfem::Vector& dx)
 {
-    return hierarchy_.BlockOffsets(level);
+    solvers_[level].BackTracking(rhs, prev_resid_norm, x, dx, true);
 }
 
-mfem::Vector EllipticNLMG::AssembleTrueVector(const mfem::Vector& vec) const
+mfem::Vector EllipticNLMG::AssembleTrueVector(int level, const mfem::Vector& vec) const
 {
-    return AssembleTrueVector(0, vec);
+    return hierarchy_.GetMatrix(level).AssembleTrueVector(vec);
+}
+
+const mfem::Array<int>& EllipticNLMG::GetEssDofs(int level) const
+{
+    return hierarchy_.GetMatrix(level).GetEssDofs();
 }
 
 Kappa::Kappa(const Soil& soil, const mfem::Vector& Z_in)

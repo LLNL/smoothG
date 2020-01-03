@@ -51,11 +51,11 @@ class NonlinearSolver
 public:
     NonlinearSolver(MPI_Comm comm, int size, NLSolverParameters param);
 
-    // Solve R(sol) = rhs
+    /// Solve A(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
 
-    // Compute the residual Rx = R(x).
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) = 0;
+    /// Action of nonlinear operator Ax = A(x).
+    virtual void Mult(const mfem::Vector& x, mfem::Vector& Ax) = 0;
 
     ///@name Set solver parameters
     ///@{
@@ -79,7 +79,7 @@ protected:
 
     virtual void IterationStep(const mfem::Vector& x, mfem::Vector& y) = 0;
 
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
+    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const = 0;
 
     virtual const mfem::Array<int>& GetEssDofs() const = 0;
 
@@ -105,40 +105,45 @@ protected:
 
 enum Cycle { V_CYCLE, FMG };
 
-struct FASParameters : public NLSolverParameters
+struct FASParameters
 {
-    int num_levels = 1;
-    Cycle cycle = V_CYCLE;
-    NLSolverParameters fine;
-    NLSolverParameters mid;
-    NLSolverParameters coarse;
+    int num_levels = 1;             // number of multigrid levels
+    Cycle cycle = V_CYCLE;          // multigrid cycle type
+    double coarse_correct_tol;      // no coarse correction if rel resid < tol
+    NLSolverParameters nl_solve;    // for FAS itself as a nonlinear solver
+    NLSolverParameters fine;        // for finest level nonlinear solve
+    NLSolverParameters mid;         // for intermediate levels nonlinear solves
+    NLSolverParameters coarse;      // for coarsest level nonlinear solve
 };
 
 /**
-   @brief Nonlinear multigrid using full approximation scheme and nonlinear relaxation.
+   @brief Nonlinear multigrid solver using full approximation scheme.
 
-       Solve a nonlinear problem using FAS
+       Abstract class for FAS. Operations like smoothing, interpolation,
+       restriction, projection, etc. need to be provided.
        Vectors here are in "dof" numbering, NOT "truedof" numbering.
 */
-class NonlinearMG : public NonlinearSolver
+class FAS : public NonlinearSolver
 {
 public:
-    // the time dependent operators gets updated during solving
-    NonlinearMG(MPI_Comm comm, int size, FASParameters param);
+    /// Constructor
+    FAS(MPI_Comm comm, int size, FASParameters param);
 
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
+    void Mult(const mfem::Vector& x, mfem::Vector& Ax) override { Mult(0, x, Ax); }
 protected:
-    void FAS_Cycle(int level);
+    void MG_Cycle(int level);
 
-    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
+    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
 
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
+    mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const override
+    {
+        return AssembleTrueVector(0, vec);
+    }
+
+    const mfem::Array<int>& GetEssDofs() const override { return GetEssDofs(0); }
 
     /// Evaluates the action of the operator out = A[level](in)
     virtual void Mult(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
-
-    /// Solves the (possibly nonlinear) problem A[level](sol) = rhs
-    virtual void Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol) = 0;
 
     /// Restrict a vector from level to level+1 (coarser level)
     virtual void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const = 0;
@@ -155,17 +160,15 @@ protected:
     virtual void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
                               mfem::Vector& x, mfem::Vector& dx) = 0;
 
-
-    virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec_dof) const = 0;
+    virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec) const = 0;
     virtual const mfem::Array<int>& GetEssDofs(int level) const = 0;
 
-    Cycle cycle_;
-    int num_levels_;
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;
     mutable std::vector<mfem::Vector> help_;
-
     std::vector<double> resid_norms_;
+
+    FASParameters param_;
 };
 
 } // namespace smoothg

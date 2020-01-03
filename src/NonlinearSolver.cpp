@@ -95,38 +95,32 @@ void NonlinearSolver::UpdateLinearSolveTol()
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, FASParameters param)
-    : NonlinearSolver(comm, size, param), cycle_(param.cycle),
-      num_levels_(param.num_levels), rhs_(num_levels_),
-      sol_(num_levels_), help_(num_levels_), resid_norms_(num_levels_)
+FAS::FAS(MPI_Comm comm, int size, FASParameters param)
+    : NonlinearSolver(comm, size, param.nl_solve), rhs_(param.num_levels),
+      sol_(rhs_.size()), help_(rhs_.size()), resid_norms_(rhs_.size()), param_(param)
 {
-    tag_ = "Nonlinear MG";
+    tag_ = "FAS";
 }
 
-void NonlinearMG::Mult(const mfem::Vector& x, mfem::Vector& Rx)
-{
-    Mult(0, x, Rx);
-}
-
-void NonlinearMG::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+void FAS::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
     rhs_[0].SetDataAndSize(rhs.GetData(), rhs.Size());
     sol_[0].SetDataAndSize(sol.GetData(), sol.Size());
 
-    FAS_Cycle(0);
+    MG_Cycle(0);
 }
 
-void NonlinearMG::FAS_Cycle(int level)
+void FAS::MG_Cycle(int level)
 {
-    if (level == num_levels_ - 1)
+    if (level == param_.num_levels - 1)
     {
-        Solve(level, rhs_[level], sol_[level]);
+        Smoothing(level, rhs_[level], sol_[level]);
         SetZeroAtMarker(GetEssDofs(level), sol_[level]);
     }
     else
     {
         // Pre-smoothing
-        if (cycle_ == V_CYCLE)
+        if (param_.cycle == V_CYCLE)
         {
             Smoothing(level, rhs_[level], sol_[level]);
         }
@@ -138,8 +132,8 @@ void NonlinearMG::FAS_Cycle(int level)
         SetZeroAtMarker(GetEssDofs(level), help_[level]);
 
         mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
-
         resid_norms_[level] = resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
+
         if (level == 0)
         {
             UpdateLinearSolveTol();
@@ -157,7 +151,7 @@ void NonlinearMG::FAS_Cycle(int level)
             prev_resid_norm_ = resid_norm_;
         }
 
-        if (level || resid_norm_ > rhs_norm_ * (param_.linearization == Picard ? 1e-8 : 1e-4))
+        if (level || resid_norm_ > rhs_norm_ * param_.coarse_correct_tol)
         {
             Restrict(level, help_[level], help_[level + 1]);
 
@@ -170,7 +164,7 @@ void NonlinearMG::FAS_Cycle(int level)
             mfem::Vector coarse_sol = sol_[level + 1];
 
             // Go to coarser level (sol_[level + 1] will be updated)
-            FAS_Cycle(level + 1);
+            MG_Cycle(level + 1);
 
             // Compute correction x_l += P( x_{l+1} - pi x_l )
             coarse_sol -= sol_[level + 1];
@@ -178,7 +172,7 @@ void NonlinearMG::FAS_Cycle(int level)
             Interpolate(level + 1, coarse_sol, help_[level]);
             sol_[level] -= help_[level];
 
-            if (cycle_ == V_CYCLE)
+            if (param_.cycle == V_CYCLE)
             {
                 BackTracking(level, rhs_[level], resid_norms_[level],
                              sol_[level], help_[level]);
@@ -186,10 +180,7 @@ void NonlinearMG::FAS_Cycle(int level)
         }
 
         // Post-smoothing
-        if (cycle_ == V_CYCLE || cycle_ == FMG)
-        {
-            Smoothing(level, rhs_[level], sol_[level]);
-        }
+        Smoothing(level, rhs_[level], sol_[level]);
     }
 }
 
