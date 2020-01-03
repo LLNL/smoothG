@@ -56,8 +56,8 @@ class LevelSolver : public NonlinearSolver
 {
 public:
     /// Constructor
-    LevelSolver(const MixedMatrix& mixed_system, int level,
-                Kappa kappa, NLSolverParameters param);
+    LevelSolver(const MixedMatrix& mixed_system, int level, Kappa kappa,
+                const mfem::Array<int>& ess_attr, NLSolverParameters param);
 
     void Mult(const mfem::Vector& x, mfem::Vector& Ax) override;
 
@@ -93,7 +93,8 @@ private:
 class EllipticNLMG : public FAS
 {
 public:
-    EllipticNLMG(const Hierarchy& hierarchy_, const Kappa& kappa, FASParameters param);
+    EllipticNLMG(const Hierarchy& hierarchy_, const Kappa& kappa,
+                 const mfem::Array<int>& ess_attr, FASParameters param);
 private:
     void Mult(int level, const mfem::Vector& x, mfem::Vector& Ax) override;
     void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
@@ -199,7 +200,7 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     unique_ptr<DarcyProblem> fv_problem;
-    unique_ptr<Kappa> kappa(new Kappa(alpha));
+    Kappa kappa(alpha);
     if (problem == "spe10")
     {
         ess_attr[dim - 2] = 0;
@@ -220,7 +221,7 @@ int main(int argc, char* argv[])
     {
         ess_attr[0] = 0;
         fv_problem.reset(new Richards(num_sr, ess_attr));
-        kappa.reset(new Kappa(Loam, fv_problem->ComputeZ()));
+        kappa = Kappa(Loam, fv_problem->ComputeZ());
     }
     else
     {
@@ -250,7 +251,7 @@ int main(int argc, char* argv[])
     mfem::BlockVector sol_nlmg(rhs);
     sol_nlmg = 0.0;
 
-    EllipticNLMG nlmg(hierarchy, *kappa, mg_param);
+    EllipticNLMG nlmg(hierarchy, kappa, ess_attr, mg_param);
     nlmg.SetPrintLevel(1);
     nlmg.SetRelTol(1e-6);
     nlmg.SetMaxIter(200);
@@ -260,7 +261,7 @@ int main(int argc, char* argv[])
 
     if (visualization)
     {
-        sol_nlmg.GetBlock(1).Add(problem == "richard" ? -1.0 : 0.0, kappa->Z);
+        sol_nlmg.GetBlock(1).Add(problem == "richard" ? -1.0 : 0.0, kappa.Z);
 
         mfem::socketstream sout;
         fv_problem->VisSetup(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "", false, false);
@@ -295,19 +296,14 @@ void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
     param.coarse.diff_tol = diff_tol;
 }
 
-LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level,
-                         Kappa kappa, NLSolverParameters param)
+LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level, Kappa kappa,
+                         const mfem::Array<int>& ess_attr, NLSolverParameters param)
     : NonlinearSolver(mixed_system.GetComm(), mixed_system.BlockOffsets()[2], param),
       level_(level), mixed_system_(mixed_system), offsets_(mixed_system_.BlockOffsets()),
       p_(mixed_system.GetGraph().NumVertices()), kp_(p_.Size()), dkinv_dp_(p_.Size()),
       kappa_(std::move(kappa))
 {
     tag_ = param.linearization ? "Picard" : "Newton";
-
-    // TODO: deal with ess_attr correctly
-    mfem::Array<int> ess_attr(4);
-    ess_attr = 1;
-    ess_attr[0] = 0;
 
     if (level > 0) // Hybridization solver
     {
@@ -476,7 +472,8 @@ void LevelSolver::Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p)
     }
 }
 
-EllipticNLMG::EllipticNLMG(const Hierarchy& hierarchy, const Kappa& kappa, FASParameters param)
+EllipticNLMG::EllipticNLMG(const Hierarchy& hierarchy, const Kappa& kappa,
+                           const mfem::Array<int>& ess_attr, FASParameters param)
     : FAS(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2], param), hierarchy_(hierarchy)
 {
     std::vector<mfem::Vector> help(param.num_levels);
@@ -490,18 +487,19 @@ EllipticNLMG::EllipticNLMG(const Hierarchy& hierarchy, const Kappa& kappa, FASPa
             kappa_l.Z = hierarchy.PWConstProject(l, help[l]);
         }
 
+        auto& matrix_l = hierarchy.GetMatrix(l);
         auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
-        solvers_.emplace_back(hierarchy.GetMatrix(l), l, std::move(kappa_l), param_l);
+        solvers_.emplace_back(matrix_l, l, std::move(kappa_l), ess_attr, param_l);
         solvers_[l].SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 0);
 
         if (l > 0)
         {
-            rhs_[l].SetSize(hierarchy_.GetMatrix(l).NumTotalDofs());
-            sol_[l].SetSize(hierarchy_.GetMatrix(l).NumTotalDofs());
+            rhs_[l].SetSize(matrix_l.NumTotalDofs());
+            sol_[l].SetSize(matrix_l.NumTotalDofs());
             rhs_[l] = 0.0;
             sol_[l] = 0.0;
         }
-        help_[l].SetSize(hierarchy_.GetMatrix(l).NumTotalDofs());
+        help_[l].SetSize(matrix_l.NumTotalDofs());
         help_[l] = 0.0;
 
         if (myid_ == 0 && param.nl_solve.print_level > -1)
