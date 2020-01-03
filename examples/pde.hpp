@@ -513,11 +513,7 @@ public:
 
     int NumIsoVerts() const { return iso_vert_count_; }
 
-    InversePermeabilityCoefficient& GetCoeff() { return (InversePermeabilityCoefficient&)(*kinv_vector_); }
-
     const mfem::ParMesh& GetMesh() const { return *pmesh_; }
-
-    mfem::GridFunction& GetGF() const { return *coeff_gf_; }
 
     /// Save mesh with partitioning information (GLVis can separate partitions)
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
@@ -541,7 +537,8 @@ public:
 
     void VisualizePermeability();
 
-    mfem::Vector GetZVector() const;
+    /// @return a vector of size number of cells containing z-coordinates of cell centers
+    mfem::Vector ComputeZ() const;
 protected:
     void BuildReservoirGraph();
     void InitGraph();
@@ -809,12 +806,11 @@ void DarcyProblem::Partition(bool metis_parition,
     }
 }
 
-mfem::Vector DarcyProblem::GetZVector() const
+mfem::Vector DarcyProblem::ComputeZ() const
 {
-    mfem::Vector Z_vector(vertex_edge_.NumRows());
-    Z_vector = 0.0;
-
-    int z_index = pmesh_->SpaceDimension() - 1;
+    const int z_index = pmesh_->SpaceDimension() - 1;
+    mfem::Vector Z(vertex_edge_.NumRows());
+    Z = 0.0;
 
     mfem::Array<int> vertices;
     for (int i = 0; i < pmesh_->GetNE(); ++i)
@@ -822,12 +818,12 @@ mfem::Vector DarcyProblem::GetZVector() const
         pmesh_->GetElement(i)->GetVertices(vertices);
         for (auto& vertex : vertices)
         {
-            Z_vector[i] += pmesh_->GetVertex(vertex)[z_index];
+            Z[i] += pmesh_->GetVertex(vertex)[z_index];
         }
-        Z_vector[i] /= vertices.Size();
+        Z[i] /= vertices.Size();
     }
 
-    return Z_vector;
+    return Z;
 }
 
 void DarcyProblem::VisualizePermeability()
@@ -1245,7 +1241,6 @@ class Richards : public DarcyProblem
 {
 public:
     Richards(int num_ref, const mfem::Array<int>& ess_attr);
-    mfem::Vector GetZVector() const;
 private:
     void SetupMeshCoeff(int num_ref);
     void SetupRHS();

@@ -24,7 +24,8 @@ namespace smoothg
 {
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, NLSolverParameters param)
-    : comm_(comm), size_(size), tag_("Nonlinear"), residual_(size), param_(param)
+    : comm_(comm), size_(size), tag_("Nonlinear"), residual_(size),
+      linear_tol_(param.init_linear_tol), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -51,7 +52,7 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     converged_ = false;
     for (iter_ = 0; iter_ < param_.max_num_iter + 1; iter_++)
     {
-        if (check_converge_)
+        if (param_.check_converge)
         {
             resid_norm_ = ResidualNorm(sol, rhs);
 
@@ -64,11 +65,11 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
             converged_ = (resid_norm_ < adjusted_tol_);
 
-            if (converged_ || iter_ == param_.max_num_iter) { break; }
-
             UpdateLinearSolveTol();
             prev_resid_norm_ = resid_norm_;
         }
+
+        if (converged_ || iter_ == param_.max_num_iter) { break; }
 
         IterationStep(rhs, sol);
     }
@@ -94,10 +95,10 @@ void NonlinearSolver::UpdateLinearSolveTol()
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, FASParameters param)
-    : NonlinearSolver(comm, size, param),
-      cycle_(param.cycle), num_levels_(num_levels), rhs_(num_levels_),
-      sol_(num_levels_), help_(num_levels_), resid_norms_(num_levels)
+NonlinearMG::NonlinearMG(MPI_Comm comm, int size, FASParameters param)
+    : NonlinearSolver(comm, size, param), cycle_(param.cycle),
+      num_levels_(param.num_levels), rhs_(num_levels_),
+      sol_(num_levels_), help_(num_levels_), resid_norms_(num_levels_)
 {
     tag_ = "Nonlinear MG";
 }

@@ -94,7 +94,6 @@ protected:
 
     mfem::Vector residual_;
 
-    bool check_converge_;
     double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
     double rhs_norm_;
     double resid_norm_;
@@ -125,7 +124,7 @@ class NonlinearMG : public NonlinearSolver
 {
 public:
     // the time dependent operators gets updated during solving
-    NonlinearMG(MPI_Comm comm, int size, int num_levels, FASParameters param);
+    NonlinearMG(MPI_Comm comm, int size, FASParameters param);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx);
 protected:
