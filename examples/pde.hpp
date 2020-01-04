@@ -1145,7 +1145,7 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length)
         rhs[i] = scalar_g * std::sqrt(cell_vol) * normal_dist.Sample();
     }
 
-    MinresBlockSolverFalse solver(mgL, &ess_attr);
+    BlockSolverFalse solver(mgL, &ess_attr);
     mfem::Vector sol;
     sol = 0.0;
     solver.Solve(rhs, sol);

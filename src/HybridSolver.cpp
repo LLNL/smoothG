@@ -37,7 +37,6 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
     :
     MixedLaplacianSolver(mgL.GetComm(), mgL.BlockOffsets(), mgL.CheckW()),
     mgL_(mgL),
-    cg_(comm_),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
@@ -109,12 +108,7 @@ void HybridSolver::Init(
         std::cout << "  Timing: Hybridized system built in "
                   << chrono.RealTime() << "s. \n";
 
-    cg_.SetPrintLevel(print_level_);
-    cg_.SetMaxIter(max_num_iter_);
-    cg_.SetRelTol(rtol_);
-    cg_.SetAbsTol(atol_);
-    cg_.iterative_mode = true;
-
+    solver_ = InitKrylovSolver(CG);
     BuildParallelSystemAndSolver(H_proc);
 
     Hrhs_.SetSize(num_multiplier_dofs_);
@@ -571,15 +565,12 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
         InvRescaleVector(diagonal_scaling_, trueMu_);
     }
 
-    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&cg_)
-                  : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
-
     // solve the parallel global hybridized system
     mfem::StopWatch chrono;
     chrono.Clear();
     chrono.Start();
 
-    solver->Mult(trueHrhs_, trueMu_);
+    solver_->Mult(trueHrhs_, trueMu_);
 
     chrono.Stop();
     timing_ = chrono.RealTime();
@@ -593,23 +584,23 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     }
 
     // TODO: decide to use = or += here and in timing_ update (MinresBlockSolver uses +=)
-    num_iterations_ = solver->GetNumIterations();
+    num_iterations_ = solver_->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
     {
-        if (solver->GetConverged())
+        if (solver_->GetConverged())
         {
             std::cout << "  " + solver_name + " converged in "
                       << num_iterations_
                       << " with a final residual norm "
-                      << solver->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         }
         else
         {
             std::cout << "  " + solver_name + " did not converge in "
                       << num_iterations_
                       << ". Final residual norm is "
-                      << solver->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         }
     }
 
@@ -927,9 +918,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
     }
     nnz_ = H_->NNZ();
 
-    auto solver = is_symmetric_ ? dynamic_cast<mfem::IterativeSolver*>(&cg_)
-                  : dynamic_cast<mfem::IterativeSolver*>(&gmres_);
-    solver->SetOperator(*H_);
+    solver_->SetOperator(*H_);
 
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -988,7 +977,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
             prec_ = make_unique<AuxSpacePrec>(*H_, std::move(PV_map), local_dofs);
         }
 
-        solver->SetPreconditioner(*prec_);
+        solver_->SetPreconditioner(*prec_);
     }
     if (myid_ == 0 && print_level_ > 0)
         std::cout << "  Timing: Preconditioner for hybridized system"
@@ -1066,12 +1055,6 @@ void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
     }
     BuildParallelSystemAndSolver(H_proc);
 
-    gmres_.SetPrintLevel(print_level_);
-    gmres_.SetMaxIter(max_num_iter_);
-    gmres_.SetRelTol(rtol_);
-    gmres_.SetAbsTol(atol_);
-    gmres_.SetKDim(100);
-
     if (myid_ == 0 && print_level_ > 0)
     {
         std::cout << "  HybridSolver: rescaled system assembled in "
@@ -1087,15 +1070,11 @@ void HybridSolver::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
 
     is_symmetric_ = false;
 
+    solver_ = InitKrylovSolver(GMRES);
+    solver_->iterative_mode = false;
+
     auto H_proc = AssembleHybridSystem(elem_scaling_inverse, N_el);
     BuildParallelSystemAndSolver(H_proc);
-
-    gmres_.SetPrintLevel(print_level_);
-    gmres_.SetMaxIter(max_num_iter_);
-    gmres_.SetRelTol(rtol_);
-    gmres_.SetAbsTol(atol_);
-    gmres_.iterative_mode = false;
-    gmres_.SetKDim(100);
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -1150,34 +1129,6 @@ mfem::Vector HybridSolver::MakeInitialGuess(const mfem::BlockVector& sol,
     mfem::Vector true_mu(H_->NumRows());
     multiplier_td_d_->Mult(mu, true_mu);
     return true_mu;
-}
-
-void HybridSolver::SetPrintLevel(int print_level)
-{
-    MixedLaplacianSolver::SetPrintLevel(print_level);
-
-    cg_.SetPrintLevel(print_level_);
-}
-
-void HybridSolver::SetMaxIter(int max_num_iter)
-{
-    MixedLaplacianSolver::SetMaxIter(max_num_iter);
-
-    cg_.SetMaxIter(max_num_iter_);
-}
-
-void HybridSolver::SetRelTol(double rtol)
-{
-    MixedLaplacianSolver::SetRelTol(rtol);
-
-    cg_.SetRelTol(rtol_);
-}
-
-void HybridSolver::SetAbsTol(double atol)
-{
-    MixedLaplacianSolver::SetAbsTol(atol);
-
-    cg_.SetAbsTol(atol_);
 }
 
 AuxSpacePrec::AuxSpacePrec(mfem::HypreParMatrix& op, mfem::SparseMatrix aux_map,

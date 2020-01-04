@@ -311,7 +311,7 @@ LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level, Kappa kappa
     }
     else // L2-H1 block diagonal preconditioner
     {
-        linear_solver_.reset(new MinresBlockSolverFalse(mixed_system_, &ess_attr));
+        linear_solver_.reset(new BlockSolverFalse(mixed_system_, &ess_attr));
     }
     linear_solver_->SetPrintLevel(-1);
     linear_solver_->SetMaxIter(200);
@@ -388,7 +388,6 @@ void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
     if (!interlopate && param_.diff_tol > 0) // constrain change in p
     {
         auto delta_p = mixed_system_.PWConstProject(block_dx.GetBlock(1));
-
         auto max_p_change = AbsMax(delta_p, comm_);
         auto relative_change = max_p_change * kappa_.alpha / std::log(param_.diff_tol);
 

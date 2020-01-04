@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> partitioning;
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
-    mfem::SparseMatrix W_block = SparseIdentity(graph.VertexToEdge().Height());
+    mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
     W_block *= spe10problem.CellVolume() / delta_t;     // Mass matrix / delta_t
 
     // Time Stepping
@@ -133,6 +133,7 @@ int main(int argc, char* argv[])
 
         // Set some pressure initial condition
         mfem::BlockVector fine_u(hierarchy.BlockOffsets(0));
+        fine_u.GetBlock(0) = 0.0;
         fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace

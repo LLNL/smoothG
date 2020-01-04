@@ -26,6 +26,8 @@
 namespace smoothg
 {
 
+enum KrylovMethod { CG, MINRES, GMRES };
+
 /**
    @brief Abstract base class for solvers of graph Laplacian problems
 */
@@ -62,23 +64,23 @@ public:
 
     ///@name Set solver parameters
     ///@{
-    virtual void SetPrintLevel(int print_level) { print_level_ = print_level; }
-    virtual void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
-    virtual void SetRelTol(double rtol) { rtol_ = rtol; }
-    virtual void SetAbsTol(double atol) { atol_ = atol; }
+    void SetPrintLevel(int l) { print_level_ = l; solver_->SetPrintLevel(l); }
+    void SetMaxIter(int it) { max_num_iter_ = it; solver_->SetMaxIter(it); }
+    void SetRelTol(double rtol) { rtol_ = rtol; solver_->SetRelTol(rtol); }
+    void SetAbsTol(double atol) { atol_ = atol; solver_->SetAbsTol(atol); }
     ///@}
 
     ///@name Get results of iterative solve
     ///@{
-    virtual int GetNumIterations() const { return num_iterations_; }
-    virtual int GetNNZ() const { return nnz_; }
-    virtual double GetTiming() const { return timing_; }
+    int GetNumIterations() const { return num_iterations_; }
+    int GetNNZ() const { return nnz_; }
+    double GetTiming() const { return timing_; }
     ///@}
 
 protected:
     void Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
     void Orthogonalize(mfem::Vector& vec) const;
-
+    std::unique_ptr<mfem::IterativeSolver> InitKrylovSolver(KrylovMethod method);
     MPI_Comm comm_;
     int myid_;
 
@@ -103,10 +105,9 @@ protected:
     mfem::Array<int> ess_edofs_;
     const mfem::Vector* const_rep_;
 
-    mfem::GMRESSolver gmres_;
+    std::unique_ptr<mfem::IterativeSolver> solver_;
     bool is_symmetric_;
 };
-
 
 } // namespace smoothg
 

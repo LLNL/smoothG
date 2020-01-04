@@ -30,7 +30,7 @@ MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
                                            bool W_is_nonzero)
     : comm_(comm), rhs_(block_offsets), sol_(block_offsets), nnz_(0),
       num_iterations_(0), timing_(0), remove_one_dof_(true),
-      W_is_nonzero_(W_is_nonzero), gmres_(comm_), is_symmetric_(true)
+      W_is_nonzero_(W_is_nonzero), is_symmetric_(true)
 {
     sol_ = 0.0;
 }
@@ -92,6 +92,29 @@ void MixedLaplacianSolver::Orthogonalize(mfem::Vector& vec) const
     MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
 
     vec.Add(-global_dot / global_scale, *const_rep_);
+}
+
+std::unique_ptr<mfem::IterativeSolver>
+MixedLaplacianSolver::InitKrylovSolver(KrylovMethod method)
+{
+    mfem::IterativeSolver* out;
+    if (method == CG)
+    {
+        out = new mfem::CGSolver(comm_);
+    }
+    else if (method == MINRES)
+    {
+        out = new mfem::MINRESSolver(comm_);
+    }
+    else
+    {
+        out = new mfem::GMRESSolver(comm_);
+    }
+    out->SetPrintLevel(print_level_);
+    out->SetMaxIter(max_num_iter_);
+    out->SetRelTol(rtol_);
+    out->SetAbsTol(atol_);
+    return std::unique_ptr<mfem::IterativeSolver>(out);
 }
 
 } // namespace smoothg

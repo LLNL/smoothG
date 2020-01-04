@@ -102,7 +102,7 @@ void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        solvers_[level].reset(new MinresBlockSolverFalse(GetMatrix(level), ess_attr_));
+        solvers_[level].reset(new BlockSolverFalse(GetMatrix(level), ess_attr_));
     }
 }
 
