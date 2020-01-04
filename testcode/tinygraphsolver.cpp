@@ -26,7 +26,7 @@
 #include "../src/GraphCoarsen.hpp"
 #include "../src/utilities.hpp"
 #include "../src/MixedMatrix.hpp"
-#include "../src/MinresBlockSolver.hpp"
+#include "../src/BlockSolver.hpp"
 #include "../src/HybridSolver.hpp"
 #include "../src/MatrixUtilities.hpp"
 

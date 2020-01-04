@@ -21,9 +21,8 @@
 #ifndef __HIERARCHY_HPP__
 #define __HIERARCHY_HPP__
 
-#include "MinresBlockSolver.hpp"
+#include "BlockSolver.hpp"
 #include "HybridSolver.hpp"
-#include "MetisGraphPartitioner.hpp"
 #include "MixedMatrix.hpp"
 
 namespace smoothg

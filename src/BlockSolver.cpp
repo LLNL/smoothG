@@ -16,10 +16,10 @@
 /**
    @file
 
-   @brief Implements MinresBlockSolver object.
+   @brief Implements BlockSolver object.
 */
 
-#include "MinresBlockSolver.hpp"
+#include "BlockSolver.hpp"
 #include "utilities.hpp"
 #include <assert.h>
 

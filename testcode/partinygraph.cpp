@@ -25,7 +25,7 @@
 
 #include "../src/GraphCoarsen.hpp"
 #include "../src/utilities.hpp"
-#include "../src/MinresBlockSolver.hpp"
+#include "../src/BlockSolver.hpp"
 #include "../src/MatrixUtilities.hpp"
 
 using namespace smoothg;
