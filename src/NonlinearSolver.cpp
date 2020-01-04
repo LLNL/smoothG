@@ -23,20 +23,11 @@
 namespace smoothg
 {
 
-NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, NLSolverParameters param)
-    : comm_(comm), size_(size), tag_("Nonlinear"), residual_(size),
-      linear_tol_(param.init_linear_tol), param_(param)
+NonlinearSolver::NonlinearSolver(MPI_Comm comm, NLSolverParameters param)
+    : comm_(comm), tag_("Nonlinear"), linear_tol_(param.init_linear_tol),
+      param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
-}
-
-double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs)
-{
-    residual_ = 0.0;
-    Mult(sol, residual_);
-    residual_ -= rhs;
-    SetZeroAtMarker(GetEssDofs(), residual_);
-    return mfem::ParNormlp(AssembleTrueVector(residual_), 2, comm_);
 }
 
 void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
@@ -44,10 +35,13 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     mfem::StopWatch chrono;
     chrono.Start();
 
-    mfem::Vector zero_vec(sol);
-    zero_vec = 0.0;
-    rhs_norm_ = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
-    adjusted_tol_ = std::max(param_.atol, param_.rtol * rhs_norm_);
+    if (param_.check_converge)
+    {
+        mfem::Vector zero_vec(sol);
+        zero_vec = 0.0;
+        rhs_norm_ = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
+        adjusted_tol_ = std::max(param_.atol, param_.rtol * rhs_norm_);
+    }
 
     converged_ = false;
     for (iter_ = 0; iter_ < param_.max_num_iter + 1; iter_++)
@@ -95,8 +89,8 @@ void NonlinearSolver::UpdateLinearSolveTol()
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
-FAS::FAS(MPI_Comm comm, int size, FASParameters param)
-    : NonlinearSolver(comm, size, param.nl_solve), rhs_(param.num_levels),
+FAS::FAS(MPI_Comm comm, FASParameters param)
+    : NonlinearSolver(comm, param.nl_solve), rhs_(param.num_levels),
       sol_(rhs_.size()), help_(rhs_.size()), resid_norms_(rhs_.size()), param_(param)
 {
     tag_ = "FAS";
@@ -110,12 +104,16 @@ void FAS::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
     MG_Cycle(0);
 }
 
+double FAS::ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs)
+{
+    return ResidualNorm(0, ComputeResidual(0, sol, rhs));
+}
+
 void FAS::MG_Cycle(int level)
 {
     if (level == param_.num_levels - 1)
     {
         Smoothing(level, rhs_[level], sol_[level]);
-        SetZeroAtMarker(GetEssDofs(level), sol_[level]);
     }
     else
     {
@@ -127,12 +125,8 @@ void FAS::MG_Cycle(int level)
 
         // Compute FAS coarser level rhs
         // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
-        Mult(level, sol_[level], help_[level]);
-        help_[level] -= rhs_[level];
-        SetZeroAtMarker(GetEssDofs(level), help_[level]);
-
-        mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
-        resid_norms_[level] = resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
+        help_[level] = ComputeResidual(level, sol_[level], rhs_[level]);
+        resid_norms_[level] = resid_norm_ = ResidualNorm(level, help_[level]);
 
         if (level == 0)
         {
@@ -157,8 +151,7 @@ void FAS::MG_Cycle(int level)
 
             Project(level, sol_[level], sol_[level + 1]);
 
-            Mult(level + 1, sol_[level + 1], rhs_[level + 1]);
-            rhs_[level + 1] -= help_[level + 1];
+            rhs_[level + 1] = ComputeResidual(level + 1, sol_[level + 1], help_[level + 1]);
 
             // Store projected coarse solution pi x_l
             mfem::Vector coarse_sol = sol_[level + 1];

@@ -59,25 +59,27 @@ public:
     LevelSolver(const MixedMatrix& mixed_system, int level, Kappa kappa,
                 const mfem::Array<int>& ess_attr, NLSolverParameters param);
 
-    void Mult(const mfem::Vector& x, mfem::Vector& Ax) override;
-
     /// Set relative tolerance of solver for linearized problem
     void SetLinearRelTol(double tol) { linear_solver_->SetRelTol(tol); }
 
     /// Shrink delta x (change in solution) in case of bad step
     void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
                       mfem::Vector& x, mfem::Vector& dx, bool interlopate = false);
+
+    /// @return l2 norm of "true" residual
+    double ResidualNorm(const mfem::Vector& resid);
+
+    /// @return resid = A(sol) - rhs
+    mfem::Vector ComputeResidual(const mfem::Vector& sol, const mfem::Vector& rhs);
 private:
+    double ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs) override;
     void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p);
     void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
-    mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const override;
-    const mfem::Array<int>& GetEssDofs() const override { return mixed_system_.GetEssDofs(); }
 
     int level_;
     const MixedMatrix& mixed_system_;
-    const mfem::Array<int>& offsets_;
 
     unique_ptr<MixedLaplacianSolver> linear_solver_;
 
@@ -96,15 +98,15 @@ public:
     EllipticNLMG(const Hierarchy& hierarchy_, const Kappa& kappa,
                  const mfem::Array<int>& ess_attr, FASParameters param);
 private:
-    void Mult(int level, const mfem::Vector& x, mfem::Vector& Ax) override;
     void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
     void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const override;
     void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
     void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) override;
     void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
                       mfem::Vector& x, mfem::Vector& dx) override;
-    mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec) const override;
-    const mfem::Array<int>& GetEssDofs(int level) const override;
+    mfem::Vector ComputeResidual(int level, const mfem::Vector& sol,
+                                 const mfem::Vector& rhs) override;
+    double ResidualNorm(int level, const mfem::Vector& resid) override;
 
     const Hierarchy& hierarchy_;
     std::vector<LevelSolver> solvers_;
@@ -298,8 +300,8 @@ void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
 
 LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level, Kappa kappa,
                          const mfem::Array<int>& ess_attr, NLSolverParameters param)
-    : NonlinearSolver(mixed_system.GetComm(), mixed_system.BlockOffsets()[2], param),
-      level_(level), mixed_system_(mixed_system), offsets_(mixed_system_.BlockOffsets()),
+    : NonlinearSolver(mixed_system.GetComm(), param),
+      level_(level), mixed_system_(mixed_system),
       p_(mixed_system.GetGraph().NumVertices()), kp_(p_.Size()), dkinv_dp_(p_.Size()),
       kappa_(std::move(kappa))
 {
@@ -317,27 +319,37 @@ LevelSolver::LevelSolver(const MixedMatrix& mixed_system, int level, Kappa kappa
     linear_solver_->SetMaxIter(200);
 }
 
-void LevelSolver::Mult(const mfem::Vector& x, mfem::Vector& Ax)
+mfem::Vector LevelSolver::ComputeResidual(const mfem::Vector& sol, const mfem::Vector& rhs)
 {
-    assert(size_ == Ax.Size());
-    assert(size_ == x.Size());
-    mfem::BlockVector block_x(x.GetData(), offsets_);
-    mfem::BlockVector block_Ax(Ax.GetData(), offsets_);
+    mfem::Vector out(sol.Size());
+    out = 0.0;
 
-    p_ = mixed_system_.PWConstProject(block_x.GetBlock(1));
+    mfem::BlockVector blk_sol(sol.GetData(), mixed_system_.BlockOffsets());
+    mfem::BlockVector blk_out(out.GetData(), mixed_system_.BlockOffsets());
+
+    p_ = mixed_system_.PWConstProject(blk_sol.GetBlock(1));
     kp_ = kappa_.Eval(p_);
-    mixed_system_.Mult(kp_, block_x, block_Ax);
+    mixed_system_.Mult(kp_, blk_sol, blk_out);
+
+    out -= rhs;
+    SetZeroAtMarker(mixed_system_.GetEssDofs(), out);
+    return out;
 }
 
-mfem::Vector LevelSolver::AssembleTrueVector(const mfem::Vector& vec) const
+double LevelSolver::ResidualNorm(const mfem::Vector& resid)
 {
-    return mixed_system_.AssembleTrueVector(vec);
+    return mfem::ParNormlp(mixed_system_.AssembleTrueVector(resid), 2, comm_);
+}
+
+double LevelSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs)
+{
+    return ResidualNorm(ComputeResidual(sol, rhs));
 }
 
 void LevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-    mfem::BlockVector block_sol(sol.GetData(), offsets_);
-    mfem::BlockVector block_rhs(rhs.GetData(), offsets_);
+    mfem::BlockVector block_sol(sol.GetData(), mixed_system_.BlockOffsets());
+    mfem::BlockVector block_rhs(rhs.GetData(), mixed_system_.BlockOffsets());
 
     if (param_.linearization == Picard)
     {
@@ -363,19 +375,15 @@ void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 
 void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 {
-    Mult(x, residual_);  // p_ and kp_ is updated in Mult
-    residual_ -= rhs;
-    SetZeroAtMarker(GetEssDofs(), residual_);
+    mfem::Vector resid = ComputeResidual(x, rhs);  // p_, kp_ are updated here
+    prev_resid_norm_ = ResidualNorm(resid);
 
     Build_dMdp(x.GetBlock(0), p_);
     linear_solver_->UpdateJacobian(kp_, dMdp_);
 
-    mfem::BlockVector block_residual(residual_.GetData(), offsets_);
-    mfem::BlockVector delta_x = linear_solver_->Solve(block_residual);
+    mfem::BlockVector blk_resid(resid.GetData(), mixed_system_.BlockOffsets());
+    mfem::BlockVector delta_x = linear_solver_->Solve(blk_resid);
     x -= delta_x;
-
-    mfem::Vector true_resid = AssembleTrueVector(block_residual);
-    prev_resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
 
     BackTracking(rhs, prev_resid_norm_, x, delta_x);
 }
@@ -383,7 +391,7 @@ void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
 void LevelSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
                                mfem::Vector& x, mfem::Vector& dx, bool interlopate)
 {
-    mfem::BlockVector block_dx(dx.GetData(), offsets_);
+    mfem::BlockVector block_dx(dx.GetData(), mixed_system_.BlockOffsets());
 
     if (!interlopate && param_.diff_tol > 0) // constrain change in p
     {
@@ -473,7 +481,7 @@ void LevelSolver::Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p)
 
 EllipticNLMG::EllipticNLMG(const Hierarchy& hierarchy, const Kappa& kappa,
                            const mfem::Array<int>& ess_attr, FASParameters param)
-    : FAS(hierarchy.GetComm(), hierarchy.BlockOffsets(0)[2], param), hierarchy_(hierarchy)
+    : FAS(hierarchy.GetComm(), param), hierarchy_(hierarchy)
 {
     std::vector<mfem::Vector> help(param.num_levels);
     solvers_.reserve(param.num_levels);
@@ -512,9 +520,15 @@ EllipticNLMG::EllipticNLMG(const Hierarchy& hierarchy, const Kappa& kappa,
     }
 }
 
-void EllipticNLMG::Mult(int level, const mfem::Vector& x, mfem::Vector& Ax)
+mfem::Vector EllipticNLMG::ComputeResidual(int level, const mfem::Vector& sol,
+                                           const mfem::Vector& rhs)
 {
-    solvers_[level].Mult(x, Ax);
+    return solvers_[level].ComputeResidual(sol, rhs);
+}
+
+double EllipticNLMG::ResidualNorm(int level, const mfem::Vector& resid)
+{
+    return solvers_[level].ResidualNorm(resid);
 }
 
 void EllipticNLMG::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
@@ -545,16 +559,6 @@ void EllipticNLMG::BackTracking(int level, const mfem::Vector& rhs, double prev_
                                 mfem::Vector& x, mfem::Vector& dx)
 {
     solvers_[level].BackTracking(rhs, prev_resid_norm, x, dx, true);
-}
-
-mfem::Vector EllipticNLMG::AssembleTrueVector(int level, const mfem::Vector& vec) const
-{
-    return hierarchy_.GetMatrix(level).AssembleTrueVector(vec);
-}
-
-const mfem::Array<int>& EllipticNLMG::GetEssDofs(int level) const
-{
-    return hierarchy_.GetMatrix(level).GetEssDofs();
 }
 
 Kappa::Kappa(const Soil& soil, const mfem::Vector& Z_in)
