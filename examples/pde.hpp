@@ -147,9 +147,9 @@ InversePermeabilityCoefficient::InversePermeabilityCoefficient(
 void InversePermeabilityCoefficient::ReadPermeabilityFile(const std::string& fileName,
                                                           const mfem::Array<int>& max_N)
 {
-    std::ifstream permfile(fileName.c_str());
+    std::ifstream perm_file(fileName.c_str());
 
-    if (!permfile.is_open())
+    if (!perm_file.is_open())
     {
         std::cerr << "Error in opening file " << fileName << std::endl;
         mfem::mfem_error("File does not exist");
@@ -165,23 +165,23 @@ void InversePermeabilityCoefficient::ReadPermeabilityFile(const std::string& fil
             {
                 for (int i = 0; i < N_[0]; i++)
                 {
-                    permfile >> *ip;
+                    perm_file >> *ip;
                     *ip = 1. / (*ip);
                     ip++;
                 }
                 for (int i = 0; i < max_N[0] - N_[0]; i++)
-                    permfile >> tmp; // skip unneeded part
+                    perm_file >> tmp; // skip unneeded part
             }
             for (int j = 0; j < max_N[1] - N_[1]; j++)
                 for (int i = 0; i < max_N[0]; i++)
-                    permfile >> tmp;  // skip unneeded part
+                    perm_file >> tmp;  // skip unneeded part
         }
 
         if (l < 2) // if not processing Kz, skip unneeded part
             for (int k = 0; k < max_N[2] - N_[2]; k++)
                 for (int j = 0; j < max_N[1]; j++)
                     for (int i = 0; i < max_N[0]; i++)
-                        permfile >> tmp;
+                        perm_file >> tmp;
     }
 }
 
@@ -877,7 +877,7 @@ class SPE10Problem : public DarcyProblem
 public:
     /**
        @brief Constructor
-       @param permFile file name
+       @param perm_file file name
        @param nDimensions
        @param spe10_scale scale of problem size (1-5)
        @param slice
@@ -886,7 +886,7 @@ public:
               condition is imposed
        @param unit_weight whether set edge weight as unit weight (1.0)
     */
-    SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
+    SPE10Problem(const char* perm_file, int nDimensions, int spe10_scale,
                  int slice, bool metis_parition,
                  const mfem::Array<int>& ess_attr, bool unit_weight = false);
 
@@ -895,7 +895,7 @@ public:
     mfem::Vector InitialCondition(double initial_val) const;
 
 private:
-    void SetupMeshAndCoeff(const char* permFile, int nDimensions,
+    void SetupMeshAndCoeff(const char* perm_file, int nDimensions,
                            int spe10_scale, bool metis_partition, int slice);
     unique_ptr<mfem::ParMesh> MakeParMesh(mfem::Mesh& mesh, bool metis_partition);
     void MakeRHS();
@@ -906,12 +906,12 @@ private:
     unique_ptr<GCoefficient> source_coeff_;
 };
 
-SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scale,
+SPE10Problem::SPE10Problem(const char* perm_file, int nDimensions, int spe10_scale,
                            int slice, bool metis_parition,
                            const mfem::Array<int>& ess_attr, bool unit_weight)
     : DarcyProblem(MPI_COMM_WORLD, nDimensions, ess_attr)
 {
-    SetupMeshAndCoeff(permFile, nDimensions, spe10_scale, metis_parition, slice);
+    SetupMeshAndCoeff(perm_file, nDimensions, spe10_scale, metis_parition, slice);
 
     InitGraph();
 
@@ -919,7 +919,7 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
     MakeRHS();
 }
 
-void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
+void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int nDimensions,
                                      int spe10_scale, bool metis_partition, int slice)
 {
     mfem::Array<int> max_N(3);
@@ -946,7 +946,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* permFile, int nDimensions,
 
     using IPC = InversePermeabilityCoefficient;
     IPC::SliceOrientation orient = nDimensions == 2 ? IPC::XY : IPC::NONE;
-    kinv_vector_ = make_unique<IPC>(comm_, permFile, N_, max_N, h, orient, slice);
+    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
 
     mfem::Array<int> coarsening_factor(nDimensions);
     coarsening_factor = 10;

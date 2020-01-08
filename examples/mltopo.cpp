@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
     int num_levels = 4;
     int coarsening_factor = dim == 2 ? 8 : 32;
     bool use_weight = false;
+    const char* perm_file = "";
     bool visualization = true;
     args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
     args.AddOption(&num_levels, "-nl", "--num-levels", "Number of levels.");
@@ -58,6 +59,7 @@ int main(int argc, char* argv[])
                    "Coarsening factor.");
     args.AddOption(&use_weight, "-weight", "--weight", "-no-weight",
                    "--no-weight", "Use edge weight when generating partition.");
+    args.AddOption(&perm_file, "-p", "--perm", "Permeability file data.");
     args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                    "--no-visualization", "Enable visualization.");
     args.Parse();
@@ -82,7 +84,7 @@ int main(int argc, char* argv[])
     graphs.reserve(num_levels);
 
     // Construct a weighted graph from a finite volume problem defined on a mesh
-    SPE10Problem spe10problem("spe_perm.dat", dim, 5, 0, 1, ess_attr);
+    SPE10Problem spe10problem(perm_file, dim, 5, 0, 1, ess_attr);
     graphs.push_back(spe10problem.GetFVGraph());
 
     // Build multilevel graph topology
