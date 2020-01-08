@@ -415,50 +415,6 @@ void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coeff)
     solvers_[level]->UpdateElemScaling(coeff);
 }
 
-void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coarse_sol,
-                                   void (*f)(const mfem::Vector&, mfem::Vector&))
-{
-    mfem::Vector fine_sol = Interpolate(level, coarse_sol);
-
-    auto& coarse_mbuilder = ((ElementMBuilder&)GetMatrix(level).GetMBuilder());
-    if (level == 1)
-    {
-        mfem::Vector coeff(fine_sol);
-        (*f)(fine_sol, coeff);
-
-        auto& fine_mbuilder = ((ElementMBuilder&)GetMatrix(level - 1).GetMBuilder());
-        auto agg_Ms = fine_mbuilder.BuildAggM(agg_vert_[level - 1], coeff);
-
-        auto& agg_coarse_edof = GetMatrix(level).GetGraphSpace().VertexToEDof();
-        auto agg_fine_edof = smoothg::Mult(agg_vert_[level - 1], fine_mbuilder.GetElemEdgeDofTable());
-
-        mfem::Array<int> fine_edofs, coarse_edofs, colmap(Psigma_[level - 1].NumCols());
-        colmap = -1;
-
-        std::vector<mfem::DenseMatrix> agg_CMs(agg_vert_[level - 1].NumRows());
-        for (int a = 0 ; a < agg_vert_[level - 1].NumRows(); ++a)
-        {
-            GetTableRow(agg_fine_edof, a, fine_edofs);
-            GetTableRow(agg_coarse_edof, a, coarse_edofs);
-
-            auto agg_Psigma = ExtractRowAndColumns(Psigma_[level - 1], fine_edofs,
-                                                   coarse_edofs, colmap);
-            auto agg_PsigmaT = smoothg::Transpose(agg_Psigma);
-
-            std::unique_ptr<mfem::SparseMatrix> agg_CM(RAP(agg_Ms[a], agg_PsigmaT));
-            Full(*agg_CM, agg_CMs[a]);
-        }
-
-        coarse_mbuilder.SetElementMatrices(std::move(agg_CMs));
-    }
-    else
-    {
-        RescaleCoefficient(level - 1, fine_sol, *f);
-    }
-
-    MakeSolver(level, param_);
-}
-
 void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
                                const std::vector<mfem::DenseMatrix>& dMdp)
 {

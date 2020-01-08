@@ -29,7 +29,7 @@ const mfem::Vector SimpleAscendingScaling(const int size)
     mfem::Vector scale(size);
     for (int i = 0; i < size; i++)
     {
-        scale(i) = i + 10.0;
+        scale(i) = i + 1.0;
     }
     return scale;
 }
@@ -104,11 +104,6 @@ double RelativeDiff(MPI_Comm comm, const mfem::SparseMatrix& M1, const mfem::Spa
     return FrobeniusNorm(comm, diff) / FrobeniusNorm(comm, M1);
 }
 
-void Kappa(const mfem::Vector& p, mfem::Vector& kp)
-{
-    kp = p;
-}
-
 int main(int argc, char* argv[])
 {
     int myid;
@@ -145,7 +140,7 @@ int main(int argc, char* argv[])
     // Create Hierarchy to build interpolation matrices and coarse M builder
     UpscaleParameters param;
     param.spect_tol = 1.0;
-    param.max_evects = 1;
+    param.max_evects = 3;
     Hierarchy hierarchy(graph, param, &partitioning);
 
     MixedMatrix& fine_mgL = hierarchy.GetMatrix(0);
@@ -165,18 +160,6 @@ int main(int argc, char* argv[])
     auto& Psigma = hierarchy.GetPsigma(0);
     unique_ptr<mfem::SparseMatrix> coarse_M2(mfem::RAP(Psigma, fine_M2, Psigma));
 
-    auto elem_scale_coarse = hierarchy.Project(0, elem_scale);
-    auto projected_elem_scale = hierarchy.Interpolate(1, elem_scale_coarse);
-
-    // Assemble rescaled fine and coarse M through MixedMatrix (non-const coeff)
-    auto fine_M3 = fine_mgL.GetMBuilder().BuildAssembledM(projected_elem_scale);
-    hierarchy.RescaleCoefficient(1, elem_scale_coarse, Kappa);
-    auto coarse_M3 = coarse_mgL.GetMBuilder().BuildAssembledM();
-
-    // Assembled rescaled fine and coarse M through direct assembling and RAP (non-const coeff)
-    auto fine_M4 = RescaledFineM(sigmafespace, elem_scale, projected_elem_scale);
-    unique_ptr<mfem::SparseMatrix> coarse_M4(mfem::RAP(Psigma, fine_M4, Psigma));
-
     // Check relative differences measured in Frobenius norm
     bool fine_rescale_fail = (RelativeDiff(comm, fine_M1, fine_M2) > 1e-14);
     bool coarse_rescale_fail = (RelativeDiff(comm, coarse_M1, *coarse_M2) > 1e-14);
@@ -187,17 +170,6 @@ int main(int argc, char* argv[])
     if (myid == 0 && coarse_rescale_fail)
     {
         std::cerr << "Coarse level rescaling is NOT working as expected! \n";
-    }
-
-    bool fine_rescale_fail2 = (RelativeDiff(comm, fine_M3, fine_M4) > 1e-14);
-    bool coarse_rescale_fail2 = (RelativeDiff(comm, coarse_M3, *coarse_M4) > 1e-14);
-    if (myid == 0 && fine_rescale_fail2)
-    {
-        std::cerr << "Fine 2 level rescaling is NOT working as expected! \n";
-    }
-    if (myid == 0 && coarse_rescale_fail2)
-    {
-        std::cerr << "Coarse 2 level rescaling is NOT working as expected! \n";
     }
 
     return (fine_rescale_fail || coarse_rescale_fail) ? 1 : 0;
