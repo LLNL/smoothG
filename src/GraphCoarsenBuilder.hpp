@@ -158,14 +158,9 @@ public:
     virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
 
-    std::vector<mfem::SparseMatrix> BuildAggM(
-        const mfem::SparseMatrix& agg_elem, const mfem::Vector& agg_weights_inverse) const;
-
     bool NeedsCoarseVertexDofs() { return true; }
 
     const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return M_el_; }
-
-    void SetElementMatrices(std::vector<mfem::DenseMatrix>&& M_el) {  M_el_ = M_el; }
 
     const mfem::SparseMatrix& GetElemEdgeDofTable() const { return elem_edgedof_; }
 

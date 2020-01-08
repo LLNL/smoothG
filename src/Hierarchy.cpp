@@ -415,12 +415,6 @@ void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coeff)
     solvers_[level]->UpdateElemScaling(coeff);
 }
 
-void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
-                               const std::vector<mfem::DenseMatrix>& dMdp)
-{
-    solvers_[level]->UpdateJacobian(elem_scaling_inverse, dMdp);
-}
-
 int Hierarchy::NumVertices(int level) const
 {
     return GetMatrix(level).GetGraph().NumVertices();

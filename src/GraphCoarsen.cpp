@@ -298,11 +298,11 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
     // this is Gelever's "ScaleEdgeTargets"
     NormalizeTraces(const_cast<std::vector<mfem::DenseMatrix>&>(edge_traces_), agg_vdof, face_edof);
 
-    //    if (build_coarse_components)
-    //    {
-    //        coarse_m_builder_ = make_unique<CoefficientMBuilder>();
-    //    }
-    //    else
+    if (build_coarse_components)
+    {
+        coarse_m_builder_ = make_unique<CoefficientMBuilder>();
+    }
+    else
     {
         coarse_m_builder_ = make_unique<ElementMBuilder>();
     }

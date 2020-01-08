@@ -140,10 +140,6 @@ public:
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
-    /// At a given level, update mixed Jacobian system associated with the nonlinear problem
-    void UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
-                        const std::vector<mfem::DenseMatrix>& dMdp);
-
     /// Show Total setup time
     void ShowSetupTime(std::ostream& out = std::cout) const;
 
