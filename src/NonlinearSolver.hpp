@@ -15,11 +15,11 @@
 
 /** @file
 
-    @brief Contains class NonlinearMG
+    @brief Contains class NonlinearSolver and FAS
 */
 
-#ifndef __NONLINEARMG_HPP__
-#define __NONLINEARMG_HPP__
+#ifndef __NONLINEARSOLVER_HPP__
+#define __NONLINEARSOLVER_HPP__
 
 #include "utilities.hpp"
 #include "Hierarchy.hpp"
@@ -60,12 +60,23 @@ public:
     /// Solve A(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
 
+    /// Reduce dx (change in solution) if || A(x) - rhs || > prev_resid_norm
+    void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
+                      mfem::Vector& x, mfem::Vector& dx);
+
+    /// @return resid = A(x) - y
+    virtual mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) = 0;
+
+    /// @return some norm of vec for convergene test
+    virtual double Norm(const mfem::Vector& vec) = 0;
+
     ///@name Set solver parameters
     ///@{
     void SetPrintLevel(int print_level) { param_.print_level = print_level; }
     void SetMaxIter(int max_num_iter) { param_.max_num_iter = max_num_iter; }
     void SetRelTol(double rtol) { param_.rtol = rtol; }
     void SetAbsTol(double atol) { param_.atol = atol; }
+    virtual void SetLinearRelTol(double tol) { linear_tol_ = tol; }
     ///@}
 
     ///@name Get results of iterative solve
@@ -75,13 +86,11 @@ public:
     bool IsConverged() const { return converged_; }
     ///@}
 protected:
+    /// Nonlinear iteration step, sol gets updated
+    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) = 0;
+
     /// Update linear tolerance based on choice 2 in Eisenstat & Walker, SISC 1996
     void UpdateLinearSolveTol();
-
-    /// @return || A(sol) - rhs ||
-    virtual double ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs) = 0;
-
-    virtual void IterationStep(const mfem::Vector& x, mfem::Vector& y) = 0;
 
     int iter_;
     double timing_;
@@ -96,6 +105,7 @@ protected:
     double resid_norm_;
     double prev_resid_norm_;
     double linear_tol_;
+    bool update_is_needed_;
 
     NLSolverParameters param_;
 };
@@ -116,21 +126,22 @@ struct FASParameters
 /**
    @brief Nonlinear multigrid solver using full approximation scheme.
 
-       Abstract class for FAS. Operations like smoothing, interpolation,
-       restriction, projection, etc. need to be provided.
+       Abstract class for FAS. Solver in each level and operations like
+       interpolation, restriction, projection, etc. need to be provided.
 */
 class FAS : public NonlinearSolver
 {
 public:
     /// Constructor
     FAS(MPI_Comm comm, FASParameters param);
+
+    mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override
+    {
+        return solvers_[0]->Residual(x, y);
+    }
+
+    double Norm(const mfem::Vector& vec) override { return solvers_[0]->Norm(vec); }
 protected:
-    void MG_Cycle(int level);
-
-    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
-
-    double ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs) override;
-
     /// Restrict a vector from level to level+1 (coarser level)
     virtual void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const = 0;
 
@@ -140,28 +151,17 @@ protected:
     /// Project a vector from level to level+1 (coarser level)
     virtual void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const = 0;
 
-    /// Relaxation on each level
-    virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
-
-    /// Backtracking on each level
-    virtual void BackTracking(int level, const mfem::Vector& rhs, double prev_resid_norm,
-                              mfem::Vector& x, mfem::Vector& dx) = 0;
-
-    /// Evaluates residual resid = A[level](sol) - rhs
-    virtual mfem::Vector ComputeResidual(int level, const mfem::Vector& sol,
-                                         const mfem::Vector& rhs) = 0;
-
-    /// Evaluates residual norm on each level
-    virtual double ResidualNorm(int level, const mfem::Vector& resid) = 0;
+    void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out);
+    void MG_Cycle(int level);
+    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
 
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;
-    mutable std::vector<mfem::Vector> help_;
-    std::vector<double> resid_norms_;
-
+    std::vector<mfem::Vector> help_;
+    std::vector<std::unique_ptr<NonlinearSolver>> solvers_;
     FASParameters param_;
 };
 
 } // namespace smoothg
 
-#endif /* __NONLINEARMG_HPP__ */
+#endif /* __NONLINEARSOLVER_HPP__ */

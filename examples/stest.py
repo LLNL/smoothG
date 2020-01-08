@@ -876,7 +876,7 @@ def make_tests():
          {"nonlinear-iterations":13}]
 
     tests["fas-newton-one-level"] = \
-        [["mpirun", "-n", num_procs, "./nldarcy",
+        [["./nldarcy",
           "--alpha", "1.0",
           "--max-levels", "1",
           "--diff-tol", "5",

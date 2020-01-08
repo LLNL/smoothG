@@ -147,7 +147,6 @@ public:
 
     void SetEssDofs(const mfem::Array<int>& ess_attr);
     const mfem::Array<int>& GetEssDofs() const { return ess_edofs_; }
-
 private:
     void Init();
 
