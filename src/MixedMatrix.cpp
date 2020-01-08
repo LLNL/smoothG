@@ -111,13 +111,13 @@ mfem::HypreParMatrix* MixedMatrix::MakeParallelW(const mfem::SparseMatrix& W) co
 mfem::Vector MixedMatrix::AssembleTrueVector(const mfem::Vector& vec) const
 {
     assert(vec.Size() == block_offsets_[2]);
-    mfem::BlockVector block_vec(vec.GetData(), block_offsets_);
-    mfem::BlockVector block_true_vec(block_true_offsets_);
+    mfem::Vector true_vec(block_true_offsets_[2]);
+    mfem::BlockVector blk_vec(vec.GetData(), block_offsets_);
+    mfem::BlockVector blk_true_vec(true_vec.GetData(), block_true_offsets_);
 
-    graph_space_.TrueEDofToEDof().Mult(
-        block_vec.GetBlock(0), block_true_vec.GetBlock(0));
-    block_true_vec.GetBlock(1) = block_vec.GetBlock(1);
-    return block_true_vec;
+    graph_space_.TrueEDofToEDof().Mult(blk_vec.GetBlock(0), blk_true_vec.GetBlock(0));
+    blk_true_vec.GetBlock(1) = blk_vec.GetBlock(1);
+    return true_vec;
 }
 
 void MixedMatrix::Mult(const mfem::Vector& scale,

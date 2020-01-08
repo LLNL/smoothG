@@ -1295,9 +1295,9 @@ double FroNorm(const mfem::SparseMatrix& mat)
     double norm = 0.0;
     for (int i = 0; i < mat.NumNonZeroElems(); ++i)
     {
-        norm += mat.GetData()[i] * mat.GetData()[i];
+        norm += std::pow(mat.GetData()[i], 2.0);
     }
-    return norm;
+    return std::sqrt(norm);
 }
 
 } // namespace smoothg
