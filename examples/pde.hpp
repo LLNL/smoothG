@@ -484,7 +484,7 @@ public:
        @param ess_attr marker for boundary attributes where essential edge
               condition is imposed
     */
-    DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& ess_attr);
+    DarcyProblem(const mfem::ParMesh& mesh, const mfem::Array<int>& ess_attr);
 
     /**
        @param use_local_weight whether to store "element" weight
@@ -501,12 +501,12 @@ public:
     const mfem::Array<int>& EssentialAttribute() const {return ess_attr_; }
 
     /// Volume of a cell in the mesh (assuming all cells have the same volume)
-    double CellVolume() const { return pmesh_->GetElementVolume(0); }
+    double CellVolume() const { return mesh_->GetElementVolume(0); }
 
     /// @return number of isolated (graph) vertices
     int NumIsoVerts() const { return iso_vert_count_; }
 
-    const mfem::ParMesh& GetMesh() const { return *pmesh_; }
+    const mfem::ParMesh& GetMesh() const { return *mesh_; }
 
     /// Save mesh with partitioning information (GLVis can separate partitions)
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
@@ -554,7 +554,7 @@ protected:
     int num_procs_;
 
     mfem::Array<int> num_procs_xyz_;
-    unique_ptr<mfem::ParMesh> pmesh_;
+    unique_ptr<mfem::ParMesh> mesh_;
 
     mfem::RT_FECollection sigma_fec_;
     mfem::L2_FECollection u_fec_;
@@ -591,10 +591,10 @@ DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_a
     ess_attr.Copy(ess_attr_);
 }
 
-DarcyProblem::DarcyProblem(const mfem::ParMesh& pmesh, const mfem::Array<int>& ess_attr)
-    : DarcyProblem(pmesh.GetComm(), pmesh.Dimension(), ess_attr)
+DarcyProblem::DarcyProblem(const mfem::ParMesh& mesh, const mfem::Array<int>& ess_attr)
+    : DarcyProblem(mesh.GetComm(), mesh.Dimension(), ess_attr)
 {
-    pmesh_ = make_unique<mfem::ParMesh>(pmesh, false);
+    mesh_ = make_unique<mfem::ParMesh>(mesh, false);
     InitGraph();
     kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
     ComputeGraphWeight();
@@ -611,18 +611,18 @@ Graph DarcyProblem::GetFVGraph(bool use_local_weight)
 
 void DarcyProblem::BuildReservoirGraph()
 {
-    auto& v_e_table = pmesh_->Dimension() == 2 ? pmesh_->ElementToEdgeTable()
-                      : pmesh_->ElementToFaceTable();
+    auto& v_e_table = mesh_->Dimension() == 2 ? mesh_->ElementToEdgeTable()
+                      : mesh_->ElementToFaceTable();
     vertex_edge_ = TableToMatrix(v_e_table);
     edge_trueedge_ = sigma_fes_->Dof_TrueDof_Matrix();
-    edge_bdr_ = GenerateEdgeToBoundary(*pmesh_);
+    edge_bdr_ = GenerateEdgeToBoundary(*mesh_);
     assert(edge_bdr_.NumCols() == ess_attr_.Size());
 }
 
 void DarcyProblem::InitGraph()
 {
-    sigma_fes_ = make_unique<mfem::ParFiniteElementSpace>(pmesh_.get(), &sigma_fec_);
-    u_fes_ = make_unique<mfem::ParFiniteElementSpace>(pmesh_.get(), &u_fec_);
+    sigma_fes_ = make_unique<mfem::ParFiniteElementSpace>(mesh_.get(), &sigma_fec_);
+    u_fes_ = make_unique<mfem::ParFiniteElementSpace>(mesh_.get(), &u_fec_);
     coeff_gf_.SetSpace(u_fes_.get());
 
     BuildReservoirGraph();
@@ -643,7 +643,7 @@ void DarcyProblem::ComputeGraphWeight(bool unit_weight)
     }
 
     // Compute local edge weights
-    LocalTPFA local_TPFA(*pmesh_, *kinv_vector_);
+    LocalTPFA local_TPFA(*mesh_, *kinv_vector_);
     local_weight_ = local_TPFA.ComputeLocalWeights();
 
     // Assemble edge weights w_ij = (w_{ij,i}^{-1} + w_{ij,j}^{-1})^{-1}
@@ -674,7 +674,7 @@ void DarcyProblem::PrintMeshWithPartitioning(mfem::Array<int>& partition)
     fname << "mesh0.with_parts." << std::setfill('0') << std::setw(6) << myid_;
     std::ofstream ofid(fname.str().c_str());
     ofid.precision(8);
-    pmesh_->PrintWithPartitioning(partition.GetData(), ofid, 1);
+    mesh_->PrintWithPartitioning(partition.GetData(), ofid, 1);
 }
 
 void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
@@ -691,7 +691,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
     vis_v.precision(8);
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
-    vis_v << "solution\n" << *pmesh_ << gf;
+    vis_v << "solution\n" << *mesh_ << gf;
     vis_v << "window_size 500 800\n"; // Richard's example 800 250
     vis_v << "window_title 'vertex space unknown'\n";
     vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
@@ -700,7 +700,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
         vis_v << "valuerange " << range_min << " " << range_max << "\n";
     }
 
-    if (pmesh_->SpaceDimension() == 2)
+    if (mesh_->SpaceDimension() == 2)
     {
         vis_v << "view 0 0\n"; // view from top
         vis_v << "keys jl\n";  // turn off perspective and light
@@ -737,7 +737,7 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec,
     mfem::ParGridFunction gf(fes.get(), vec.GetData());
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
-    vis_v << "solution\n" << *pmesh_ << gf;
+    vis_v << "solution\n" << *mesh_ << gf;
 
     MPI_Barrier(comm_);
 
@@ -755,7 +755,7 @@ void DarcyProblem::SaveFigure(const mfem::Vector& sol, const std::string& name,
         std::stringstream filename;
         filename << name << ".mesh";
         std::ofstream out(filename.str().c_str());
-        pmesh_->Print(out);
+        mesh_->Print(out);
     }
     {
         std::stringstream filename;
@@ -780,7 +780,7 @@ void DarcyProblem::MetisPart(const mfem::Array<int>& coarsening_factor,
     }
     DivOp.SpMat().ScaleColumns(weight_sqrt);
 
-    const int dim = pmesh_->Dimension();
+    const int dim = mesh_->Dimension();
     const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
     const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
     PartitionAAT(DivOp.SpMat(), partitioning, metis_cf, dim > 2);
@@ -802,17 +802,17 @@ void DarcyProblem::Partition(bool metis_parition,
 
 mfem::Vector DarcyProblem::ComputeZ() const
 {
-    const int z_index = pmesh_->SpaceDimension() - 1;
+    const int z_index = mesh_->SpaceDimension() - 1;
     mfem::Vector Z(vertex_edge_.NumRows());
     Z = 0.0;
 
     mfem::Array<int> vertices;
-    for (int i = 0; i < pmesh_->GetNE(); ++i)
+    for (int i = 0; i < mesh_->GetNE(); ++i)
     {
-        pmesh_->GetElement(i)->GetVertices(vertices);
+        mesh_->GetElement(i)->GetVertices(vertices);
         for (auto& vertex : vertices)
         {
-            Z[i] += pmesh_->GetVertex(vertex)[z_index];
+            Z[i] += mesh_->GetVertex(vertex)[z_index];
         }
         Z[i] /= vertices.Size();
     }
@@ -823,16 +823,16 @@ mfem::Vector DarcyProblem::ComputeZ() const
 void DarcyProblem::VisualizePermeability()
 {
     mfem::Array<int> vertices;
-    for (int i = 0; i < pmesh_->GetNE(); ++i)
+    for (int i = 0; i < mesh_->GetNE(); ++i)
     {
-        pmesh_->GetElement(i)->GetVertices(vertices);
-        mfem::Vector center(pmesh_->Dimension());
+        mesh_->GetElement(i)->GetVertices(vertices);
+        mfem::Vector center(mesh_->Dimension());
         center = 0.0;
-        for (int index = 0; index < pmesh_->Dimension(); ++index)
+        for (int index = 0; index < mesh_->Dimension(); ++index)
         {
             for (auto& vertex : vertices)
             {
-                center[index] += pmesh_->GetVertex(vertex)[index];
+                center[index] += mesh_->GetVertex(vertex)[index];
             }
             center[index] /= vertices.Size();
         }
@@ -953,11 +953,11 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
     if (dim == 2)
     {
         mfem::Mesh mesh(N_[0], N_[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
-        pmesh_ = MakeParMesh(mesh, use_metis);
+        mesh_ = MakeParMesh(mesh, use_metis);
         return;
     }
     mfem::Mesh mesh(N_[0], N_[1], N_[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
-    pmesh_ = MakeParMesh(mesh, use_metis);
+    mesh_ = MakeParMesh(mesh, use_metis);
 }
 
 unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis_partition)
@@ -995,7 +995,7 @@ void SPE10Problem::CartPart(const mfem::Array<int>& coarsening_factor,
         nxyz[i] = std::max(1, N_[i] / num_procs_xyz_[i] / coarsening_factor[i]);
     }
 
-    partitioning.MakeRef(pmesh_->CartesianPartitioning(nxyz), pmesh_->GetNE());
+    partitioning.MakeRef(mesh_->CartesianPartitioning(nxyz), mesh_->GetNE());
     partitioning.MakeDataOwner();
 }
 
@@ -1014,7 +1014,7 @@ void SPE10Problem::MakeRHS()
     {
         mfem::Array<int> nat_one(ess_attr_.Size());
         nat_one = 0;
-        nat_one[pmesh_->Dimension() - 2] = 1;
+        nat_one[mesh_->Dimension() - 2] = 1;
 
         mfem::ConstantCoefficient one(1.0);
         mfem::RestrictedCoefficient pinflow_coeff(one, nat_one);
@@ -1025,7 +1025,7 @@ void SPE10Problem::MakeRHS()
 
         mfem::Array<int> nat_negative_one(ess_attr_.Size());
         nat_negative_one = 0;
-        nat_negative_one[pmesh_->Dimension() == 2 ? 2 : 3] = 1;
+        nat_negative_one[mesh_->Dimension() == 2 ? 2 : 3] = 1;
 
         mfem::ConstantCoefficient negative_one(1.0);
         mfem::RestrictedCoefficient poutflow_coeff(negative_one, nat_negative_one);
@@ -1068,8 +1068,6 @@ public:
 private:
     void SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref);
     void SetupCoeff(int nDimensions, double correlation_length);
-
-    unique_ptr<mfem::ParMesh> pmesh_c_;
 };
 
 LognormalModel::LognormalModel(int nDimensions, int num_ser_ref,
@@ -1099,15 +1097,10 @@ void LognormalModel::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref
         mesh = make_unique<mfem::Mesh>(N, N, N, mfem::Element::HEXAHEDRON, true);
     }
 
-    pmesh_ = make_unique<mfem::ParMesh>(comm_, *mesh);
-    for (int i = 0; i < 0; i++)
-    {
-        pmesh_->UniformRefinement();
-    }
-    pmesh_c_ = make_unique<mfem::ParMesh>(*pmesh_);
+    mesh_ = make_unique<mfem::ParMesh>(comm_, *mesh);
     for (int i = 0; i < num_par_ref ; i++)
     {
-        pmesh_->UniformRefinement();
+        mesh_->UniformRefinement();
     }
 }
 
@@ -1123,8 +1116,8 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length)
     mfem::Array<int> ess_attr(ess_attr_.Size());
     ess_attr = 0;
 
-    DarcyProblem darcy_problem(*pmesh_, ess_attr);
-    mfem::SparseMatrix W_block = SparseIdentity(pmesh_->GetNE());
+    DarcyProblem darcy_problem(*mesh_, ess_attr);
+    mfem::SparseMatrix W_block = SparseIdentity(mesh_->GetNE());
     double cell_vol = CellVolume();
     W_block = cell_vol * kappa * kappa;
     MixedMatrix mgL(darcy_problem.GetFVGraph(), W_block);
@@ -1207,10 +1200,10 @@ void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
         mesh.UniformRefinement();
     }
 
-    pmesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
+    mesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
     for (int i = 0; i < num_par_ref; i++)
     {
-        pmesh_->UniformRefinement();
+        mesh_->UniformRefinement();
     }
 }
 
@@ -1259,7 +1252,7 @@ void Richards::SetupMeshCoeff(int num_ref)
         mesh.UniformRefinement();
     }
 
-    pmesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
+    mesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
 }
 
 void Velocity(const mfem::Vector& x, mfem::Vector& out)

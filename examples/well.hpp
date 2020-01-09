@@ -229,7 +229,7 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
                    bool metis_parition, const mfem::Array<int>& ess_attr,
                    int well_height, double inject_rate, double bottom_hole_pressure)
     : SPE10Problem(perm_file, dim, spe10_scale, slice, metis_parition, ess_attr),
-      well_manager_(*pmesh_, *kinv_vector_), block_offsets_(4)
+      well_manager_(*mesh_, *kinv_vector_), block_offsets_(4)
 {
     rhs_sigma_ = 0.0;
     rhs_u_ = 0.0;
@@ -251,7 +251,7 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
     const double max_x = 365.76 - ft_;
     const double max_y = 670.56 - ft_;
 
-    mfem::DenseMatrix point(pmesh_->Dimension(), num_wells);
+    mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
     point = ft_;
     point(0, 1) = max_x;
     point(1, 2) = max_y;
@@ -264,12 +264,12 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
     {
         mfem::Array<int> ids;
         mfem::Array<mfem::IntegrationPoint> ips;
-        pmesh_->FindPoints(point, ids, ips, false);
+        mesh_->FindPoints(point, ids, ips, false);
 
         for (int i = 0; i < num_wells; ++i)
         {
             if (ids[i] >= 0) { cells[i].push_back(ids[i]); }
-            if (pmesh_->Dimension() == 3) { point(2, i) += 2.0 * ft_; }
+            if (mesh_->Dimension() == 3) { point(2, i) += 2.0 * ft_; }
         }
     }
 
@@ -443,7 +443,7 @@ void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor,
     }
     scaled_vert_edge.ScaleColumns(weight_sqrt);
 
-    const int dim = pmesh_->Dimension();
+    const int dim = mesh_->Dimension();
     const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
     const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
 
@@ -451,7 +451,7 @@ void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor,
     iso_vert_count_ = well_manager_.NumWells(Injector);
     for (int i = 0; i < iso_vert_count_; ++i)
     {
-        iso_verts.push_back(std::vector<int>(1, pmesh_->GetNE() + i));
+        iso_verts.push_back(std::vector<int>(1, mesh_->GetNE() + i));
     }
 
     PartitionAAT(scaled_vert_edge, partitioning, metis_cf, dim > 2, iso_verts);
