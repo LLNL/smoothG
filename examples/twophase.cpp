@@ -124,11 +124,12 @@ public:
                                 const mfem::Array<int>& starts,
                                 const MixedMatrix& darcy_system,
                                 const double dt)
-        : NonlinearSolver(Winv_D.GetComm(), upwind.NumCols(), Newton, "", 1e-6),
+        : NonlinearSolver(Winv_D.GetComm(), upwind.NumCols(), Newton, "", 1e-8),
           gmres_(Winv_D.GetComm()), Winv_Adv_(ParMult(Winv_D, upwind, starts)),
           dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt)),
           darcy_system_(darcy_system), starts_(starts)
     {
+//        gmres_.SetPrintLevel(1);
         gmres_.SetMaxIter(200);
         gmres_.SetRelTol(1e-9);
     }
@@ -295,7 +296,7 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
 
     source_.reset(new mfem::BlockVector(blk_offsets_));
     auto Winv = SparseIdentity(source_->BlockSize(2));
-    Winv *= 1. / problem.CellVolume() / 0.3; // assume W is diagonal
+    Winv *= 1. / problem.CellVolume() / 0.3; // assume W is diagonal, 0.3 is porosity
 
     const MixedMatrix& system = hierarchy_.GetMatrix(level);
     const GraphSpace& space = system.GetGraphSpace();
@@ -350,6 +351,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     {
         mfem::BlockVector previous_x(x);
         dt_real = std::min(std::min(dt_real * 2.0, param_.total_time - time), param_.dt);
+//        dt_real = std::min(param_.dt, param_.total_time - time);
         step_converged_ = false;
 
         Step(dt_real, x);
@@ -410,7 +412,9 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
         auto& starts = hierarchy_.GetGraph(0).VertexStarts();
         CoupledStepSolver solver(hierarchy_.GetMatrix(level_), *Winv_D_, starts,
                                  hierarchy_.GetTraces(level_), dt);
-        solver.SetPrintLevel(-1);
+        solver.SetPrintLevel(1);
+        solver.SetRelTol(1e-10);
+        solver.SetMaxIter(20);
 
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(2).Add(1. / dt, x.GetBlock(2));
@@ -453,7 +457,8 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
     {
         auto& starts = hierarchy_.GetGraph(level_).VertexStarts();
         ImplicitTransportStepSolver solver(*Winv_D_, upwind, starts, system, dt);
-        solver.SetPrintLevel(-1);
+        solver.SetPrintLevel(1);
+        solver.SetRelTol(1e-10);
 
         mfem::Vector rhs(source_->GetBlock(2));
         rhs.Add(1. / dt, x.GetBlock(2));
@@ -468,7 +473,7 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
                                      const mfem::Array<int>& starts,
                                      const std::vector<mfem::DenseMatrix>& edge_traces,
                                      const double dt)
-    : NonlinearSolver(Winv_D.GetComm(), 0, Newton, "", 1e-6),
+    : NonlinearSolver(Winv_D.GetComm(), 0, Newton, "", 1e-8),
       darcy_system_(darcy_system), gmres_(Winv_D.GetComm()),
       dt_inv_(SparseIdentity(Winv_D.NumRows()) *= (1.0 / dt)), Winv_D_(Winv_D),
       starts_(starts), edge_traces_(edge_traces),
@@ -685,6 +690,8 @@ void ImplicitTransportStepSolver::IterationStep(const mfem::Vector& rhs, mfem::V
     mfem::Vector delta_sol(rhs.Size());
     delta_sol = 0.0;
     gmres_.Mult(residual_, delta_sol);
+    solver.Mult(residual_, delta_sol);
+
     sol -= delta_sol;
 }
 
@@ -715,6 +722,59 @@ void ImplicitTransportStepSolver::IterationStep(const mfem::Vector& rhs, mfem::V
 //    return out;
 //}
 
+//mfem::Vector TotalMobility(const mfem::Vector& S)
+//{
+//    mfem::Vector LamS(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        LamS(i)  = S_w * S_w + S_o * S_o / 5.0;
+//    }
+//    return LamS;
+//}
+
+//mfem::Vector dTMinv_dS(const mfem::Vector& S)
+//{
+//    mfem::Vector out(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        out(i)  = 2.0 * (S_w - S_o / 5.0);
+//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+//        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
+//    }
+//    return out;
+//}
+
+//mfem::Vector FractionalFlow(const mfem::Vector& S)
+//{
+//    mfem::Vector FS(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+//        FS(i) = S_w * S_w / Lam_S;
+//    }
+//    return FS;
+//}
+
+//mfem::Vector dFdS(const mfem::Vector& S)
+//{
+//    mfem::Vector out(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+//        out(i) = 0.4 * (S_w - S_w * S_w) / (Lam_S * Lam_S);
+//    }
+//    return out;
+//}
+
+// case 1
 mfem::Vector TotalMobility(const mfem::Vector& S)
 {
     mfem::Vector LamS(S.Size());
@@ -722,7 +782,7 @@ mfem::Vector TotalMobility(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        LamS(i)  = S_w * S_w + S_o * S_o / 5.0;
+        LamS(i)  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
     }
     return LamS;
 }
@@ -734,8 +794,8 @@ mfem::Vector dTMinv_dS(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        out(i)  = 2.0 * (S_w - S_o / 5.0);
-        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
+        out(i)  = 2. * S_w / 1e-3 - 1.5 * std::pow(S_o, 0.5) / 1e-4;
+        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
         out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
     }
     return out;
@@ -748,8 +808,8 @@ mfem::Vector FractionalFlow(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-        FS(i) = S_w * S_w / Lam_S;
+        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
+        FS(i) = S_w * S_w / 1e-3 / Lam_S;
     }
     return FS;
 }
@@ -761,8 +821,65 @@ mfem::Vector dFdS(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-        out(i) = 0.4 * (S_w - S_w * S_w) / (Lam_S * Lam_S);
+        double dLw_dS = 2. * S_w / 1e-3;
+        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
+        double dLam_dS = 2. * S_w / 1e-3 - 1.5 * std::pow(S_o, 0.5) / 1e-4;
+        out(i) = (dLw_dS * Lam_S - dLam_dS * S_w * S_w / 1e-3) / (Lam_S * Lam_S);
     }
     return out;
 }
+
+// case 2
+//mfem::Vector TotalMobility(const mfem::Vector& S)
+//{
+//    mfem::Vector LamS(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        LamS(i)  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
+//    }
+//    return LamS;
+//}
+
+//mfem::Vector dTMinv_dS(const mfem::Vector& S)
+//{
+//    mfem::Vector out(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        out(i)  = 2. * S_w / 1e-3 - 3.0 * std::pow(S_o, 2.0) / 1e-2;
+//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
+//        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
+//    }
+//    return out;
+//}
+
+//mfem::Vector FractionalFlow(const mfem::Vector& S)
+//{
+//    mfem::Vector FS(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
+//        FS(i) = S_w * S_w / 1e-3 / Lam_S;
+//    }
+//    return FS;
+//}
+
+//mfem::Vector dFdS(const mfem::Vector& S)
+//{
+//    mfem::Vector out(S.Size());
+//    for (int i = 0; i < S.Size(); i++)
+//    {
+//        double S_w = S(i);
+//        double S_o = 1.0 - S_w;
+//        double dLw_dS = 2. * S_w / 1e-3;
+//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
+//        double dLam_dS = 2. * S_w / 1e-3 - 3.0 * std::pow(S_o, 2.0) / 1e-2;
+//        out(i) = (dLw_dS * Lam_S - dLam_dS * S_w * S_w / 1e-3) / (Lam_S * Lam_S);
+//    }
+//    return out;
+//}
