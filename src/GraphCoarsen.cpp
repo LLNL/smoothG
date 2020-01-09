@@ -379,9 +379,8 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                                                   facefdofs[j], col_map_);
             mfem::SparseMatrix DtransferT = smoothg::Transpose(Dtransfer);
 
-            auto Mtransfer = ExtractRowAndColumns(M_proc_, local_edofs,
-                                                  facefdofs[j], col_map_);
-            mfem::SparseMatrix MtransferT = smoothg::Transpose(Mtransfer);
+            auto MtransferT = ExtractRowAndColumns(M_proc_, facefdofs[j],
+                                                   local_edofs,col_map_);
 
             auto& edge_traces_f = edge_traces_[face];
             int num_traces = edge_traces_f.Width();
@@ -395,7 +394,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                 edge_traces_f.GetColumn(k, trace);
                 trace *= -1.0;
                 Dtransfer.Mult(trace, local_rhs_trace1);
-                Mtransfer.Mult(trace, local_rhs_trace0);
+                MtransferT.MultTranspose(trace, local_rhs_trace0);
 
                 // compute and store local coarse D
                 if (k == 0)
@@ -440,9 +439,8 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                             if (loc_map.first != other_j)
                             {
                                 other_j = loc_map.first;
-                                auto tmp = ExtractRowAndColumns(M_proc_, facefdofs[j],
-                                                                facefdofs[other_j], col_map_);
-                                Mbb.Swap(tmp);
+                                Mbb = ExtractRowAndColumns(M_proc_, facefdofs[j],
+                                                           facefdofs[other_j], col_map_);
                             }
                             entry_value += DTTraceProduct(Mbb, edge_traces_[faces[other_j]],
                                                           loc_map.second, trace);
@@ -610,10 +608,8 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
     const int num_faces = agg_face.NumCols();
 
     mfem::SparseMatrix Q_edge(agg_edof.NumCols(), coarse_D_.NumCols());
-    mfem::DenseMatrix Q_i;
 
-    mfem::DenseMatrix DT_one_pi_f_PV;
-
+    mfem::DenseMatrix Q_i, DT_one_pi_f_PV;
     mfem::Vector PV_trace;
     mfem::Vector one_rep;
 
@@ -686,16 +682,16 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
 
             sigma_f_prod.Invert();
 
-            mfem::DenseMatrix pi_f(sigma_f.Height(), sigma_f.Width());
+            mfem::DenseMatrix pi_f(Q_i.Data() + Q_i.NumRows(),
+                                   Q_i.NumRows(), Q_i.NumCols() - 1);
             mfem::Mult(sigma_f, sigma_f_prod, pi_f);
 
             mfem::Vector pi_f_PV(pi_f.Width());
             pi_f.MultTranspose(PV_trace, pi_f_PV);
-            DT_one_pi_f_PV.UseExternalData(Q_i.Data() + Q_i.NumRows(),
-                                           Q_i.NumRows(), Q_i.NumCols() - 1);
+            DT_one_pi_f_PV.SetSize(sigma_f.Height(), sigma_f.Width());
             mfem::MultVWt(one_D, pi_f_PV, DT_one_pi_f_PV);
 
-            DT_one_pi_f_PV -= pi_f;
+            pi_f -= DT_one_pi_f_PV;
         }
 
         Q_edge.AddSubMatrix(face_edofs, face_coarse_edofs, Q_i);
