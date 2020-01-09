@@ -25,7 +25,7 @@
 
 #include "../src/GraphCoarsen.hpp"
 #include "../src/utilities.hpp"
-#include "../src/MinresBlockSolver.hpp"
+#include "../src/BlockSolver.hpp"
 #include "../src/MatrixUtilities.hpp"
 
 using namespace smoothg;
@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
     sol = 0.0;
     if (myid == 0)
         std::cout << "Solving graph problem..." << std::endl;
-    MinresBlockSolver mgp(M, D, W, block_true_offsets);
+    BlockSolver mgp(M, D, W, block_true_offsets);
     mgp.Mult(rhs, sol);
     int iter = mgp.GetNumIterations();
     // int nnz = mgp.GetNNZ();

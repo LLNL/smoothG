@@ -143,51 +143,6 @@ mfem::SparseMatrix ElementMBuilder::BuildAssembledM(
     return M;
 }
 
-std::vector<mfem::SparseMatrix> ElementMBuilder::BuildAggM(
-    const mfem::SparseMatrix& agg_elem, const mfem::Vector& agg_weights_inverse) const
-{
-    const mfem::SparseMatrix agg_edof = smoothg::Mult(agg_elem, elem_edgedof_);
-
-    mfem::Array<int> edofs, agg_edofs, elems, edof_map(agg_edof.NumCols());
-    edof_map = -1;
-
-    std::vector<mfem::SparseMatrix> agg_Ms;
-    agg_Ms.reserve(agg_elem.NumRows());
-
-    for (int a = 0; a < agg_edof.NumRows(); ++a)
-    {
-        GetTableRow(agg_edof, a, agg_edofs);
-        GetTableRow(agg_elem, a, elems);
-
-        for (int j = 0; j < agg_edofs.Size(); ++j)
-            edof_map[agg_edofs[j]] = j;
-
-        mfem::SparseMatrix M(agg_edofs.Size());
-        for (int elem : elems)
-        {
-            GetTableRowCopy(elem_edgedof_, elem, edofs);
-
-            for (auto& edof : edofs)
-            {
-                assert(edof_map[edof] != -1);
-                edof = edof_map[edof];
-            }
-
-            const double agg_weight = 1. / agg_weights_inverse(elem);
-            mfem::DenseMatrix agg_M = M_el_[elem];
-            agg_M *= agg_weight;
-            M.AddSubMatrix(edofs, edofs, agg_M);
-        }
-        M.Finalize();
-
-        agg_Ms.push_back(M);
-
-        for (int j = 0; j < agg_edofs.Size(); ++j)
-            edof_map[agg_edofs[j]] = -1;
-    }
-    return agg_Ms;
-}
-
 mfem::Vector ElementMBuilder::Mult(
     const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
 {
@@ -463,7 +418,7 @@ mfem::SparseMatrix CoefficientMBuilder::BuildAssembledM(
 mfem::Vector CoefficientMBuilder::Mult(
     const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
 {
-    mfem::mfem_error("Not implemented yet!\n");
+    mfem::mfem_error("CoefficientMBuilder::Mult is not implemented!\n");
     return mfem::Vector();
 }
 

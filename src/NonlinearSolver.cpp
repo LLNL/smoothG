@@ -23,242 +23,179 @@
 namespace smoothg
 {
 
-NonlinearSolver::NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type,
-                                 std::string tag, double initial_linear_tol)
-    : comm_(comm), size_(size), solve_type_(solve_type), tag_(tag), residual_(size),
-      linear_tol_criterion_(NonlinearResidual), linear_tol_(initial_linear_tol)
+NonlinearSolver::NonlinearSolver(MPI_Comm comm, NLSolverParameters param)
+    : comm_(comm), tag_("Nonlinear"), linear_tol_(param.init_linear_tol),
+      update_is_needed_(true), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
 
-double NonlinearSolver::ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs)
-{
-    residual_ = 0.0;
-    Mult(sol, residual_);
-
-    residual_ -= rhs;
-
-    for (int i = 0; i < GetEssDofs().Size(); ++i)
-    {
-        if (GetEssDofs()[i])
-            residual_[i] = 0.0;
-    }
-
-    mfem::Vector true_resid = AssembleTrueVector(residual_);
-
-    return mfem::ParNormlp(true_resid, 2, comm_);
-}
-
 void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 {
-//    if (max_num_iter_ == 1)
-//    {
-//        IterationStep(rhs, sol);
-//    }
-//    else
-    {
-        mfem::StopWatch chrono;
-        chrono.Start();
+    mfem::StopWatch chrono;
+    chrono.Start();
 
+    if (param_.check_converge)
+    {
         mfem::Vector zero_vec(sol);
         zero_vec = 0.0;
-        rhs_norm_ = prev_resid_norm_ = ResidualNorm(zero_vec, rhs);
+        rhs_norm_ = prev_resid_norm_ = Norm(Residual(zero_vec, rhs));
+        adjusted_tol_ = std::max(param_.atol, param_.rtol * rhs_norm_);
+    }
 
-        adjusted_tol_ = std::max(atol_, rtol_ * rhs_norm_);
-
-        converged_ = false;
-        for (iter_ = 0; iter_ < max_num_iter_ + 1; iter_++)
+    converged_ = false;
+    for (iter_ = 0; iter_ < param_.max_num_iter + 1; iter_++)
+    {
+        if (param_.check_converge)
         {
-            resid_norm_ = ResidualNorm(sol, rhs);
-
-            if (myid_ == 0 && print_level_ > 0)
-            {
-                double rel_resid = resid_norm_ / rhs_norm_;
-                std::cout << tag_ << " iter " << iter_ << ": rel resid = "
-                          << rel_resid << ", abs resid = " << resid_norm_ << ".\n";
-            }
-
+            if (update_is_needed_) { resid_norm_ = Norm(Residual(sol, rhs)); }
             converged_ = (resid_norm_ < adjusted_tol_);
-
-            if (converged_ || iter_ == max_num_iter_)
-            {
-                break;
-            }
-
             UpdateLinearSolveTol();
             prev_resid_norm_ = resid_norm_;
 
-            IterationStep(rhs, sol);
+            if (myid_ == 0 && param_.print_level > 0)
+            {
+                std::cout << tag_ << " iter " << iter_ << ": abs resid = " << resid_norm_
+                          << ", rel resid = " << resid_norm_ / rhs_norm_ << ".\n";
+            }
         }
 
-        timing_ = chrono.RealTime();
-        if (!converged_ && myid_ == 0 && print_level_ >= 0)
-        {
-            std::cout << "Warning: " << tag_ << " solver reached maximum "
-                      << "number of iterations!\n";
-        }
-        else if (myid_ == 0 && print_level_ >= 0)
-        {
-            std::cout << tag_ << " solver took " << iter_ << " iterations in "
-                      << timing_ << " seconds.\n\n";
-        }
+        if (converged_ || iter_ == param_.max_num_iter) { break; }
+
+        IterationStep(rhs, sol);
+    }
+
+    timing_ = chrono.RealTime();
+    if (!converged_ && myid_ == 0 && param_.print_level > -1)
+    {
+        std::cout << "Warning: " << tag_ << " reached maximum number "
+                  << "of iterations and took " << timing_ << " seconds!\n\n";
+    }
+    else if (myid_ == 0 && param_.print_level > -1)
+    {
+        std::cout << tag_ << " took " << iter_ << " iterations in "
+                  << timing_ << " seconds.\n\n";
     }
 }
 
 void NonlinearSolver::UpdateLinearSolveTol()
 {
-    double tol;
-    if (linear_tol_criterion_ == TaylorResidual)
-    {
-        tol = std::fabs(resid_norm_ - linear_resid_norm_) / prev_resid_norm_;
-    }
-    else // NonlinearResidual
-    {
-//        double exponent = solve_type_ == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;//
-        double ref_norm = solve_type_ == Newton ? prev_resid_norm_ : rhs_norm_;
-        tol = std::pow(resid_norm_ / ref_norm, 1.0);
-    }
-
+    double exponent = param_.linearization == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
+    double ref_norm = param_.linearization == Newton ? prev_resid_norm_ : rhs_norm_;
+    double tol = std::pow(resid_norm_ / ref_norm, exponent);
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
 
-NonlinearMG::NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param)
-    : NonlinearSolver(comm, size, param.solve_type, "Nonlinear MG", param.initial_linear_tol),
-      cycle_(param.cycle), num_levels_(num_levels), rhs_(num_levels_),
-      sol_(num_levels_), help_(num_levels_), residual_norms_(num_levels)
-{ }
+void NonlinearSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_norm,
+                                   mfem::Vector& x, mfem::Vector& dx)
+{
+    if (param_.num_backtrack == 0) { return; }
 
-void NonlinearMG::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+    update_is_needed_ = false;
+    int k = 0;
+    resid_norm_ = Norm(Residual(x, rhs));
+
+    while (k < param_.num_backtrack && resid_norm_ > prev_resid_norm)
+    {
+        dx *= 0.5;
+        x += dx;
+
+        const double backtracking_resid_norm = resid_norm_;
+        resid_norm_ = Norm(Residual(x, rhs));
+
+        if (resid_norm_ > 0.9 * backtracking_resid_norm)
+        {
+            x -= dx;
+            resid_norm_ = backtracking_resid_norm;
+            break;
+        }
+
+        if (myid_ == 0  && param_.print_level > 1)
+        {
+            if (k == 0) { std::cout << "  backtracking: || R(u) ||"; }
+            std::cout << " -> " << backtracking_resid_norm;
+        }
+        k++;
+    }
+
+    if (k > 0 && myid_ == 0 && param_.print_level > 1)
+    {
+        std::cout << "\n";
+    }
+}
+
+FAS::FAS(MPI_Comm comm, FASParameters param)
+    : NonlinearSolver(comm, param.nl_solve), rhs_(param.num_levels),
+      sol_(rhs_.size()), help_(rhs_.size()), solvers_(rhs_.size()), param_(param)
+{
+    tag_ = "FAS";
+}
+
+void FAS::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
+{
+    solvers_[level]->SetLinearRelTol(linear_tol_);
+    solvers_[level]->Solve(in, out);
+}
+
+void FAS::MG_Cycle(int l)
+{
+    if (param_.cycle == V_CYCLE || l == param_.num_levels - 1)
+    {
+        Smoothing(l, rhs_[l], sol_[l]); // Pre-smoothing
+    }
+
+    if (l == param_.num_levels - 1) { return; } // terminate if coarsest level
+
+    // Compute FAS coarser level rhs
+    // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
+    help_[l] = solvers_[l]->Residual(sol_[l], rhs_[l]);
+    double resid_norm_l = resid_norm_ = solvers_[l]->Norm(help_[l]);
+
+    if (l == 0 && param_.cycle == V_CYCLE)
+    {
+        if (resid_norm_ < adjusted_tol_)
+        {
+            update_is_needed_ = false;
+            if (myid_ == 0)
+            {
+                std::cout << "V cycle terminated after pre-smoothing\n";
+            }
+            return;
+        }
+        UpdateLinearSolveTol();
+        prev_resid_norm_ = resid_norm_;
+    }
+
+    if (l || resid_norm_ > rhs_norm_ * param_.coarse_correct_tol)
+    {
+        Restrict(l, help_[l], help_[l + 1]);
+        Project(l, sol_[l], sol_[l + 1]);
+        rhs_[l + 1] = solvers_[l + 1]->Residual(sol_[l + 1], help_[l + 1]);
+
+        // Store projected coarse solution pi x_l
+        mfem::Vector coarse_sol = sol_[l + 1];
+
+        MG_Cycle(l + 1); // Go to coarser level (sol_[l+1] will be updated)
+
+        // Compute correction x_l += P( x_{l+1} - pi x_l )
+        coarse_sol -= sol_[l + 1];
+        Interpolate(l + 1, coarse_sol, help_[l]);
+        sol_[l] -= help_[l];
+
+        if (param_.cycle == V_CYCLE)
+        {
+            solvers_[l]->BackTracking(rhs_[l], resid_norm_l, sol_[l], help_[l]);
+        }
+    }
+
+    Smoothing(l, rhs_[l], sol_[l]); // Post-smoothing
+}
+
+void FAS::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
 {
     rhs_[0].SetDataAndSize(rhs.GetData(), rhs.Size());
     sol_[0].SetDataAndSize(sol.GetData(), sol.Size());
-
-    FAS_Cycle(0);
-}
-
-void NonlinearMG::FAS_Cycle(int level)
-{
-    if (level == num_levels_ - 1)
-    {
-        Solve(level, rhs_[level], sol_[level]);
-
-        {
-            for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-            {
-                if (GetEssDofs(level)[i])
-                    sol_[level][i] = 0.0;
-            }
-        }
-    }
-    else
-    {
-        // Pre-smoothing
-        if (cycle_ == V_CYCLE || cycle_ == CASCADIC)
-        {
-            Smoothing(level, rhs_[level], sol_[level]);
-        }
-
-        // Compute FAS coarser level rhs
-        // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
-        Mult(level, sol_[level], help_[level]);
-        help_[level] -= rhs_[level];
-
-        {
-//            if (level == 0)
-            {
-                for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-                {
-                    if (GetEssDofs(level)[i])
-                        help_[level][i] = 0.0;
-                }
-            }
-
-            mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
-
-            if (level == 0)
-            {
-                resid_norm_ = mfem::ParNormlp(true_resid, 2, comm_);
-                UpdateLinearSolveTol();
-                prev_resid_norm_ = resid_norm_;
-
-                if (resid_norm_ < adjusted_tol_)
-                {
-                    converged_ = true;
-                    if (level == 0 && myid_ == 0)
-                    {
-                        std::cout<<"V cycle terminated after pre-smoothing\n";
-                    }
-                    return;
-                }
-            }
-            else
-            {
-                residual_norms_[level] = mfem::ParNormlp(true_resid, 2, comm_);
-            }
-
-//            if (myid_==0)
-//            {
-//                double resid_norm = level ? residual_norms_[level] : resid_norm_;
-//                std::cout<<"level "<<level<<": pre-smooth resid = " << resid_norm <<" "<<resid_norm /rhs_norm_<<"\n";
-//            }
-        }
-
-//if (solve_type_ == Picard || (level || resid_norm_ > rhs_norm_*1e-2))
-
-        if (level || resid_norm_ > rhs_norm_*(solve_type_ == Picard ? 1e-8 : 1e-4))
-            //if (iter_ == 0)
-        {
-            Restrict(level, help_[level], help_[level + 1]);
-
-            Project(level, sol_[level], sol_[level + 1]);
-
-            Mult(level + 1, sol_[level + 1], rhs_[level + 1]);
-            rhs_[level + 1] -= help_[level + 1];
-
-            // Store projected coarse solution pi x_l
-            mfem::Vector coarse_sol = sol_[level + 1];
-
-            // Go to coarser level (sol_[level + 1] will be updated)
-            FAS_Cycle(level + 1);
-
-            // Compute correction x_l += P( x_{l+1} - pi x_l )
-            coarse_sol -= sol_[level + 1];
-
-            Interpolate(level + 1, coarse_sol, help_[level]);
-            sol_[level] -= help_[level];
-
-            if (cycle_ == V_CYCLE)
-            {
-                BackTracking(level, rhs_[level], level ? residual_norms_[level] : prev_resid_norm_,
-                             sol_[level], help_[level]);
-            }
-
-//            {
-//                Mult(level, sol_[level], help_[level]);
-//                help_[level] -= rhs_[level];
-
-//                for (int i = 0; i < GetEssDofs(level).Size(); ++i)
-//                {
-//                    if (GetEssDofs(level)[i])
-//                        help_[level][i] = 0.0;
-//                }
-
-//                mfem::Vector true_resid = AssembleTrueVector(level, help_[level]);
-//                residual_norms_[level] = mfem::ParNormlp(true_resid, 2, comm_);
-
-//                if (myid_==0)
-//                {
-//                    std::cout<<"level "<<level<<": coarse grid correction resid = " << residual_norms_[level] <<"\n";
-//                }
-//            }
-        }
-
-        // Post-smoothing
-        if (cycle_ == V_CYCLE || cycle_ == FMG)
-        {
-            Smoothing(level, rhs_[level], sol_[level]);
-        }
-    }
+    MG_Cycle(0);
 }
 
 } // namespace smoothg

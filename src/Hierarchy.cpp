@@ -51,19 +51,16 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
-    if (ess_attr)
-        mixed_systems_.back().SetEssDofs(*ess_attr);
+    if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
     MakeSolver(0, param);
 
     agg_vert_.reserve(param.max_levels - 1);
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
-//        param_.max_evects = param.max_evects + level;
         Coarsen(level, param, level ? nullptr : partitioning);
         MakeSolver(level + 1, param);
-        if (ess_attr)
-            mixed_systems_.back().SetEssDofs(*ess_attr);
+        if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
     }
 
     chrono.Stop();
@@ -78,8 +75,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     GraphTopology topology;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
-                         topology.Coarsen(mgL.GetGraph(), level ? 8 : param.coarse_factor,
-                                          param.num_iso_verts);
+                         topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
 
     agg_vert_.push_back(topology.Agg_vertex_);
 
@@ -87,13 +83,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
     auto vertex_targets = localtargets.ComputeVertexTargets();
-
     edge_traces_.push_back(localtargets.ComputeEdgeTargets(vertex_targets));
-
-//    for (auto& target : vertex_targets)
-//    {
-//        target.SetSize(target.NumRows(), 1);
-//    }
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces_.back(),
                                vertex_targets, std::move(coarse_graph));
@@ -111,7 +101,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization && level) // Hybridization solver
+    if (param.hybridization) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
@@ -120,7 +110,7 @@ void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        solvers_[level].reset(new MinresBlockSolverFalse(GetMatrix(level), ess_attr_));
+        solvers_[level].reset(new BlockSolverFalse(GetMatrix(level), ess_attr_));
     }
 }
 
@@ -170,11 +160,6 @@ void Hierarchy::Interpolate(int level, const mfem::BlockVector& x, mfem::BlockVe
     assert(level >= 1 && level < NumLevels());
     Psigma_[level - 1].Mult(x.GetBlock(0), y.GetBlock(0));
     Pu_[level - 1].Mult(x.GetBlock(1), y.GetBlock(1));
-//y.GetBlock(0) = 0.0;
-//    auto tmp = PWConstProject(level, x.GetBlock(1));
-//    auto tmp2 = PWConstInterpolate(level, tmp);
-//    Pu_[level - 1].Mult(tmp2, y.GetBlock(1));
-//    y.GetBlock(0) = 0.0;
 }
 
 mfem::BlockVector Hierarchy::Interpolate(int level, const mfem::BlockVector& x) const
@@ -237,18 +222,12 @@ mfem::BlockVector Hierarchy::Project(int level, const mfem::BlockVector& x) cons
 
 mfem::Vector Hierarchy::PWConstProject(int level, const mfem::Vector& x) const
 {
-    mfem::Vector out(GetMatrix(level).GetGraph().NumVertices());
-    GetMatrix(level).GetPWConstProj().Mult(x, out);
-    return out;
+    return GetMatrix(level).PWConstProject(x);
 }
 
 mfem::Vector Hierarchy::PWConstInterpolate(int level, const mfem::Vector& x) const
 {
-    mfem::Vector scaled_x(x);
-    RescaleVector(GetMatrix(level).GetVertexSizes(), scaled_x);
-    mfem::Vector out(GetMatrix(level).NumVDofs());
-    GetMatrix(level).GetPWConstProj().MultTranspose(scaled_x, out);
-    return out;
+    return GetMatrix(level).PWConstInterpolate(x);
 }
 
 MixedMatrix& Hierarchy::GetMatrix(int level)
@@ -442,56 +421,6 @@ void Hierarchy::DumpDebug(const std::string& prefix) const
 void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coeff)
 {
     solvers_[level]->UpdateElemScaling(coeff);
-}
-
-void Hierarchy::RescaleCoefficient(int level, const mfem::Vector& coarse_sol,
-                                   void (*f)(const mfem::Vector&, mfem::Vector&))
-{
-    mfem::Vector fine_sol = Interpolate(level, coarse_sol);
-
-    auto& coarse_mbuilder = ((ElementMBuilder&)GetMatrix(level).GetMBuilder());
-    if (level == 1)
-    {
-        mfem::Vector coeff(fine_sol);
-        (*f)(fine_sol, coeff);
-
-        auto& fine_mbuilder = ((ElementMBuilder&)GetMatrix(level - 1).GetMBuilder());
-        auto agg_Ms = fine_mbuilder.BuildAggM(agg_vert_[level - 1], coeff);
-
-        auto& agg_coarse_edof = GetMatrix(level).GetGraphSpace().VertexToEDof();
-        auto agg_fine_edof = smoothg::Mult(agg_vert_[level - 1], fine_mbuilder.GetElemEdgeDofTable());
-
-        mfem::Array<int> fine_edofs, coarse_edofs, colmap(Psigma_[level - 1].NumCols());
-        colmap = -1;
-
-        std::vector<mfem::DenseMatrix> agg_CMs(agg_vert_[level - 1].NumRows());
-        for (int a = 0 ; a < agg_vert_[level - 1].NumRows(); ++a)
-        {
-            GetTableRow(agg_fine_edof, a, fine_edofs);
-            GetTableRow(agg_coarse_edof, a, coarse_edofs);
-
-            auto agg_Psigma = ExtractRowAndColumns(Psigma_[level - 1], fine_edofs,
-                                                   coarse_edofs, colmap);
-            auto agg_PsigmaT = smoothg::Transpose(agg_Psigma);
-
-            std::unique_ptr<mfem::SparseMatrix> agg_CM(RAP(agg_Ms[a], agg_PsigmaT));
-            Full(*agg_CM, agg_CMs[a]);
-        }
-
-        coarse_mbuilder.SetElementMatrices(std::move(agg_CMs));
-    }
-    else
-    {
-        RescaleCoefficient(level - 1, fine_sol, *f);
-    }
-
-    MakeSolver(level, param_);
-}
-
-void Hierarchy::UpdateJacobian(int level, const mfem::Vector& elem_scaling_inverse,
-                               const std::vector<mfem::DenseMatrix>& dMdp)
-{
-    solvers_[level]->UpdateJacobian(elem_scaling_inverse, dMdp);
 }
 
 int Hierarchy::NumVertices(int level) const

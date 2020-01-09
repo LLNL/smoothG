@@ -26,6 +26,8 @@
 namespace smoothg
 {
 
+enum KrylovMethod { CG, MINRES, GMRES };
+
 /**
    @brief Abstract base class for solvers of graph Laplacian problems
 */
@@ -46,6 +48,7 @@ public:
        come into and go out of this method.
     */
     void Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    mfem::BlockVector Solve(const mfem::BlockVector& rhs) const;
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const = 0;
 
     /// Solve the primal form of the graph Laplacian problem (DM^{-1}D^T) sol = rhs
@@ -61,23 +64,23 @@ public:
 
     ///@name Set solver parameters
     ///@{
-    virtual void SetPrintLevel(int print_level) { print_level_ = print_level; }
-    virtual void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
-    virtual void SetRelTol(double rtol) { rtol_ = rtol; }
-    virtual void SetAbsTol(double atol) { atol_ = atol; }
+    void SetPrintLevel(int l) { print_level_ = l; solver_->SetPrintLevel(l); }
+    void SetMaxIter(int it) { max_num_iter_ = it; solver_->SetMaxIter(it); }
+    void SetRelTol(double rtol) { rtol_ = rtol; solver_->SetRelTol(rtol); }
+    void SetAbsTol(double atol) { atol_ = atol; solver_->SetAbsTol(atol); }
     ///@}
 
     ///@name Get results of iterative solve
     ///@{
-    virtual int GetNumIterations() const { return num_iterations_; }
-    virtual int GetNNZ() const { return nnz_; }
-    virtual double GetTiming() const { return timing_; }
+    int GetNumIterations() const { return num_iterations_; }
+    int GetNNZ() const { return nnz_; }
+    double GetTiming() const { return timing_; }
     ///@}
 
 protected:
     void Init(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr);
     void Orthogonalize(mfem::Vector& vec) const;
-
+    std::unique_ptr<mfem::IterativeSolver> InitKrylovSolver(KrylovMethod method);
     MPI_Comm comm_;
     int myid_;
 
@@ -102,51 +105,8 @@ protected:
     mfem::Array<int> ess_edofs_;
     const mfem::Vector* const_rep_;
 
-    mfem::GMRESSolver gmres_;
+    std::unique_ptr<mfem::IterativeSolver> solver_;
     bool is_symmetric_;
-};
-
-class PrimalSolver : public MixedLaplacianSolver
-{
-public:
-    /**
-       @brief Constructor from individual M and D matrices.
-
-       @param mgL containing information of mixed system
-       @param ess_attr marker for essential boundary attributes
-    */
-    PrimalSolver(const MixedMatrix& mgL,
-                 const mfem::Array<int>* ess_attr = nullptr);
-
-    /**
-       @brief Use CG preconditioned by BoomerAMG to solve the primal problem.
-    */
-    virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
-
-    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
-
-    ///@name Set solver parameters
-    ///@{
-    virtual void SetPrintLevel(int print_level) override;
-    virtual void SetMaxIter(int max_num_iter) override;
-    virtual void SetRelTol(double rtol) override;
-    virtual void SetAbsTol(double atol) override;
-    ///@}
-
-protected:
-    void Init(mfem::SparseMatrix M_proc);
-
-    mfem::CGSolver cg_;
-
-    mfem::Vector M_diag_;
-    std::unique_ptr<mfem::HypreParMatrix> D_;
-    std::unique_ptr<mfem::HypreParMatrix> Dt_;
-    std::unique_ptr<mfem::SparseMatrix> W_;
-
-    std::unique_ptr<mfem::HypreParMatrix> operator_;
-    std::unique_ptr<mfem::HypreBoomerAMG> prec_;
-
-    const MixedMatrix& mixed_matrix_;
 };
 
 } // namespace smoothg

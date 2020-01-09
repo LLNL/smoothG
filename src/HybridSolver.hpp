@@ -119,15 +119,6 @@ public:
 
     virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
                                 const std::vector<mfem::DenseMatrix>& N_el);
-
-    ///@name Set solver parameters
-    ///@{
-    virtual void SetPrintLevel(int print_level) override;
-    virtual void SetMaxIter(int max_num_iter) override;
-    virtual void SetRelTol(double rtol) override;
-    virtual void SetAbsTol(double atol) override;
-    ///@}
-
 private:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
@@ -191,7 +182,6 @@ private:
 
     std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
-    mfem::CGSolver cg_;
 
     // eliminated part of H_ (for applying elimination in repeated solves)
     std::unique_ptr<mfem::HypreParMatrix> H_elim_;
@@ -252,7 +242,7 @@ public:
                  const std::vector<mfem::Array<int>>& loc_dofs);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual void SetOperator(const mfem::Operator& op) {}
+    virtual void SetOperator(const mfem::Operator& op) { }
 private:
 
     void Smoothing(const mfem::Vector& x, mfem::Vector& y) const;
@@ -265,7 +255,6 @@ private:
     mfem::SparseMatrix aux_map_;
     std::unique_ptr<mfem::HypreParMatrix> aux_op_;
     std::unique_ptr<mfem::HypreBoomerAMG> aux_solver_;
-    mfem::GMRESSolver gmres_;
 };
 
 } // namespace smoothg

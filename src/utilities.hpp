@@ -248,6 +248,9 @@ double Min(const mfem::Vector& vec, MPI_Comm comm);
 /// @return Global value of MPI_Allreduce of MPI operation op on local_value
 bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm);
 
+/// Set entries in vec corresponding to nonzero entries of marker to be 0
+void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec);
+
 } // namespace smoothg
 
 #endif /* __UTILITIES_HPP */

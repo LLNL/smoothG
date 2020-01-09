@@ -280,11 +280,11 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
         if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
     }
 
-//    for (int i = 0; i < num_wells; ++i)
-//    {
-//        double value = (i == num_wells - 1) ? 1e6 : 1e5;
-//        if (cells[i].size()) { well_manager_.AddWell(Producer, value, cells[i]); }
-//    }
+    //    for (int i = 0; i < num_wells; ++i)
+    //    {
+    //        double value = (i == num_wells - 1) ? 1e6 : 1e5;
+    //        if (cells[i].size()) { well_manager_.AddWell(Producer, value, cells[i]); }
+    //    }
 }
 
 mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edge)
@@ -357,7 +357,7 @@ std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vect
 mfem::Vector TwoPhase::AppendWellData(const mfem::Vector& vec, WellType type)
 {
     const int append_size = type & Producer ? well_manager_.NumWellCells()
-                                            : well_manager_.NumWells(Injector);
+                            : well_manager_.NumWells(Injector);
 
     mfem::Vector combined_vec(vec.Size() + append_size);
     std::copy_n(vec.GetData(), vec.Size(), combined_vec.GetData());
@@ -368,9 +368,9 @@ mfem::Vector TwoPhase::AppendWellData(const mfem::Vector& vec, WellType type)
         const int size = w.cells.size();
         switch (type)
         {
-        case Any: std::copy_n(w.well_indices.data(), size, data); break;
-        case Injector: if (w.type == type) *(data++) = w.value; break;
-        case Producer: std::fill_n(data, size, w.type == type ? w.value : 0.0);
+            case Any: std::copy_n(w.well_indices.data(), size, data); break;
+            case Injector: if (w.type == type) *(data++) = w.value; break;
+            case Producer: std::fill_n(data, size, w.type == type ? w.value : 0.0);
         }
         data += type & Producer ? size : 0;
     }
@@ -432,7 +432,8 @@ void TwoPhase::CombineReservoirAndWellModel()
     ess_attr_.Append(producer_attr);
 }
 
-void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const
+void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor,
+                         mfem::Array<int>& partitioning) const
 {
     mfem::SparseMatrix scaled_vert_edge(vertex_edge_);
     mfem::Vector weight_sqrt(weight_);
@@ -442,9 +443,9 @@ void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<
     }
     scaled_vert_edge.ScaleColumns(weight_sqrt);
 
-    int metis_coarsening_factor = 1;
-    for (const auto factor : coarsening_factor)
-        metis_coarsening_factor *= factor;
+    const int dim = pmesh_->Dimension();
+    const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
+    const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
 
     std::vector<std::vector<int>> iso_verts;
     iso_vert_count_ = well_manager_.NumWells(Injector);
@@ -453,6 +454,6 @@ void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<
         iso_verts.push_back(std::vector<int>(1, pmesh_->GetNE() + i));
     }
 
-    PartitionAAT(scaled_vert_edge, partitioning, metis_coarsening_factor, iso_verts);
+    PartitionAAT(scaled_vert_edge, partitioning, metis_cf, dim > 2, iso_verts);
 }
 

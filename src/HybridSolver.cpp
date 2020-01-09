@@ -37,7 +37,6 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
     :
     MixedLaplacianSolver(mgL.GetComm(), mgL.BlockOffsets(), mgL.CheckW()),
     mgL_(mgL),
-    cg_(comm_),
     rescale_iter_(rescale_iter),
     saamge_param_(saamge_param)
 {
@@ -109,12 +108,7 @@ void HybridSolver::Init(
         std::cout << "  Timing: Hybridized system built in "
                   << chrono.RealTime() << "s. \n";
 
-    cg_.SetPrintLevel(print_level_);
-    cg_.SetMaxIter(max_num_iter_);
-    cg_.SetRelTol(rtol_);
-    cg_.SetAbsTol(atol_);
-    cg_.iterative_mode = true;
-
+    solver_ = InitKrylovSolver(CG);
     BuildParallelSystemAndSolver(H_proc);
 
     Hrhs_.SetSize(num_multiplier_dofs_);
@@ -285,7 +279,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         Mloc_solver.SetOperator(M_el[iAgg]);
         Mloc_solver.GetInverseMatrix(Minv_ref_[iAgg]);
-//        Minv_ref_[iAgg].Symmetrize();
 
         mfem::DenseMatrix& MinvCT_i(MinvCT_[iAgg]);
         mfem::DenseMatrix& AinvDMinvCT_i(AinvDMinvCT_[iAgg]);
@@ -302,7 +295,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         // Compute CMinvCT = Cloc * MinvCT
         Hybrid_el_[iAgg] = smoothg::Mult(C_[iAgg], MinvCT_i);
-//        Hybrid_el_[iAgg].Symmetrize();
 
         // Compute Aloc = DMinvDT = Dloc * MinvDT
         Aloc = smoothg::Mult(Dloc, MinvDT_i);
@@ -321,7 +313,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         // Compute the LU factorization of Aloc and Ainv_ * DMinvCT
         Aloc_solver.SetOperator(Aloc);
         Aloc_solver.GetInverseMatrix(Ainv_i);
-//        Ainv_i.Symmetrize();
         mfem::Mult(Ainv_i, DMinvCT, AinvDMinvCT_i);
 
         // Compute CMinvDTAinvDMinvCT = CMinvDT * AinvDMinvCT_
@@ -331,7 +322,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         if (CMinvDT.Height() > 0 && CMinvDT.Width() > 0)
         {
             mfem::Mult(CMinvDT, AinvDMinvCT_i, CMDADMC);
-//            CMDADMC.Symmetrize();
         }
         else
         {
@@ -340,7 +330,6 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
 
         // Hybrid_el_ = CMinvCT - CMinvDTAinvDMinvCT
         Hybrid_el_[iAgg] -= CMDADMC;
-//        Hybrid_el_[iAgg].Symmetrize();
 
         // Add contribution of the element matrix to the global system
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, Hybrid_el_[iAgg]);
@@ -402,8 +391,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
     mfem::Array<int> col_marker(mgL_.GetD().NumCols());
     col_marker = -1;
 
-    const int scaling_size = rescale_iter_ < 0 &&
-            diagonal_scaling_.Capacity() == 0 ? H_proc.NumRows() : 0;
+    const int scaling_size = rescale_iter_ < 0 ? H_proc.NumRows() : 0;
     mfem::Vector CCT_diag(scaling_size), CDT1(scaling_size);
     CCT_diag = 0.0;
     CDT1 = 0.0;
@@ -545,7 +533,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 
     if (is_symmetric_)
     {
-//        trueMu_ = MakeInitialGuess(Sol, Rhs);
+        trueMu_ = MakeInitialGuess(Sol, Rhs);
     }
     else
     {
@@ -577,34 +565,15 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
         InvRescaleVector(diagonal_scaling_, trueMu_);
     }
 
-    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&cg_)
-                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
-
     // solve the parallel global hybridized system
     mfem::StopWatch chrono;
     chrono.Clear();
     chrono.Start();
 
-    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-12);
-    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-15);
-
-    solver->Mult(trueHrhs_, trueMu_);
+    solver_->Mult(trueHrhs_, trueMu_);
 
     chrono.Stop();
     timing_ = chrono.RealTime();
-
-//        mfem::SparseMatrix H_diag(GetDiag(*H_), true);
-//        mfem::UMFPackSolver H_solve(H_diag);
-//std::cout<<"trueMu = " <<trueMu_.Norml2()<<"\n";
-//    mfem::Vector trueMu2(trueMu_);trueMu2 = 0.0;
-//        trueMu_ = 0.0;
-//    solver->Mult(trueHrhs_, trueMu2);
-
-//    if (solver->GetConverged() == false)
-//        H_solve.Mult(trueHrhs_, trueMu_);
-//        trueMu2-=trueMu_;
-//    std::cout<<"rel trueMu diff = " <<trueMu2.Norml2()/ trueMu_.Norml2()<<"\n";
-
 
     std::string solver_name = is_symmetric_ ? "CG" : "GMRES";
 
@@ -615,23 +584,23 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     }
 
     // TODO: decide to use = or += here and in timing_ update (MinresBlockSolver uses +=)
-    num_iterations_ = solver->GetNumIterations();
+    num_iterations_ = solver_->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
     {
-        if (solver->GetConverged())
+        if (solver_->GetConverged())
         {
             std::cout << "  " + solver_name + " converged in "
                       << num_iterations_
                       << " with a final residual norm "
-                      << solver->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         }
         else
         {
             std::cout << "  " + solver_name + " did not converge in "
                       << num_iterations_
                       << ". Final residual norm is "
-                      << solver->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         }
     }
 
@@ -949,9 +918,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
     }
     nnz_ = H_->NNZ();
 
-    auto solver = is_symmetric_ ? dynamic_cast<mfem::IterativeSolver*>(&cg_)
-                                : dynamic_cast<mfem::IterativeSolver*>(&gmres_);
-    solver->SetOperator(*H_);
+    solver_->SetOperator(*H_);
 
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -1010,7 +977,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
             prec_ = make_unique<AuxSpacePrec>(*H_, std::move(PV_map), local_dofs);
         }
 
-        solver->SetPreconditioner(*prec_);
+        solver_->SetPreconditioner(*prec_);
     }
     if (myid_ == 0 && print_level_ > 0)
         std::cout << "  Timing: Preconditioner for hybridized system"
@@ -1083,17 +1050,10 @@ void HybridSolver::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
         GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
         mfem::DenseMatrix H_el = Hybrid_el_[iAgg]; // deep copy
         H_el *= (1.0 / elem_scaling_(iAgg));
-//        H_el.Symmetrize();
         H_proc.AddSubMatrix(local_multiplier, local_multiplier, H_el);
 
     }
     BuildParallelSystemAndSolver(H_proc);
-
-    gmres_.SetPrintLevel(print_level_);
-    gmres_.SetMaxIter(max_num_iter_);
-    gmres_.SetRelTol(rtol_);
-    gmres_.SetAbsTol(atol_);
-    gmres_.SetKDim(100);
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -1110,15 +1070,11 @@ void HybridSolver::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
 
     is_symmetric_ = false;
 
+    solver_ = InitKrylovSolver(GMRES);
+    solver_->iterative_mode = false;
+
     auto H_proc = AssembleHybridSystem(elem_scaling_inverse, N_el);
     BuildParallelSystemAndSolver(H_proc);
-
-    gmres_.SetPrintLevel(print_level_);
-    gmres_.SetMaxIter(max_num_iter_);
-    gmres_.SetRelTol(rtol_);
-    gmres_.SetAbsTol(atol_);
-    gmres_.iterative_mode = false;
-    gmres_.SetKDim(100);
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -1175,34 +1131,6 @@ mfem::Vector HybridSolver::MakeInitialGuess(const mfem::BlockVector& sol,
     return true_mu;
 }
 
-void HybridSolver::SetPrintLevel(int print_level)
-{
-    MixedLaplacianSolver::SetPrintLevel(print_level);
-
-    cg_.SetPrintLevel(print_level_);
-}
-
-void HybridSolver::SetMaxIter(int max_num_iter)
-{
-    MixedLaplacianSolver::SetMaxIter(max_num_iter);
-
-    cg_.SetMaxIter(max_num_iter_);
-}
-
-void HybridSolver::SetRelTol(double rtol)
-{
-    MixedLaplacianSolver::SetRelTol(rtol);
-
-    cg_.SetRelTol(rtol_);
-}
-
-void HybridSolver::SetAbsTol(double atol)
-{
-    MixedLaplacianSolver::SetAbsTol(atol);
-
-    cg_.SetAbsTol(atol_);
-}
-
 AuxSpacePrec::AuxSpacePrec(mfem::HypreParMatrix& op, mfem::SparseMatrix aux_map,
                            const std::vector<mfem::Array<int>>& loc_dofs)
     : mfem::Solver(op.NumRows(), false),
@@ -1210,8 +1138,7 @@ AuxSpacePrec::AuxSpacePrec(mfem::HypreParMatrix& op, mfem::SparseMatrix aux_map,
       local_ops_(local_dofs_.size()),
       local_solvers_(local_dofs_.size()),
       op_(op),
-      aux_map_(std::move(aux_map)),
-      gmres_(op.GetComm())
+      aux_map_(std::move(aux_map))
 {
     op.GetDiag(op_diag_);
     for (unsigned int i = 0; i < local_dofs_.size(); ++i)
@@ -1235,15 +1162,6 @@ AuxSpacePrec::AuxSpacePrec(mfem::HypreParMatrix& op, mfem::SparseMatrix aux_map,
 
     aux_solver_ = make_unique<mfem::HypreBoomerAMG>(*aux_op_);
     aux_solver_->SetPrintLevel(-1);
-//    HYPRE_BoomerAMGSetMaxIter(*aux_solver_, 3);
-
-    gmres_.SetPrintLevel(-1);
-    gmres_.SetMaxIter(10);
-    gmres_.SetRelTol(1e-6);
-    gmres_.SetAbsTol(1e-8);
-    gmres_.iterative_mode = true;
-    gmres_.SetOperator(*aux_op_);
-    gmres_.SetPreconditioner(*aux_solver_);
 }
 
 void AuxSpacePrec::Mult(const mfem::Vector& x, mfem::Vector& y) const

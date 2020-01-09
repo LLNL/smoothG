@@ -250,7 +250,7 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
     }
 }
 
-mfem::DenseMatrix Mult(const mfem::Operator &A, const mfem::DenseMatrix& B)
+mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B)
 {
     MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
     mfem::DenseMatrix out(A.Height(), B.Width());
@@ -1306,9 +1306,9 @@ double FroNorm(const mfem::SparseMatrix& mat)
     double norm = 0.0;
     for (int i = 0; i < mat.NumNonZeroElems(); ++i)
     {
-        norm += mat.GetData()[i] * mat.GetData()[i];
+        norm += std::pow(mat.GetData()[i], 2.0);
     }
-    return norm;
+    return std::sqrt(norm);
 }
 
 mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A)

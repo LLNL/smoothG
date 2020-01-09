@@ -15,11 +15,11 @@
 
 /** @file
 
-    @brief Contains class NonlinearMG
+    @brief Contains class NonlinearSolver and FAS
 */
 
-#ifndef __NONLINEARMG_HPP__
-#define __NONLINEARMG_HPP__
+#ifndef __NONLINEARSOLVER_HPP__
+#define __NONLINEARSOLVER_HPP__
 
 #include "utilities.hpp"
 #include "Hierarchy.hpp"
@@ -27,34 +27,56 @@
 namespace smoothg
 {
 
-enum SolveType { Newton, Picard };
+/// Linearization method
+enum Linearization { Newton, Picard };
 
-/// Respectively modified from choice 1 and 2 in Eisenstat and Walker, SISC 1996
-enum EisenstatWalker { TaylorResidual, NonlinearResidual };
+/// Parameter list for abstract nonlinear solver
+struct NLSolverParameters
+{
+    int print_level = 0;
+    int max_num_iter = 50;
+    double rtol = 1e-8;
+    double atol = 1e-10;
 
-/// Iterative solver for nonlinear problems
+    bool check_converge = true;
+    Linearization linearization = Newton;
+    int num_backtrack = 0;
+    double diff_tol = -1.0;
+    double init_linear_tol = 1e-8;
+};
+
+/**
+   @brief Abstract iterative solver class for nonlinear problems.
+
+       This class takes care of nonlinear iterations; computation of nonlinear
+       residual and iteration step need to be defined in derived class.
+*/
 class NonlinearSolver
 {
 public:
-    NonlinearSolver(MPI_Comm comm, int size, SolveType solve_type,
-                    std::string tag, double initial_linear_tol);
+    /// Constructor
+    NonlinearSolver(MPI_Comm comm, NLSolverParameters param);
 
-    // Solve R(sol) = rhs
+    /// Solve A(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
 
-    // Compute the residual Rx = R(x).
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) = 0;
+    /// Reduce dx (change in solution) if || A(x) - rhs || > prev_resid_norm
+    void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
+                      mfem::Vector& x, mfem::Vector& dx);
+
+    /// @return resid = A(x) - y
+    virtual mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) = 0;
+
+    /// @return some norm of vec for convergene test
+    virtual double Norm(const mfem::Vector& vec) = 0;
 
     ///@name Set solver parameters
     ///@{
-    void SetPrintLevel(int print_level) { print_level_ = print_level; }
-    void SetMaxIter(int max_num_iter) { max_num_iter_ = max_num_iter; }
-    void SetRelTol(double rtol) { rtol_ = rtol; }
-    void SetAbsTol(double atol) { atol_ = atol; }
-    void SetLinearTolCriterion(EisenstatWalker criterion)
-    {
-        linear_tol_criterion_ = criterion;
-    }
+    void SetPrintLevel(int print_level) { param_.print_level = print_level; }
+    void SetMaxIter(int max_num_iter) { param_.max_num_iter = max_num_iter; }
+    void SetRelTol(double rtol) { param_.rtol = rtol; }
+    void SetAbsTol(double atol) { param_.atol = atol; }
+    virtual void SetLinearRelTol(double tol) { linear_tol_ = tol; }
     ///@}
 
     ///@name Get results of iterative solve
@@ -64,20 +86,11 @@ public:
     bool IsConverged() const { return converged_; }
     ///@}
 protected:
-    double ResidualNorm(const mfem::Vector& sol, const mfem::Vector& rhs);
+    /// Nonlinear iteration step, sol gets updated
+    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) = 0;
+
+    /// Update linear tolerance based on choice 2 in Eisenstat & Walker, SISC 1996
     void UpdateLinearSolveTol();
-
-    virtual void IterationStep(const mfem::Vector& x, mfem::Vector& y) = 0;
-
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
-
-    virtual const mfem::Array<int>& GetEssDofs() const = 0;
-
-    // default nonlinear solver options
-    int print_level_ = 0;
-    int max_num_iter_ = 50;
-    double rtol_ = 1e-8;
-    double atol_ = 1e-10;
 
     int iter_;
     double timing_;
@@ -85,91 +98,50 @@ protected:
 
     MPI_Comm comm_;
     int myid_;
-    int size_;
-    SolveType solve_type_;
     std::string tag_;
-
-    mfem::Vector residual_;
 
     double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
     double rhs_norm_;
     double resid_norm_;
     double prev_resid_norm_;
-
-    EisenstatWalker linear_tol_criterion_;
     double linear_tol_;
-    double linear_resid_norm_;
+    bool update_is_needed_;
+
+    NLSolverParameters param_;
 };
 
-enum Cycle { V_CYCLE, FMG, CASCADIC };
+enum Cycle { V_CYCLE, FMG };
 
-struct NLMGParameter
+struct FASParameters
 {
-    Cycle cycle = V_CYCLE;
-    SolveType solve_type = Newton;
-    int max_num_backtrack = 4;
-    double diff_tol = 5;
-    double coarse_diff_tol = 5;
-    int num_relax_fine = 1;
-    int num_relax_middle = 1;
-    int num_relax_coarse = 1;
-    double initial_linear_tol = 1e-8;
-
-    void RegisterInOptionsParser(mfem::OptionsParser& args)
-    {
-//        int cycle_int = 0;
-//        int solve_type_int = 0;
-//        args.AddOption(&cycle_int, "--cycle", "--mg-cycle",
-//                       "Multigrid cycle: V-cycle (0), FMG (1), CASCADIC (2) ");
-//        args.AddOption(&solve_type_int, "--solve-type", "--nonlinear-solve-type",
-//                       "Nonlinear solver type: Newton (0), Picard (1)");
-        args.AddOption(&max_num_backtrack, "--num-backtrack", "--max-num-backtrack",
-                       "Maximum number of backtracking steps.");
-        args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
-                       "Tolerance for solution change in fine level.");
-        args.AddOption(&coarse_diff_tol, "--coarse-diff-tol", "--coarse-diff-tol",
-                       "Tolerance for solution change in coarse level.");
-        args.AddOption(&num_relax_fine, "--num-relax-fine", "--num-relax-fine",
-                       "Number of relaxation in fine level.");
-        args.AddOption(&num_relax_middle, "--num-relax-middle", "--num-relax-middle",
-                       "Number of relaxation in intermediate levels.");
-        args.AddOption(&num_relax_coarse, "--num-relax-coarse", "--num-relax-coarse",
-                       "Number of relaxation in coarse level.");
-        args.AddOption(&initial_linear_tol, "--init-linear-tol", "--init-linear-tol",
-                       "Initial tol for linear solve inside nonlinear iterations.");
-//        cycle = static_cast<Cycle>(cycle_int);
-//        solve_type = static_cast<SolveType>(solve_type_int);
-    }
+    int num_levels = 1;             // number of multigrid levels
+    Cycle cycle = V_CYCLE;          // multigrid cycle type
+    double coarse_correct_tol;      // no coarse correction if rel resid < tol
+    NLSolverParameters nl_solve;    // for FAS itself as a nonlinear solver
+    NLSolverParameters fine;        // for finest level nonlinear solve
+    NLSolverParameters mid;         // for intermediate levels nonlinear solves
+    NLSolverParameters coarse;      // for coarsest level nonlinear solve
 };
 
 /**
-   @brief Nonlinear multigrid using full approximation scheme and nonlinear relaxation.
+   @brief Nonlinear multigrid solver using full approximation scheme.
 
-       Solve a nonlinear problem using FAS
-       Vectors here are in "dof" numbering, NOT "truedof" numbering.
+       Abstract class for FAS. Solver in each level and operations like
+       interpolation, restriction, projection, etc. need to be provided.
 */
-class NonlinearMG : public NonlinearSolver
+class FAS : public NonlinearSolver
 {
 public:
-    // the time dependent operators gets updated during solving
-    NonlinearMG(MPI_Comm comm, int size, int num_levels, NLMGParameter param);
+    /// Constructor
+    FAS(MPI_Comm comm, FASParameters param);
 
-    virtual void Mult(const mfem::Vector& x, mfem::Vector& Rx) { Mult(0, x, Rx); }
+    mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override
+    {
+        return solvers_[0]->Residual(x, y);
+    }
+
+    double Norm(const mfem::Vector& vec) override { return solvers_[0]->Norm(vec); }
 protected:
-    void FAS_Cycle(int level);
-
-    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol);
-
-    virtual mfem::Vector AssembleTrueVector(const mfem::Vector& vec_dof) const = 0;
-
-    virtual const mfem::Array<int>& GetEssDofs() const { return GetEssDofs(0); }
-
-    /// Evaluates the action of the operator out = A[level](in)
-    virtual void Mult(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
-
-    /// Solves the (possibly nonlinear) problem A[level](sol) = rhs
-    virtual void Solve(int level, const mfem::Vector& rhs, mfem::Vector& sol) = 0;
-
     /// Restrict a vector from level to level+1 (coarser level)
     virtual void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const = 0;
 
@@ -179,24 +151,17 @@ protected:
     /// Project a vector from level to level+1 (coarser level)
     virtual void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const = 0;
 
-    /// Relaxation on each level
-    virtual void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out) = 0;
+    void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out);
+    void MG_Cycle(int level);
+    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
 
-    virtual void BackTracking(int level, const mfem::Vector &rhs, double prev_resid_norm,
-                              mfem::Vector& x, mfem::Vector& dx) = 0;
-
-    virtual mfem::Vector AssembleTrueVector(int level, const mfem::Vector& vec_dof) const = 0;
-    virtual const mfem::Array<int>& GetEssDofs(int level) const = 0;
-
-    Cycle cycle_;
-    int num_levels_;
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;
-    mutable std::vector<mfem::Vector> help_;
-
-    std::vector<double> residual_norms_;
+    std::vector<mfem::Vector> help_;
+    std::vector<std::unique_ptr<NonlinearSolver>> solvers_;
+    FASParameters param_;
 };
 
 } // namespace smoothg
 
-#endif /* __NONLINEARMG_HPP__ */
+#endif /* __NONLINEARSOLVER_HPP__ */

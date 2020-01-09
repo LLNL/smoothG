@@ -45,18 +45,15 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
-                   "SPE10 permeability file data.");
-    int nDimensions = 2;
-    args.AddOption(&nDimensions, "-d", "--dim",
-                   "Dimension of the physical space.");
+    const char* perm_file = "spe_perm.dat";
+    args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
+    int dim = 2;
+    args.AddOption(&dim, "-d", "--dim", "Dimension of the physical space.");
     int spe10_scale = 1;
     args.AddOption(&spe10_scale, "-sc", "--spe10-scale",
                    "Scale of problem, 1=small, 5=full SPE10");
     int slice = 0;
-    args.AddOption(&slice, "-s", "--slice",
-                   "Slice of SPE10 data to take for 2D run.");
+    args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
 
     upscale_param.max_levels = 3;
     upscale_param.coarse_factor = 8;
@@ -79,18 +76,15 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
+    mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
     ess_attr = 1;
 
-    const bool metis_agglomeration = false;
-
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, ess_attr);
-    Graph graph = spe10problem.GetFVGraph();
+    const bool use_metis = false;
+    SPE10Problem spe10problem(perm_file, dim, spe10_scale, slice, use_metis, ess_attr);
 
     // Create Hierarchy
-    Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
+    Hierarchy hierarchy(spe10problem.GetFVGraph(), upscale_param, nullptr, &ess_attr);
 
     hierarchy.PrintInfo();
 

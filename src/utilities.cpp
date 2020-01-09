@@ -563,4 +563,12 @@ bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm)
     return global_value;
 }
 
+void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec)
+{
+    for (int i = 0; i < marker.Size(); ++i)
+    {
+        if (marker[i]) { vec[i] = 0.0; }
+    }
+}
+
 } // namespace smoothg

@@ -175,7 +175,7 @@ private:
     mfem::SparseMatrix coarse_D_;
 
     /// Builder for coarse M operator
-    std::unique_ptr<ElementMBuilder> coarse_m_builder_;
+    std::unique_ptr<CoarseMBuilder> coarse_m_builder_;
 };
 
 } // namespace smoothg

@@ -55,17 +55,17 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm_rescaled.dat";
-    args.AddOption(&permFile, "-p", "--perm",
+    const char* perm_file = "spe_perm.dat";
+    args.AddOption(&perm_file, "-p", "--perm",
                    "SPE10 permeability file data.");
-    int nDimensions = 2;
-    args.AddOption(&nDimensions, "-d", "--dim",
+    int dim = 2;
+    args.AddOption(&dim, "-d", "--dim",
                    "Dimension of the physical space.");
     int slice = 0;
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
-    bool metis_agglomeration = false;
-    args.AddOption(&metis_agglomeration, "-ma", "--metis-agglomeration",
+    bool use_metis = false;
+    args.AddOption(&use_metis, "-ma", "--metis-agglomeration",
                    "-nm", "--no-metis-agglomeration",
                    "Use Metis as the partitioner (instead of geometric).");
     int spe10_scale = 5;
@@ -95,45 +95,35 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    SAAMGeParam sa_param;
-    sa_param.num_levels = 2;
-    sa_param.first_coarsen_factor = 64;
-    sa_param.first_theta = 1e-3;
-//    sa_param.do_aggregates = false;
-
-//    upscale_param.saamge_param = &sa_param;
-
-    mfem::Array<int> coarsening_factors(nDimensions);
-    if (metis_agglomeration)
+    mfem::Array<int> coarsening_factors(dim);
+    if (use_metis)
     {
         coarsening_factors = 1;
         coarsening_factors.Last() = upscale_param.coarse_factor;
     }
     else
     {
-        coarsening_factors = 20;
-        coarsening_factors.Last() = nDimensions == 3 ? 2 : 10;
+        coarsening_factors = 10;
+        coarsening_factors.Last() = dim == 3 ? 2 : 10;
     }
 
-    mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
+    mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
     ess_attr = 1;
     if (lateral_pressure)
     {
-        ess_attr[nDimensions - 2] = ess_attr[nDimensions] = 0;
+        ess_attr[dim - 2] = ess_attr[dim] = 0;
     }
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, ess_attr);
+    SPE10Problem spe10problem(perm_file, dim, spe10_scale, slice, use_metis, ess_attr);
     Graph graph = spe10problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
-    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
+    spe10problem.Partition(use_metis, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
     Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
-
     upscale.PrintInfo();
 
     mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
@@ -148,7 +138,6 @@ int main(int argc, char* argv[])
     {
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);
-
 
         if (lateral_pressure)
         {

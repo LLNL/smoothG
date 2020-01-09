@@ -23,7 +23,7 @@
 #include "HybridSolver.hpp"
 #include "MixedMatrix.hpp"
 #include "GraphTopology.hpp"
-#include "MinresBlockSolver.hpp"
+#include "BlockSolver.hpp"
 #include "MetisGraphPartitioner.hpp"
 #include "MatrixUtilities.hpp"
 #include "GraphGenerator.hpp"

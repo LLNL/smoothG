@@ -16,23 +16,23 @@
 /**
    @file
 
-   @brief Implements MinresBlockSolver object.
+   @brief Implements BlockSolver object.
 */
 
-#include "MinresBlockSolver.hpp"
+#include "BlockSolver.hpp"
 #include "utilities.hpp"
 #include <assert.h>
 
 namespace smoothg
 {
 
-MinresBlockSolver::MinresBlockSolver(mfem::HypreParMatrix* M,
-                                     mfem::HypreParMatrix* D,
-                                     mfem::SparseMatrix* W,
-                                     const mfem::Array<int>& block_true_offsets)
+BlockSolver::BlockSolver(mfem::HypreParMatrix* M,
+                         mfem::HypreParMatrix* D,
+                         mfem::SparseMatrix* W,
+                         const mfem::Array<int>& block_true_offsets)
     :
     MixedLaplacianSolver(M->GetComm(), block_true_offsets, W),
-    minres_(comm_), operator_(block_true_offsets), prec_(block_true_offsets)
+    operator_(block_true_offsets), prec_(block_true_offsets)
 {
     remove_one_dof_ = false;
     MPI_Comm_rank(comm_, &myid_);
@@ -40,8 +40,8 @@ MinresBlockSolver::MinresBlockSolver(mfem::HypreParMatrix* M,
 }
 
 /// implementation largely lifted from ex5p.cpp
-void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
-                             mfem::SparseMatrix* W)
+void BlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
+                       mfem::SparseMatrix* W)
 {
     assert(M && D);
 
@@ -85,20 +85,15 @@ void MinresBlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     prec_.SetDiagonalBlock(0, Mprec_.get());
     prec_.SetDiagonalBlock(1, Sprec_.get());
 
-    minres_.SetPrintLevel(print_level_);
-    minres_.SetMaxIter(max_num_iter_);
-    minres_.SetRelTol(rtol_);
-    minres_.SetAbsTol(atol_);
-    minres_.SetPreconditioner(prec_);
-    minres_.SetOperator(operator_);
-    //    minres_.iterative_mode = false;
+    solver_ = InitKrylovSolver(MINRES);
+    solver_->SetPreconditioner(prec_);
+    solver_->SetOperator(operator_);
 }
 
-MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
-                                     const mfem::Array<int>* ess_attr)
+BlockSolver::BlockSolver(const MixedMatrix& mgL,
+                         const mfem::Array<int>* ess_attr)
     :
     MixedLaplacianSolver(mgL.GetComm(), mgL.BlockTrueOffsets(), mgL.CheckW()),
-    minres_(comm_),
     operator_(mgL.BlockTrueOffsets()),
     prec_(mgL.BlockTrueOffsets())
 {
@@ -139,8 +134,8 @@ MinresBlockSolver::MinresBlockSolver(const MixedMatrix& mgL,
     Init(hM_.get(), hD_.get(), W_.get());
 }
 
-void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
-                             mfem::BlockVector& sol) const
+void BlockSolver::Mult(const mfem::BlockVector& rhs,
+                       mfem::BlockVector& sol) const
 {
     mfem::StopWatch chrono;
     chrono.Clear();
@@ -153,45 +148,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
         const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = 0.0;
     }
 
-    auto solver = is_symmetric_ ? dynamic_cast<const mfem::IterativeSolver*>(&minres_)
-                                : dynamic_cast<const mfem::IterativeSolver*>(&gmres_);
-
-//    const_cast<mfem::IterativeSolver*>(solver)->SetRelTol(1e-12);
-//    const_cast<mfem::IterativeSolver*>(solver)->SetAbsTol(1e-15);
-
-    // debug
-    {
-//    std::cout<<"FNorm = "<< FroNorm(GetDiag(*hD_))<<"\n";
-
-//    std::cout<<"Rhs Norm = "<< const_cast<mfem::Array<int>&>(ess_edofs_).Sum()<<"\n";
-
-//    mfem::Array<int> offsets;
-//    auto& nonconst_op = const_cast<mfem::BlockOperator&>(operator_);
-//    nonconst_op.ColOffsets().Copy(offsets);
-//    mfem::BlockMatrix op_proc(offsets);
-
-//    auto Mproc = GetDiag(*hM_);
-//    auto Dproc = GetDiag(*hD_);
-//    auto& block01 = dynamic_cast<mfem::HypreParMatrix&>(nonconst_op.GetBlock(0, 1));
-//    auto DprocT = GetDiag(block01);
-
-//    op_proc.SetBlock(0, 0, &Mproc);
-//    op_proc.SetBlock(0, 1, &DprocT);
-//    op_proc.SetBlock(1, 0, &Dproc);
-//    if (W_)
-//        op_proc.SetBlock(1, 1, W_.get());
-
-//    std::unique_ptr<mfem::SparseMatrix> op_mono(op_proc.CreateMonolithic());
-//    mfem::UMFPackSolver direct_solver(*op_mono);
-//    direct_solver.Mult(rhs, sol);
-
-//    mfem::BlockVector r(sol); r = 0.0;
-//    prec_.Mult(rhs, r);
-//     std::cout<<"||r|| = " <<FroNorm(GetDiag(block01))<<"\n";
-    }
-
-    solver->Mult(rhs, sol);
-
+    solver_->Mult(rhs, sol);
 
     const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
 
@@ -203,7 +160,7 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Stop();
     timing_ = chrono.RealTime();
 
-    num_iterations_ = solver->GetNumIterations();
+    num_iterations_ = solver_->GetNumIterations();
 
     if (myid_ == 0 && print_level_ > 0)
     {
@@ -212,24 +169,24 @@ void MinresBlockSolver::Mult(const mfem::BlockVector& rhs,
         std::cout << "  Timing " + solver_name + ": Solver done in "
                   << timing_ << "s. \n";
 
-        if (solver->GetConverged())
+        if (solver_->GetConverged())
         {
             std::cout << "  " + solver_name + " converged in "
                       << num_iterations_
                       << " with a final residual norm "
-                      << solver->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         }
         else
         {
             std::cout << "  " + solver_name + " did not converge in "
                       << num_iterations_
                       << ". Final residual norm is "
-                      << solver->GetFinalNorm() << "\n";
+                      << solver_->GetFinalNorm() << "\n";
         }
     }
 }
 
-void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
+void BlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -253,16 +210,16 @@ void MinresBlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_
 }
 
 
-MinresBlockSolverFalse::MinresBlockSolverFalse(const MixedMatrix& mgL,
-                                               const mfem::Array<int>* ess_attr)
+BlockSolverFalse::BlockSolverFalse(const MixedMatrix& mgL,
+                                   const mfem::Array<int>* ess_attr)
     :
-    MinresBlockSolver(mgL, ess_attr),
+    BlockSolver(mgL, ess_attr),
     mixed_matrix_(mgL)
 {
 }
 
-void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
-                                  mfem::BlockVector& sol) const
+void BlockSolverFalse::Mult(const mfem::BlockVector& rhs,
+                            mfem::BlockVector& sol) const
 {
     const auto& edof_trueedof = mixed_matrix_.GetGraphSpace().EDofToTrueEDof();
     edof_trueedof.MultTranspose(rhs.GetBlock(0), rhs_.GetBlock(0));
@@ -272,25 +229,25 @@ void MinresBlockSolverFalse::Mult(const mfem::BlockVector& rhs,
     edof_trueedof_diag.MultTranspose(sol.GetBlock(0), sol_.GetBlock(0));
     sol_.GetBlock(1) = sol.GetBlock(1);
 
-    MinresBlockSolver::Mult(rhs_, sol_);
+    BlockSolver::Mult(rhs_, sol_);
 
     edof_trueedof.Mult(sol_.GetBlock(0), sol.GetBlock(0));
     sol.GetBlock(1) = sol_.GetBlock(1);
 }
 
-void MinresBlockSolverFalse::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const
+void BlockSolverFalse::Mult(const mfem::Vector& rhs, mfem::Vector& sol) const
 {
     rhs_.GetBlock(0) = 0.0;
     rhs_.GetBlock(1) = rhs;
     rhs_.GetBlock(1) *= -1.0;
 
-    MinresBlockSolver::Mult(rhs_, sol_);
+    BlockSolver::Mult(rhs_, sol_);
 
     sol = sol_.GetBlock(1);
 }
 
-void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
-                                            const std::vector<mfem::DenseMatrix>& N_el)
+void BlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                      const std::vector<mfem::DenseMatrix>& N_el)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -359,13 +316,10 @@ void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inv
     Sprec_->SetPrintLevel(0);
     prec_.SetDiagonalBlock(1, Sprec_.get());
 
-    gmres_.SetPrintLevel(print_level_);
-    gmres_.SetMaxIter(max_num_iter_);
-    gmres_.SetRelTol(rtol_);
-    gmres_.SetAbsTol(atol_);
-    gmres_.SetOperator(operator_);
-    gmres_.SetPreconditioner(prec_);
-    gmres_.iterative_mode = false;
+    solver_ = InitKrylovSolver(GMRES);
+    solver_->SetOperator(operator_);
+    solver_->SetPreconditioner(prec_);
+    solver_->iterative_mode = false;
 
     is_symmetric_ = false;
 
@@ -374,35 +328,6 @@ void MinresBlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inv
         std::cout << "  BlockSolver: rescaled system assembled in "
                   << chrono.RealTime() << "s. \n";
     }
-}
-
-
-void MinresBlockSolver::SetPrintLevel(int print_level)
-{
-    MixedLaplacianSolver::SetPrintLevel(print_level);
-
-    minres_.SetPrintLevel(print_level_);
-}
-
-void MinresBlockSolver::SetMaxIter(int max_num_iter)
-{
-    MixedLaplacianSolver::SetMaxIter(max_num_iter);
-
-    minres_.SetMaxIter(max_num_iter_);
-}
-
-void MinresBlockSolver::SetRelTol(double rtol)
-{
-    MixedLaplacianSolver::SetRelTol(rtol);
-
-    minres_.SetRelTol(rtol_);
-}
-
-void MinresBlockSolver::SetAbsTol(double atol)
-{
-    MixedLaplacianSolver::SetAbsTol(atol);
-
-    minres_.SetAbsTol(atol_);
 }
 
 } // namespace smoothg
