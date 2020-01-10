@@ -440,57 +440,37 @@ std::vector<int> Hierarchy::GetVertexSizes() const
 
 void Hierarchy::Debug_tests(int level) const
 {
-    const mfem::SparseMatrix& D = GetMatrix(level).GetD();
+    const double tol = 5e-10;
+    mfem::Vector rand_vec(Psigma_[level].NumRows());
+    rand_vec.Randomize(myid_);
 
-    mfem::Vector random_vec(Proj_sigma_[level].Height());
-    random_vec.Randomize(myid_);
-
-    const double error_tolerance = 5e-10;
-
-    mfem::Vector Psigma_rand(Psigma_[level].Height());
-    Psigma_[level].Mult(random_vec, Psigma_rand);
-    mfem::Vector out(Proj_sigma_[level].Height());
-    Proj_sigma_[level].Mult(Psigma_rand, out);
-
-    out -= random_vec;
-    double diff = mfem::ParNormlp(out, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
-
-    if (myid_ == 0 && diff >= error_tolerance)
+    auto Check = [&](mfem::Vector& v, mfem::Vector& u, std::string op)
     {
-        std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || / || rand || = " << diff
-                  << "\nWarning: Edge projection operator is not a projection!\n";
-    }
-
-    random_vec.SetSize(Psigma_[level].Height());
-    random_vec.Randomize(myid_);
+        v -= u;
+        double diff = mfem::ParNormlp(v, 2, comm_) / mfem::ParNormlp(rand_vec, 2, comm_);
+        if (diff > tol && myid_ == 0)
+        {
+            std::cerr << "\nWarning: || " << op << " || = " << diff <<" !!!\n";
+        }
+    };
 
     // Compute D * pi_sigma * random vector
-    mfem::Vector D_pi_sigma_rand(D.Height());
-    {
-        mfem::Vector Proj_sigma_rand(Proj_sigma_[level].Height());
-        Proj_sigma_[level].Mult(random_vec, Proj_sigma_rand);
-        mfem::Vector pi_sigma_rand(Psigma_[level].Height());
-        Psigma_[level].Mult(Proj_sigma_rand, pi_sigma_rand);
-        D.Mult(pi_sigma_rand, D_pi_sigma_rand);
-    }
+    const mfem::SparseMatrix& D = GetMatrix(level).GetD();
+    mfem::Vector Proj_sigma_rand = Mult(Proj_sigma_[level], rand_vec);
+    mfem::Vector pi_sigma_rand = Mult(Psigma_[level], Proj_sigma_rand);
+    mfem::Vector D_pi_sigma_rand = Mult(D, pi_sigma_rand);
 
     // Compute pi_u * D * random vector
-    mfem::Vector pi_u_D_rand(D.Height());
-    {
-        mfem::Vector D_rand(D.Height());
-        D.Mult(random_vec, D_rand);
-        mfem::Vector PuT_D_rand = Restrict(level, D_rand);
-        Pu_[level].Mult(PuT_D_rand, pi_u_D_rand);
-    }
+    mfem::Vector D_rand = Mult(D, rand_vec);
+    mfem::Vector PuT_D_rand = Restrict(level, D_rand);
+    mfem::Vector pi_u_D_rand = Mult(Pu_[level], PuT_D_rand);
+    Check(pi_u_D_rand, D_pi_sigma_rand, "pi_u * D - D * pi_sigma");
 
-    pi_u_D_rand -= D_pi_sigma_rand;
-    diff = mfem::ParNormlp(pi_u_D_rand, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
+    rand_vec.SetSize(Proj_sigma_[level].NumRows());
+    mfem::Vector Psigma_rand = Mult(Psigma_[level], rand_vec);
+    mfem::Vector Proj_sigma_Psigma_rand = Mult(Proj_sigma_[level], Psigma_rand);
 
-    if (myid_ == 0 && diff >= error_tolerance)
-    {
-        std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || / || rand || = "
-                  << diff << "\nWarning: commutativity does not hold!\n";
-    }
+    Check(Proj_sigma_Psigma_rand, rand_vec, "Proj_sigma * Psigma - I");
 }
 
 } // namespace smoothg

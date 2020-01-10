@@ -252,7 +252,6 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
 
 mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B)
 {
-    MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
     mfem::DenseMatrix out(A.Height(), B.Width());
 
     mfem::Vector column_in, column_out;
@@ -263,6 +262,13 @@ mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B)
         A.Mult(column_in, column_out);
     }
 
+    return out;
+}
+
+mfem::Vector Mult(const mfem::Operator& A, const mfem::Vector& B)
+{
+    mfem::Vector out(A.NumRows());
+    A.Mult(B, out);
     return out;
 }
 
