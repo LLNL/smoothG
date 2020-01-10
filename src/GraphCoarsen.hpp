@@ -148,11 +148,9 @@ private:
     /**
        @brief Build fine-level aggregate sub-M corresponding to dofs on a face
     */
-    void BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
-                             const mfem::SparseMatrix& vert_agg,
-                             const mfem::SparseMatrix& edof_vert,
-                             const int agg,
-                             mfem::DenseMatrix& Mloc);
+    mfem::DenseMatrix BuildAggregateFaceM(
+        const mfem::Array<int>& face_edofs, const mfem::SparseMatrix& vert_agg,
+        const mfem::SparseMatrix& edof_vert, const int agg);
 
     const std::vector<mfem::DenseMatrix>& edge_traces_;
     const std::vector<mfem::DenseMatrix>& vertex_targets_;

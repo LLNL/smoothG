@@ -221,13 +221,11 @@ double GraphCoarsen::DTTraceProduct(const mfem::SparseMatrix& DtransferT,
    @todo: modify this to if/else (or have another method) so that we
    do a 1/2, 1/2 split if element matrices are not available.
  */
-void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
-                                       const mfem::SparseMatrix& vert_agg,
-                                       const mfem::SparseMatrix& edof_vert,
-                                       const int agg,
-                                       mfem::DenseMatrix& Mloc)
+mfem::DenseMatrix GraphCoarsen::BuildAggregateFaceM(
+    const mfem::Array<int>& face_edofs, const mfem::SparseMatrix& vert_agg,
+    const mfem::SparseMatrix& edof_vert, const int agg)
 {
-    Mloc.SetSize(face_edofs.Size());
+    mfem::DenseMatrix Mloc(face_edofs.Size());
     Mloc = 0.0;
     mfem::Array<int> partition(const_cast<int*>(vert_agg.GetJ()), vert_agg.Height());
     mfem::Array<int> verts, vert_edofs;
@@ -266,6 +264,8 @@ void GraphCoarsen::BuildAggregateFaceM(const mfem::Array<int>& face_edofs,
             }
         }
     }
+
+    return Mloc;
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
@@ -375,12 +375,11 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
             GetTableRow(face_coarse_edof, face, facecdofs);
             GetTableRow(face_edof, face, facefdofs[j]);
 
+            auto MtransferT = ExtractRowAndColumns(M_proc_, facefdofs[j],
+                                                   local_edofs, col_map_);
             auto Dtransfer = ExtractRowAndColumns(D_proc_, local_vdofs,
                                                   facefdofs[j], col_map_);
             mfem::SparseMatrix DtransferT = smoothg::Transpose(Dtransfer);
-
-            auto MtransferT = ExtractRowAndColumns(M_proc_, facefdofs[j],
-                                                   local_edofs,col_map_);
 
             auto& edge_traces_f = edge_traces_[face];
             int num_traces = edge_traces_f.Width();
@@ -442,7 +441,7 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                                 Mbb = ExtractRowAndColumns(M_proc_, facefdofs[j],
                                                            facefdofs[other_j], col_map_);
                             }
-                            entry_value += DTTraceProduct(Mbb, edge_traces_[faces[other_j]],
+                            entry_value -= DTTraceProduct(Mbb, edge_traces_[faces[other_j]],
                                                           loc_map.second, trace);
                         }
 
@@ -506,16 +505,14 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
     auto edof_vert = smoothg::Transpose(fine_space_.VertexToEDof());
     auto vert_agg = smoothg::Transpose(topology_.Agg_vertex_);
 
-    mfem::DenseMatrix Mloc_dm;
     mfem::Array<int> Aggs;
     for (unsigned int i = 0; i < num_faces; i++)
     {
-        // put edge_traces (original, non-extended) into Pedges
         auto& edge_traces_i = const_cast<mfem::DenseMatrix&>(edge_traces_[i]);
         GetTableRow(face_edof, i, local_edofs);
         GetTableRow(face_coarse_edof, i, facecdofs);
 
-        for (int j = 0; j < local_edofs.Size(); j++)
+        for (int j = 0; j < local_edofs.Size(); j++) // put traces into Pedges
         {
             int ptr = I[local_edofs[j]];
             for (int k = 0; k < facecdofs.Size(); k++)
@@ -530,19 +527,19 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
         GetTableRow(face_Agg, i, Aggs);
         for (int a = 0; a < Aggs.Size(); a++)
         {
-            BuildAggregateFaceM(local_edofs, vert_agg, edof_vert, Aggs[a], Mloc_dm);
+            auto Mloc = BuildAggregateFaceM(local_edofs, vert_agg, edof_vert, Aggs[a]);
             for (int l = 0; l < facecdofs.Size(); l++)
             {
                 const int row = facecdofs[l];
                 edge_traces_i.GetColumnReference(l, ref_vec1);
-                entry_value = Mloc_dm.InnerProduct(ref_vec1, ref_vec1);
+                entry_value = Mloc.InnerProduct(ref_vec1, ref_vec1);
                 coarse_m_builder_->AddTraceAcross(row, row, a, entry_value);
 
                 for (int j = l + 1; j < facecdofs.Size(); j++)
                 {
                     const int col = facecdofs[j];
                     edge_traces_i.GetColumnReference(j, ref_vec2);
-                    entry_value = Mloc_dm.InnerProduct(ref_vec1, ref_vec2);
+                    entry_value = Mloc.InnerProduct(ref_vec1, ref_vec2);
                     coarse_m_builder_->AddTraceAcross(row, col, a, entry_value);
                     coarse_m_builder_->AddTraceAcross(col, row, a, entry_value);
                 }
