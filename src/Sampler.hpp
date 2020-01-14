@@ -150,12 +150,18 @@ public:
 
     mfem::Vector GetLogCoefficientForVisualization(int level);
 
-    void SetHierarchyTols(double rel_tol, double abs_tol=-1.0)
+    void SetHierarchyCoarseTols(double rel_tol, double abs_tol=-1.0)
     {
-        hierarchy_.SetRelTol(rel_tol);
+        for (int i = 1; i < hierarchy_.NumLevels(); ++i)
+        {
+            hierarchy_.SetRelTolAtLevel(i, rel_tol);
+        }
         if (abs_tol >= 0.0)
         {
-            hierarchy_.SetAbsTol(abs_tol);
+            for (int i = 1; i < hierarchy_.NumLevels(); ++i)
+            {
+                hierarchy_.SetAbsTolAtLevel(i, abs_tol);
+            }
         }
     }
 

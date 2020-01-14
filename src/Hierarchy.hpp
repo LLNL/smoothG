@@ -124,7 +124,11 @@ public:
     virtual void SetPrintLevel(int print_level);
     virtual void SetMaxIter(int max_num_iter);
     virtual void SetRelTol(double rtol);
+    virtual void SetRelTolAtLevel(int level, double rtol)
+    { solvers_[level]->SetRelTol(rtol); }
     virtual void SetAbsTol(double atol);
+    virtual void SetAbsTolAtLevel(int level, double atol)
+    { solvers_[level]->SetAbsTol(atol); }
 
     /// Show Total setup time
     void ShowSetupTime(std::ostream& out = std::cout) const;
