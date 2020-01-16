@@ -59,23 +59,17 @@ public:
                 const mfem::Array<int>& ess_attr, NLSolverParameters param);
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
-
-    /// @return l2 norm of "true" vec
-    double Norm(const mfem::Vector& vec) override;
-
+    double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
     void SetLinearRelTol(double tol) override { linear_solver_->SetRelTol(tol); }
 private:
-    void PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
-    void NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x);
     void Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p);
-    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
+    void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
     void AdjustChange(mfem::Vector& x, mfem::Vector& dx); // limit change in k(p)
 
     const MixedMatrix& mixed_system_;
     unique_ptr<MixedLaplacianSolver> linear_solver_;
     mfem::Vector p_; // projected pressure in piecewise 1 basis
     mfem::Vector kp_; // kp_ = k(p)
-    mfem::BlockVector delta_x_;
     std::vector<mfem::DenseMatrix> dMdp_;
     Kappa kappa_;
 };
@@ -87,6 +81,7 @@ public:
     EllipticFAS(const Hierarchy& hierarchy_, const Kappa& kappa,
                 const mfem::Array<int>& ess_attr, FASParameters param);
 private:
+    double Norm(int level, const mfem::Vector& vec) const override;
     void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
     void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const override;
     void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
@@ -280,9 +275,8 @@ void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
 
 LevelSolver::LevelSolver(const MixedMatrix& mixed_system, Kappa kappa,
                          const mfem::Array<int>& ess_attr, NLSolverParameters param)
-    : NonlinearSolver(mixed_system.GetComm(), param), mixed_system_(mixed_system),
-      p_(mixed_system.GetGraph().NumVertices()), kp_(p_.Size()),
-      delta_x_(mixed_system.BlockOffsets()), kappa_(std::move(kappa))
+    : NonlinearSolver(mixed_system.GetComm(), param),
+      mixed_system_(mixed_system), kappa_(std::move(kappa))
 {
     tag_ = param.linearization ? "Picard" : "Newton";
 
@@ -315,50 +309,45 @@ mfem::Vector LevelSolver::Residual(const mfem::Vector& sol, const mfem::Vector& 
     return out;
 }
 
-double LevelSolver::Norm(const mfem::Vector& vec)
+double LevelSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
-    return mfem::ParNormlp(mixed_system_.AssembleTrueVector(vec), 2, comm_);
+    return ParNormlp(mixed_system_.AssembleTrueVector(Residual(x, y)), 2, comm_);
 }
 
-void LevelSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+void LevelSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
-    mfem::BlockVector block_sol(sol.GetData(), mixed_system_.BlockOffsets());
-    mfem::BlockVector block_rhs(rhs.GetData(), mixed_system_.BlockOffsets());
+    mfem::BlockVector blk_b(rhs.GetData(), mixed_system_.BlockOffsets());
+    mfem::BlockVector blk_x(x.GetData(), mixed_system_.BlockOffsets());
+    mfem::BlockVector blk_dx(dx.GetData(), mixed_system_.BlockOffsets());
 
-    if (param_.linearization == Picard)
+    if (param_.linearization == Picard) // fixed point iteration
     {
-        PicardStep(block_rhs, block_sol);
+        dx.Set(-1.0, x);
+
+        if (param_.check_converge || param_.num_backtrack) // kp_ is updated otherwise
+        {
+            p_ = mixed_system_.PWConstProject(blk_x.GetBlock(1));
+            kp_ = kappa_.Eval(p_);
+        }
+        linear_solver_->UpdateElemScaling(kp_);
+        linear_solver_->Solve(blk_b, blk_x);
+
+        dx += x;
     }
-    else
+    else // Newton's method, solve J dx = -residual
     {
-        NewtonStep(block_rhs, block_sol);
+        mfem::Vector resid = Residual(x, rhs);  // p_, kp_ are updated here
+        resid *= -1.0;
+
+        Build_dMdp(blk_x.GetBlock(0), p_);
+        linear_solver_->UpdateJacobian(kp_, dMdp_);
+
+        mfem::BlockVector blk_resid(resid, mixed_system_.BlockOffsets());
+        linear_solver_->Solve(blk_resid, blk_dx);
+        x += dx;
     }
 
-    AdjustChange(block_sol, delta_x_);
-    BackTracking(rhs, prev_resid_norm_, block_sol, delta_x_);
-}
-
-void LevelSolver::PicardStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
-{
-    delta_x_ = x;
-    prev_resid_norm_ = Norm(Residual(x, rhs)); // kp_ is updated in Residual
-
-    linear_solver_->UpdateElemScaling(kp_);
-    linear_solver_->Solve(rhs, x);
-    delta_x_ -= x;
-}
-
-void LevelSolver::NewtonStep(const mfem::BlockVector& rhs, mfem::BlockVector& x)
-{
-    mfem::Vector resid = Residual(x, rhs);  // p_, kp_ are updated here
-    prev_resid_norm_ = Norm(resid);
-
-    Build_dMdp(x.GetBlock(0), p_);
-    linear_solver_->UpdateJacobian(kp_, dMdp_);
-
-    mfem::BlockVector blk_resid(resid.GetData(), mixed_system_.BlockOffsets());
-    linear_solver_->Solve(blk_resid, delta_x_);
-    x -= delta_x_;
+    AdjustChange(x, dx);
 }
 
 void LevelSolver::AdjustChange(mfem::Vector& x, mfem::Vector& dx)
@@ -373,7 +362,7 @@ void LevelSolver::AdjustChange(mfem::Vector& x, mfem::Vector& dx)
     if (relative_change > 1.0)
     {
         dx /= relative_change;
-        x.Add(relative_change - 1.0, dx);
+        x.Add(1.0 - relative_change, dx);
     }
 }
 
@@ -443,15 +432,20 @@ EllipticFAS::EllipticFAS(const Hierarchy& hierarchy, const Kappa& kappa,
         help_[l].SetSize(matrix_l.NumTotalDofs());
         help_[l] = 0.0;
 
-        if (myid_ == 0 && param.nl_solve.print_level >= 0)
+        if (myid_ == 0 && param.nl_solve.print_level > -1)
         {
-            std::cout << "\nMG level " << l << " parameters:\n  Number of "
+            std::cout << "FAS level " << l << " parameters:\n    Number of "
                       << "smoothing steps: " << param_l.max_num_iter << "\n"
-                      << "  Kappa change tol: " << param_l.diff_tol << "\n"
-                      << "  Max number of residual-based backtracking: "
-                      << param_l.num_backtrack << "\n";
+                      << "    Kappa change tol: " << param_l.diff_tol << "\n"
+                      << "    Max number of residual-based backtracking: "
+                      << param_l.num_backtrack << "\n\n";
         }
     }
+}
+
+double EllipticFAS::Norm(int level, const mfem::Vector& vec) const
+{
+    return ParNormlp(hierarchy_.GetMatrix(level).AssembleTrueVector(vec), 2, comm_);
 }
 
 void EllipticFAS::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
