@@ -36,6 +36,7 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     chrono.Start();
 
     mfem::Vector sol_change(sol.Size());
+    iter_ = 0;
 
     if (param_.check_converge)
     {
@@ -46,7 +47,7 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
     if (param_.num_backtrack) { resid_norm_ = ResidualNorm(sol, rhs); }
 
-    for (iter_ = 0; iter_ < param_.max_num_iter + 1; iter_++)
+    for (; iter_ < param_.max_num_iter + 1; iter_++)
     {
         if (param_.check_converge)
         {
