@@ -85,6 +85,7 @@ public:
     bool hybridization;
     bool coarse_components;
     int coarse_factor;
+    int num_iso_verts;
     int rescale_iter;
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
@@ -99,6 +100,7 @@ public:
         hybridization(false),
         coarse_components(false),
         coarse_factor(64),
+        num_iso_verts(0),
         rescale_iter(-1),
         saamge_param(NULL)
     {}
@@ -125,6 +127,8 @@ public:
                        "--no-coarse-components", "Store trace, bubble components of coarse M.");
         args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
                        "Coarsening factor for metis agglomeration.");
+        args.AddOption(&num_iso_verts, "--num-iso-verts", "--num-iso-verts",
+                       "Number of isolated vertices.");
         args.AddOption(&rescale_iter, "--rescale-iter", "--rescale-iter",
                        "Number of iteration to compute rescale vector in hybridization.");
     }
@@ -185,20 +189,6 @@ public:
     ~LocalMixedGraphSpectralTargets() {}
 
     /**
-       @brief Return targets as result of eigenvalue computations.
-
-       @param local_edge_trace_targets traces of the vertex targets
-       @param local_vertex_targets vectors corresponding to smallest eigenvalues
-                                   on the vertex space.
-       @param constant_rep representation of constant vertex vector on finer
-                           space
-    */
-    void Compute(std::vector<mfem::DenseMatrix>& local_edge_trace_targets,
-                 std::vector<mfem::DenseMatrix>& local_vertex_targets);
-private:
-    enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
-
-    /**
        @brief Compute spectral vectex targets for each aggregate
 
        Solve an eigenvalue problem on each extended aggregate, restrict eigenvectors
@@ -208,11 +198,9 @@ private:
        Put edge traces into ExtAgg_sigmaT as row vectors
        Trace generation depends on dual_target_, scaled_dual_, and energy_dual_
 
-       @param ExtAgg_sigmaT (OUT)
-       @param local_vertex targets (OUT)
+       @param local vertex targets in each aggregate
     */
-    void ComputeVertexTargets(std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
-                              std::vector<mfem::DenseMatrix>& local_vertex_targets);
+    std::vector<mfem::DenseMatrix> ComputeVertexTargets();
 
     /**
        @brief Compute edge trace targets for each coarse face
@@ -221,11 +209,12 @@ private:
        face, put those restricted vectors as well as some kind of PV vector into
        local_edge_trace_targets after SVD.
 
-       @param ExtAgg_sigmaT (IN)
-       @param local_edge_trace_targets (OUT)
+       @return local edge trace targets on each face
     */
-    void ComputeEdgeTargets(const std::vector<mfem::DenseMatrix>& ExtAgg_sigmaT,
-                            std::vector<mfem::DenseMatrix>& local_edge_trace_targets);
+    std::vector<mfem::DenseMatrix> ComputeEdgeTargets(
+        const std::vector<mfem::DenseMatrix>& local_vertex_targets);
+private:
+    enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
 
     /// Build extended aggregates to vertex-based and edge-based dofs relation
     void BuildExtendedAggregates(const GraphSpace& space);
@@ -283,6 +272,9 @@ private:
 
     /// face to extended edge dof relation table
     std::unique_ptr<mfem::HypreParMatrix> face_ext_edof_;
+
+    /// Transpose of M^{-1}D^T to vertex targets (candidates for traces)
+    std::vector<mfem::DenseMatrix> ExtAgg_sigmaT_;
 
     mfem::Array<int> col_map_;
 };

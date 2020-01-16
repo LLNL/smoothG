@@ -87,6 +87,7 @@ public:
 
     // Get hierarchy of mixed systems
     const Hierarchy& GetHierarchy() const { return hierarchy_; }
+    Hierarchy& GetHierarchy() { return hierarchy_; }
 
     /// Show Solver Information
     void PrintInfo(std::ostream& out = std::cout) const;

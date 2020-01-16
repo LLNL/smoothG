@@ -149,7 +149,6 @@ int main(int argc, char* argv[])
     ess_attr = 0;
     ess_attr[0] = 1;
     DarcyProblem fvproblem(*pmesh, ess_attr);
-    double cell_volume = fvproblem.CellVolume();
     Graph graph = fvproblem.GetFVGraph();
     Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
 
@@ -164,7 +163,7 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1)(index) = 1.0;
 
     const int seed = argseed + myid;
-    PDESampler sampler(dimension, cell_volume, kappa, seed,
+    PDESampler sampler(dimension, fvproblem.CellVolume(), kappa, seed,
                        graph, upscale_param, nullptr, &ess_attr);
 
     mfem::Vector functional(rhs_fine.GetBlock(1));

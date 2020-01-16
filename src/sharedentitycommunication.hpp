@@ -37,8 +37,8 @@
    (adruinksy@lbl.gov).
 */
 
-#ifndef _SHAREDENTITYCOMMUNICATION_HPP
-#define _SHAREDENTITYCOMMUNICATION_HPP
+#ifndef _SHAREDENTITYCOMMUNICATION_HPP_
+#define _SHAREDENTITYCOMMUNICATION_HPP_
 
 #include <fstream>
 #include <sstream>

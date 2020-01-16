@@ -106,6 +106,48 @@ public:
     /// Wrapper for solving the saddle point system through hybridization
     void Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) const;
 
+    /**
+       @brief Update weights of local M matrices on "elements"
+
+       elem_scaling_inverse in the input is like the coefficient in
+       a finite volume problem, elem_scaling is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+
+       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
+    */
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
+
+    virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                const std::vector<mfem::DenseMatrix>& N_el);
+private:
+    void Init(const mfem::SparseMatrix& face_edgedof,
+              const std::vector<mfem::DenseMatrix>& M_el,
+              const mfem::HypreParMatrix& edgedof_d_td,
+              const mfem::SparseMatrix& face_bdrattr);
+
+    void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
+                                   const mfem::HypreParMatrix& edgedof_d_td);
+
+    mfem::SparseMatrix AssembleHybridSystem(
+        const std::vector<mfem::DenseMatrix>& M_el);
+
+    mfem::SparseMatrix AssembleHybridSystem(
+        const mfem::Vector& elem_scaling_inverse,
+        const std::vector<mfem::DenseMatrix>& N_el);
+
+    // Compute scaling vector and the scaled hybridized system
+    void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
+
+    // Construct spectral AMGe preconditioner
+    void BuildSpectralAMGePreconditioner();
+
+    // Assemble parallel hybridized system and build a solver for it
+    void BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc);
+
+    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr);
+
+    std::vector<bool> MakeAveragingIndicators();
+
     /// Transform original RHS to the RHS of the hybridized system
     void RHSTransform(const mfem::BlockVector& OriginalRHS,
                       mfem::Vector& HybridRHS) const;
@@ -129,75 +171,47 @@ public:
     void RecoverOriginalSolution(const mfem::Vector& HybridSol,
                                  mfem::BlockVector& RecoveredSol) const;
 
-    /**
-       @brief Update weights of local M matrices on "elements"
-
-       elem_scaling_inverse in the input is like the coefficient in
-       a finite volume problem, elem_scaling is the weights on the mass matrix
-       in the mixed form, which is the reciprocal of that.
-
-       @todo when W is non-zero, Aloc and Hybrid_el need to be recomputed
-    */
-    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
-
-    ///@name Set solver parameters
-    ///@{
-    virtual void SetPrintLevel(int print_level) override;
-    virtual void SetMaxIter(int max_num_iter) override;
-    virtual void SetRelTol(double rtol) override;
-    virtual void SetAbsTol(double atol) override;
-    ///@}
-
-private:
-    void Init(const mfem::SparseMatrix& face_edgedof,
-              const std::vector<mfem::DenseMatrix>& M_el,
-              const mfem::HypreParMatrix& edgedof_d_td,
-              const mfem::SparseMatrix& face_bdrattr);
-
-    void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
-                                   const mfem::HypreParMatrix& edgedof_d_td);
-
-    mfem::SparseMatrix AssembleHybridSystem(
-        const std::vector<mfem::DenseMatrix>& M_el);
-
-    // Compute scaling vector and the scaled hybridized system
-    void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
-
-    // Construct spectral AMGe preconditioner
-    void BuildSpectralAMGePreconditioner();
-
-    // Assemble parallel hybridized system and build a solver for it
-    void BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc);
-
-    void CollectEssentialDofs(const mfem::SparseMatrix& edof_bdrattr);
+    mfem::Vector MakeInitialGuess(const mfem::BlockVector& sol,
+                                  const mfem::BlockVector& rhs) const;
 
     const MixedMatrix& mgL_;
 
     mfem::SparseMatrix Agg_multiplier_;
 
+    std::vector<bool> edof_needs_averaging_;
+
     std::unique_ptr<mfem::HypreParMatrix> H_;
     std::unique_ptr<mfem::Solver> prec_;
-    std::unique_ptr<mfem::CGSolver> cg_;
 
     // eliminated part of H_ (for applying elimination in repeated solves)
     std::unique_ptr<mfem::HypreParMatrix> H_elim_;
 
     std::vector<mfem::DenseMatrix> Hybrid_el_;
 
-    std::vector<mfem::DenseMatrix> MinvDT_;
+    std::vector<mfem::DenseMatrix> MinvN_;
+    std::vector<mfem::DenseMatrix> DMinv_;
     std::vector<mfem::DenseMatrix> MinvCT_;
     std::vector<mfem::DenseMatrix> AinvDMinvCT_;
+    std::vector<mfem::DenseMatrix> CMinvNAinv_;
     std::vector<mfem::DenseMatrix> Ainv_;
+    std::vector<mfem::DenseMatrix> Minv_;
+    std::vector<mfem::DenseMatrix> Minv_ref_;
+    std::vector<mfem::SparseMatrix> C_;
+    std::vector<mfem::DenseMatrix> CM_;
+    std::vector<mfem::SparseMatrix> CDT_;
 
-    mutable std::vector<mfem::Vector> Ainv_f_;
+    mutable std::vector<mfem::Vector> Minv_g_;
+    mutable std::vector<mfem::Vector> local_rhs_;
 
     mfem::Array<int> ess_true_multipliers_;
     mfem::Array<int> multiplier_to_edof_;
     mfem::Array<int> ess_true_mult_to_edof_;
     mfem::Array<HYPRE_Int> multiplier_start_;
+    mfem::Array<bool> mult_on_bdr_;
 
     std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
     std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;
+    std::unique_ptr<mfem::HypreParMatrix> edof_shared_mean_;
 
     mutable mfem::Vector trueHrhs_;
     mutable mfem::Vector trueMu_;
@@ -228,7 +242,7 @@ public:
                  const std::vector<mfem::Array<int>>& loc_dofs);
 
     virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const;
-    virtual void SetOperator(const mfem::Operator& op) {}
+    virtual void SetOperator(const mfem::Operator& op) { }
 private:
 
     void Smoothing(const mfem::Vector& x, mfem::Vector& y) const;

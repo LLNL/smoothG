@@ -250,19 +250,20 @@ void BroadCast(MPI_Comm comm, mfem::SparseMatrix& mat)
     }
 }
 
-void MultSparseDense(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
-                     mfem::DenseMatrix& C)
+mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B)
 {
     MFEM_ASSERT(A.Width() == B.Height(), "incompatible dimensions");
-    C.SetSize(A.Height(), B.Width());
+    mfem::DenseMatrix out(A.Height(), B.Width());
 
     mfem::Vector column_in, column_out;
     for (int j = 0; j < B.Width(); ++j)
     {
         const_cast<mfem::DenseMatrix&>(B).GetColumnReference(j, column_in);
-        C.GetColumnReference(j, column_out);
+        out.GetColumnReference(j, column_out);
         A.Mult(column_in, column_out);
     }
+
+    return out;
 }
 
 void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
@@ -1041,7 +1042,7 @@ LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
     M_is_diag_ = IsDiag(M);
     if (M_is_diag_)
     {
-        const mfem::Vector M_diag(M.GetData(), M.Height());
+        const mfem::Vector M_diag(const_cast<double*>(M.GetData()), M.Height());
         Init(M_diag, D);
     }
     else
@@ -1067,9 +1068,7 @@ void LocalGraphEdgeSolver::Init(const mfem::Vector& M_diag, const mfem::SparseMa
     }
     MinvDT_.ScaleRows(Minv_);
 
-    // TODO(gelever1): change all the swaps once mfem version > PR #352
-    mfem::SparseMatrix DMinvDT = smoothg::Mult(D, MinvDT_);
-    A_.Swap(DMinvDT);
+    A_ = smoothg::Mult(D, MinvDT_);
 
     // Eliminate the first unknown so that A_ is invertible
     A_.EliminateRowCol(0);
@@ -1284,6 +1283,21 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
     mfem::SparseMatrix offd;
     mat.GetOffd(offd, col_map);
     return offd;
+}
+
+int NNZ(const mfem::SparseMatrix& mat)
+{
+    return mat.NumNonZeroElems();
+}
+
+double FroNorm(const mfem::SparseMatrix& mat)
+{
+    double norm = 0.0;
+    for (int i = 0; i < mat.NumNonZeroElems(); ++i)
+    {
+        norm += std::pow(mat.GetData()[i], 2.0);
+    }
+    return std::sqrt(norm);
 }
 
 } // namespace smoothg

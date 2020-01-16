@@ -26,7 +26,7 @@
 #include "../src/GraphCoarsen.hpp"
 #include "../src/utilities.hpp"
 #include "../src/MixedMatrix.hpp"
-#include "../src/MinresBlockSolver.hpp"
+#include "../src/BlockSolver.hpp"
 #include "../src/HybridSolver.hpp"
 #include "../src/MatrixUtilities.hpp"
 
@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
     // setup solvers
     std::map<MixedLaplacianSolver*, std::string> solver_to_name;
 
-    MinresBlockSolver minres(mixed_graph_laplacian);
+    BlockSolver minres(mixed_graph_laplacian);
     solver_to_name[&minres] = "Minres + block preconditioner";
 
     HybridSolver hb_bamg(mixed_graph_laplacian);
