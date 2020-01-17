@@ -90,7 +90,7 @@ class CoupledStepSolver : public NonlinearSolver
     mfem::Array<int> block_offsets_;
     mfem::Array<int> true_block_offsets_;
 
-    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
+    void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
     std::vector<mfem::DenseMatrix> Build_dMdS(const mfem::BlockVector& x);
 public:
@@ -101,7 +101,7 @@ public:
                       const double dt);
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
-    double Norm(const mfem::Vector& vec) override;
+    double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
 };
 
 class ImplicitTransportStepSolver : public NonlinearSolver
@@ -113,7 +113,7 @@ class ImplicitTransportStepSolver : public NonlinearSolver
     const MixedMatrix& darcy_system_;
     const mfem::Array<int>& starts_;
 
-    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
+    virtual void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
 public:
     ImplicitTransportStepSolver(const mfem::HypreParMatrix& Winv_D,
                                 const mfem::SparseMatrix& upwind,
@@ -131,7 +131,10 @@ public:
     }
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
-    double Norm(const mfem::Vector& v) override { return ParNormlp(v, 2, comm_); }
+    double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override
+    {
+        return mfem::ParNormlp(Residual(x, y), 2, comm_);
+    }
 };
 
 int main(int argc, char* argv[])
@@ -155,9 +158,9 @@ int main(int argc, char* argv[])
     args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
     int well_height = 1;
     args.AddOption(&well_height, "-wh", "--well-height", "Well Height.");
-    double inject_rate = 0.3;
+    double inject_rate = 0.02;
     args.AddOption(&inject_rate, "-ir", "--inject-rate", "Injector rate.");
-    double bhp = 175.0;
+    double bhp = 1.0e5;
     args.AddOption(&bhp, "-bhp", "--bottom-hole-pressure", "Bottom Hole Pressure.");
     args.AddOption(&evolve_param.dt, "-dt", "--delta-t", "Time step.");
     args.AddOption(&evolve_param.total_time, "-time", "--total-time",
@@ -506,11 +509,6 @@ mfem::Vector CoupledStepSolver::AssembleTrueVector(const mfem::Vector& vec) cons
     return true_v;
 }
 
-double CoupledStepSolver::Norm(const mfem::Vector& vec)
-{
-    return mfem::ParNormlp(AssembleTrueVector(vec), 2, comm_);
-}
-
 mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
 {
     mfem::BlockVector blk_x(x.GetData(), block_offsets_);
@@ -538,9 +536,14 @@ mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vect
     return out;
 }
 
-void CoupledStepSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+double CoupledStepSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
-    mfem::BlockVector blk_sol(sol.GetData(), block_offsets_);
+    return mfem::ParNormlp(AssembleTrueVector(Residual(x, y)), 2, comm_);
+}
+
+void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
+{
+    mfem::BlockVector blk_sol(x.GetData(), block_offsets_);
 
     const GraphSpace& space = darcy_system_.GetGraphSpace();
     auto& vert_edof = space.VertexToEDof();
@@ -619,19 +622,19 @@ void CoupledStepSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
 
-    auto true_resid = AssembleTrueVector(Residual(sol, rhs));
+    auto true_resid = AssembleTrueVector(Residual(x, rhs));
 
-    mfem::BlockVector true_delta_sol(true_block_offsets_);
-    true_delta_sol = 0.0;
-    gmres_.Mult(true_resid, true_delta_sol);
+    mfem::BlockVector true_blk_dx(true_block_offsets_);
+    true_blk_dx = 0.0;
+    gmres_.Mult(true_resid, true_blk_dx);
 
-    mfem::BlockVector delta_sol(block_offsets_);
+    mfem::BlockVector blk_dx(dx.GetData(), block_offsets_);
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
-    dof_truedof.Mult(true_delta_sol.GetBlock(0), delta_sol.GetBlock(0));
-    delta_sol.GetBlock(1) = true_delta_sol.GetBlock(1);
-    delta_sol.GetBlock(2) = true_delta_sol.GetBlock(2);
+    dof_truedof.Mult(true_blk_dx.GetBlock(0), blk_dx.GetBlock(0));
+    blk_dx.GetBlock(1) = true_blk_dx.GetBlock(1);
+    blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
 
-    sol -= delta_sol;
+    x -= blk_dx;
 }
 
 std::vector<mfem::DenseMatrix> CoupledStepSolver::Build_dMdS(const mfem::BlockVector& x)
@@ -684,10 +687,11 @@ mfem::Vector ImplicitTransportStepSolver::Residual(
     return out;
 }
 
-void ImplicitTransportStepSolver::IterationStep(const mfem::Vector& rhs, mfem::Vector& sol)
+void ImplicitTransportStepSolver::Step(
+        const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::Vector S(Winv_Adv_->NumCols());
-    darcy_system_.GetPWConstProj().Mult(sol, S);
+    darcy_system_.GetPWConstProj().Mult(x, S);
     auto tmp = ParMult(*Winv_Adv_, SparseDiag(dFdS(S)), starts_);
     auto A = ParMult(*tmp, darcy_system_.GetPWConstProj(), starts_);
     GetDiag(*A) += dt_inv_;
@@ -697,11 +701,10 @@ void ImplicitTransportStepSolver::IterationStep(const mfem::Vector& rhs, mfem::V
     gmres_.SetOperator(*A);
     gmres_.SetPreconditioner(solver);
 
-    mfem::Vector residual = Residual(sol, rhs);
-    mfem::Vector delta_sol(rhs.Size());
-    delta_sol = 0.0;
-    gmres_.Mult(residual, delta_sol);
-    sol -= delta_sol;
+    mfem::Vector residual = Residual(x, rhs);
+    dx = 0.0;
+    gmres_.Mult(residual, dx);
+    x -= dx;
 }
 
 //mfem::Vector TotalMobility(const mfem::Vector& S)
