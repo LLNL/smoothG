@@ -64,11 +64,11 @@ public:
     void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
                       mfem::Vector& x, mfem::Vector& dx);
 
-    /// @return resid = A(x) - y
+    /// @return residual = A(x) - y
     virtual mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) = 0;
 
-    /// @return some norm of vec for convergene test
-    virtual double Norm(const mfem::Vector& vec) = 0;
+    /// @return residual norm || A(x) - y ||
+    virtual double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) = 0;
 
     ///@name Set solver parameters
     ///@{
@@ -81,31 +81,31 @@ public:
 
     ///@name Get results of iterative solve
     ///@{
+    bool IsConverged() const { return converged_; }
     int GetNumIterations() const { return iter_; }
     double GetTiming() const { return timing_; }
-    bool IsConverged() const { return converged_; }
+    double GetResidualNorm() const { return resid_norm_; }
     ///@}
 protected:
-    /// Nonlinear iteration step, sol gets updated
-    virtual void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) = 0;
+    /// Nonlinear iteration step: x is updated, dx stores the change in x
+    virtual void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) = 0;
 
     /// Update linear tolerance based on choice 2 in Eisenstat & Walker, SISC 1996
     void UpdateLinearSolveTol();
 
-    int iter_;
-    double timing_;
-    bool converged_;
-
     MPI_Comm comm_;
     int myid_;
     std::string tag_;
+
+    int iter_;
+    double timing_;
+    bool converged_;
 
     double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
     double rhs_norm_;
     double resid_norm_;
     double prev_resid_norm_;
     double linear_tol_;
-    bool update_is_needed_;
 
     NLSolverParameters param_;
 };
@@ -135,13 +135,12 @@ public:
     /// Constructor
     FAS(MPI_Comm comm, FASParameters param);
 
-    mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override
-    {
-        return solvers_[0]->Residual(x, y);
-    }
+    mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
 
-    double Norm(const mfem::Vector& vec) override { return solvers_[0]->Norm(vec); }
+    double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
 protected:
+    virtual double Norm(int level, const mfem::Vector& vec) const = 0;
+
     /// Restrict a vector from level to level+1 (coarser level)
     virtual void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const = 0;
 
@@ -153,7 +152,7 @@ protected:
 
     void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out);
     void MG_Cycle(int level);
-    void IterationStep(const mfem::Vector& rhs, mfem::Vector& sol) override;
+    void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
 
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;

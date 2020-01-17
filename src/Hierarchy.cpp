@@ -376,7 +376,7 @@ void Hierarchy::ShowSetupTime(std::ostream& out) const
 {
     if (myid_ == 0)
     {
-        out << "Hierarchy Setup Time:      " << setup_time_ << "\n";
+        out << "Hierarchy Setup Time:      " << setup_time_ << "\n\n";
     }
 }
 
