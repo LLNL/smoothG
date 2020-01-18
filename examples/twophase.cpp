@@ -58,7 +58,8 @@ mfem::Vector dFdS(const mfem::Vector& S);
 class TwoPhaseSolver
 {
     const int level_;
-    const EvolveParamenters& param_;
+    const EvolveParamenters& evolve_param_;
+    const NLSolverParameters& solver_param_;
     const TwoPhase& problem_;
     Hierarchy& hierarchy_;
     std::vector<mfem::BlockVector> blk_helper_;
@@ -73,7 +74,8 @@ class TwoPhaseSolver
     void TransportStep(const double dt, mfem::BlockVector& x);
 public:
     TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
-                   const int level, const EvolveParamenters& param);
+                   const int level, const EvolveParamenters& evolve_param,
+                   const NLSolverParameters& solver_param);
 
     void Step(const double dt, mfem::BlockVector& x);
     mfem::BlockVector Solve(const mfem::BlockVector& init_val);
@@ -98,7 +100,8 @@ public:
                       const mfem::HypreParMatrix& Winv_D,
                       const mfem::Array<int>& starts,
                       const std::vector<mfem::DenseMatrix>& edge_traces,
-                      const double dt);
+                      const double dt,
+                      NLSolverParameters param);
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
     double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
@@ -119,8 +122,9 @@ public:
                                 const mfem::SparseMatrix& upwind,
                                 const mfem::Array<int>& starts,
                                 const MixedMatrix& darcy_system,
-                                const double dt)
-        : NonlinearSolver(Winv_D.GetComm(), NLSolverParameters()),
+                                const double dt,
+                                NLSolverParameters param)
+        : NonlinearSolver(Winv_D.GetComm(), param),
           gmres_(Winv_D.GetComm()), Winv_Adv_(ParMult(Winv_D, upwind, starts)),
           dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt)),
           darcy_system_(darcy_system), starts_(starts)
@@ -149,6 +153,7 @@ int main(int argc, char* argv[])
 
     // program options from command line
     EvolveParamenters evolve_param;
+    NLSolverParameters solver_param;
     mfem::OptionsParser args(argc, argv);
     const char* perm_file = "spe_perm.dat";
     args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
@@ -170,7 +175,12 @@ int main(int argc, char* argv[])
     int scheme = 1;
     args.AddOption(&scheme, "-scheme", "--stepping-scheme",
                    "Time stepping: 1. IMPES, 2. sequentially implicit, 3. fully implicit. ");
-    UpscaleParameters upscale_param;
+    int num_backtrack = 4;
+    args.AddOption(&num_backtrack, "--num-backtrack", "--num-backtrack",
+                   "Maximum number of backtracking steps.");
+    double diff_tol = -1.0;
+    args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
+                   "Tolerance for coefficient change.");UpscaleParameters upscale_param;
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
@@ -188,6 +198,8 @@ int main(int argc, char* argv[])
     }
 
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
+    solver_param.num_backtrack = num_backtrack;
+    solver_param.diff_tol = diff_tol;
 
     mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
     ess_attr = 1;
@@ -198,8 +210,9 @@ int main(int argc, char* argv[])
                      well_height, inject_rate, bhp);
 
     mfem::Array<int> part;
-    mfem::Array<int> coarsening_factors(1);
-    coarsening_factors = upscale_param.coarse_factor;
+    mfem::Array<int> coarsening_factors(dim);
+    coarsening_factors = 1;
+    coarsening_factors[0] = upscale_param.coarse_factor;
     problem.Partition(use_metis, coarsening_factors, part);
     upscale_param.num_iso_verts = problem.NumIsoVerts();
 
@@ -208,10 +221,9 @@ int main(int argc, char* argv[])
     hierarchy.PrintInfo();
 
     // Fine scale transport based on fine flux
-
     for (int l = 0; l < upscale_param.max_levels; ++l)
     {
-        TwoPhaseSolver solver(problem, hierarchy, l, evolve_param);
+        TwoPhaseSolver solver(problem, hierarchy, l, evolve_param, solver_param);
 
         mfem::BlockVector initial_value(problem.BlockOffsets());
         initial_value = 0.0;
@@ -287,9 +299,11 @@ mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
 }
 
 TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
-                               const int level, const EvolveParamenters& param)
-    : level_(level), param_(param), problem_(problem), hierarchy_(hierarchy),
-      blk_offsets_(4), nonlinear_iter_(0), step_converged_(true)
+                               const int level, const EvolveParamenters& evolve_param,
+                               const NLSolverParameters& solver_param)
+    : level_(level), evolve_param_(evolve_param), solver_param_(solver_param),
+      problem_(problem), hierarchy_(hierarchy), blk_offsets_(4),
+      nonlinear_iter_(0), step_converged_(true)
 {
     blk_offsets_[0] = 0;
     blk_offsets_[1] = hierarchy.BlockOffsets(level)[1];
@@ -333,7 +347,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     mfem::Vector x_blk2 = init_val.GetBlock(2);
 
     mfem::socketstream sout;
-    if (param_.vis_step) { problem_.VisSetup(sout, x_blk2, 0.0, 1.0, "Fine scale"); }
+    if (evolve_param_.vis_step) { problem_.VisSetup(sout, x_blk2, 0.0, 1.0, "Fine scale"); }
 
     for (int l = 0; l < level_; ++l)
     {
@@ -346,13 +360,13 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     x.GetBlock(2) = x_blk2;
 
     double time = 0.0;
-    double dt_real = std::min(param_.dt, param_.total_time - time) / 2.0;
+    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time) / 2.0;
 
     bool done = false;
     for (int step = 1; !done; step++)
     {
         mfem::BlockVector previous_x(x);
-        dt_real = std::min(std::min(dt_real * 2.0, param_.total_time - time), param_.dt);
+        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), evolve_param_.dt);
         //        dt_real = std::min(param_.dt, param_.total_time - time);
         step_converged_ = false;
 
@@ -365,14 +379,14 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         }
 
         time += dt_real;
-        done = (time >= param_.total_time);
+        done = (time >= evolve_param_.total_time);
 
         if (myid == 0)
         {
             std::cout << "Time step " << step << ": step size = " << dt_real
                       << ", time = " << time << "\n";
         }
-        if (param_.vis_step && (done || step % param_.vis_step == 0))
+        if (evolve_param_.vis_step && (done || step % evolve_param_.vis_step == 0))
         {
             x_blk2 = x.GetBlock(2);
             for (int l = level_; l > 0; --l)
@@ -409,11 +423,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
 void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
 {
-    if (param_.scheme == FullyImplcit) // coupled: solve all unknowns together
+    if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
         auto& starts = hierarchy_.GetGraph(0).VertexStarts();
         CoupledStepSolver solver(hierarchy_.GetMatrix(level_), *Winv_D_, starts,
-                                 hierarchy_.GetTraces(level_), dt);
+                                 hierarchy_.GetTraces(level_), dt, solver_param_);
         solver.SetPrintLevel(1);
         solver.SetRelTol(1e-10);
         solver.SetMaxIter(20);
@@ -444,7 +458,7 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
     auto upwind = BuildUpwindPattern(system.GetGraphSpace(), flux);
     upwind.ScaleRows(flux);
 
-    if (param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
+    if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
     {
         mfem::Vector upwind_flux(x.GetBlock(0).Size());
         upwind_flux = 0.0;
@@ -458,7 +472,8 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
     else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
     {
         auto& starts = hierarchy_.GetGraph(level_).VertexStarts();
-        ImplicitTransportStepSolver solver(*Winv_D_, upwind, starts, system, dt);
+        ImplicitTransportStepSolver solver(*Winv_D_, upwind, starts, system,
+                                           dt, solver_param_);
         solver.SetPrintLevel(1);
         solver.SetRelTol(1e-10);
 
@@ -474,8 +489,9 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
                                      const mfem::HypreParMatrix& Winv_D,
                                      const mfem::Array<int>& starts,
                                      const std::vector<mfem::DenseMatrix>& edge_traces,
-                                     const double dt)
-    : NonlinearSolver(Winv_D.GetComm(), NLSolverParameters()),
+                                     const double dt,
+                                     NLSolverParameters param)
+    : NonlinearSolver(Winv_D.GetComm(), param),
       darcy_system_(darcy_system), gmres_(Winv_D.GetComm()),
       dt_inv_(SparseIdentity(Winv_D.NumRows()) *= (1.0 / dt)), Winv_D_(Winv_D),
       starts_(starts), edge_traces_(edge_traces),

@@ -924,9 +924,9 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
 
     // SPE10 grid cell sizes
     mfem::Vector h(3);
-    h(0) = 20.0; // 365.76 / 60. in meters
-    h(1) = 10.0; // 670.56 / 220. in meters
-    h(2) = 2.0; // 51.816 / 85. in meters
+    h(0) = 20.0 * ft_; // 365.76 / 60. in meters
+    h(1) = 10.0 * ft_; // 670.56 / 220. in meters
+    h(2) = 2.0 * ft_; // 51.816 / 85. in meters
 
     const double Lx = N_[0] * h(0);
     const double Ly = N_[1] * h(1);
@@ -935,28 +935,24 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
     hy_g = h(1);
     Ly_g = Ly;
 
-    using IPC = InversePermeabilityCoefficient;
-    IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
-    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
-    //    mfem::Vector constant(dim);
-    //    constant = 1.0e10;
-    //    kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
+//    using IPC = InversePermeabilityCoefficient;
+//    IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
+//    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
+    mfem::Vector constant(dim);
+    constant = 1.0e10;
+    kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
 
-    mfem::Array<int> coarsening_factor(dim);
-    coarsening_factor = 10;
-    coarsening_factor.Last() = dim == 3 ? 2 : 10;
-
-    const double Hx = coarsening_factor[0] * h(0);
-    const double Hy = coarsening_factor[1] * h(1);
+    const double Hx = 10 * h(0);
+    const double Hy = 10 * h(1);
     source_coeff_ = make_unique<GCoefficient>(Lx, Ly, Hx, Hy);
 
     if (dim == 2)
     {
-        mfem::Mesh mesh(N_[0], N_[1], mfem::Element::QUADRILATERAL, 1, Lx, Ly);
+        mfem::Mesh mesh(N_[0], N_[1], mfem::Element::QUADRILATERAL, true, Lx, Ly);
         mesh_ = MakeParMesh(mesh, use_metis);
         return;
     }
-    mfem::Mesh mesh(N_[0], N_[1], N_[2], mfem::Element::HEXAHEDRON, 1, Lx, Ly, Lz);
+    mfem::Mesh mesh(N_[0], N_[1], N_[2], mfem::Element::HEXAHEDRON, true, Lx, Ly, Lz);
     mesh_ = MakeParMesh(mesh, use_metis);
 }
 

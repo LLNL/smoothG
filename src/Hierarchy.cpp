@@ -444,13 +444,13 @@ void Hierarchy::Debug_tests(int level) const
     mfem::Vector rand_vec(Psigma_[level].NumRows());
     rand_vec.Randomize(myid_);
 
-    auto Check = [&](mfem::Vector& v, mfem::Vector& u, std::string op)
+    auto Check = [&](mfem::Vector & v, mfem::Vector & u, std::string op)
     {
         v -= u;
         double diff = mfem::ParNormlp(v, 2, comm_) / mfem::ParNormlp(rand_vec, 2, comm_);
         if (diff > tol && myid_ == 0)
         {
-            std::cerr << "\nWarning: || " << op << " || = " << diff <<" !!!\n";
+            std::cerr << "\nWarning: || " << op << " || = " << diff << " !!!\n";
         }
     };
 
