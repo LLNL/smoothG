@@ -70,6 +70,8 @@ class TwoPhaseSolver
     int nonlinear_iter_;
     bool step_converged_;
 
+    double scale_;
+
     // update saturation block only
     void TransportStep(const double dt, mfem::BlockVector& x);
 public:
@@ -91,6 +93,8 @@ class CoupledStepSolver : public NonlinearSolver
     const std::vector<mfem::DenseMatrix>& edge_traces_;
     mfem::Array<int> block_offsets_;
     mfem::Array<int> true_block_offsets_;
+    double scale_;
+    double dt_;
 
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
@@ -101,6 +105,7 @@ public:
                       const mfem::Array<int>& starts,
                       const std::vector<mfem::DenseMatrix>& edge_traces,
                       const double dt,
+                      const double scale,
                       NLSolverParameters param);
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
@@ -175,7 +180,7 @@ int main(int argc, char* argv[])
     int scheme = 1;
     args.AddOption(&scheme, "-scheme", "--stepping-scheme",
                    "Time stepping: 1. IMPES, 2. sequentially implicit, 3. fully implicit. ");
-    int num_backtrack = 4;
+    int num_backtrack = 0;
     args.AddOption(&num_backtrack, "--num-backtrack", "--num-backtrack",
                    "Maximum number of backtracking steps.");
     double diff_tol = -1.0;
@@ -310,14 +315,19 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     blk_offsets_[2] = hierarchy.BlockOffsets(level)[2];
     blk_offsets_[3] = blk_offsets_[2] + blk_offsets_[2] - blk_offsets_[1];
 
+    const double density = 1e3;
+    const double porosity = 0.3;
+    scale_ = problem.CellVolume() * porosity * density;
+
     source_.reset(new mfem::BlockVector(blk_offsets_));
     auto Winv = SparseIdentity(source_->BlockSize(2));
-    Winv *= 1. / problem.CellVolume() / 0.3; // assume W is diagonal, 0.3 is porosity
+    Winv *= density;
+//    Winv *= 1. / problem.CellVolume() / porosity; // assume W is diagonal
 
     const MixedMatrix& system = hierarchy_.GetMatrix(level);
     const GraphSpace& space = system.GetGraphSpace();
     unique_ptr<mfem::HypreParMatrix> D(system.MakeParallelD(system.GetD()));
-    auto tmp(ParMult(Winv, *D, space.VDofStarts()));
+    auto tmp(ParMult(Winv, *D, space.VDofStarts())); // TODO: simplify
     Winv_D_.reset(mfem::ParMult(tmp.get(), &space.TrueEDofToEDof()));
 
     blk_helper_.reserve(level + 1);
@@ -333,6 +343,9 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     source_->GetBlock(0) = blk_helper_[level].GetBlock(0);
     source_->GetBlock(1) = blk_helper_[level].GetBlock(1);
     Winv.Mult(blk_helper_[level].GetBlock(1), source_->GetBlock(2));
+
+//    source_->GetBlock(0) *= density;
+    source_->GetBlock(1) *= density;
 }
 
 mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
@@ -427,13 +440,16 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
     {
         auto& starts = hierarchy_.GetGraph(0).VertexStarts();
         CoupledStepSolver solver(hierarchy_.GetMatrix(level_), *Winv_D_, starts,
-                                 hierarchy_.GetTraces(level_), dt, solver_param_);
+                                 hierarchy_.GetTraces(level_), dt, scale_, solver_param_);
         solver.SetPrintLevel(1);
         solver.SetRelTol(1e-10);
-        solver.SetMaxIter(20);
+//        solver.SetAbsTol(1e-8);
+        solver.SetMaxIter(25);
 
         mfem::BlockVector rhs(*source_);
-        rhs.GetBlock(2).Add(1. / dt, x.GetBlock(2));
+        rhs *= dt;
+        rhs.GetBlock(0) *= (1. / dt / dt / 1e3);
+        rhs.GetBlock(2).Add(scale_, x.GetBlock(2));
         solver.Solve(rhs, x);
         step_converged_ = solver.IsConverged();
         nonlinear_iter_ += solver.GetNumIterations();
@@ -490,12 +506,13 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
                                      const mfem::Array<int>& starts,
                                      const std::vector<mfem::DenseMatrix>& edge_traces,
                                      const double dt,
+                                     const double scale,
                                      NLSolverParameters param)
     : NonlinearSolver(Winv_D.GetComm(), param),
       darcy_system_(darcy_system), gmres_(Winv_D.GetComm()),
-      dt_inv_(SparseIdentity(Winv_D.NumRows()) *= (1.0 / dt)), Winv_D_(Winv_D),
+      dt_inv_(SparseIdentity(Winv_D.NumRows()) *= scale), Winv_D_(Winv_D),
       starts_(starts), edge_traces_(edge_traces),
-      block_offsets_(4), true_block_offsets_(4)
+      block_offsets_(4), true_block_offsets_(4), scale_(scale), dt_(dt)
 {
     block_offsets_[0] = 0;
     block_offsets_[1] = darcy_system.NumEDofs();
@@ -507,7 +524,7 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
     true_block_offsets_[2] = true_block_offsets_[1] + darcy_system.NumVDofs();
     true_block_offsets_[3] = true_block_offsets_[2] + darcy_system.GetGraph().NumVertices();
 
-    gmres_.SetMaxIter(200);
+    gmres_.SetMaxIter(1000);
     gmres_.SetRelTol(1e-9);
 }
 
@@ -537,17 +554,36 @@ mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vect
     darcy_system_.GetPWConstProj().Mult(blk_x.GetBlock(2), S);
     darcy_system_.Mult(TotalMobility(S), darcy_x, darcy_Rx);
 
+    darcy_Rx.GetBlock(0) *= (1. / dt_ / 1e3);
+//    darcy_Rx.GetBlock(0) *= (dt_ * 1e3);
+    darcy_Rx.GetBlock(1) *= (dt_ * 1e3);
+
     out.GetBlock(2) = blk_x.GetBlock(2);
 
     auto face_flux = ComputeFaceFlux(darcy_system_.GetGraphSpace(),
                                      edge_traces_, blk_x.GetBlock(0));
     auto upwind = BuildUpwindPattern(darcy_system_.GetGraphSpace(), face_flux);
     upwind.ScaleRows(blk_x.GetBlock(0));
+    upwind *= dt_;
     auto Winv_Adv = ParMult(Winv_D_, upwind, starts_);
-    Winv_Adv->Mult(1.0, FractionalFlow(blk_x.GetBlock(2)), dt_inv_(0, 0), out.GetBlock(2));
+    Winv_Adv->Mult(1.0, FractionalFlow(S), dt_inv_(0, 0), out.GetBlock(2));
 
     out -= y;
     SetZeroAtMarker(darcy_system_.GetEssDofs(), out.GetBlock(0));
+
+
+//    auto true_out = AssembleTrueVector(out);
+//    mfem::BlockVector blk_out(true_out.GetData(), true_block_offsets_);
+//    double norm0 = mfem::ParNormlp(blk_out.GetBlock(0), 2, comm_);
+//    double norm1 = mfem::ParNormlp(blk_out.GetBlock(1), 2, comm_);
+//    double norm2 = mfem::ParNormlp(blk_out.GetBlock(2), 2, comm_);
+
+//    if (myid_ ==0)
+//    {
+//        std::cout<<"resid blk 0 = "<<norm0<<"\n";
+//        std::cout<<"resid blk 1 = "<<norm1<<"\n";
+//        std::cout<<"resid blk 2 = "<<norm2<<"\n";
+//    }
 
     return out;
 }
@@ -559,6 +595,8 @@ double CoupledStepSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector
 
 void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
+    const double density = 1e3;
+
     mfem::BlockVector blk_sol(x.GetData(), block_offsets_);
 
     const GraphSpace& space = darcy_system_.GetGraphSpace();
@@ -582,9 +620,11 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
 
     auto face_flux = ComputeFaceFlux(space, edge_traces_, blk_sol.GetBlock(0));
     auto upwind_pattern = BuildUpwindPattern(space, face_flux);
-    mfem::Vector pattern_FS(blk_sol.BlockSize(0));
-    upwind_pattern.Mult(FractionalFlow(blk_sol.GetBlock(2)), pattern_FS);
 
+//    upwind_pattern *= dt_;
+
+    mfem::Vector pattern_FS(blk_sol.BlockSize(0));
+    upwind_pattern.Mult(FractionalFlow(S), pattern_FS);
     upwind_pattern.ScaleRows(blk_sol.GetBlock(0));
     upwind_pattern.ScaleColumns(dFdS(blk_sol.GetBlock(2)));
 
@@ -611,6 +651,22 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     unique_ptr<mfem::HypreParMatrix> dTdsigma(mfem::ParMult(&Winv_D_, U_FS.get()));
 
     auto dTdS = ParMult(Winv_D_, upwind_pattern, starts_);
+
+
+    *D *= (density * dt_);
+
+//    *DT *= (density * dt_);
+//    *M *= (density * dt_);
+//    *dMdS *= (density * dt_);
+
+    *DT *= (1. / dt_ / 1e3);
+    *M *= (1. / dt_ / 1e3);
+    *dMdS *= (1. / dt_ / 1e3);
+
+    *dTdsigma *= (dt_);
+    *dTdS *= (dt_);
+
+
     GetDiag(*dTdS) += dt_inv_;
 
     mfem::BlockOperator op(true_block_offsets_);
@@ -625,7 +681,7 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     M->GetDiag(Md);
     DT->InvScaleRows(Md);
     unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D.get(), DT.get()));
-    (*schur) *= -1.0;
+//    (*schur) *= -1.0;
     DT->ScaleRows(Md);
 
     mfem::BlockDiagonalPreconditioner prec(true_block_offsets_);
@@ -634,15 +690,25 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     prec.SetDiagonalBlock(2, BoomerAMG(*dTdS));
     prec.owns_blocks = true;
 
-    gmres_.SetPrintLevel(-1);
+    gmres_.SetPrintLevel(0);
+    gmres_.SetKDim(100);
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
 
     auto true_resid = AssembleTrueVector(Residual(x, rhs));
+    true_resid *= -1.0;
 
     mfem::BlockVector true_blk_dx(true_block_offsets_);
     true_blk_dx = 0.0;
     gmres_.Mult(true_resid, true_blk_dx);
+
+    const double max_dS = mfem::ParNormlp(true_blk_dx.GetBlock(2), std::numeric_limits<double>::infinity(), comm_);
+
+    if (myid_ == 0 && max_dS > 0.2)
+    {
+        true_blk_dx *= (0.2 / max_dS);
+        std::cout << "max_dS is cut to 0.2\n";
+    }
 
     mfem::BlockVector blk_dx(dx.GetData(), block_offsets_);
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
@@ -650,7 +716,7 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     blk_dx.GetBlock(1) = true_blk_dx.GetBlock(1);
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
 
-    x -= blk_dx;
+    x += blk_dx;
 }
 
 std::vector<mfem::DenseMatrix> CoupledStepSolver::Build_dMdS(const mfem::BlockVector& x)
