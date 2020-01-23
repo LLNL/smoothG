@@ -96,6 +96,8 @@ class CoupledStepSolver : public NonlinearSolver
     double scale_;
     double dt_;
 
+    mfem::Vector normalizer_;
+
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
     std::vector<mfem::DenseMatrix> Build_dMdS(const mfem::BlockVector& x);
@@ -344,7 +346,6 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     source_->GetBlock(1) = blk_helper_[level].GetBlock(1);
     Winv.Mult(blk_helper_[level].GetBlock(1), source_->GetBlock(2));
 
-//    source_->GetBlock(0) *= density;
     source_->GetBlock(1) *= density;
 }
 
@@ -441,9 +442,9 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
         auto& starts = hierarchy_.GetGraph(0).VertexStarts();
         CoupledStepSolver solver(hierarchy_.GetMatrix(level_), *Winv_D_, starts,
                                  hierarchy_.GetTraces(level_), dt, scale_, solver_param_);
-        solver.SetPrintLevel(1);
-        solver.SetRelTol(1e-10);
-//        solver.SetAbsTol(1e-8);
+        solver.SetPrintLevel(-1);
+        solver.SetRelTol(0.0);
+        solver.SetAbsTol(1e-10);
         solver.SetMaxIter(25);
 
         mfem::BlockVector rhs(*source_);
@@ -525,7 +526,7 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
     true_block_offsets_[3] = true_block_offsets_[2] + darcy_system.GetGraph().NumVertices();
 
     gmres_.SetMaxIter(1000);
-    gmres_.SetRelTol(1e-9);
+    gmres_.SetRelTol(1e-8);
 }
 
 mfem::Vector CoupledStepSolver::AssembleTrueVector(const mfem::Vector& vec) const
@@ -555,7 +556,6 @@ mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vect
     darcy_system_.Mult(TotalMobility(S), darcy_x, darcy_Rx);
 
     darcy_Rx.GetBlock(0) *= (1. / dt_ / 1e3);
-//    darcy_Rx.GetBlock(0) *= (dt_ * 1e3);
     darcy_Rx.GetBlock(1) *= (dt_ * 1e3);
 
     out.GetBlock(2) = blk_x.GetBlock(2);
@@ -571,26 +571,27 @@ mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vect
     out -= y;
     SetZeroAtMarker(darcy_system_.GetEssDofs(), out.GetBlock(0));
 
-
-//    auto true_out = AssembleTrueVector(out);
-//    mfem::BlockVector blk_out(true_out.GetData(), true_block_offsets_);
-//    double norm0 = mfem::ParNormlp(blk_out.GetBlock(0), 2, comm_);
-//    double norm1 = mfem::ParNormlp(blk_out.GetBlock(1), 2, comm_);
-//    double norm2 = mfem::ParNormlp(blk_out.GetBlock(2), 2, comm_);
-
-//    if (myid_ ==0)
-//    {
-//        std::cout<<"resid blk 0 = "<<norm0<<"\n";
-//        std::cout<<"resid blk 1 = "<<norm1<<"\n";
-//        std::cout<<"resid blk 2 = "<<norm2<<"\n";
-//    }
+    if (iter_ == 0)
+    {
+        normalizer_ = S;
+        normalizer_ -= 1.0;
+        normalizer_ *= -800.0;
+        normalizer_.Add(1000.0, S);
+        normalizer_ *= (scale_ / 1e3);
+    }
 
     return out;
 }
 
 double CoupledStepSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
-    return mfem::ParNormlp(AssembleTrueVector(Residual(x, y)), 2, comm_);
+    auto true_resid = AssembleTrueVector(Residual(x, y));
+    mfem::BlockVector blk_resid(true_resid.GetData(), true_block_offsets_);
+
+    InvRescaleVector(normalizer_, blk_resid.GetBlock(1));
+    InvRescaleVector(normalizer_, blk_resid.GetBlock(2));
+
+    return mfem::ParNormlp(blk_resid, mfem::infinity(), comm_);
 }
 
 void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
@@ -620,8 +621,6 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
 
     auto face_flux = ComputeFaceFlux(space, edge_traces_, blk_sol.GetBlock(0));
     auto upwind_pattern = BuildUpwindPattern(space, face_flux);
-
-//    upwind_pattern *= dt_;
 
     mfem::Vector pattern_FS(blk_sol.BlockSize(0));
     upwind_pattern.Mult(FractionalFlow(S), pattern_FS);
@@ -654,11 +653,6 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
 
 
     *D *= (density * dt_);
-
-//    *DT *= (density * dt_);
-//    *M *= (density * dt_);
-//    *dMdS *= (density * dt_);
-
     *DT *= (1. / dt_ / 1e3);
     *M *= (1. / dt_ / 1e3);
     *dMdS *= (1. / dt_ / 1e3);
@@ -690,7 +684,7 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     prec.SetDiagonalBlock(2, BoomerAMG(*dTdS));
     prec.owns_blocks = true;
 
-    gmres_.SetPrintLevel(0);
+    gmres_.SetPrintLevel(-1);
     gmres_.SetKDim(100);
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
@@ -702,12 +696,12 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     true_blk_dx = 0.0;
     gmres_.Mult(true_resid, true_blk_dx);
 
-    const double max_dS = mfem::ParNormlp(true_blk_dx.GetBlock(2), std::numeric_limits<double>::infinity(), comm_);
+    const double max_dS = mfem::ParNormlp(true_blk_dx.GetBlock(2), mfem::infinity(), comm_);
 
     if (myid_ == 0 && max_dS > 0.2)
     {
         true_blk_dx *= (0.2 / max_dS);
-        std::cout << "max_dS is cut to 0.2\n";
+//        std::cout << "stepLength = "<< 0.2 / max_dS <<"\n";
     }
 
     mfem::BlockVector blk_dx(dx.GetData(), block_offsets_);
