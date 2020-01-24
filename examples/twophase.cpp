@@ -67,10 +67,11 @@ class TwoPhaseSolver
     mfem::Array<int> blk_offsets_;
     unique_ptr<mfem::BlockVector> source_;
     unique_ptr<mfem::HypreParMatrix> Winv_D_;
+    unique_ptr<mfem::HypreParMatrix> D_;
     int nonlinear_iter_;
     bool step_converged_;
 
-    double scale_;
+    double weight_;
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
@@ -320,18 +321,18 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     blk_offsets_[2] = hierarchy.BlockOffsets(level)[2];
     blk_offsets_[3] = blk_offsets_[2] + blk_offsets_[2] - blk_offsets_[1];
 
-    scale_ = problem.CellVolume() * porosity_ * density_;
+    weight_ = problem.CellVolume() * porosity_ * density_;
 
     source_.reset(new mfem::BlockVector(blk_offsets_));
     auto Winv = SparseIdentity(source_->BlockSize(2));
-    Winv *= density_;
+//    Winv *= density_;
 //    Winv *= 1. / problem.CellVolume() / porosity; // assume diagonal and uniform W
 
     const MixedMatrix& system = hierarchy_.GetMatrix(level);
-    const GraphSpace& space = system.GetGraphSpace();
-    unique_ptr<mfem::HypreParMatrix> D(system.MakeParallelD(system.GetD()));
-    auto tmp(ParMult(Winv, *D, space.VDofStarts())); // TODO: simplify
-    Winv_D_.reset(mfem::ParMult(tmp.get(), &space.TrueEDofToEDof()));
+//    const GraphSpace& space = system.GetGraphSpace();
+    D_.reset(system.MakeParallelD(system.GetD()));
+//    auto tmp(ParMult(Winv, *D, space.VDofStarts())); // TODO: simplify
+//    Winv_D_.reset(mfem::ParMult(tmp.get(), &space.TrueEDofToEDof()));
 
     blk_helper_.reserve(level + 1);
     blk_helper_.emplace_back(hierarchy.BlockOffsets(0));
@@ -346,8 +347,6 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     source_->GetBlock(0) = blk_helper_[level].GetBlock(0);
     source_->GetBlock(1) = blk_helper_[level].GetBlock(1);
     Winv.Mult(blk_helper_[level].GetBlock(1), source_->GetBlock(2));
-
-    source_->GetBlock(1) *= density_;
 }
 
 mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
@@ -396,7 +395,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         time += dt_real;
         done = (time >= evolve_param_.total_time);
 
-        if (myid == 0)
+        if (myid == 0 && (done || step % evolve_param_.vis_step == 0))
         {
             std::cout << "Time step " << step << ": step size = " << dt_real
                       << ", time = " << time << "\n";
@@ -441,16 +440,16 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
         CoupledStepSolver solver(hierarchy_.GetMatrix(level_), hierarchy_.GetTraces(level_),
-                                 dt, scale_, density_, solver_param_);
+                                 dt, weight_, density_, solver_param_);
         solver.SetPrintLevel(1);
         solver.SetRelTol(0.0);
         solver.SetAbsTol(1e-10);
         solver.SetMaxIter(25);
 
         mfem::BlockVector rhs(*source_);
-        rhs *= dt;
-        rhs.GetBlock(0) *= (1. / dt / dt / 1e3);
-        rhs.GetBlock(2).Add(scale_, x.GetBlock(2));
+        rhs.GetBlock(0) *= (1. / dt / density_);
+        rhs.GetBlock(1) *= (dt * density_);
+        add(dt, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
         solver.Solve(rhs, x);
         step_converged_ = solver.IsConverged();
         nonlinear_iter_ += solver.GetNumIterations();
@@ -477,13 +476,12 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
 
     if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
     {
-        mfem::Vector upwind_flux(x.GetBlock(0).Size());
-        upwind_flux = 0.0;
-        upwind.Mult(FractionalFlow(x.GetBlock(2)), upwind_flux);
+        const mfem::Vector S = system.PWConstProject(x.GetBlock(2));
+        const mfem::Vector upwind_flux = Mult(upwind, FractionalFlow(S));
 
         mfem::Vector dSdt(source_->GetBlock(2));
-        Winv_D_->Mult(-1.0, upwind_flux, 1.0, dSdt);
-        x.GetBlock(2).Add(dt, dSdt);
+        D_->Mult(-1.0, upwind_flux, 1.0, dSdt);
+        x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
         step_converged_ = true;
     }
     else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
