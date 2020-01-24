@@ -104,7 +104,6 @@ class CoupledStepSolver : public NonlinearSolver
 public:
     CoupledStepSolver(const MixedMatrix& darcy_system,
                       const mfem::HypreParMatrix& Winv_D,
-                      const mfem::Array<int>& starts,
                       const std::vector<mfem::DenseMatrix>& edge_traces,
                       const double dt,
                       const double scale,
@@ -116,25 +115,24 @@ public:
 
 class ImplicitTransportStepSolver : public NonlinearSolver
 {
+    const MixedMatrix& darcy_system_;
+    const mfem::Array<int>& starts_;
     mfem::Array<int> ess_dofs_;
     mfem::GMRESSolver gmres_;
     unique_ptr<mfem::HypreParMatrix> Winv_Adv_;
     mfem::SparseMatrix dt_inv_;
-    const MixedMatrix& darcy_system_;
-    const mfem::Array<int>& starts_;
 
     virtual void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
 public:
     ImplicitTransportStepSolver(const mfem::HypreParMatrix& Winv_D,
                                 const mfem::SparseMatrix& upwind,
-                                const mfem::Array<int>& starts,
                                 const MixedMatrix& darcy_system,
                                 const double dt,
                                 NLSolverParameters param)
         : NonlinearSolver(Winv_D.GetComm(), param),
-          gmres_(Winv_D.GetComm()), Winv_Adv_(ParMult(Winv_D, upwind, starts)),
-          dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt)),
-          darcy_system_(darcy_system), starts_(starts)
+          darcy_system_(darcy_system), starts_(darcy_system.GetGraph().VertexStarts()),
+          gmres_(Winv_D.GetComm()), Winv_Adv_(ParMult(Winv_D, upwind, starts_)),
+          dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt))
     {
         //        gmres_.SetPrintLevel(1);
         gmres_.SetMaxIter(200);
@@ -324,7 +322,7 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     source_.reset(new mfem::BlockVector(blk_offsets_));
     auto Winv = SparseIdentity(source_->BlockSize(2));
     Winv *= density;
-//    Winv *= 1. / problem.CellVolume() / porosity; // assume W is diagonal
+//    Winv *= 1. / problem.CellVolume() / porosity; // assume diagonal and uniform W
 
     const MixedMatrix& system = hierarchy_.GetMatrix(level);
     const GraphSpace& space = system.GetGraphSpace();
@@ -439,8 +437,7 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
 {
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
-        auto& starts = hierarchy_.GetGraph(0).VertexStarts();
-        CoupledStepSolver solver(hierarchy_.GetMatrix(level_), *Winv_D_, starts,
+        CoupledStepSolver solver(hierarchy_.GetMatrix(level_), *Winv_D_,
                                  hierarchy_.GetTraces(level_), dt, scale_, solver_param_);
         solver.SetPrintLevel(-1);
         solver.SetRelTol(0.0);
@@ -488,8 +485,7 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
     }
     else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
     {
-        auto& starts = hierarchy_.GetGraph(level_).VertexStarts();
-        ImplicitTransportStepSolver solver(*Winv_D_, upwind, starts, system,
+        ImplicitTransportStepSolver solver(*Winv_D_, upwind, system,
                                            dt, solver_param_);
         solver.SetPrintLevel(1);
         solver.SetRelTol(1e-10);
@@ -504,7 +500,6 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
 
 CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
                                      const mfem::HypreParMatrix& Winv_D,
-                                     const mfem::Array<int>& starts,
                                      const std::vector<mfem::DenseMatrix>& edge_traces,
                                      const double dt,
                                      const double scale,
@@ -512,7 +507,7 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
     : NonlinearSolver(Winv_D.GetComm(), param),
       darcy_system_(darcy_system), gmres_(Winv_D.GetComm()),
       dt_inv_(SparseIdentity(Winv_D.NumRows()) *= scale), Winv_D_(Winv_D),
-      starts_(starts), edge_traces_(edge_traces),
+      starts_(darcy_system.GetGraph().VertexStarts()), edge_traces_(edge_traces),
       block_offsets_(4), true_block_offsets_(4), scale_(scale), dt_(dt)
 {
     block_offsets_[0] = 0;
