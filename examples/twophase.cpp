@@ -125,22 +125,19 @@ class ImplicitTransportStepSolver : public NonlinearSolver
     const mfem::Array<int>& starts_;
     mfem::Array<int> ess_dofs_;
     mfem::GMRESSolver gmres_;
-    unique_ptr<mfem::HypreParMatrix> Winv_Adv_;
-    mfem::SparseMatrix dt_inv_;
+    const mfem::HypreParMatrix& Adv_;
+    mfem::SparseMatrix Ms_;
 
     virtual void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
 public:
-    ImplicitTransportStepSolver(const mfem::HypreParMatrix& Winv_D,
-                                const mfem::SparseMatrix& upwind,
+    ImplicitTransportStepSolver(const mfem::HypreParMatrix& Adv_,
                                 const MixedMatrix& darcy_system,
-                                const double dt,
+                                const double scale,
                                 NLSolverParameters param)
-        : NonlinearSolver(Winv_D.GetComm(), param),
-          darcy_system_(darcy_system), starts_(darcy_system.GetGraph().VertexStarts()),
-          gmres_(Winv_D.GetComm()), Winv_Adv_(ParMult(Winv_D, upwind, starts_)),
-          dt_inv_(SparseIdentity(upwind.NumCols()) *= (1.0 / dt))
+        : NonlinearSolver(Adv_.GetComm(), param), darcy_system_(darcy_system),
+          starts_(darcy_system.GetGraph().VertexStarts()),
+          gmres_(comm_), Adv_(Adv_), Ms_(SparseIdentity(Adv_.NumCols()) *= scale)
     {
-        //        gmres_.SetPrintLevel(1);
         gmres_.SetMaxIter(200);
         gmres_.SetRelTol(1e-9);
     }
@@ -325,14 +322,9 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
 
     source_.reset(new mfem::BlockVector(blk_offsets_));
     auto Winv = SparseIdentity(source_->BlockSize(2));
-//    Winv *= density_;
-//    Winv *= 1. / problem.CellVolume() / porosity; // assume diagonal and uniform W
 
     const MixedMatrix& system = hierarchy_.GetMatrix(level);
-//    const GraphSpace& space = system.GetGraphSpace();
     D_.reset(system.MakeParallelD(system.GetD()));
-//    auto tmp(ParMult(Winv, *D, space.VDofStarts())); // TODO: simplify
-//    Winv_D_.reset(mfem::ParMult(tmp.get(), &space.TrueEDofToEDof()));
 
     blk_helper_.reserve(level + 1);
     blk_helper_.emplace_back(hierarchy.BlockOffsets(0));
@@ -346,7 +338,7 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
 
     source_->GetBlock(0) = blk_helper_[level].GetBlock(0);
     source_->GetBlock(1) = blk_helper_[level].GetBlock(1);
-    Winv.Mult(blk_helper_[level].GetBlock(1), source_->GetBlock(2));
+    source_->GetBlock(2) = blk_helper_[level].GetBlock(1);
 }
 
 mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
@@ -449,7 +441,7 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(0) *= (1. / dt / density_);
         rhs.GetBlock(1) *= (dt * density_);
-        add(dt, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
+        add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
         solver.Solve(rhs, x);
         step_converged_ = solver.IsConverged();
         nonlinear_iter_ += solver.GetNumIterations();
@@ -486,13 +478,14 @@ void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
     }
     else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
     {
-        ImplicitTransportStepSolver solver(*Winv_D_, upwind, system,
-                                           dt, solver_param_);
+        auto Adv = ParMult(*D_, upwind, system.GetGraph().VertexStarts());
+        ImplicitTransportStepSolver solver(*Adv, system,
+                                           weight_ / density_ / dt, solver_param_);
         solver.SetPrintLevel(1);
         solver.SetRelTol(1e-10);
 
         mfem::Vector rhs(source_->GetBlock(2));
-        rhs.Add(1. / dt, x.GetBlock(2));
+        rhs.Add(weight_ / density_ / dt, x.GetBlock(2));
         solver.Solve(rhs, x.GetBlock(2));
         step_converged_ = solver.IsConverged();
         nonlinear_iter_ += solver.GetNumIterations();
@@ -600,8 +593,7 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     const GraphSpace& space = darcy_system_.GetGraphSpace();
     auto& vert_edof = space.VertexToEDof();
 
-    mfem::Vector S(darcy_system_.GetPWConstProj().NumRows());
-    darcy_system_.GetPWConstProj().Mult(blk_sol.GetBlock(2), S);
+    const mfem::Vector S = darcy_system_.PWConstProject(blk_sol.GetBlock(2));
     auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
     mfem::SparseMatrix D_proc(darcy_system_.GetD());
 
@@ -685,26 +677,20 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
 
-    auto true_resid = AssembleTrueVector(Residual(x, rhs));
-    true_resid *= -1.0;
-
+    mfem::Vector true_resid = AssembleTrueVector(Residual(x, rhs));
     mfem::BlockVector true_blk_dx(true_block_offsets_);
     true_blk_dx = 0.0;
-    gmres_.Mult(true_resid, true_blk_dx);
-
-    const double max_dS = mfem::ParNormlp(true_blk_dx.GetBlock(2), mfem::infinity(), comm_);
-
-    if (myid_ == 0 && max_dS > 0.2)
-    {
-        true_blk_dx *= (0.2 / max_dS);
-//        std::cout << "stepLength = "<< 0.2 / max_dS <<"\n";
-    }
+    gmres_.Mult(true_resid *= -1.0, true_blk_dx);
 
     mfem::BlockVector blk_dx(dx.GetData(), block_offsets_);
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
     dof_truedof.Mult(true_blk_dx.GetBlock(0), blk_dx.GetBlock(0));
     blk_dx.GetBlock(1) = true_blk_dx.GetBlock(1);
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
+
+    const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
+    const double max_dS = mfem::ParNormlp(dS, mfem::infinity(), comm_);
+    blk_dx *= std::min(1.0, 0.2 / max_dS);
 
     x += blk_dx;
 }
@@ -754,7 +740,8 @@ mfem::Vector ImplicitTransportStepSolver::Residual(
     const mfem::Vector& x, const mfem::Vector& y)
 {
     mfem::Vector out(x);
-    Winv_Adv_->Mult(1.0, FractionalFlow(x), dt_inv_(0, 0), out);
+    const mfem::Vector S = darcy_system_.PWConstProject(x);
+    Adv_.Mult(1.0, FractionalFlow(S), Ms_(0, 0), out);
     out -= y;
     return out;
 }
@@ -762,20 +749,17 @@ mfem::Vector ImplicitTransportStepSolver::Residual(
 void ImplicitTransportStepSolver::Step(
         const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
-    mfem::Vector S(Winv_Adv_->NumCols());
-    darcy_system_.GetPWConstProj().Mult(x, S);
-    auto tmp = ParMult(*Winv_Adv_, SparseDiag(dFdS(S)), starts_);
-    auto A = ParMult(*tmp, darcy_system_.GetPWConstProj(), starts_);
-    GetDiag(*A) += dt_inv_;
+    mfem::SparseMatrix df_ds = darcy_system_.GetPWConstProj();
+    df_ds.ScaleRows(dFdS(darcy_system_.PWConstProject(x)));
+    auto A = ParMult(Adv_, df_ds, starts_);
+    GetDiag(*A) += Ms_;
 
-    mfem::HypreBoomerAMG solver(*A);
-    solver.SetPrintLevel(-1);
+    unique_ptr<mfem::HypreBoomerAMG> solver(BoomerAMG(*A));
     gmres_.SetOperator(*A);
-    gmres_.SetPreconditioner(solver);
+    gmres_.SetPreconditioner(*solver);
 
-    mfem::Vector residual = Residual(x, rhs);
     dx = 0.0;
-    gmres_.Mult(residual, dx);
+    gmres_.Mult(Residual(x, rhs), dx);
     x -= dx;
 }
 
