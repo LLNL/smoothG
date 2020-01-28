@@ -387,7 +387,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         time += dt_real;
         done = (time >= evolve_param_.total_time);
 
-        if (myid == 0 && (done || step % evolve_param_.vis_step == 0))
+        if (myid == 0)
         {
             std::cout << "Time step " << step << ": step size = " << dt_real
                       << ", time = " << time << "\n";
@@ -557,8 +557,8 @@ mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vect
 
     unique_ptr<mfem::HypreParMatrix> D(darcy_system_.MakeParallelD(darcy_system_.GetD()));
     auto U = ParMult(darcy_system_.GetGraphSpace().TrueEDofToEDof(), upwind, starts_);
-    auto Winv_Adv = mfem::ParMult(D.get(), U.get());
-    Winv_Adv->Mult(dt_ * density_, FractionalFlow(S), Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
+    auto Adv = mfem::ParMult(D.get(), U.get());
+    Adv->Mult(dt_ * density_, FractionalFlow(S), Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
 
     out -= y;
     SetZeroAtMarker(darcy_system_.GetEssDofs(), out.GetBlock(0));
@@ -663,8 +663,29 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     M->GetDiag(Md);
     DT->InvScaleRows(Md);
     unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D.get(), DT.get()));
-//    (*schur) *= -1.0;
+    (*schur) *= -1.0;
     DT->ScaleRows(Md);
+
+//    mfem::Vector Ld;
+//    schur->GetDiag(Ld);
+
+//    unique_ptr<mfem::HypreParMatrix> DMinv(DT->Transpose());
+//    *DMinv *= (dt_ * density_ * dt_ * density_);
+//    DMinv->InvScaleRows(Ld);
+//    unique_ptr<mfem::HypreParMatrix> schur4(mfem::ParMult(DT.get(), DMinv.get()));
+
+//    DT->ScaleRows(Md);
+
+//    unique_ptr<mfem::HypreParMatrix> tmp1(mfem::ParMult(dTdsigma.get(), schur4.get()));
+//    unique_ptr<mfem::HypreParMatrix> tmp2(mfem::ParMult(tmp1.get(), dMdS.get()));
+
+//    dMdS->InvScaleRows(Md);
+//    unique_ptr<mfem::HypreParMatrix> schur2(mfem::ParMult(dTdsigma.get(), dMdS.get()));
+//    (*schur2) *= -1.0;
+//    dMdS->ScaleRows(Md);
+
+//    unique_ptr<mfem::HypreParMatrix> schur3(smoothg::ParAdd(*dTdS, *schur2));
+//    unique_ptr<mfem::HypreParMatrix> schur5(smoothg::ParAdd(*schur3, *tmp2));
 
     mfem::BlockDiagonalPreconditioner prec(true_block_offsets_);
     prec.SetDiagonalBlock(0, new mfem::HypreDiagScale(*M));
@@ -681,6 +702,8 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     mfem::BlockVector true_blk_dx(true_block_offsets_);
     true_blk_dx = 0.0;
     gmres_.Mult(true_resid *= -1.0, true_blk_dx);
+
+//    if (!myid_) std::cout << "GMRES took " << gmres_.GetNumIterations() << " iterations\n";
 
     mfem::BlockVector blk_dx(dx.GetData(), block_offsets_);
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
@@ -755,8 +778,8 @@ void ImplicitTransportStepSolver::Step(
     GetDiag(*A) += Ms_;
 
     unique_ptr<mfem::HypreBoomerAMG> solver(BoomerAMG(*A));
-    gmres_.SetOperator(*A);
     gmres_.SetPreconditioner(*solver);
+    gmres_.SetOperator(*A);
 
     dx = 0.0;
     gmres_.Mult(Residual(x, rhs), dx);
