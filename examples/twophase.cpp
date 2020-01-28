@@ -76,19 +76,16 @@ class TwoPhaseSolver
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
     const double porosity_ = 0.3;
-
-    // update saturation block only
-    void TransportStep(const double dt, mfem::BlockVector& x);
 public:
     TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
                    const int level, const EvolveParamenters& evolve_param,
                    const NLSolverParameters& solver_param);
 
-    void Step(const double dt, mfem::BlockVector& x);
+    void TimeStepping(const double dt, mfem::BlockVector& x);
     mfem::BlockVector Solve(const mfem::BlockVector& init_val);
 };
 
-class CoupledStepSolver : public NonlinearSolver
+class CoupledSolver : public NonlinearSolver
 {
     const MixedMatrix& darcy_system_;
     mfem::GMRESSolver gmres_;
@@ -99,7 +96,7 @@ class CoupledStepSolver : public NonlinearSolver
     mfem::Array<int> block_offsets_;
     mfem::Array<int> true_block_offsets_;
     double dt_;
-    double scale_;
+    double weight_;
     double density_;
 
     mfem::Vector normalizer_;
@@ -108,18 +105,18 @@ class CoupledStepSolver : public NonlinearSolver
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
     std::vector<mfem::DenseMatrix> Build_dMdS(const mfem::BlockVector& x);
 public:
-    CoupledStepSolver(const MixedMatrix& darcy_system,
-                      const std::vector<mfem::DenseMatrix>& edge_traces,
-                      const double dt,
-                      const double scale,
-                      const double density,
-                      NLSolverParameters param);
+    CoupledSolver(const MixedMatrix& darcy_system,
+                  const std::vector<mfem::DenseMatrix>& edge_traces,
+                  const double dt,
+                  const double weight,
+                  const double density,
+                  NLSolverParameters param);
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
     double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
 };
 
-class ImplicitTransportStepSolver : public NonlinearSolver
+class TransportSolver : public NonlinearSolver
 {
     const MixedMatrix& darcy_system_;
     const mfem::Array<int>& starts_;
@@ -130,13 +127,13 @@ class ImplicitTransportStepSolver : public NonlinearSolver
 
     virtual void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
 public:
-    ImplicitTransportStepSolver(const mfem::HypreParMatrix& Adv_,
-                                const MixedMatrix& darcy_system,
-                                const double scale,
-                                NLSolverParameters param)
+    TransportSolver(const mfem::HypreParMatrix& Adv_,
+                    const MixedMatrix& darcy_system,
+                    const double vol_dt_inv,
+                    NLSolverParameters param)
         : NonlinearSolver(Adv_.GetComm(), param), darcy_system_(darcy_system),
-          starts_(darcy_system.GetGraph().VertexStarts()),
-          gmres_(comm_), Adv_(Adv_), Ms_(SparseIdentity(Adv_.NumCols()) *= scale)
+          starts_(darcy_system.GetGraph().VertexStarts()), gmres_(comm_),
+          Adv_(Adv_), Ms_(SparseIdentity(Adv_.NumCols()) *= vol_dt_inv)
     {
         gmres_.SetMaxIter(200);
         gmres_.SetRelTol(1e-9);
@@ -208,6 +205,10 @@ int main(int argc, char* argv[])
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
     solver_param.num_backtrack = num_backtrack;
     solver_param.diff_tol = diff_tol;
+    solver_param.print_level = 0;
+    solver_param.max_num_iter = 25;
+    solver_param.atol = 1e-10;
+    solver_param.rtol = 0.0;
 
     mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
     ess_attr = 1;
@@ -376,12 +377,12 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         //        dt_real = std::min(param_.dt, param_.total_time - time);
         step_converged_ = false;
 
-        Step(dt_real, x);
+        TimeStepping(dt_real, x);
         while (!step_converged_)
         {
             x = previous_x;
             dt_real /= 2.0;
-            Step(dt_real, x);
+            TimeStepping(dt_real, x);
         }
 
         time += dt_real;
@@ -427,16 +428,14 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     return x;
 }
 
-void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
+void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 {
+    const MixedMatrix& system = hierarchy_.GetMatrix(level_);
+    const std::vector<mfem::DenseMatrix>& traces = hierarchy_.GetTraces(level_);
+
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
-        CoupledStepSolver solver(hierarchy_.GetMatrix(level_), hierarchy_.GetTraces(level_),
-                                 dt, weight_, density_, solver_param_);
-        solver.SetPrintLevel(1);
-        solver.SetRelTol(0.0);
-        solver.SetAbsTol(1e-10);
-        solver.SetMaxIter(25);
+        CoupledSolver solver(system, traces, dt, weight_, density_, solver_param_);
 
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(0) *= (1. / dt / density_);
@@ -448,62 +447,49 @@ void TwoPhaseSolver::Step(const double dt, mfem::BlockVector& x)
     }
     else // sequential: solve for flux and pressure first, and then saturation
     {
-        mfem::Vector S = hierarchy_.PWConstProject(level_, x.GetBlock(2));
+        const mfem::Vector S = system.PWConstProject(x.GetBlock(2));
         hierarchy_.RescaleCoefficient(level_, TotalMobility(S));
-        mfem::BlockVector flow_rhs(source_->GetData(), hierarchy_.BlockOffsets(level_));
-        mfem::BlockVector flow_sol(x.GetData(), hierarchy_.BlockOffsets(level_));
+        mfem::BlockVector flow_rhs(*source_, hierarchy_.BlockOffsets(level_));
+        mfem::BlockVector flow_sol(x, hierarchy_.BlockOffsets(level_));
         hierarchy_.Solve(level_, flow_rhs, flow_sol);
 
-        TransportStep(dt, x);
+        auto flux = ComputeFaceFlux(system.GetGraphSpace(), traces, x.GetBlock(0));
+        auto upwind = BuildUpwindPattern(system.GetGraphSpace(), flux);
+        upwind.ScaleRows(flux);
+
+        if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
+        {
+            mfem::Vector dSdt(source_->GetBlock(2));
+            D_->Mult(-1.0, Mult(upwind, FractionalFlow(S)), 1.0, dSdt);
+            x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
+            step_converged_ = true;
+        }
+        else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
+        {
+            auto Adv = ParMult(*D_, upwind, system.GetGraph().VertexStarts());
+            TransportSolver solver(*Adv, system, weight_ / density_ / dt, solver_param_);
+
+            mfem::Vector rhs(source_->GetBlock(2));
+            rhs.Add(weight_ / density_ / dt, x.GetBlock(2));
+            solver.Solve(rhs, x.GetBlock(2));
+            step_converged_ = solver.IsConverged();
+            nonlinear_iter_ += solver.GetNumIterations();
+        }
     }
 }
 
-void TwoPhaseSolver::TransportStep(const double dt, mfem::BlockVector& x)
-{
-    const MixedMatrix& system = hierarchy_.GetMatrix(level_);
-    auto& edge_traces = hierarchy_.GetTraces(level_);
-    auto flux = ComputeFaceFlux(system.GetGraphSpace(), edge_traces, x.GetBlock(0));
-    auto upwind = BuildUpwindPattern(system.GetGraphSpace(), flux);
-    upwind.ScaleRows(flux);
-
-    if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
-    {
-        const mfem::Vector S = system.PWConstProject(x.GetBlock(2));
-        const mfem::Vector upwind_flux = Mult(upwind, FractionalFlow(S));
-
-        mfem::Vector dSdt(source_->GetBlock(2));
-        D_->Mult(-1.0, upwind_flux, 1.0, dSdt);
-        x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
-        step_converged_ = true;
-    }
-    else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
-    {
-        auto Adv = ParMult(*D_, upwind, system.GetGraph().VertexStarts());
-        ImplicitTransportStepSolver solver(*Adv, system,
-                                           weight_ / density_ / dt, solver_param_);
-        solver.SetPrintLevel(1);
-        solver.SetRelTol(1e-10);
-
-        mfem::Vector rhs(source_->GetBlock(2));
-        rhs.Add(weight_ / density_ / dt, x.GetBlock(2));
-        solver.Solve(rhs, x.GetBlock(2));
-        step_converged_ = solver.IsConverged();
-        nonlinear_iter_ += solver.GetNumIterations();
-    }
-}
-
-CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
-                                     const std::vector<mfem::DenseMatrix>& edge_traces,
-                                     const double dt,
-                                     const double scale,
-                                     const double density,
-                                     NLSolverParameters param)
+CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
+                             const std::vector<mfem::DenseMatrix>& edge_traces,
+                             const double dt,
+                             const double weight,
+                             const double density,
+                             NLSolverParameters param)
     : NonlinearSolver(darcy_system.GetComm(), param),
       darcy_system_(darcy_system), gmres_(comm_),
-      Ms_(SparseIdentity(darcy_system.GetGraph().NumVertices()) *= scale),
+      Ms_(SparseIdentity(darcy_system.GetGraph().NumVertices()) *= weight),
       starts_(darcy_system.GetGraph().VertexStarts()), edge_traces_(edge_traces),
       block_offsets_(4), true_block_offsets_(4),
-      dt_(dt), scale_(scale), density_(density)
+      dt_(dt), weight_(weight), density_(density)
 {
     block_offsets_[0] = 0;
     block_offsets_[1] = darcy_system.NumEDofs();
@@ -519,7 +505,7 @@ CoupledStepSolver::CoupledStepSolver(const MixedMatrix& darcy_system,
     gmres_.SetRelTol(1e-8);
 }
 
-mfem::Vector CoupledStepSolver::AssembleTrueVector(const mfem::Vector& vec) const
+mfem::Vector CoupledSolver::AssembleTrueVector(const mfem::Vector& vec) const
 {
     mfem::Vector true_v(true_block_offsets_.Last());
     mfem::BlockVector blk_v(vec.GetData(), block_offsets_);
@@ -533,7 +519,7 @@ mfem::Vector CoupledStepSolver::AssembleTrueVector(const mfem::Vector& vec) cons
     return true_v;
 }
 
-mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
+mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
 {
     mfem::BlockVector blk_x(x.GetData(), block_offsets_);
     mfem::BlockVector out(block_offsets_);
@@ -569,13 +555,13 @@ mfem::Vector CoupledStepSolver::Residual(const mfem::Vector& x, const mfem::Vect
         normalizer_ -= 1.0;
         normalizer_ *= -800.0;
         normalizer_.Add(1000.0, S);
-        normalizer_ *= (scale_ / density_);
+        normalizer_ *= (weight_ / density_);
     }
 
     return out;
 }
 
-double CoupledStepSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
+double CoupledSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
     auto true_resid = AssembleTrueVector(Residual(x, y));
     mfem::BlockVector blk_resid(true_resid.GetData(), true_block_offsets_);
@@ -586,7 +572,7 @@ double CoupledStepSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector
     return mfem::ParNormlp(blk_resid, mfem::infinity(), comm_);
 }
 
-void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
+void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::BlockVector blk_sol(x.GetData(), block_offsets_);
 
@@ -666,27 +652,6 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     (*schur) *= -1.0;
     DT->ScaleRows(Md);
 
-//    mfem::Vector Ld;
-//    schur->GetDiag(Ld);
-
-//    unique_ptr<mfem::HypreParMatrix> DMinv(DT->Transpose());
-//    *DMinv *= (dt_ * density_ * dt_ * density_);
-//    DMinv->InvScaleRows(Ld);
-//    unique_ptr<mfem::HypreParMatrix> schur4(mfem::ParMult(DT.get(), DMinv.get()));
-
-//    DT->ScaleRows(Md);
-
-//    unique_ptr<mfem::HypreParMatrix> tmp1(mfem::ParMult(dTdsigma.get(), schur4.get()));
-//    unique_ptr<mfem::HypreParMatrix> tmp2(mfem::ParMult(tmp1.get(), dMdS.get()));
-
-//    dMdS->InvScaleRows(Md);
-//    unique_ptr<mfem::HypreParMatrix> schur2(mfem::ParMult(dTdsigma.get(), dMdS.get()));
-//    (*schur2) *= -1.0;
-//    dMdS->ScaleRows(Md);
-
-//    unique_ptr<mfem::HypreParMatrix> schur3(smoothg::ParAdd(*dTdS, *schur2));
-//    unique_ptr<mfem::HypreParMatrix> schur5(smoothg::ParAdd(*schur3, *tmp2));
-
     mfem::BlockDiagonalPreconditioner prec(true_block_offsets_);
     prec.SetDiagonalBlock(0, new mfem::HypreDiagScale(*M));
     prec.SetDiagonalBlock(1, BoomerAMG(*schur));
@@ -712,13 +677,12 @@ void CoupledStepSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vec
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
 
     const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
-    const double max_dS = mfem::ParNormlp(dS, mfem::infinity(), comm_);
-    blk_dx *= std::min(1.0, 0.2 / max_dS);
+    blk_dx *= std::min(1.0, 0.2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
 
     x += blk_dx;
 }
 
-std::vector<mfem::DenseMatrix> CoupledStepSolver::Build_dMdS(const mfem::BlockVector& x)
+std::vector<mfem::DenseMatrix> CoupledSolver::Build_dMdS(const mfem::BlockVector& x)
 {
     // TODO: saturation is only 1 dof per cell
     auto& vert_edof = darcy_system_.GetGraphSpace().VertexToEDof();
@@ -759,18 +723,15 @@ std::vector<mfem::DenseMatrix> CoupledStepSolver::Build_dMdS(const mfem::BlockVe
     return out;
 }
 
-mfem::Vector ImplicitTransportStepSolver::Residual(
-    const mfem::Vector& x, const mfem::Vector& y)
+mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
 {
     mfem::Vector out(x);
-    const mfem::Vector S = darcy_system_.PWConstProject(x);
-    Adv_.Mult(1.0, FractionalFlow(S), Ms_(0, 0), out);
+    Adv_.Mult(1.0, FractionalFlow(darcy_system_.PWConstProject(x)), Ms_(0, 0), out);
     out -= y;
     return out;
 }
 
-void ImplicitTransportStepSolver::Step(
-        const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
+void TransportSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::SparseMatrix df_ds = darcy_system_.GetPWConstProj();
     df_ds.ScaleRows(dFdS(darcy_system_.PWConstProject(x)));
@@ -782,7 +743,11 @@ void ImplicitTransportStepSolver::Step(
     gmres_.SetOperator(*A);
 
     dx = 0.0;
-    gmres_.Mult(Residual(x, rhs), dx);
+    auto resid = Residual(x, rhs);
+    gmres_.Mult(resid, dx);
+
+    const mfem::Vector dS = darcy_system_.PWConstProject(dx);
+    dx *= std::min(1.0, 0.2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
     x -= dx;
 }
 
