@@ -88,20 +88,26 @@ class CoupledSolver : public NonlinearSolver
     const MixedMatrix& darcy_system_;
     mfem::GMRESSolver gmres_;
     mfem::SparseMatrix Ms_;
+    unique_ptr<mfem::HypreParMatrix> D_;
+    unique_ptr<mfem::HypreParMatrix> DT_;
 
-    const mfem::Array<int>& starts_;
+    mfem::Array<int> blk_offsets_;
+    mfem::Array<int> true_blk_offsets_;
+    const mfem::Array<int>& ess_dofs_;
+    const mfem::Array<int>& vert_starts_;
+    mfem::Array<int> true_edof_starts_;
     const std::vector<mfem::DenseMatrix>& traces_;
-    mfem::Array<int> block_offsets_;
-    mfem::Array<int> true_block_offsets_;
-    double dt_;
-    double weight_;
-    double density_;
+
+    const double dt_;
+    const double weight_;
+    const double density_;
 
     mfem::Vector normalizer_;
 
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
     std::vector<mfem::DenseMatrix> Build_dMdS(const mfem::BlockVector& x);
+    mfem::SparseMatrix Assemble_dMdS(const mfem::BlockVector& blk_x);
 public:
     CoupledSolver(const MixedMatrix& darcy_system,
                   const std::vector<mfem::DenseMatrix>& edge_traces,
@@ -482,29 +488,44 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
     : NonlinearSolver(darcy_system.GetComm(), param),
       darcy_system_(darcy_system), gmres_(comm_),
       Ms_(SparseIdentity(darcy_system.GetGraph().NumVertices()) *= weight),
-      starts_(darcy_system.GetGraph().VertexStarts()), traces_(edge_traces),
-      block_offsets_(4), true_block_offsets_(4),
-      dt_(dt), weight_(weight), density_(density)
+      blk_offsets_(4), true_blk_offsets_(4), ess_dofs_(darcy_system.GetEssDofs()),
+      vert_starts_(darcy_system.GetGraph().VertexStarts()),
+      traces_(edge_traces), dt_(dt), weight_(weight), density_(density)
 {
-    block_offsets_[0] = 0;
-    block_offsets_[1] = darcy_system.NumEDofs();
-    block_offsets_[2] = block_offsets_[1] + darcy_system.NumVDofs();
-    block_offsets_[3] = block_offsets_[2] + darcy_system.GetGraph().NumVertices();
+    blk_offsets_[0] = 0;
+    blk_offsets_[1] = darcy_system.NumEDofs();
+    blk_offsets_[2] = blk_offsets_[1] + darcy_system.NumVDofs();
+    blk_offsets_[3] = blk_offsets_[2] + darcy_system.GetGraph().NumVertices();
 
-    true_block_offsets_[0] = 0;
-    true_block_offsets_[1] = darcy_system.GetGraphSpace().EDofToTrueEDof().NumCols();
-    true_block_offsets_[2] = true_block_offsets_[1] + darcy_system.NumVDofs();
-    true_block_offsets_[3] = true_block_offsets_[2] + darcy_system.GetGraph().NumVertices();
+    true_blk_offsets_[0] = 0;
+    true_blk_offsets_[1] = darcy_system.GetGraphSpace().EDofToTrueEDof().NumCols();
+    true_blk_offsets_[2] = true_blk_offsets_[1] + darcy_system.NumVDofs();
+    true_blk_offsets_[3] = true_blk_offsets_[2] + darcy_system.GetGraph().NumVertices();
 
     gmres_.SetMaxIter(1000);
     gmres_.SetRelTol(1e-8);
+    gmres_.SetPrintLevel(-1);
+    gmres_.SetKDim(100);
+
+    mfem::SparseMatrix D_proc(darcy_system_.GetD());
+    if (darcy_system_.GetEssDofs().Size())
+    {
+        D_proc.EliminateCols(darcy_system_.GetEssDofs());
+    }
+
+    D_.reset(darcy_system_.MakeParallelD(D_proc));
+    DT_.reset(D_->Transpose());
+    *D_ *= (dt_ * density_);
+    *DT_ *= (1. / dt_ / density_);
+
+    GenerateOffsets(comm_, D_->NumCols(), true_edof_starts_);
 }
 
 mfem::Vector CoupledSolver::AssembleTrueVector(const mfem::Vector& vec) const
 {
-    mfem::Vector true_v(true_block_offsets_.Last());
-    mfem::BlockVector blk_v(vec.GetData(), block_offsets_);
-    mfem::BlockVector blk_true_v(true_v.GetData(), true_block_offsets_);
+    mfem::Vector true_v(true_blk_offsets_.Last());
+    mfem::BlockVector blk_v(vec.GetData(), blk_offsets_);
+    mfem::BlockVector blk_true_v(true_v.GetData(), true_blk_offsets_);
 
     auto& truedof_dof = darcy_system_.GetGraphSpace().TrueEDofToEDof();
     truedof_dof.Mult(blk_v.GetBlock(0), blk_true_v.GetBlock(0));
@@ -516,8 +537,8 @@ mfem::Vector CoupledSolver::AssembleTrueVector(const mfem::Vector& vec) const
 
 mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
 {
-    mfem::BlockVector blk_x(x.GetData(), block_offsets_);
-    mfem::BlockVector out(block_offsets_);
+    mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
+    mfem::BlockVector out(blk_offsets_);
 
     mfem::BlockVector darcy_x(x.GetData(), darcy_system_.BlockOffsets());
     mfem::BlockVector darcy_Rx(out.GetData(), darcy_system_.BlockOffsets());
@@ -530,19 +551,16 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 
     out.GetBlock(2) = blk_x.GetBlock(2);
 
-    auto face_flux = ComputeFaceFlux(darcy_system_.GetGraphSpace(),
-                                     traces_, blk_x.GetBlock(0));
-    auto upwind = BuildUpwindPattern(darcy_system_.GetGraphSpace(), face_flux);
-    upwind.ScaleRows(blk_x.GetBlock(0));
-
-    unique_ptr<mfem::HypreParMatrix> D(darcy_system_.MakeParallelD(darcy_system_.GetD()));
-
-    auto U = ParMult(darcy_system_.GetGraphSpace().TrueEDofToEDof(), upwind, starts_);
-    auto Adv = mfem::ParMult(D.get(), U.get());
-    Adv->Mult(dt_ * density_, FractionalFlow(S), Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
+    const GraphSpace& space = darcy_system_.GetGraphSpace();
+    auto face_flux = ComputeFaceFlux(space, traces_, blk_x.GetBlock(0));
+    auto upwind = BuildUpwindPattern(space, face_flux);
+    auto upw_FS = Mult(upwind, FractionalFlow(S));
+    RescaleVector(blk_x.GetBlock(0), upw_FS);
+    auto U_FS = Mult(space.TrueEDofToEDof(), upw_FS);
+    D_->Mult(1.0, U_FS, Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
 
     out -= y;
-    SetZeroAtMarker(darcy_system_.GetEssDofs(), out.GetBlock(0));
+    SetZeroAtMarker(ess_dofs_, out.GetBlock(0));
 
     if (iter_ == 0)
     {
@@ -559,7 +577,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 double CoupledSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
     auto true_resid = AssembleTrueVector(Residual(x, y));
-    mfem::BlockVector blk_resid(true_resid.GetData(), true_block_offsets_);
+    mfem::BlockVector blk_resid(true_resid.GetData(), true_blk_offsets_);
 
     InvRescaleVector(normalizer_, blk_resid.GetBlock(1));
     InvRescaleVector(normalizer_, blk_resid.GetBlock(2));
@@ -567,104 +585,92 @@ double CoupledSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
     return mfem::ParNormlp(blk_resid, mfem::infinity(), comm_);
 }
 
-void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
+mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::BlockVector& blk_x)
 {
-    mfem::BlockVector blk_x(x.GetData(), block_offsets_);
-
-    const GraphSpace& space = darcy_system_.GetGraphSpace();
-    auto& vert_edof = space.VertexToEDof();
-
-    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
-    auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
-    mfem::SparseMatrix D_proc(darcy_system_.GetD());
-
     std::vector<mfem::DenseMatrix> local_dMdS = Build_dMdS(blk_x);
+
+    auto& vert_edof = darcy_system_.GetGraphSpace().VertexToEDof();
     mfem::Array<int> local_edofs, local_vert(1);
-    mfem::SparseMatrix dMdS_proc(vert_edof.NumCols(), vert_edof.NumRows());
+    mfem::SparseMatrix out(vert_edof.NumCols(), vert_edof.NumRows());
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
         GetTableRow(vert_edof, i, local_edofs);
         local_vert[0] = i;
-        dMdS_proc.AddSubMatrix(local_edofs, local_vert, local_dMdS[i]);
+        out.AddSubMatrix(local_edofs, local_vert, local_dMdS[i]);
     }
-    dMdS_proc.Finalize();
+    out.Finalize();
+    return out;
+}
 
-    auto face_flux = ComputeFaceFlux(space, traces_, blk_x.GetBlock(0));
-    auto upwind_pattern = BuildUpwindPattern(space, face_flux);
+void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
+{
+    mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
 
-    mfem::Vector pattern_FS = Mult(upwind_pattern, FractionalFlow(S));
-    upwind_pattern.ScaleRows(blk_x.GetBlock(0));
-    upwind_pattern.ScaleColumns(dFdS(S));
+    const GraphSpace& space = darcy_system_.GetGraphSpace();
 
-    const auto& ess_dofs = darcy_system_.GetEssDofs();
-    for (int mm = 0; mm < ess_dofs.Size(); ++mm)
+    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
+    auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
+    auto dMdS_proc = Assemble_dMdS(blk_x);
+
+    for (int mm = 0; mm < ess_dofs_.Size(); ++mm)
     {
-        if (ess_dofs[mm])
+        if (ess_dofs_[mm])
         {
             M_proc.EliminateRowCol(mm); // assume essential data = 0
             dMdS_proc.EliminateRow(mm);
-            pattern_FS[mm] = 0.0;
         }
     }
-    if (ess_dofs.Size()) { D_proc.EliminateCols(ess_dofs); }
 
     unique_ptr<mfem::HypreParMatrix> M(darcy_system_.MakeParallelM(M_proc));
-    unique_ptr<mfem::HypreParMatrix> D(darcy_system_.MakeParallelD(D_proc));
-    unique_ptr<mfem::HypreParMatrix> DT(D->Transpose());
+    auto dMdS = ParMult(space.TrueEDofToEDof(), dMdS_proc, vert_starts_);
 
-    auto dMdS = ParMult(space.TrueEDofToEDof(), dMdS_proc, starts_);
-
-    auto U_FS = Copy(space.EDofToTrueEDof());
-    U_FS->ScaleRows(pattern_FS);
-    auto dTdsigma = ParMult(D_proc, *U_FS, starts_);
-
-    auto U = ParMult(space.TrueEDofToEDof(), upwind_pattern, starts_);
-    unique_ptr<mfem::HypreParMatrix> dTdS(mfem::ParMult(D.get(), U.get()));
-
-    *D *= (dt_ * density_);
-    *DT *= (1. / dt_ / density_);
     *M *= (1. / dt_ / density_);
     *dMdS *= (1. / dt_ / density_);
 
-    *dTdsigma *= (dt_ * density_);
-    *dTdS *= (dt_ * density_);
+    auto face_flux = ComputeFaceFlux(space, traces_, blk_x.GetBlock(0));
+    auto upwind = BuildUpwindPattern(space, face_flux);
 
+    auto U_FS = Mult(space.TrueEDofToEDof(), Mult(upwind, FractionalFlow(S)));
+    auto dTdsigma = ParMult(*D_, SparseDiag(U_FS), true_edof_starts_);
+
+    upwind.ScaleRows(blk_x.GetBlock(0));
+    upwind.ScaleColumns(dFdS(S));
+    auto U = ParMult(space.TrueEDofToEDof(), upwind, vert_starts_);
+    unique_ptr<mfem::HypreParMatrix> dTdS(mfem::ParMult(D_.get(), U.get()));
     GetDiag(*dTdS) += Ms_;
 
-    mfem::BlockOperator op(true_block_offsets_);
+    mfem::BlockOperator op(true_blk_offsets_);
     op.SetBlock(0, 0, M.get());
-    op.SetBlock(0, 1, DT.get());
-    op.SetBlock(1, 0, D.get());
+    op.SetBlock(0, 1, DT_.get());
+    op.SetBlock(1, 0, D_.get());
     op.SetBlock(0, 2, dMdS.get());
     op.SetBlock(2, 0, dTdsigma.get());
     op.SetBlock(2, 2, dTdS.get());
 
     mfem::Vector Md;
     M->GetDiag(Md);
-    DT->InvScaleRows(Md);
-    unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D.get(), DT.get()));
-    (*schur) *= -1.0;
-    DT->ScaleRows(Md);
+    Md *= -1.0;
+    DT_->InvScaleRows(Md);
+    unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D_.get(), DT_.get()));
+    DT_->ScaleRows(Md);
 
-    mfem::BlockDiagonalPreconditioner prec(true_block_offsets_);
+    mfem::BlockDiagonalPreconditioner prec(true_blk_offsets_);
     prec.SetDiagonalBlock(0, new mfem::HypreDiagScale(*M));
     prec.SetDiagonalBlock(1, BoomerAMG(*schur));
     prec.SetDiagonalBlock(2, BoomerAMG(*dTdS));
     prec.owns_blocks = true;
 
-    gmres_.SetPrintLevel(-1);
-    gmres_.SetKDim(100);
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
 
     mfem::Vector true_resid = AssembleTrueVector(Residual(x, rhs));
-    mfem::BlockVector true_blk_dx(true_block_offsets_);
+    mfem::BlockVector true_blk_dx(true_blk_offsets_);
     true_blk_dx = 0.0;
     gmres_.Mult(true_resid *= -1.0, true_blk_dx);
 
 //    if (!myid_) std::cout << "GMRES took " << gmres_.GetNumIterations() << " iterations\n";
 
-    mfem::BlockVector blk_dx(dx.GetData(), block_offsets_);
+    mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
     dof_truedof.Mult(true_blk_dx.GetBlock(0), blk_dx.GetBlock(0));
     blk_dx.GetBlock(1) = true_blk_dx.GetBlock(1);
@@ -692,7 +698,7 @@ std::vector<mfem::DenseMatrix> CoupledSolver::Build_dMdS(const mfem::BlockVector
     mfem::Vector sigma_loc, Msigma_vec;
     mfem::DenseMatrix proj_pwc_loc;
 
-    mfem::Vector dTMinv_dS_vec = dTMinv_dS(x.GetBlock(2));
+    mfem::Vector dTMinv_dS_vec = dTMinv_dS(x.GetBlock(2)); // TODO: use S
 
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
