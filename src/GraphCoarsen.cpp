@@ -106,70 +106,6 @@ mfem::SparseMatrix GraphCoarsen::BuildPVertices()
     return mfem::SparseMatrix(I, J, data, num_vdofs, coarse_vdof_counter);
 }
 
-void GraphCoarsen::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
-                                   const mfem::SparseMatrix& agg_vdof,
-                                   const mfem::SparseMatrix& face_edof)
-{
-    const unsigned int num_faces = face_edof.Height();
-    const auto& face_Agg = coarse_space_.GetGraph().EdgeToVertex();
-    bool sign_flip;
-    mfem::Vector trace, PV_trace;
-    mfem::Array<int> local_vdofs, local_edofs;
-    for (unsigned int iface = 0; iface < num_faces; iface++)
-    {
-        int Agg0 = face_Agg.GetRowColumns(iface)[0];
-
-        // extract local matrices
-        GetTableRow(agg_vdof, Agg0, local_vdofs);
-        GetTableRow(face_edof, iface, local_edofs);
-        auto Dtransfer = ExtractRowAndColumns(D_proc_, local_vdofs,
-                                              local_edofs, col_map_);
-
-        mfem::DenseMatrix& edge_traces_f(edge_traces[iface]);
-        int num_traces = edge_traces_f.Width();
-
-        mfem::Vector local_constant;
-        constant_rep_.GetSubVector(local_vdofs, local_constant);
-
-        edge_traces_f.GetColumnReference(0, PV_trace);
-        double oneDpv = Dtransfer.InnerProduct(PV_trace, local_constant);
-
-        if (fabs(oneDpv) < 1e-10)
-        {
-            std::cerr << "Warning: oneDpv is closed to zero, oneDpv = "
-                      << oneDpv << ", this may be due to bad PV traces!\n";
-        }
-
-        if (oneDpv < 0)
-        {
-            sign_flip = true;
-            oneDpv *= -1.;
-        }
-        else
-        {
-            sign_flip = false;
-        }
-
-        PV_trace /= oneDpv;
-
-        for (int k = 1; k < num_traces; k++)
-        {
-            edge_traces_f.GetColumnReference(k, trace);
-            double alpha = Dtransfer.InnerProduct(trace, local_constant);
-
-            if (sign_flip)
-                alpha *= -1.;
-
-            mfem::Vector ScaledPV(PV_trace.Size());
-            ScaledPV.Set(alpha, PV_trace);
-            trace -= ScaledPV;
-        }
-
-        // TODO: might need to SVD?
-
-    }
-}
-
 int* GraphCoarsen::InitializePEdgesNNZ(const mfem::SparseMatrix& agg_coarse_edof,
                                        const mfem::SparseMatrix& agg_fine_edof,
                                        const mfem::SparseMatrix& face_coares_edof,
@@ -293,10 +229,6 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
     const int num_coarse_edofs = coarse_space_.VertexToEDof().NumCols();
 
     mfem::SparseMatrix coarse_D(num_coarse_vdofs, num_coarse_edofs);
-
-    // Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
-    // this is Gelever's "ScaleEdgeTargets"
-    NormalizeTraces(const_cast<std::vector<mfem::DenseMatrix>&>(edge_traces_), agg_vdof, face_edof);
 
     if (build_coarse_components)
     {

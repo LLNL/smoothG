@@ -521,9 +521,7 @@ Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
     auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
     auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
     auto UPu = smoothg::Mult(U, vert_agg);
-//    auto UPu = smoothg::Mult(U, GetAggVert(level - 1));
     UPu.ScaleRows(trace_vec);
-
 
     return smoothg::Mult(GetQsigma(level - 1), UPu);
 }

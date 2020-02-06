@@ -109,15 +109,6 @@ public:
     mfem::SparseMatrix BuildEdgeProjection();
 private:
     /**
-       Modify the traces so that "1^T D PV_trace = 1", "1^T D other trace = 0"
-
-       Helper for BuildPEdges
-    */
-    void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces,
-                         const mfem::SparseMatrix& agg_vdof,
-                         const mfem::SparseMatrix& face_edof);
-
-    /**
        Figure out NNZ for each row of PEdges, which is to say, for each fine
        edge dof, figure out how many coarse dofs it gets interpolated from.
 

@@ -535,8 +535,6 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 //            assert(upwind2.MaxNorm() < 1e-12);
 //            std::cout<<"upwind diff = " << upwind2.MaxNorm()<<"\n";
 
-//            auto Dc = RAP(hierarchy_.GetPu(0), hierarchy_.GetMatrix(0).GetD(), hierarchy_.GetPsigma(0));
-//            if (level_&& yo ==1){hierarchy_.GetMatrix(1).GetD().Print();;yo++;}
         }
         else
         {

@@ -244,6 +244,10 @@ private:
     /// stacked on top of each other
     mfem::Vector ConstantLocal(mfem::Vector* shared_constant);
 
+    /// Modify traces so that "1^T D PV_trace = 1", "1^T D non-PV trace = 0"
+    /// this is Gelever's "ScaleEdgeTargets"
+    void NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces);
+
     MPI_Comm comm_;
 
     const double rel_tol_;

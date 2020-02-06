@@ -968,6 +968,8 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
     }
     delete [] shared_sigma;
 
+    NormalizeTraces(out);
+
     shared_sigma = new mfem::DenseMatrix*[nfaces];
     for (int iface = 0; iface < nfaces; ++iface)
         shared_sigma[iface] = &out[iface];
@@ -985,6 +987,46 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
     delete [] shared_constant;
 
     return out;
+}
+
+void LocalMixedGraphSpectralTargets::NormalizeTraces(std::vector<mfem::DenseMatrix>& edge_traces)
+{
+    const mfem::SparseMatrix& agg_vdof = dof_agg_.agg_vdof_;
+    const mfem::SparseMatrix& face_edof = dof_agg_.face_edof_;
+    const unsigned int num_faces = face_edof.Height();
+    const mfem::SparseMatrix& face_agg = coarse_graph_.EdgeToVertex();
+    const mfem::SparseMatrix& D = mgL_.GetD();
+
+    mfem::Vector trace, PV_trace, local_constant;
+    mfem::Array<int> local_vdofs, local_edofs;
+    for (unsigned int i = 0; i < num_faces; i++)
+    {
+        mfem::DenseMatrix& edge_traces_f(edge_traces[i]);
+        if (edge_traces_f.NumCols() == 0) { continue; }
+
+        GetTableRow(agg_vdof, face_agg.GetRowColumns(i)[0], local_vdofs);
+        GetTableRow(face_edof, i, local_edofs);
+        auto Dtransfer = ExtractRowAndColumns(D, local_vdofs, local_edofs, col_map_);
+        constant_rep_.GetSubVector(local_vdofs, local_constant);
+
+        edge_traces_f.GetColumnReference(0, PV_trace);
+        const double oneDpv = Dtransfer.InnerProduct(PV_trace, local_constant);
+
+        if (fabs(oneDpv) < 1e-10)
+        {
+            std::cerr << "Warning: oneDpv is closed to zero, oneDpv = "
+                      << oneDpv << ", this may be due to bad PV traces!\n";
+        }
+
+        PV_trace /= oneDpv;
+
+        for (int j = 1; j < edge_traces_f.NumCols(); j++)
+        {
+            edge_traces_f.GetColumnReference(j, trace);
+            const double alpha = Dtransfer.InnerProduct(trace, local_constant);
+            add(trace, -alpha, PV_trace, trace);
+        }
+    }
 }
 
 } // namespace smoothg
