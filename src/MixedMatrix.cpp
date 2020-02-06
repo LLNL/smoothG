@@ -35,22 +35,45 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
     : mbuilder_(new ElementMBuilder(graph.EdgeWeight(), graph.VertexToEdge())),
       M_(mbuilder_->BuildAssembledM()), D_(ConstructD(graph)), W_(W),
       graph_space_(std::move(graph)), constant_rep_(NumVDofs()),
-      vertex_sizes_(&constant_rep_[0], NumVDofs()), P_pwc_(SparseIdentity(NumVDofs()))
+      vertex_sizes_(constant_rep_.GetData(), NumVDofs()),
+      trace_fluxes_(NumEDofs()), P_pwc_(SparseIdentity(NumVDofs()))
 {
-    constant_rep_ = 1.0;
-
     Init();
+    constant_rep_ = 1.0;
+    trace_fluxes_ = 1.0;
 }
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
                          mfem::SparseMatrix D, mfem::SparseMatrix W,
-                         mfem::Vector constant_rep, mfem::Vector vertex_sizes,
+                         mfem::Vector vertex_sizes,
                          mfem::SparseMatrix P_pwc)
     : mbuilder_(std::move(mbuilder)), D_(std::move(D)), W_(std::move(W)),
-      graph_space_(std::move(graph_space)), constant_rep_(std::move(constant_rep)),
-      vertex_sizes_(std::move(vertex_sizes)), P_pwc_(std::move(P_pwc))
+      graph_space_(std::move(graph_space)), vertex_sizes_(std::move(vertex_sizes)),
+      trace_fluxes_(NumEDofs()), P_pwc_(std::move(P_pwc))
 {
     Init();
+    mfem::Vector ones(P_pwc_.NumRows());
+    constant_rep_ = PWConstInterpolate(ones = 1.0);
+
+    // TODO: trace_fluxes_ and below probably shouldn't belong to this class
+    auto P_pwcD = smoothg::Mult(P_pwc_, D_);
+    P_pwcD.ScaleRows(vertex_sizes);
+    auto P_pwcD_T = smoothg::Transpose(P_pwcD);
+
+    for (int i = 0; i < NumEDofs(); ++i)
+    {
+        double* entries = P_pwcD_T.GetRowEntries(i);
+        if (P_pwcD_T.RowSize(i) == 1 || entries[0] >= 0.0)
+        {
+            trace_fluxes_[i] = entries[0];
+        }
+        else
+        {
+            trace_fluxes_[i] = entries[1];
+        }
+    }
+
+
 }
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
@@ -64,6 +87,7 @@ MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
     mfem::Swap(block_true_offsets_, other.block_true_offsets_);
     constant_rep_.Swap(other.constant_rep_);
     vertex_sizes_.Swap(other.vertex_sizes_);
+    trace_fluxes_.Swap(other.trace_fluxes_);
     P_pwc_.Swap(other.P_pwc_);
     W_is_nonzero_ = other.W_is_nonzero_;
 }

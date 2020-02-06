@@ -72,7 +72,6 @@ public:
                 std::unique_ptr<MBuilder> mbuilder,
                 mfem::SparseMatrix D,
                 mfem::SparseMatrix W,
-                mfem::Vector constant_rep,
                 mfem::Vector vertex_sizes,
                 mfem::SparseMatrix P_pwc);
 
@@ -114,6 +113,7 @@ public:
     const GraphSpace& GetGraphSpace() const { return graph_space_; }
     const Graph& GetGraph() const { return graph_space_.GetGraph(); }
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
+    const mfem::Vector& GetTraceFluxes() const { return  trace_fluxes_; }
     const mfem::SparseMatrix& GetM() const { return M_; }
     const MBuilder& GetMBuilder() const { return *mbuilder_; }
     const mfem::SparseMatrix& GetD() const { return D_; }
@@ -161,6 +161,7 @@ private:
     mfem::Vector constant_rep_;
 
     mfem::Vector vertex_sizes_; // number of finest level vertices in "aggregate"
+    mfem::Vector trace_fluxes_; // net flux of trace in its associated "face"
 
     /**
        At a certain level, a vertex is an aggregate of "finest level" vertices.

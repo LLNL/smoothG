@@ -500,6 +500,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
+        if (first_evect[0] < 0.0) { first_evect *= -1.0; }
         Orthogonalize(evects_restricted, first_evect, 1, out[agg]);
 
         // Compute edge trace samples (before restriction and SVD)

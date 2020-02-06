@@ -148,8 +148,9 @@ public:
     int GetSolveIters(int level) const { return solvers_[level]->GetNumIterations(); }
     double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
     MPI_Comm GetComm() const { return GetMatrix(0).GetComm(); }
-    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
     const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
+    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
+    const mfem::SparseMatrix& GetQsigma(int level) const { return Proj_sigma_[level]; }
     int NumLevels() const { return mixed_systems_.size(); }
     ///@}
 
@@ -168,11 +169,17 @@ public:
     void DumpDebug(const std::string& prefix) const;
 
     const mfem::SparseMatrix& GetAggVert(int level) const { return agg_vert_[level]; }
+
     const std::vector<mfem::DenseMatrix>& GetTraces(int level) const
     {
         return edge_traces_[level];
     }
 
+    mfem::SparseMatrix ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg);
+    const mfem::SparseMatrix& GetUpwindFlux(int level) const
+    {
+        return upwind_fluxes_[level];
+    }
 private:
     void Coarsen(int level, const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning);
@@ -190,6 +197,7 @@ private:
     std::vector<mfem::SparseMatrix> Pu_;
     std::vector<mfem::SparseMatrix> Proj_sigma_;
     std::vector<std::vector<mfem::DenseMatrix>> edge_traces_;
+    std::vector<mfem::SparseMatrix> upwind_fluxes_;
 
     double setup_time_;
 

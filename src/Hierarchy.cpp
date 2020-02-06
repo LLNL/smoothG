@@ -41,6 +41,7 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     MPI_Comm_rank(comm_, &myid_);
 
+    upwind_fluxes_.reserve(param.max_levels - 1);
     edge_traces_.reserve(param.max_levels);
     const int num_edges = mixed_system.GetGraph().NumEdges();
     edge_traces_.emplace_back(num_edges, mfem::DenseMatrix(1));
@@ -77,23 +78,22 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
                          topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
 
-    agg_vert_.push_back(topology.Agg_vertex_);
-
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    auto vertex_targets = localtargets.ComputeVertexTargets();
-    edge_traces_.push_back(localtargets.ComputeEdgeTargets(vertex_targets));
+    auto vert_targets = localtargets.ComputeVertexTargets();
+    edge_traces_.push_back(localtargets.ComputeEdgeTargets(vert_targets));
 
-    GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces_.back(),
-                               vertex_targets, std::move(coarse_graph));
+    GraphCoarsen coarsener(mgL, dof_agg, edge_traces_.back(),
+                           vert_targets, std::move(coarse_graph));
+    Pu_.push_back(coarsener.BuildPVertices());
+    Psigma_.push_back(coarsener.BuildPEdges(param.coarse_components));
+    Proj_sigma_.push_back(coarsener.BuildEdgeProjection());
+    mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level]));
 
-    Pu_.push_back(graph_coarsen.BuildPVertices());
-    Psigma_.push_back(graph_coarsen.BuildPEdges(param.coarse_components));
-    Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
+    agg_vert_.push_back(std::move(topology.Agg_vertex_));
 
-    mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_[level]));
-
+    upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
 #ifdef SMOOTHG_DEBUG
     Debug_tests(level);
 #endif
@@ -461,16 +461,71 @@ void Hierarchy::Debug_tests(int level) const
     mfem::Vector D_pi_sigma_rand = Mult(D, pi_sigma_rand);
 
     // Compute pi_u * D * random vector
-    mfem::Vector D_rand = Mult(D, rand_vec);
-    mfem::Vector PuT_D_rand = Restrict(level, D_rand);
+    mfem::Vector PuT_D_rand = Restrict(level, Mult(D, rand_vec));
     mfem::Vector pi_u_D_rand = Mult(Pu_[level], PuT_D_rand);
     Check(pi_u_D_rand, D_pi_sigma_rand, "pi_u * D - D * pi_sigma");
 
-    rand_vec.SetSize(Proj_sigma_[level].NumRows());
+    rand_vec.SetSize(Proj_sigma_rand.Size());
     mfem::Vector Psigma_rand = Mult(Psigma_[level], rand_vec);
     mfem::Vector Proj_sigma_Psigma_rand = Mult(Proj_sigma_[level], Psigma_rand);
-
     Check(Proj_sigma_Psigma_rand, rand_vec, "Proj_sigma * Psigma - I");
+}
+
+mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
+                                      const mfem::Vector& flux)
+{
+    const Graph& graph = graph_space.GetGraph();
+    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+
+    mfem::SparseMatrix upwind_pattern(graph.NumEdges(), graph.NumVertices());
+
+    for (int i = 0; i < graph.NumEdges(); ++i)
+    {
+        if (edge_vert.RowSize(i) == 2) // edge is interior
+        {
+            const int upwind_vert = flux[i] > 0.0 ? 0 : 1;
+            upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[upwind_vert], 1.0);
+        }
+        else
+        {
+            assert(edge_vert.RowSize(i) == 1);
+            const bool edge_is_owned = e_te_diag.RowSize(i);
+
+            if ((flux[i] > 0.0 && edge_is_owned) || (flux[i] <= 0.0 && !edge_is_owned))
+            {
+                upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[0], 1.0);
+            }
+        }
+    }
+    upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
+
+    return upwind_pattern;
+}
+
+mfem::SparseMatrix
+Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
+{
+    auto& traces = GetTraces(level);
+//    assert(GetQsigma(level - 1).NumRows() == traces.size());
+
+    mfem::Array<int> edofs;
+    mfem::Vector trace_vec(dof_agg.agg_edof_.NumCols());
+    trace_vec = 0.0;
+    for (unsigned int i = 0; i < traces.size(); ++i)
+    {
+        GetTableRow(dof_agg.face_edof_, i, edofs);
+        trace_vec.SetSubVector(edofs, traces[i].GetData());
+    }
+
+    auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
+    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
+    auto UPu = smoothg::Mult(U, vert_agg);
+//    auto UPu = smoothg::Mult(U, GetAggVert(level - 1));
+    UPu.ScaleRows(trace_vec);
+
+
+    return smoothg::Mult(GetQsigma(level - 1), UPu);
 }
 
 } // namespace smoothg

@@ -928,6 +928,15 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
     h(1) = 10.0 * ft_; // 670.56 / 220. in meters
     h(2) = 2.0 * ft_; // 51.816 / 85. in meters
 
+//    N_ = 15;
+//    N_[1] = 55;
+//    N_[2] = 20;
+
+
+//    h(0) = 1200.0 / N_[0];
+//    h(1) = 2200.0 / N_[1];
+//    h(2) = 40.0 / N_[2];
+
     const double Lx = N_[0] * h(0);
     const double Ly = N_[1] * h(1);
     const double Lz = N_[2] * h(2);
@@ -949,10 +958,14 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
     if (dim == 2)
     {
         mfem::Mesh mesh(N_[0], N_[1], mfem::Element::QUADRILATERAL, true, Lx, Ly);
+
+//        mfem::Mesh mesh(N_[0], N_[1], mfem::Element::QUADRILATERAL, true, 1.0, 1.0);
+//        mfem::Mesh mesh("well_amr.mesh", 1, 1);
         mesh_ = MakeParMesh(mesh, use_metis);
         return;
     }
     mfem::Mesh mesh(N_[0], N_[1], N_[2], mfem::Element::HEXAHEDRON, true, Lx, Ly, Lz);
+//    mfem::Mesh mesh("well_amr_spe10.mesh", 1, 1);
     mesh_ = MakeParMesh(mesh, use_metis);
 }
 

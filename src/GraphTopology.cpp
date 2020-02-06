@@ -248,6 +248,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
     auto e_te_f = ParMult(edge_trueedge_edge, edge_face, face_starts);
     auto face_trueface_face = ParMult(tmp_face_edge, *e_te_f, face_starts);
     auto tmp_face_trueface = BuildEntityToTrueEntity(*face_trueface_face);
+    *tmp_face_trueface = 1.0;
 
     // Reorder shared faces so that their "true face" numbering is increasing
     auto face_reorder_map = EntityReorderMap(*tmp_face_trueface, *face_trueface_face);

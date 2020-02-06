@@ -66,14 +66,18 @@ class TwoPhaseSolver
 
     mfem::Array<int> blk_offsets_;
     unique_ptr<mfem::BlockVector> source_;
-    unique_ptr<mfem::HypreParMatrix> D_te_e;
+    unique_ptr<mfem::HypreParMatrix> D_te_e_;
     int nonlinear_iter_;
     bool step_converged_;
+
+    std::vector<mfem::Vector> micro_upwind_flux_;
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
     const double porosity_ = 0.3;
     const double weight_;
+
+    std::vector<mfem::Vector> ComputeMicroUpwindFlux();
 public:
     TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
                    const int level, const EvolveParamenters& evolve_param,
@@ -209,7 +213,7 @@ int main(int argc, char* argv[])
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
     solver_param.num_backtrack = num_backtrack;
     solver_param.diff_tol = diff_tol;
-    solver_param.print_level = 0;
+    solver_param.print_level = -1;
     solver_param.max_num_iter = 25;
     solver_param.atol = 1e-10;
     solver_param.rtol = 0.0;
@@ -243,7 +247,7 @@ int main(int argc, char* argv[])
 
         mfem::StopWatch chrono;
         chrono.Start();
-        mfem::BlockVector S = solver.Solve(initial_value);
+        mfem::BlockVector sol = solver.Solve(initial_value);
 
         if (myid == 0)
         {
@@ -251,31 +255,70 @@ int main(int argc, char* argv[])
                       << chrono.RealTime() << "s.\n";
         }
 
-        double norm = mfem::ParNormlp(S.GetBlock(2), 2, comm);
-        if (myid == 0) { std::cout << "    || S || = " << norm << "\n"; }
+        mfem::Vector fine_S = l ? hierarchy.Interpolate(1, sol.GetBlock(2)) : sol.GetBlock(2);
+
+        double norm = mfem::ParNormlp(fine_S, 1, comm);
+        if (myid == 0) { std::cout << "    || S ||_1 = " << norm << "\n"; }
     }
     return EXIT_SUCCESS;
 }
 
-mfem::Vector ComputeFaceFlux(const GraphSpace& graph_space,
-                             const std::vector<mfem::DenseMatrix>& edge_traces_,
+mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
+                                      const mfem::SparseMatrix& micro_upwind_fluxes,
+                                      const mfem::Vector& flux)
+{
+    const Graph& graph = graph_space.GetGraph();
+    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+
+    mfem::SparseMatrix upwind_pattern(graph.NumEdges(), graph.NumVertices());
+
+    for (int i = 0; i < graph.NumEdges(); ++i)
+    {
+        const double weight = micro_upwind_fluxes.GetRowEntries(i)[0];
+        if (edge_vert.RowSize(i) == 2) // edge is interior
+        {
+//            const int upwind_vert = flux[i] > 0.0 ? 0 : 1;
+//            upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[upwind_vert], weight);
+
+            int upwind_vert = micro_upwind_fluxes.GetRowColumns(i)[0];
+            if (flux[i] < 0.0)
+            {
+                if (edge_vert.GetRowColumns(i)[0] == upwind_vert)
+                    upwind_vert = edge_vert.GetRowColumns(i)[1];
+                else
+                    upwind_vert = edge_vert.GetRowColumns(i)[0];
+            }
+
+            upwind_pattern.Set(i, upwind_vert, weight);
+
+            assert(micro_upwind_fluxes.RowSize(i) == 1);
+//            if (micro_upwind_fluxes.RowSize(i) == 1) { continue; }
+
+//            const int downwind_vert = flux[i] > 0.0 ? 0 : 1;
+//            upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[downwind_vert], 1.0);
+        }
+        else
+        {
+            assert(edge_vert.RowSize(i) == 1);
+            const bool edge_is_owned = e_te_diag.RowSize(i);
+
+            if ((flux[i] > 0.0 && edge_is_owned) || (flux[i] <= 0.0 && !edge_is_owned))
+            {
+                upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[0], weight);
+            }
+        }
+    }
+    upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
+
+    return upwind_pattern;
+}
+
+mfem::Vector ComputeFaceFlux(const MixedMatrix& darcy_system,
                              const mfem::Vector& flux)
 {
-    const mfem::SparseMatrix& edge_edof = graph_space.EdgeToEDof();
-    mfem::Array<int> local_edofs;
-    mfem::Vector local_flux;
-    mfem::Vector out(edge_edof.NumRows());
-
-    for (int i = 0; i < edge_edof.NumRows(); ++i)
-    {
-        GetTableRow(edge_edof, i, local_edofs);
-        flux.GetSubVector(local_edofs, local_flux);
-
-        mfem::Vector local_finer_flux(edge_traces_[i].NumRows());
-        edge_traces_[i].Mult(local_flux, local_finer_flux);
-        out[i] = local_finer_flux.Sum();
-    }
-
+    mfem::Vector out(darcy_system.GetTraceFluxes());
+    RescaleVector(flux, out);
     return out;
 }
 
@@ -340,7 +383,7 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
 
     auto& e_te_e = hierarchy.GetMatrix(level).GetGraph().EdgeToTrueEdgeToEdge();
     auto& starts = hierarchy.GetMatrix(level).GetGraph().VertexStarts();
-    D_te_e = ParMult(hierarchy.GetMatrix(level).GetD(), e_te_e, starts);
+    D_te_e_ = ParMult(hierarchy.GetMatrix(level).GetD(), e_te_e, starts);
 }
 
 mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
@@ -428,11 +471,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
     return x;
 }
-
+int yo = 1;
 void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 {
     const MixedMatrix& system = hierarchy_.GetMatrix(level_);
-    const std::vector<mfem::DenseMatrix>& traces = hierarchy_.GetTraces(level_);
+    std::vector<mfem::DenseMatrix> traces;
 
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
@@ -454,20 +497,68 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         mfem::BlockVector flow_sol(x, hierarchy_.BlockOffsets(level_));
         hierarchy_.Solve(level_, flow_rhs, flow_sol);
 
-        auto flux = ComputeFaceFlux(system.GetGraphSpace(), traces, x.GetBlock(0));
-        auto upwind = BuildUpwindPattern(system.GetGraphSpace(), flux);
-        upwind.ScaleRows(flux);
+        auto upwind = !level_ ? BuildUpwindPattern(system.GetGraphSpace(), x.GetBlock(0))
+                              : BuildUpwindPattern(system.GetGraphSpace(),
+                                                   hierarchy_.GetUpwindFlux(level_ - 1),
+                                                   x.GetBlock(0));
+        upwind.ScaleRows(x.GetBlock(0));
+//        if (level_&& yo == 1){upwind.Print();yo++;}
+
+        unique_ptr<mfem::HypreParMatrix> Adv;
+        if (level_<0)
+        {
+            auto& system0 = hierarchy_.GetMatrix(0);
+            auto& e_te_e = system0.GetGraph().EdgeToTrueEdgeToEdge();
+            auto& starts = system0.GetGraph().VertexStarts();
+            auto D_te_e = ParMult(system0.GetD(), e_te_e, starts);
+
+            auto flux0 = Mult(hierarchy_.GetPsigma(0), x.GetBlock(0));
+            auto upwind0 = BuildUpwindPattern(system0.GetGraphSpace(), flux0);
+            upwind0.ScaleRows(flux0);
+
+            auto Adv0 = ParMult(*D_te_e, upwind0, starts);
+
+            auto vert_agg = smoothg::Transpose(hierarchy_.GetAggVert(0));
+            auto tmp = ParMult(*Adv0, vert_agg, system.GetGraph().VertexStarts());
+
+//            auto tmp = ParMult(*Adv0, hierarchy_.GetPu(0), system.GetGraph().VertexStarts());
+
+            auto PuT = smoothg::Transpose(hierarchy_.GetPu(0));
+            Adv = ParMult(PuT, *tmp, system.GetGraph().VertexStarts());
+
+
+
+//            auto upwind2 = smoothg::Mult(QU, vert_agg);
+//            if (level_&& yo == 1){upwind2.Print();yo++;}
+
+//            upwind2.Add(-1.0, upwind);
+//            assert(upwind2.MaxNorm() < 1e-12);
+//            std::cout<<"upwind diff = " << upwind2.MaxNorm()<<"\n";
+
+//            auto Dc = RAP(hierarchy_.GetPu(0), hierarchy_.GetMatrix(0).GetD(), hierarchy_.GetPsigma(0));
+//            if (level_&& yo ==1){hierarchy_.GetMatrix(1).GetD().Print();;yo++;}
+        }
+        else
+        {
+            Adv = ParMult(*D_te_e_, upwind, system.GetGraph().VertexStarts());
+        }
+//        if (level_&& yo ==1){GetDiag(*Adv).Print();yo++;}
 
         if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
         {
             mfem::Vector dSdt(source_->GetBlock(2));
-            D_te_e->Mult(-1.0, Mult(upwind, FractionalFlow(S)), 1.0, dSdt);
+
+            auto FS = FractionalFlow(S);
+            Adv->Mult(-1.0, system.PWConstInterpolate(FS), 1.0, dSdt);
+
+
+//            D_te_e_->Mult(-1.0, Mult(upwind, FractionalFlow(S)), 1.0, dSdt);
             x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
             step_converged_ = true;
         }
         else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
         {
-            auto Adv = ParMult(*D_te_e, upwind, system.GetGraph().VertexStarts());
+
             TransportSolver solver(*Adv, system, weight_ / density_ / dt, solver_param_);
 
             mfem::Vector rhs(source_->GetBlock(2));
@@ -492,33 +583,29 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
       vert_starts_(darcy_system.GetGraph().VertexStarts()),
       traces_(edge_traces), dt_(dt), weight_(weight), density_(density)
 {
-    blk_offsets_[0] = 0;
-    blk_offsets_[1] = darcy_system.NumEDofs();
-    blk_offsets_[2] = blk_offsets_[1] + darcy_system.NumVDofs();
-    blk_offsets_[3] = blk_offsets_[2] + darcy_system.GetGraph().NumVertices();
-
-    true_blk_offsets_[0] = 0;
-    true_blk_offsets_[1] = darcy_system.GetGraphSpace().EDofToTrueEDof().NumCols();
-    true_blk_offsets_[2] = true_blk_offsets_[1] + darcy_system.NumVDofs();
-    true_blk_offsets_[3] = true_blk_offsets_[2] + darcy_system.GetGraph().NumVertices();
-
-    gmres_.SetMaxIter(1000);
-    gmres_.SetRelTol(1e-8);
-    gmres_.SetPrintLevel(-1);
-    gmres_.SetKDim(100);
-
     mfem::SparseMatrix D_proc(darcy_system_.GetD());
-    if (darcy_system_.GetEssDofs().Size())
-    {
-        D_proc.EliminateCols(darcy_system_.GetEssDofs());
-    }
-
+    if (ess_dofs_.Size()) { D_proc.EliminateCols(ess_dofs_); }
     D_.reset(darcy_system_.MakeParallelD(D_proc));
     DT_.reset(D_->Transpose());
     *D_ *= (dt_ * density_);
     *DT_ *= (1. / dt_ / density_);
 
     GenerateOffsets(comm_, D_->NumCols(), true_edof_starts_);
+
+    blk_offsets_[0] = 0;
+    blk_offsets_[1] = darcy_system.NumEDofs();
+    blk_offsets_[2] = blk_offsets_[1] + darcy_system.NumVDofs();
+    blk_offsets_[3] = blk_offsets_[2] + Ms_.NumCols();
+
+    true_blk_offsets_[0] = 0;
+    true_blk_offsets_[1] = D_->NumCols();
+    true_blk_offsets_[2] = true_blk_offsets_[1] + darcy_system.NumVDofs();
+    true_blk_offsets_[3] = true_blk_offsets_[2] + Ms_.NumCols();
+
+    gmres_.SetMaxIter(1000);
+    gmres_.SetRelTol(1e-8);
+    gmres_.SetPrintLevel(-1);
+    gmres_.SetKDim(100);
 }
 
 mfem::Vector CoupledSolver::AssembleTrueVector(const mfem::Vector& vec) const
@@ -552,7 +639,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     out.GetBlock(2) = blk_x.GetBlock(2);
 
     const GraphSpace& space = darcy_system_.GetGraphSpace();
-    auto face_flux = ComputeFaceFlux(space, traces_, blk_x.GetBlock(0));
+    auto face_flux = ComputeFaceFlux(darcy_system_, blk_x.GetBlock(0));
     auto upwind = BuildUpwindPattern(space, face_flux);
     auto upw_FS = Mult(upwind, FractionalFlow(S));
     RescaleVector(blk_x.GetBlock(0), upw_FS);
@@ -627,7 +714,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     *M *= (1. / dt_ / density_);
     *dMdS *= (1. / dt_ / density_);
 
-    auto face_flux = ComputeFaceFlux(space, traces_, blk_x.GetBlock(0));
+    auto face_flux = ComputeFaceFlux(darcy_system_, blk_x.GetBlock(0));
     auto upwind = BuildUpwindPattern(space, face_flux);
 
     auto U_FS = Mult(space.TrueEDofToEDof(), Mult(upwind, FractionalFlow(S)));
@@ -726,7 +813,8 @@ std::vector<mfem::DenseMatrix> CoupledSolver::Build_dMdS(const mfem::BlockVector
 mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
 {
     mfem::Vector out(x);
-    Adv_.Mult(1.0, FractionalFlow(darcy_system_.PWConstProject(x)), Ms_(0, 0), out);
+    auto FS = FractionalFlow(darcy_system_.PWConstProject(x));
+    Adv_.Mult(1.0, darcy_system_.PWConstInterpolate(FS), Ms_(0, 0), out);
     out -= y;
     return out;
 }
@@ -734,7 +822,12 @@ mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector
 void TransportSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::SparseMatrix df_ds = darcy_system_.GetPWConstProj();
+
+//    auto tmp = dFdS(darcy_system_.PWConstProject(x));
+//    df_ds.ScaleRows(darcy_system_.PWConstInterpolate(tmp));
+
     df_ds.ScaleRows(dFdS(darcy_system_.PWConstProject(x)));
+
     auto A = ParMult(Adv_, df_ds, starts_);
     GetDiag(*A) += Ms_;
 
