@@ -40,7 +40,7 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
 {
     Init();
     constant_rep_ = 1.0;
-    trace_fluxes_ = 1.0;
+//    trace_fluxes_ = 1.0;
 }
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
@@ -56,22 +56,22 @@ MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuil
     constant_rep_ = PWConstInterpolate(ones = 1.0);
 
     // TODO: trace_fluxes_ and below probably shouldn't belong to this class
-    auto P_pwcD = smoothg::Mult(P_pwc_, D_);
-    P_pwcD.ScaleRows(vertex_sizes);
-    auto P_pwcD_T = smoothg::Transpose(P_pwcD);
+//    auto P_pwcD = smoothg::Mult(P_pwc_, D_);
+//    P_pwcD.ScaleRows(vertex_sizes);
+//    auto P_pwcD_T = smoothg::Transpose(P_pwcD);
 
-    for (int i = 0; i < NumEDofs(); ++i)
-    {
-        double* entries = P_pwcD_T.GetRowEntries(i);
-        if (P_pwcD_T.RowSize(i) == 1 || entries[0] >= 0.0)
-        {
-            trace_fluxes_[i] = entries[0];
-        }
-        else
-        {
-            trace_fluxes_[i] = entries[1];
-        }
-    }
+//    for (int i = 0; i < NumEDofs(); ++i)
+//    {
+//        double* entries = P_pwcD_T.GetRowEntries(i);
+//        if (P_pwcD_T.RowSize(i) == 1 || entries[0] >= 0.0)
+//        {
+//            trace_fluxes_[i] = entries[0];
+//        }
+//        else
+//        {
+//            trace_fluxes_[i] = entries[1];
+//        }
+//    }
 
 
 }

@@ -531,11 +531,11 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
 {
     rhs_ = Rhs;
 
-    if (is_symmetric_)
-    {
-        trueMu_ = MakeInitialGuess(Sol, Rhs);
-    }
-    else
+//    if (is_symmetric_)
+//    {
+//        trueMu_ = MakeInitialGuess(Sol, Rhs);
+//    }
+//    else
     {
         trueMu_ = 0.0;
     }

@@ -93,7 +93,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     agg_vert_.push_back(std::move(topology.Agg_vertex_));
 
-    upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
+//    upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
 #ifdef SMOOTHG_DEBUG
     Debug_tests(level);
 #endif
@@ -471,59 +471,59 @@ void Hierarchy::Debug_tests(int level) const
     Check(Proj_sigma_Psigma_rand, rand_vec, "Proj_sigma * Psigma - I");
 }
 
-mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
-                                      const mfem::Vector& flux)
-{
-    const Graph& graph = graph_space.GetGraph();
-    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
-    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+//mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
+//                                      const mfem::Vector& flux)
+//{
+//    const Graph& graph = graph_space.GetGraph();
+//    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+//    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
 
-    mfem::SparseMatrix upwind_pattern(graph.NumEdges(), graph.NumVertices());
+//    mfem::SparseMatrix upwind_pattern(graph.NumEdges(), graph.NumVertices());
 
-    for (int i = 0; i < graph.NumEdges(); ++i)
-    {
-        if (edge_vert.RowSize(i) == 2) // edge is interior
-        {
-            const int upwind_vert = flux[i] > 0.0 ? 0 : 1;
-            upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[upwind_vert], 1.0);
-        }
-        else
-        {
-            assert(edge_vert.RowSize(i) == 1);
-            const bool edge_is_owned = e_te_diag.RowSize(i);
+//    for (int i = 0; i < graph.NumEdges(); ++i)
+//    {
+//        if (edge_vert.RowSize(i) == 2) // edge is interior
+//        {
+//            const int upwind_vert = flux[i] > 0.0 ? 0 : 1;
+//            upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[upwind_vert], 1.0);
+//        }
+//        else
+//        {
+//            assert(edge_vert.RowSize(i) == 1);
+//            const bool edge_is_owned = e_te_diag.RowSize(i);
 
-            if ((flux[i] > 0.0 && edge_is_owned) || (flux[i] <= 0.0 && !edge_is_owned))
-            {
-                upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[0], 1.0);
-            }
-        }
-    }
-    upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
+//            if ((flux[i] > 0.0 && edge_is_owned) || (flux[i] <= 0.0 && !edge_is_owned))
+//            {
+//                upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[0], 1.0);
+//            }
+//        }
+//    }
+//    upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
 
-    return upwind_pattern;
-}
+//    return upwind_pattern;
+//}
 
-mfem::SparseMatrix
-Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
-{
-    auto& traces = GetTraces(level);
-//    assert(GetQsigma(level - 1).NumRows() == traces.size());
+//mfem::SparseMatrix
+//Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
+//{
+//    auto& traces = GetTraces(level);
+////    assert(GetQsigma(level - 1).NumRows() == traces.size());
 
-    mfem::Array<int> edofs;
-    mfem::Vector trace_vec(dof_agg.agg_edof_.NumCols());
-    trace_vec = 0.0;
-    for (unsigned int i = 0; i < traces.size(); ++i)
-    {
-        GetTableRow(dof_agg.face_edof_, i, edofs);
-        trace_vec.SetSubVector(edofs, traces[i].GetData());
-    }
+//    mfem::Array<int> edofs;
+//    mfem::Vector trace_vec(dof_agg.agg_edof_.NumCols());
+//    trace_vec = 0.0;
+//    for (unsigned int i = 0; i < traces.size(); ++i)
+//    {
+//        GetTableRow(dof_agg.face_edof_, i, edofs);
+//        trace_vec.SetSubVector(edofs, traces[i].GetData());
+//    }
 
-    auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
-    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
-    auto UPu = smoothg::Mult(U, vert_agg);
-    UPu.ScaleRows(trace_vec);
+//    auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
+//    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
+//    auto UPu = smoothg::Mult(U, vert_agg);
+//    UPu.ScaleRows(trace_vec);
 
-    return smoothg::Mult(GetQsigma(level - 1), UPu);
-}
+//    return smoothg::Mult(GetQsigma(level - 1), UPu);
+//}
 
 } // namespace smoothg
