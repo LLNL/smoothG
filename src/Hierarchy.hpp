@@ -175,6 +175,7 @@ public:
         return edge_traces_[level];
     }
 
+    // TODO: not needed after all?
     mfem::SparseMatrix ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg);
     const mfem::SparseMatrix& GetUpwindFlux(int level) const
     {
