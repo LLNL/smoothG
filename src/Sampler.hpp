@@ -99,7 +99,7 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+    PDESampler(int dimension, double kappa, int seed,
                Hierarchy&& hierarchy);
 
     /**
@@ -123,6 +123,13 @@ public:
     */
     PDESampler(int dimension, double cell_volume, double kappa, int seed,
                const Graph& graph,
+               const UpscaleParameters& param = UpscaleParameters(),
+               const mfem::Array<int>* partitioning = nullptr,
+               const mfem::Array<int>* ess_attr = nullptr);
+
+    /// Same as the previous constructor, except cell_volume is is not uniform
+    PDESampler(int dimension, mfem::Vector cell_volume,
+               double kappa, int seed, const Graph& graph,
                const UpscaleParameters& param = UpscaleParameters(),
                const mfem::Array<int>* partitioning = nullptr,
                const mfem::Array<int>* ess_attr = nullptr);
@@ -171,7 +178,7 @@ private:
     Hierarchy hierarchy_;
     NormalDistribution normal_distribution_;
     std::vector<int> num_aggs_;
-    double cell_volume_;
+    double kappa_;
     double scalar_g_;
     bool sampled_;
 
@@ -179,7 +186,7 @@ private:
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> coefficient_;
 
-    void Initialize(int dimension, double cell_volume, double kappa, int seed);
+    void Initialize(int dimension, double kappa, int seed);
 };
 
 }

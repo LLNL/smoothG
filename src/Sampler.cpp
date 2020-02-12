@@ -58,11 +58,11 @@ mfem::Vector& SimpleSampler::GetCoefficient(int level)
     return helper_[level];
 }
 
-PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
+PDESampler::PDESampler(int dimension, double kappa, int seed,
                        Hierarchy&& hierarchy)
     : hierarchy_(std::move(hierarchy))
 {
-    Initialize(dimension, cell_volume, kappa, seed);
+    Initialize(dimension, kappa, seed);
 }
 
 PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
@@ -70,18 +70,27 @@ PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed
                        const UpscaleParameters& param,
                        const mfem::Array<int>* partitioning,
                        const mfem::Array<int>* ess_attr)
-{
-    auto W = SparseIdentity(graph.NumVertices()) *= cell_volume * kappa * kappa;
-    hierarchy_ = Hierarchy(graph, param, partitioning, ess_attr, W);
+    : PDESampler(dimension, mfem::Vector(graph.NumVertices()) = cell_volume,
+                 kappa, seed, graph, param, partitioning, ess_attr)
+{}
 
-    Initialize(dimension, cell_volume, kappa, seed);
+PDESampler::PDESampler(int dimension, mfem::Vector cell_volume,
+                       double kappa, int seed, const Graph& graph,
+                       const UpscaleParameters& param,
+                       const mfem::Array<int>* partitioning,
+                       const mfem::Array<int>* ess_attr)
+{
+    MFEM_ASSERT(cell_volume.Size() == graph.NumVertices(), "cell_volume: wrong size!");
+    auto W = SparseDiag(std::move(cell_volume)) *= (kappa * kappa);
+    hierarchy_ = Hierarchy(graph, param, partitioning, ess_attr, W);
+    Initialize(dimension, kappa, seed);
 }
 
-void PDESampler::Initialize(int dimension, double cell_volume, double kappa, int seed)
+void PDESampler::Initialize(int dimension, double kappa, int seed)
 {
     normal_distribution_ = NormalDistribution(0.0, 1.0, seed);
     num_aggs_.resize(hierarchy_.NumLevels());
-    cell_volume_ = cell_volume;
+    kappa_ = kappa;
     sampled_ = false;
     rhs_.resize(hierarchy_.NumLevels());
     coefficient_.resize(hierarchy_.NumLevels());
@@ -128,9 +137,11 @@ void PDESampler::SetSample(const mfem::Vector& state)
 
     // build right-hand side for PDE-sampler based on white noise in state
     // (cell_volume is supposed to represent fine-grid W_h)
+    const mfem::SparseMatrix& W = hierarchy_.GetMatrix(0).GetW();
+    mfem::Vector kappa_sq_cell_volume(W.GetData(), W.NumRows());
     for (int i = 0; i < num_aggs_[0]; ++i)
     {
-        rhs_[0](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
+        rhs_[0](i) = scalar_g_ * std::sqrt(kappa_sq_cell_volume[i]) / kappa_ * state(i);
     }
 
     for (int level = 0; level < hierarchy_.NumLevels() - 1; ++level)
@@ -145,9 +156,12 @@ void PDESampler::SetSampleAtLevel(int level, const mfem::Vector& state)
                 "State vector is the wrong size for this level!");
     sampled_ = true;
 
+    const mfem::SparseMatrix& W = hierarchy_.GetMatrix(level).GetW();
+    mfem::Vector kappa_sq_cell_volume(W.GetData(), W.NumRows());
+    MFEM_ASSERT(W.NumRows() == num_aggs_[level], "Assumes one dof per agg!");
     for (int i = 0; i < num_aggs_[level]; ++i)
     {
-        rhs_[level](i) = scalar_g_ * std::sqrt(cell_volume_) * state(i);
+        rhs_[level](i) = scalar_g_ * std::sqrt(kappa_sq_cell_volume[i]) / kappa_ * state(i);
     }
 }
 

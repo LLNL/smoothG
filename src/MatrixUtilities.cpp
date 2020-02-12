@@ -345,14 +345,7 @@ mfem::SparseMatrix PartitionToMatrix(
 
 mfem::SparseMatrix SparseIdentity(int size)
 {
-    int* I = new int[size + 1];
-    std::iota(I, I + size + 1, 0);
-    int* J = new int[size];
-    std::iota(J, J + size, 0);
-    double* Data = new double[size];
-    std::fill_n(Data, size, 1.0);
-
-    return mfem::SparseMatrix(I, J, Data, size, size);
+    return SparseDiag(mfem::Vector(size) = 1.0);
 }
 
 mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset, int col_offset)
@@ -377,6 +370,17 @@ mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset, int col_of
     std::fill_n(Data, diag_size, 1.0);
 
     return mfem::SparseMatrix(I, J, Data, rows, cols);
+}
+
+mfem::SparseMatrix SparseDiag(mfem::Vector diag)
+{
+    const int size = diag.Size();
+    int* I = new int[size + 1];
+    std::iota(I, I + size + 1, 0);
+    int* J = new int[size];
+    std::iota(J, J + size, 0);
+
+    return mfem::SparseMatrix(I, J, diag.StealData(), size, size);
 }
 
 void Add(const double a, mfem::SparseMatrix& mat, const double b,
