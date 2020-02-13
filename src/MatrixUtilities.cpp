@@ -352,9 +352,7 @@ mfem::SparseMatrix PartitionToMatrix(
 
 mfem::SparseMatrix SparseIdentity(int size)
 {
-    mfem::Vector ones(size);
-    ones = 1.0;
-    return SparseDiag(ones);
+    return SparseDiag(mfem::Vector(size) = 1.0);
 }
 
 mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset, int col_offset)
