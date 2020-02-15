@@ -35,6 +35,19 @@
 
 using namespace smoothg;
 
+class BlockTriangularSolver : public mfem::Solver
+{
+    mfem::BlockOperator& op_;
+    const std::vector<mfem::Operator*>& prec_;
+    void Mult(int i, int j, const mfem::Vector& x, mfem::Vector& y) const;
+public:
+    BlockTriangularSolver(mfem::BlockOperator& op, const std::vector<mfem::Operator*>& prec)
+        : mfem::Solver(op.NumRows()), op_(op), prec_(prec) { }
+    void Mult(const mfem::Vector& x, mfem::Vector& y) const { Mult(0, 1, x, y); }
+    void MultTranspose(const mfem::Vector& x, mfem::Vector& y) const { Mult(1, 0, x, y); }
+    void SetOperator(const Operator &op) { }
+};
+
 enum SteppingScheme { IMPES = 1, SequentiallyImplicit, FullyImplcit };
 
 struct EvolveParamenters
@@ -709,11 +722,16 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D_.get(), DT_.get()));
     DT_->ScaleRows(Md);
 
-    mfem::BlockDiagonalPreconditioner prec(true_blk_offsets_);
-    prec.SetDiagonalBlock(0, new mfem::HypreDiagScale(*M));
-    prec.SetDiagonalBlock(1, BoomerAMG(*schur));
-    prec.SetDiagonalBlock(2, new mfem::HypreDiagScale(*dTdS));
-    prec.owns_blocks = true;
+    auto M_inv = make_unique<mfem::HypreDiagScale>(*M);
+    unique_ptr<mfem::HypreBoomerAMG> schur_inv(BoomerAMG(*schur));
+    auto dTdS_inv = make_unique<mfem::HypreDiagScale>(*dTdS);
+
+    mfem::BlockLowerTriangularPreconditioner prec(true_blk_offsets_);
+    prec.SetDiagonalBlock(0, M_inv.get());
+    prec.SetDiagonalBlock(1, schur_inv.get());
+    prec.SetDiagonalBlock(2, dTdS_inv.get());
+    prec.SetBlock(1, 0, D_.get());
+    prec.SetBlock(2, 0, dTdsigma.get());
 
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
@@ -1064,3 +1082,16 @@ mfem::Vector dFdS(const mfem::Vector& S)
 //    }
 //    return out;
 //}
+
+void BlockTriangularSolver::Mult(int i, int j, const mfem::Vector& x, mfem::Vector& y) const
+{
+    mfem::BlockVector blk_x(x.GetData(), op_.ColOffsets());
+    mfem::BlockVector blk_y(y.GetData(), op_.RowOffsets());
+
+    prec_[i]->Mult(blk_x.GetBlock(i), blk_y.GetBlock(i));
+
+    mfem::Vector tmp = smoothg::Mult(op_.GetBlock(j, i), blk_y.GetBlock(i));
+    tmp -= blk_x.GetBlock(i);
+    tmp *= -1.0;;
+    prec_[j]->Mult(tmp, blk_y.GetBlock(j));
+}
