@@ -262,8 +262,7 @@ int main(int argc, char* argv[])
 
     // Fine scale transport based on fine flux
     std::vector<mfem::Vector> Ss(upscale_param.max_levels);
-//    for (int l = 0; l < upscale_param.max_levels; ++l)
-    int l = 0;
+    for (int l = 0; l < upscale_param.max_levels; ++l)
     {
         TwoPhaseSolver solver(problem, hierarchy, l, evolve_param, solver_param);
 
@@ -685,12 +684,14 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     auto upwind = BuildUpwindPattern(space, blk_x.GetBlock(0));
 
     auto U_FS = Mult(space.TrueEDofToEDof(), Mult(upwind, FractionalFlow(S)));
-    auto dTdsigma = ParMult(*D_, SparseDiag(U_FS), true_edof_starts_);
+    auto dTdsigma = ParMult(*D_, SparseDiag(std::move(U_FS)), true_edof_starts_);
 
     upwind.ScaleRows(blk_x.GetBlock(0));
     upwind.ScaleColumns(dFdS(S));
+
     auto U = ParMult(space.TrueEDofToEDof(), upwind, vert_starts_);
-    unique_ptr<mfem::HypreParMatrix> dTdS(mfem::ParMult(D_.get(), U.get()));
+    auto U_pwc = ParMult(*U, darcy_system_.GetPWConstProj(), vert_starts_);
+    unique_ptr<mfem::HypreParMatrix> dTdS(mfem::ParMult(D_.get(), U_pwc.get()));
     GetDiag(*dTdS) += Ms_;
 
     mfem::BlockOperator op(true_blk_offsets_);
@@ -848,7 +849,7 @@ mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector
 {
     mfem::Vector out(x);
     auto FS = FractionalFlow(darcy_system_.PWConstProject(x));
-    Adv_.Mult(1.0, darcy_system_.PWConstInterpolate(FS), Ms_(0, 0), out);
+    Adv_.Mult(1.0, FS, Ms_(0, 0), out);
     out -= y;
     return out;
 }
