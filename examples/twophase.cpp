@@ -102,9 +102,10 @@ class CoupledSolver : public NonlinearSolver
 {
     const MixedMatrix& darcy_system_;
     mfem::GMRESSolver gmres_;
-    mfem::SparseMatrix Ms_;
     unique_ptr<mfem::HypreParMatrix> D_;
     unique_ptr<mfem::HypreParMatrix> DT_;
+    std::vector<mfem::DenseMatrix> local_dMdS_;
+    mfem::SparseMatrix Ms_;
 
     mfem::Array<int> blk_offsets_;
     mfem::Array<int> true_blk_offsets_;
@@ -120,8 +121,8 @@ class CoupledSolver : public NonlinearSolver
     mfem::Vector normalizer_;
 
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
-    std::vector<mfem::DenseMatrix> Build_dMdS(const mfem::BlockVector& x);
-    mfem::SparseMatrix Assemble_dMdS(const mfem::BlockVector& blk_x);
+    void Build_dMdS(const mfem::Vector& flux, const mfem::Vector& S);
+    mfem::SparseMatrix Assemble_dMdS(const mfem::Vector& flux, const mfem::Vector& S);
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
 public:
     CoupledSolver(const MixedMatrix& darcy_system,
@@ -548,8 +549,8 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
                              const double weight,
                              const double density,
                              NLSolverParameters param)
-    : NonlinearSolver(darcy_system.GetComm(), param),
-      darcy_system_(darcy_system), gmres_(comm_),
+    : NonlinearSolver(darcy_system.GetComm(), param), darcy_system_(darcy_system),
+      gmres_(comm_), local_dMdS_(darcy_system.GetGraph().NumVertices()),
       Ms_(SparseIdentity(darcy_system.GetGraph().NumVertices()) *= weight),
       blk_offsets_(4), true_blk_offsets_(4), ess_dofs_(darcy_system.GetEssDofs()),
       vert_starts_(darcy_system.GetGraph().VertexStarts()),
@@ -652,9 +653,46 @@ double CoupledSolver::Norm(const mfem::Vector& vec)
     return mfem::ParNormlp(blk_resid, mfem::infinity(), comm_);
 }
 
-mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::BlockVector& blk_x)
+void CoupledSolver::Build_dMdS(const mfem::Vector& flux, const mfem::Vector& S)
 {
-    std::vector<mfem::DenseMatrix> local_dMdS = Build_dMdS(blk_x);
+    // TODO: saturation is only 1 dof per cell
+    auto& vert_edof = darcy_system_.GetGraphSpace().VertexToEDof();
+    auto& vert_vdof = darcy_system_.GetGraphSpace().VertexToVDof();
+
+    auto& MB = dynamic_cast<const ElementMBuilder&>(darcy_system_.GetMBuilder());
+    auto& M_el = MB.GetElementMatrices();
+    auto& proj_pwc = const_cast<mfem::SparseMatrix&>(darcy_system_.GetPWConstProj());
+
+    mfem::Array<int> local_edofs, local_vdofs, vert(1);
+    mfem::Vector sigma_loc, Msigma_vec;
+    mfem::DenseMatrix proj_pwc_loc;
+
+    const mfem::Vector dTMinv_dS_vec = dTMinv_dS(S);
+
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        GetTableRow(vert_vdof, i, local_vdofs);
+        vert[0] = i;
+
+        flux.GetSubVector(local_edofs, sigma_loc);
+        Msigma_vec.SetSize(local_edofs.Size());
+        M_el[i].Mult(sigma_loc, Msigma_vec);
+        mfem::DenseMatrix Msigma_loc(Msigma_vec.GetData(), M_el[i].Size(), 1);
+
+        proj_pwc_loc.SetSize(1, local_vdofs.Size());
+        proj_pwc_loc = 0.0;
+        proj_pwc.GetSubMatrix(vert, local_vdofs, proj_pwc_loc);
+        proj_pwc_loc *= dTMinv_dS_vec[i];
+
+        local_dMdS_[i].SetSize(local_edofs.Size(), local_vdofs.Size());
+        mfem::Mult(Msigma_loc, proj_pwc_loc, local_dMdS_[i]);
+    }
+}
+
+mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::Vector& flux, const mfem::Vector& S)
+{
+    Build_dMdS(flux, S); // local_dMdS_ is constructed here
 
     auto& vert_edof = darcy_system_.GetGraphSpace().VertexToEDof();
     mfem::Array<int> local_edofs, local_vert(1);
@@ -663,7 +701,7 @@ mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::BlockVector& blk_x)
     {
         GetTableRow(vert_edof, i, local_edofs);
         local_vert[0] = i;
-        out.AddSubMatrix(local_edofs, local_vert, local_dMdS[i]);
+        out.AddSubMatrix(local_edofs, local_vert, local_dMdS_[i]);
     }
     out.Finalize();
     return out;
@@ -677,7 +715,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
     auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
-    auto dMdS_proc = Assemble_dMdS(blk_x);
+    auto dMdS_proc = Assemble_dMdS(blk_x.GetBlock(0), S);
 
     for (int mm = 0; mm < ess_dofs_.Size(); ++mm)
     {
@@ -758,48 +796,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     blk_dx *= std::min(1.0, 0.2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
 
     x += blk_dx;
-}
-
-std::vector<mfem::DenseMatrix> CoupledSolver::Build_dMdS(const mfem::BlockVector& x)
-{
-    // TODO: saturation is only 1 dof per cell
-    auto& vert_edof = darcy_system_.GetGraphSpace().VertexToEDof();
-    auto& vert_vdof = darcy_system_.GetGraphSpace().VertexToVDof();
-
-    auto& MB = dynamic_cast<const ElementMBuilder&>(darcy_system_.GetMBuilder());
-    auto& M_el = MB.GetElementMatrices();
-
-    auto& proj_pwc = const_cast<mfem::SparseMatrix&>(darcy_system_.GetPWConstProj());
-
-    std::vector<mfem::DenseMatrix> out(M_el.size());
-    mfem::Array<int> local_edofs, local_vdofs, vert(1);
-    mfem::Vector sigma_loc, Msigma_vec;
-    mfem::DenseMatrix proj_pwc_loc;
-
-    const mfem::Vector S = darcy_system_.PWConstProject(x.GetBlock(2));
-    const mfem::Vector dTMinv_dS_vec = dTMinv_dS(S);
-
-    for (int i = 0; i < vert_edof.NumRows(); ++i)
-    {
-        GetTableRow(vert_edof, i, local_edofs);
-        GetTableRow(vert_vdof, i, local_vdofs);
-        vert[0] = i;
-
-        x.GetSubVector(local_edofs, sigma_loc);
-        Msigma_vec.SetSize(local_edofs.Size());
-        M_el[i].Mult(sigma_loc, Msigma_vec);
-        mfem::DenseMatrix Msigma_loc(Msigma_vec.GetData(), M_el[i].Size(), 1);
-
-        proj_pwc_loc.SetSize(1, local_vdofs.Size());
-        proj_pwc_loc = 0.0;
-        proj_pwc.GetSubMatrix(vert, local_vdofs, proj_pwc_loc);
-        proj_pwc_loc *= dTMinv_dS_vec[i];
-
-        out[i].SetSize(local_edofs.Size(), local_vdofs.Size());
-        mfem::Mult(Msigma_loc, proj_pwc_loc, out[i]);
-    }
-
-    return out;
 }
 
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
