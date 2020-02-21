@@ -45,6 +45,8 @@ struct EvolveParamenters
     SteppingScheme scheme = IMPES;
 };
 
+void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double diff_tol);
+
 mfem::Vector TotalMobility(const mfem::Vector& S);
 mfem::Vector dTMinv_dS(const mfem::Vector& S);
 mfem::Vector FractionalFlow(const mfem::Vector& S);
@@ -59,7 +61,7 @@ class TwoPhaseSolver
 {
     const int level_;
     const EvolveParamenters& evolve_param_;
-    const NLSolverParameters& solver_param_;
+    const FASParameters& solver_param_;
     const TwoPhase& problem_;
     Hierarchy& hierarchy_;
     std::vector<mfem::BlockVector> blk_helper_;
@@ -79,7 +81,7 @@ class TwoPhaseSolver
 public:
     TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
                    const int level, const EvolveParamenters& evolve_param,
-                   const NLSolverParameters& solver_param);
+                   const FASParameters& solver_param);
 
     void TimeStepping(const double dt, mfem::BlockVector& x);
     mfem::BlockVector Solve(const mfem::BlockVector& init_val);
@@ -188,7 +190,6 @@ int main(int argc, char* argv[])
 
     // program options from command line
     EvolveParamenters evolve_param;
-    NLSolverParameters solver_param;
     mfem::OptionsParser args(argc, argv);
     const char* perm_file = "spe_perm.dat";
     args.AddOption(&perm_file, "-p", "--perm", "SPE10 permeability file data.");
@@ -210,6 +211,9 @@ int main(int argc, char* argv[])
     int scheme = 3;
     args.AddOption(&scheme, "-scheme", "--stepping-scheme",
                    "Time stepping: 1. IMPES, 2. sequentially implicit, 3. fully implicit. ");
+    bool use_vcycle = true;
+    args.AddOption(&use_vcycle, "-VCycle", "--use-VCycle", "-FMG",
+                   "--use-FMG", "Use V-cycle or FMG-cycle.");
     int num_backtrack = 0;
     args.AddOption(&num_backtrack, "--num-backtrack", "--num-backtrack",
                    "Maximum number of backtracking steps.");
@@ -237,12 +241,16 @@ int main(int argc, char* argv[])
     }
 
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
-    solver_param.num_backtrack = num_backtrack;
-    solver_param.diff_tol = diff_tol;
-    solver_param.print_level = 1;
-    solver_param.max_num_iter = 100;
-    solver_param.atol = 1e-10;
-    solver_param.rtol = 1e-8;
+
+    FASParameters fas_param;
+    fas_param.num_levels = upscale_param.max_levels;
+    fas_param.fine.max_num_iter = fas_param.mid.max_num_iter = 1;
+//    mg_param.coarse.max_num_iter = 5;
+    fas_param.nl_solve.print_level = 1;
+    fas_param.nl_solve.max_num_iter = 100;
+    fas_param.nl_solve.atol = 1e-10;
+    fas_param.nl_solve.rtol = 1e-8;
+    SetOptions(fas_param, use_vcycle, num_backtrack, diff_tol);
 
     mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
     ess_attr = 1;
@@ -274,7 +282,7 @@ int main(int argc, char* argv[])
 //    for (int l = 0; l < upscale_param.max_levels; ++l)
     int l = 0;
     {
-        TwoPhaseSolver solver(problem, hierarchy, l, evolve_param, solver_param);
+        TwoPhaseSolver solver(problem, hierarchy, l, evolve_param, fas_param);
 
         mfem::BlockVector initial_value(problem.BlockOffsets());
         initial_value = 0.0;
@@ -306,12 +314,11 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
-void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
-                int num_backtrack, double diff_tol)
+void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double diff_tol)
 {
     param.cycle = use_vcycle ? V_CYCLE : FMG;
-    param.nl_solve.linearization = use_newton ? Newton : Picard;
-    param.coarse_correct_tol = use_newton ? 1e-6 : 1e-8;
+    param.nl_solve.linearization = Newton;
+    param.coarse_correct_tol = 1e-6;
     param.fine.check_converge = use_vcycle ? false : true;
     param.fine.linearization = param.nl_solve.linearization;
     param.mid.linearization = param.nl_solve.linearization;
@@ -366,7 +373,7 @@ mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
 
 TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
                                const int level, const EvolveParamenters& evolve_param,
-                               const NLSolverParameters& solver_param)
+                               const FASParameters& solver_param)
     : level_(level), evolve_param_(evolve_param), solver_param_(solver_param),
       problem_(problem), hierarchy_(hierarchy), blk_offsets_(4), nonlinear_iter_(0),
       step_converged_(true), weight_(problem.CellVolume() * porosity_ * density_)
@@ -489,15 +496,8 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
-//        CoupledSolver solver(system, dt, weight_, density_, solver_param_);
-        FASParameters mg_param;
-        mg_param.num_levels = hierarchy_.NumLevels();
-        mg_param.fine.max_num_iter = mg_param.mid.max_num_iter = 1;
-//        mg_param.coarse.max_num_iter = 5;
-        mg_param.nl_solve = solver_param_;
-        SetOptions(mg_param, true, true, 1, 0.0);
-
-        CoupledFAS solver(hierarchy_, dt, weight_, density_, mg_param);
+//        CoupledSolver solver(system, dt, weight_, density_, solver_param_.nl_solve);
+        CoupledFAS solver(hierarchy_, dt, weight_, density_, solver_param_);
 
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(0) *= (1. / dt / density_);
@@ -529,7 +529,8 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
         {
             auto Adv = ParMult(*D_te_e_, upwind, system.GetGraph().VertexStarts());
-            TransportSolver solver(*Adv, system, weight_ / density_ / dt, solver_param_);
+            const double scaling = weight_ / density_ / dt;
+            TransportSolver solver(*Adv, system, scaling, solver_param_.nl_solve);
 
             mfem::Vector rhs(source_->GetBlock(2));
             rhs.Add(weight_ / density_ / dt, x.GetBlock(2));
