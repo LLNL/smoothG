@@ -35,19 +35,6 @@
 
 using namespace smoothg;
 
-class BlockTriangularSolver : public mfem::Solver
-{
-    mfem::BlockOperator& op_;
-    const std::vector<mfem::Operator*>& prec_;
-    void Mult(int i, int j, const mfem::Vector& x, mfem::Vector& y) const;
-public:
-    BlockTriangularSolver(mfem::BlockOperator& op, const std::vector<mfem::Operator*>& prec)
-        : mfem::Solver(op.NumRows()), op_(op), prec_(prec) { }
-    void Mult(const mfem::Vector& x, mfem::Vector& y) const { Mult(0, 1, x, y); }
-    void MultTranspose(const mfem::Vector& x, mfem::Vector& y) const { Mult(1, 0, x, y); }
-    void SetOperator(const Operator &op) { }
-};
-
 enum SteppingScheme { IMPES = 1, SequentiallyImplicit, FullyImplcit };
 
 struct EvolveParamenters
@@ -136,6 +123,10 @@ public:
     double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
     double Norm(const mfem::Vector& vec);
     const mfem::Array<int>& BlockOffsets() const { return blk_offsets_; }
+
+    void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
+                      mfem::Vector& x, mfem::Vector& dx) override;
+
 };
 
 class CoupledFAS : public FAS
@@ -216,7 +207,7 @@ int main(int argc, char* argv[])
                    "Total time to step.");
     args.AddOption(&evolve_param.vis_step, "-vs", "--vis-step",
                    "Step size for visualization.");
-    int scheme = 1;
+    int scheme = 3;
     args.AddOption(&scheme, "-scheme", "--stepping-scheme",
                    "Time stepping: 1. IMPES, 2. sequentially implicit, 3. fully implicit. ");
     int num_backtrack = 0;
@@ -224,7 +215,11 @@ int main(int argc, char* argv[])
                    "Maximum number of backtracking steps.");
     double diff_tol = -1.0;
     args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
-                   "Tolerance for coefficient change.");UpscaleParameters upscale_param;
+                   "Tolerance for coefficient change.");
+    UpscaleParameters upscale_param;
+    upscale_param.spect_tol = 1.0;
+    upscale_param.max_evects = 1;
+    upscale_param.max_traces = 1;
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
@@ -245,7 +240,7 @@ int main(int argc, char* argv[])
     solver_param.num_backtrack = num_backtrack;
     solver_param.diff_tol = diff_tol;
     solver_param.print_level = 1;
-    solver_param.max_num_iter = 50;
+    solver_param.max_num_iter = 100;
     solver_param.atol = 1e-10;
     solver_param.rtol = 1e-8;
 
@@ -276,7 +271,8 @@ int main(int argc, char* argv[])
 
     // Fine scale transport based on fine flux
     std::vector<mfem::Vector> Ss(upscale_param.max_levels);
-    for (int l = 0; l < upscale_param.max_levels; ++l)
+//    for (int l = 0; l < upscale_param.max_levels; ++l)
+    int l = 0;
     {
         TwoPhaseSolver solver(problem, hierarchy, l, evolve_param, solver_param);
 
@@ -315,8 +311,8 @@ void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
 {
     param.cycle = use_vcycle ? V_CYCLE : FMG;
     param.nl_solve.linearization = use_newton ? Newton : Picard;
-    param.coarse_correct_tol = use_newton ? 1e-4 : 1e-8;
-    param.fine.check_converge = false;
+    param.coarse_correct_tol = use_newton ? 1e-6 : 1e-8;
+    param.fine.check_converge = use_vcycle ? false : true;
     param.fine.linearization = param.nl_solve.linearization;
     param.mid.linearization = param.nl_solve.linearization;
     param.coarse.linearization = param.nl_solve.linearization;
@@ -497,8 +493,9 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         FASParameters mg_param;
         mg_param.num_levels = hierarchy_.NumLevels();
         mg_param.fine.max_num_iter = mg_param.mid.max_num_iter = 1;
+//        mg_param.coarse.max_num_iter = 5;
         mg_param.nl_solve = solver_param_;
-        SetOptions(mg_param, true, true, 3, 0.0);
+        SetOptions(mg_param, true, true, 1, 0.0);
 
         CoupledFAS solver(hierarchy_, dt, weight_, density_, mg_param);
 
@@ -576,7 +573,7 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
     true_blk_offsets_[2] = true_blk_offsets_[1] + darcy_system.NumVDofs();
     true_blk_offsets_[3] = true_blk_offsets_[2] + Ms_.NumCols();
 
-    gmres_.SetMaxIter(1000);
+    gmres_.SetMaxIter(8000);
     gmres_.SetRelTol(1e-8);
     gmres_.SetPrintLevel(0);
     gmres_.SetKDim(100);
@@ -710,7 +707,6 @@ mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::Vector& flux, const 
 void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
-
     const GraphSpace& space = darcy_system_.GetGraphSpace();
 
     const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
@@ -762,6 +758,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     auto M_inv = make_unique<mfem::HypreDiagScale>(*M);
     unique_ptr<mfem::HypreBoomerAMG> schur_inv(BoomerAMG(*schur));
+//    unique_ptr<mfem::HypreBoomerAMG> dTdS_inv(BoomerAMG(*dTdS));
     auto dTdS_inv = make_unique<mfem::HypreDiagScale>(*dTdS);
 
     mfem::BlockLowerTriangularPreconditioner prec(true_blk_offsets_);
@@ -773,10 +770,12 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec);
+//gmres_.SetPrintLevel(1);
 
     mfem::Vector true_resid = AssembleTrueVector(Residual(x, rhs));
     mfem::BlockVector true_blk_dx(true_blk_offsets_);
     true_blk_dx = 0.0;
+
     gmres_.Mult(true_resid *= -1.0, true_blk_dx);
 
     if (!myid_ && !gmres_.GetConverged())
@@ -784,7 +783,8 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         std::cout << "this level has " << blk_x.BlockSize(2) << " dofs\n";
     }
 
-//    if (!myid_) std::cout << "GMRES took " << gmres_.GetNumIterations() << " iterations\n";
+    if (!myid_) std::cout << "GMRES took " << gmres_.GetNumIterations()
+                          << " iterations, residual = " << gmres_.GetFinalNorm() << "\n";
 
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
@@ -793,9 +793,38 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
 
     const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
-    blk_dx *= std::min(1.0, 0.2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
+    blk_dx *= std::min(1.0, .2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
 
     x += blk_dx;
+}
+
+void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
+                              mfem::Vector& x, mfem::Vector& dx)
+{
+    if (param_.num_backtrack == 0) return;
+
+    x -= dx;
+    mfem::BlockVector blk_x(x, true_blk_offsets_);
+    mfem::BlockVector blk_dx(dx, true_blk_offsets_);
+
+    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
+    const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
+
+    double violate = mfem::infinity();
+    for (int i = 0; i < S.Size(); ++i)
+    {
+//        if (dS[i] < S[i]) violate = std::min(violate, S[i]);
+        if (dS[i] > 1.0 - S[i]) violate = std::min(violate, (1.0 - S[i]) / dS[i] *.9);
+    }
+
+//    violate = std::min(violate, 0.2);
+    if (violate < 1.0) std::cout<<"backtracking "<<violate<<"\n";
+
+    blk_dx *= std::min(1.0, violate);
+
+    x += blk_dx;
+
+    resid_norm_ = violate < 1e-2 ? 0.0 : ResidualNorm(x, rhs);
 }
 
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
@@ -810,7 +839,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
         auto& system_l = hierarchy.GetMatrix(l);
         auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
         solvers_[l].reset(new CoupledSolver(system_l, dt, weight, density, param_l));
-        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 0);
+        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 1);
 
         if (l > 0)
         {
@@ -1079,15 +1108,3 @@ mfem::Vector dFdS(const mfem::Vector& S)
 //    return out;
 //}
 
-void BlockTriangularSolver::Mult(int i, int j, const mfem::Vector& x, mfem::Vector& y) const
-{
-    mfem::BlockVector blk_x(x.GetData(), op_.ColOffsets());
-    mfem::BlockVector blk_y(y.GetData(), op_.RowOffsets());
-
-    prec_[i]->Mult(blk_x.GetBlock(i), blk_y.GetBlock(i));
-
-    mfem::Vector tmp = smoothg::Mult(op_.GetBlock(j, i), blk_y.GetBlock(i));
-    tmp -= blk_x.GetBlock(i);
-    tmp *= -1.0;;
-    prec_[j]->Mult(tmp, blk_y.GetBlock(j));
-}

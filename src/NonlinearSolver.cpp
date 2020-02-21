@@ -143,10 +143,10 @@ mfem::Vector FAS::Residual(const mfem::Vector& x, const mfem::Vector& y)
 
 double FAS::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
-    if (iter_ > 0 && (param_.fine.check_converge || param_.fine.num_backtrack))
-    {
-        return solvers_[0]->GetResidualNorm();
-    }
+//    if (iter_ > 0 && (param_.fine.check_converge || param_.fine.num_backtrack))
+//    {
+//        return solvers_[0]->GetResidualNorm();
+//    }
     return solvers_[0]->ResidualNorm(x, y);
 }
 
@@ -167,6 +167,7 @@ void FAS::MG_Cycle(int l)
 
     if (l == 0 && param_.cycle == V_CYCLE)
     {
+        resid_norm_ = solvers_[l]->ResidualNorm(sol_[l], rhs_[l]);
         if (resid_norm_ < adjusted_tol_)
         {
             if (myid_ == 0)

@@ -61,8 +61,8 @@ public:
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
 
     /// Reduce dx (change in solution) if || A(x) - rhs || > prev_resid_norm
-    void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
-                      mfem::Vector& x, mfem::Vector& dx);
+    virtual void BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
+                              mfem::Vector& x, mfem::Vector& dx);
 
     /// @return residual = A(x) - y
     virtual mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) = 0;
