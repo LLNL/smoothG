@@ -139,6 +139,7 @@ class CoupledFAS : public FAS
     void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
     void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const override;
     void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
+    mfem::Vector ProjectS(int level, const mfem::Vector& S) const;
 public:
     CoupledFAS(const Hierarchy& hierarchy,
                const double dt,
@@ -879,6 +880,24 @@ void CoupledFAS::Interpolate(int level, const mfem::Vector& coarse, mfem::Vector
     hierarchy_.Interpolate(level, blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
 }
 
+mfem::Vector CoupledFAS::ProjectS(int level, const mfem::Vector& x) const
+{
+    const auto& darcy_system = hierarchy_.GetMatrix(level);
+    const auto& agg_vert = hierarchy_.GetAggVert(level);
+    const mfem::Vector S = darcy_system.PWConstProject(x);
+
+    mfem::Vector S_loc, S_coarse(agg_vert.NumRows());
+    mfem::Array<int> verts;
+    for (int i = 0; i < agg_vert.NumRows(); ++i)
+    {
+        GetTableRow(agg_vert, i, verts);
+        S.GetSubVector(verts, S_loc);
+        S_coarse[i] = S_loc.Max();
+    }
+
+    return hierarchy_.GetMatrix(level + 1).PWConstInterpolate(S_coarse);
+}
+
 void CoupledFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
 {
     auto& solver_f = static_cast<CoupledSolver&>(*solvers_[level]);
@@ -887,6 +906,7 @@ void CoupledFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coar
     mfem::BlockVector blk_coarse(coarse.GetData(), solver_c.BlockOffsets());
     hierarchy_.Project(level, blk_fine, blk_coarse);
     hierarchy_.Project(level, blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
+//    blk_coarse.GetBlock(2) = ProjectS(level, blk_fine.GetBlock(2));
 }
 
 mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
@@ -1108,4 +1128,3 @@ mfem::Vector dFdS(const mfem::Vector& S)
 //    }
 //    return out;
 //}
-
