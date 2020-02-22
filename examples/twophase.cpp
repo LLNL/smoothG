@@ -244,11 +244,12 @@ int main(int argc, char* argv[])
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
 
     FASParameters fas_param;
-    fas_param.num_levels = upscale_param.max_levels;
-    fas_param.fine.max_num_iter = fas_param.mid.max_num_iter = 1;
-//    mg_param.coarse.max_num_iter = 5;
+    fas_param.fine.max_num_iter = fas_param.mid.max_num_iter = use_vcycle ? 1 : 100;
+//    fas_param.coarse.max_num_iter = 5;
+//    fas_param.coarse.rtol = 1e-10;
+//    fas_param.coarse.atol = 1e-12;
     fas_param.nl_solve.print_level = 1;
-    fas_param.nl_solve.max_num_iter = 100;
+    fas_param.nl_solve.max_num_iter = use_vcycle ? 100 : 1;
     fas_param.nl_solve.atol = 1e-10;
     fas_param.nl_solve.rtol = 1e-8;
     SetOptions(fas_param, use_vcycle, num_backtrack, diff_tol);
@@ -280,10 +281,12 @@ int main(int argc, char* argv[])
 
     // Fine scale transport based on fine flux
     std::vector<mfem::Vector> Ss(upscale_param.max_levels);
-//    for (int l = 0; l < upscale_param.max_levels; ++l)
-    int l = 0;
+
+    //    int l = 0;
+    for (int l = 0; l < upscale_param.max_levels; ++l)
     {
-        TwoPhaseSolver solver(problem, hierarchy, l, evolve_param, fas_param);
+        fas_param.num_levels = l + 1;
+        TwoPhaseSolver solver(problem, hierarchy, 0, evolve_param, fas_param);
 
         mfem::BlockVector initial_value(problem.BlockOffsets());
         initial_value = 0.0;
@@ -299,10 +302,6 @@ int main(int argc, char* argv[])
         }
 
         Ss[l] = sol.GetBlock(2);
-        for (int j = l; j > 0; --j)
-        {
-            Ss[l] = hierarchy.Interpolate(j, Ss[l]);
-        }
 
         double norm = mfem::ParNormlp(Ss[l], 1, comm);
         if (myid == 0) { std::cout << "    || S ||_1 = " << norm << "\n"; }
@@ -311,6 +310,12 @@ int main(int argc, char* argv[])
         double diff = mfem::ParNormlp(Ss[l], 2, comm);
         norm = mfem::ParNormlp(Ss[0], 2, comm);
         if (myid == 0) { std::cout << "    rel err = " << diff / norm << "\n"; }
+
+        mfem::socketstream sout;
+        if (l && evolve_param.vis_step)
+        {
+            problem.VisSetup(sout, Ss[l], 0.0, 0.0, "Solution difference");
+        }
     }
     return EXIT_SUCCESS;
 }
@@ -330,6 +335,7 @@ void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double
     param.fine.diff_tol = diff_tol;
     param.mid.diff_tol = diff_tol;
     param.coarse.diff_tol = diff_tol;
+    param.nl_solve.diff_tol = diff_tol;
 }
 
 //mfem::Vector ComputeFaceFlux(const MixedMatrix& darcy_system,
@@ -487,7 +493,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     out.GetBlock(1) = blk_helper_[0].GetBlock(1);
     out.GetBlock(2) = x_blk2;
 
-    return x;
+    return out;
 }
 
 void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
@@ -504,6 +510,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         rhs.GetBlock(0) *= (1. / dt / density_);
         rhs.GetBlock(1) *= (dt * density_);
         add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
+//        x = 0.0;
         solver.Solve(rhs, x);
         step_converged_ = solver.IsConverged();
         nonlinear_iter_ += solver.GetNumIterations();
@@ -575,7 +582,7 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
     true_blk_offsets_[2] = true_blk_offsets_[1] + darcy_system.NumVDofs();
     true_blk_offsets_[3] = true_blk_offsets_[2] + Ms_.NumCols();
 
-    gmres_.SetMaxIter(8000);
+    gmres_.SetMaxIter(1000);
     gmres_.SetRelTol(1e-8);
     gmres_.SetPrintLevel(0);
     gmres_.SetKDim(100);
@@ -782,7 +789,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     if (!myid_ && !gmres_.GetConverged())
     {
-        std::cout << "this level has " << blk_x.BlockSize(2) << " dofs\n";
+        std::cout << "this level has " << dTdS->N() << " dofs\n";
     }
 
     if (!myid_) std::cout << "GMRES took " << gmres_.GetNumIterations()
@@ -795,7 +802,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
 
     const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
-    blk_dx *= std::min(1.0, .2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
+    blk_dx *= std::min(1.0, param_.diff_tol / mfem::ParNormlp(dS, mfem::infinity(), comm_));
 
     x += blk_dx;
 }
@@ -812,21 +819,24 @@ void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_nor
     const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
     const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
 
-    double violate = mfem::infinity();
+    auto violate = (mfem::Vector(1) = mfem::infinity());
     for (int i = 0; i < S.Size(); ++i)
     {
 //        if (dS[i] < S[i]) violate = std::min(violate, S[i]);
-        if (dS[i] > 1.0 - S[i]) violate = std::min(violate, (1.0 - S[i]) / dS[i] *.9);
+        if (dS[i] > 1.0 - S[i])
+            violate[0] = std::min(violate[0], (1.0 - S[i]) / dS[i] *.9);
     }
 
-//    violate = std::min(violate, 0.2);
-    if (violate < 1.0) std::cout<<"backtracking "<<violate<<"\n";
+    violate = Min(violate = std::min(violate[0], 1.0), comm_);
 
-    blk_dx *= std::min(1.0, violate);
+    if (!myid_ && violate[0] < 1.0)
+        std::cout<< "backtracking = " << violate[0] << "\n";
+
+    blk_dx *= violate[0];
 
     x += blk_dx;
 
-    resid_norm_ = violate < 1e-2 ? 0.0 : ResidualNorm(x, rhs);
+    resid_norm_ = violate[0] < 1e-2 ? 0.0 : ResidualNorm(x, rhs);
 }
 
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
@@ -936,7 +946,7 @@ void TransportSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vecto
 //    if (!myid_) std::cout << "GMRES took " << gmres_.GetNumIterations() << " iterations\n";
 
     const mfem::Vector dS = darcy_system_.PWConstProject(dx);
-    dx *= std::min(1.0, 0.2 / mfem::ParNormlp(dS, mfem::infinity(), comm_));
+    dx *= std::min(1.0, param_.diff_tol / mfem::ParNormlp(dS, mfem::infinity(), comm_));
     x -= dx;
 }
 
