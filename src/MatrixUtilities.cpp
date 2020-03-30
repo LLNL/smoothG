@@ -380,6 +380,11 @@ mfem::SparseMatrix SparseDiag(mfem::Vector diag)
     int* J = new int[size];
     std::iota(J, J + size, 0);
 
+    if (size == 0)
+    {
+        double* data = new double[size];
+        return mfem::SparseMatrix(I, J, data, size, size);
+    }
     return mfem::SparseMatrix(I, J, diag.StealData(), size, size);
 }
 
