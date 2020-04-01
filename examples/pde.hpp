@@ -598,7 +598,7 @@ public:
 protected:
     void BuildReservoirGraph();
     void InitGraph();
-    void ComputeGraphWeight(bool unit_weight = false);
+    void ComputeGraphWeight();
     void CartPart(const mfem::Array<int>& coarsening_factor,
                   mfem::Array<int>& partitioning) const;
     void MetisPart(const mfem::Array<int>& coarsening_factor,
@@ -699,15 +699,8 @@ void DarcyProblem::InitGraph()
     rhs_u_ = 0.0;
 }
 
-void DarcyProblem::ComputeGraphWeight(bool unit_weight)
+void DarcyProblem::ComputeGraphWeight()
 {
-    if (unit_weight)
-    {
-        weight_.SetSize(vertex_edge_.NumCols());
-        weight_ = 1.0;
-        return;
-    }
-
     // Compute local edge weights
     LocalTPFA local_TPFA(*pmesh_, *kinv_vector_);
     local_weight_ = local_TPFA.ComputeLocalWeights();
@@ -981,8 +974,6 @@ SPE10Problem::SPE10Problem(const char* permFile, int nDimensions, int spe10_scal
     }
 
     InitGraph();
-    // TODO FIXME: unit_weight is the wrong name for what I am doing here
-    // ComputeGraphWeight(unit_weight);
     ComputeGraphWeight();
     MakeRHS();
 }
