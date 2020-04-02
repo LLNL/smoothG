@@ -146,6 +146,10 @@ public:
     /// In case you have an external state that is specific to a certain level
     void SetSampleAtLevel(int level, const mfem::Vector& state);
 
+    /// @return g * W^{1/2} state. This basically does what SetSampleAtLevel
+    /// does, but it is meant to be used by an external object.
+    mfem::Vector ScaleWhiteNoise(int level, const mfem::Vector& state) const;
+
     /// Solve PDE with current white-noise RHS to find coeffiicent
     /// on coarser level, the result is on *aggregates*
     mfem::Vector& GetCoefficient(int level);
@@ -181,6 +185,7 @@ private:
     double kappa_;
     double scalar_g_;
     bool sampled_;
+    std::vector<mfem::SparseMatrix> W_sqrt_;
 
     /// all these vectors live in the pressure / vertex space
     std::vector<mfem::Vector> rhs_;

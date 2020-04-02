@@ -111,6 +111,25 @@ void PDESampler::Initialize(int dimension, double kappa, int seed)
     double ddim = static_cast<double>(dimension);
     scalar_g_ = std::pow(4.0 * M_PI, ddim / 4.0) * std::pow(kappa, nu_parameter) *
                 std::sqrt( std::tgamma(nu_parameter + ddim / 2.0) / tgamma(nu_parameter) );
+
+    W_sqrt_.resize(hierarchy_.NumLevels());
+
+    const mfem::SparseMatrix& W = hierarchy_.GetMatrix(0).GetW();
+    mfem::Vector W_diag(W.GetData(), W.NumRows()); // assume W is diagonal
+    mfem::Vector W_sqrt_diag(W.NumRows());
+    for (int i = 0; i < W.NumRows(); ++i)
+    {
+        W_sqrt_diag[i] = std::sqrt(W_diag[i]);
+    }
+    W_sqrt_[0] = SparseDiag(std::move(W_sqrt_diag));
+
+    // This computes P^T W^{1/2} P, but we may want (P^T W P)^{1/2} instead
+    for (int level = 0; level < hierarchy_.NumLevels() - 1; ++level)
+    {
+        auto& P = hierarchy_.GetPu(level);
+        std::unique_ptr<mfem::SparseMatrix> tmp(mfem::RAP(P, W_sqrt_[level], P));
+        W_sqrt_[level + 1].Swap(*tmp);
+    }
 }
 
 PDESampler::~PDESampler()
@@ -152,17 +171,18 @@ void PDESampler::SetSample(const mfem::Vector& state)
 
 void PDESampler::SetSampleAtLevel(int level, const mfem::Vector& state)
 {
-    MFEM_ASSERT(state.Size() == num_aggs_[level],
-                "State vector is the wrong size for this level!");
     sampled_ = true;
 
-    const mfem::SparseMatrix& W = hierarchy_.GetMatrix(level).GetW();
-    mfem::Vector kappa_sq_cell_volume(W.GetData(), W.NumRows());
-    MFEM_ASSERT(W.NumRows() == num_aggs_[level], "Assumes one dof per agg!");
-    for (int i = 0; i < num_aggs_[level]; ++i)
-    {
-        rhs_[level](i) = scalar_g_ * std::sqrt(kappa_sq_cell_volume[i]) / kappa_ * state(i);
-    }
+    W_sqrt_[level].Mult(state, rhs_[level]);
+    rhs_[level] *= scalar_g_ / kappa_;
+}
+
+mfem::Vector PDESampler::ScaleWhiteNoise(int level, const mfem::Vector& state) const
+{
+    mfem::Vector out(state.Size());
+    W_sqrt_[level].Mult(state, out);
+    out *= scalar_g_ / kappa_;
+    return out;
 }
 
 /**
@@ -210,7 +230,7 @@ mfem::Vector PDESampler::GetCoefficientForVisualization(int level)
     mfem::Vector pw1_coarse_sol = GetCoefficient(level);
 
     // interpolate piece-wise constant function to vertex space
-    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;
+    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);
 }
 
 mfem::Vector PDESampler::GetLogCoefficientForVisualization(int level)
@@ -219,7 +239,7 @@ mfem::Vector PDESampler::GetLogCoefficientForVisualization(int level)
     mfem::Vector pw1_coarse_sol = GetLogCoefficient(level);
 
     // interpolate piece-wise constant function to vertex space
-    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);;
+    return hierarchy_.PWConstInterpolate(level, pw1_coarse_sol);
 }
 
 }
