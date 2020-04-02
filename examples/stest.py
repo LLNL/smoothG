@@ -705,8 +705,8 @@ def make_tests():
         [["./sampler",
           "--kappa", "0.01",
           "--num-samples", "2"],
-         {"fine-mean-l1": 0.54961180496539375,
-          "p-error-level-1": 0.39869063097389679}]
+         {"fine-mean-l1": 0.54235348335037126,
+          "p-error-level-1": 0.42784788897003051}]
 
     tests["ml-sampler"] = \
         [["./sampler",
@@ -715,8 +715,8 @@ def make_tests():
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1"],
-         {"p-error-level-1": 0.20833920382939719,
-          "p-error-level-2": 0.40118441747952621}]
+         {"p-error-level-1": 0.197584266889065,
+          "p-error-level-2": 0.38747838996654665}]
 
     tests["ml-sampler4"] = \
         [["./sampler",
@@ -724,8 +724,8 @@ def make_tests():
           "--max-levels", "3",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
-         {"p-error-level-1": 0.15983187318775974,
-          "p-error-level-2": 0.34182546133693903}]
+         {"p-error-level-1": 0.1536666324079243,
+          "p-error-level-2": 0.37704136243107045}]
 
     # this is supposed to mimic using --choose-samples, but the choice
     # depends on cpu time, so for reproducibility we fix everything

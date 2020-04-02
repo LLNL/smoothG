@@ -149,6 +149,11 @@ mfem::SparseMatrix SparseIdentity(int size);
 mfem::SparseMatrix SparseIdentity(int rows, int cols, int row_offset = 0, int col_offset = 0);
 
 /**
+   @brief Construct a diagonal matrix with diagonal diag
+*/
+mfem::SparseMatrix SparseDiag(mfem::Vector diag);
+
+/**
    @brief mat = a * mat + b * diag(vec) or diag(vec^{-1}) if invert_vec = true
 
    mat must have nonzeros on the diagonal

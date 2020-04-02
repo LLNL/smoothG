@@ -99,7 +99,7 @@ public:
 
        @todo cell_volume should be potentially spatially-varying
     */
-    PDESampler(int dimension, double cell_volume, double kappa, int seed,
+    PDESampler(int dimension, double kappa, int seed,
                Hierarchy&& hierarchy);
 
     /**
@@ -127,6 +127,13 @@ public:
                const mfem::Array<int>* partitioning = nullptr,
                const mfem::Array<int>* ess_attr = nullptr);
 
+    /// Same as the previous constructor, except cell_volume is is not uniform
+    PDESampler(int dimension, mfem::Vector cell_volume,
+               double kappa, int seed, const Graph& graph,
+               const UpscaleParameters& param = UpscaleParameters(),
+               const mfem::Array<int>* partitioning = nullptr,
+               const mfem::Array<int>* ess_attr = nullptr);
+
     ~PDESampler();
 
     /// Draw white noise on fine level
@@ -136,12 +143,38 @@ public:
     /// calling this, this is equivalent to NewSample())
     void SetSample(const mfem::Vector& state);
 
+    /// In case you have an external state that is specific to a certain level
+    void SetSampleAtLevel(int level, const mfem::Vector& state);
+
+    /// @return g * W^{1/2} state. This basically does what SetSampleAtLevel
+    /// does, but it is meant to be used by an external object.
+    mfem::Vector ScaleWhiteNoise(int level, const mfem::Vector& state) const;
+
     /// Solve PDE with current white-noise RHS to find coeffiicent
     /// on coarser level, the result is on *aggregates*
     mfem::Vector& GetCoefficient(int level);
 
+    mfem::Vector GetLogCoefficient(int level);
+
     /// Only for debugging/visualization, most users should use GetCoefficient
     mfem::Vector GetCoefficientForVisualization(int level);
+
+    mfem::Vector GetLogCoefficientForVisualization(int level);
+
+    void SetHierarchyCoarseTols(double rel_tol, double abs_tol = -1.0)
+    {
+        for (int i = 1; i < hierarchy_.NumLevels(); ++i)
+        {
+            hierarchy_.SetRelTolAtLevel(i, rel_tol);
+        }
+        if (abs_tol >= 0.0)
+        {
+            for (int i = 1; i < hierarchy_.NumLevels(); ++i)
+            {
+                hierarchy_.SetAbsTolAtLevel(i, abs_tol);
+            }
+        }
+    }
 
     const Hierarchy& GetHierarchy() const { return hierarchy_; }
 
@@ -149,15 +182,16 @@ private:
     Hierarchy hierarchy_;
     NormalDistribution normal_distribution_;
     std::vector<int> num_aggs_;
-    double cell_volume_;
+    double kappa_;
     double scalar_g_;
     bool sampled_;
+    std::vector<mfem::SparseMatrix> W_sqrt_;
 
     /// all these vectors live in the pressure / vertex space
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> coefficient_;
 
-    void Initialize(int dimension, double cell_volume, double kappa, int seed);
+    void Initialize(int dimension, double kappa, int seed);
 };
 
 }
