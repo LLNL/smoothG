@@ -944,12 +944,12 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
     hy_g = h(1);
     Ly_g = Ly;
 
-//    using IPC = InversePermeabilityCoefficient;
-//    IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
-//    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
-    mfem::Vector constant(dim);
-    constant = 1.0e3;
-    kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
+    using IPC = InversePermeabilityCoefficient;
+    IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
+    kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
+//    mfem::Vector constant(dim);
+//    constant = 1.0e3;
+//    kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
 
     const double Hx = 10 * h(0);
     const double Hy = 10 * h(1);

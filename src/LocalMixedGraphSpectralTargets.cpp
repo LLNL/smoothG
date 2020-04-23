@@ -498,6 +498,8 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, col_map_, evects_restricted_T);
         evects_restricted.Transpose(evects_restricted_T);
 
+//        evects_restricted = 1.0 / std::sqrt(loc_vdofs.Size());
+
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
         if (first_evect[0] < 0.0) { first_evect *= -1.0; }

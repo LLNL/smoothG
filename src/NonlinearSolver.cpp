@@ -190,7 +190,12 @@ void FAS::MG_Cycle(int l)
         rhs_[l + 1] = solvers_[l + 1]->Residual(sol_[l + 1], help_[l + 1]);
 
         // Store projected coarse solution pi x_l
+
         mfem::Vector coarse_sol = sol_[l + 1];
+        if (param_.cycle == FMG)
+        {
+            coarse_sol = 0.0;
+        }
         double resid_norm_l = Norm(l, help_[l]);
 
         MG_Cycle(l + 1); // Go to coarser level (sol_[l+1] will be updated)
@@ -198,7 +203,14 @@ void FAS::MG_Cycle(int l)
         // Compute correction x_l += P( x_{l+1} - pi x_l )
         sol_[l + 1] -= coarse_sol;
         Interpolate(l + 1, sol_[l + 1], help_[l]);
-        sol_[l] += help_[l];
+        if (param_.cycle == V_CYCLE)
+        {
+            sol_[l] += help_[l];
+        }
+        else
+        {
+            sol_[l] = help_[l];
+        }
 
         if (param_.cycle == V_CYCLE)
         {
