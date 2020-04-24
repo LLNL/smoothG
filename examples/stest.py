@@ -623,7 +623,7 @@ def make_tests():
          {"finest-div-error": 0.1438138616203242,
           "finest-p-error": 0.1874559440644907,
           "finest-u-error": 0.25470044682041143,
-          "operator-complexity": (1.229388, 3.e-4)}]
+          "operator-complexity": (1.230, 1.e-3)}]
 
     tests["parsamplegraph4-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
