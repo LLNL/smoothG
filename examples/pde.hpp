@@ -239,6 +239,7 @@ void InversePermeabilityCoefficient::InversePermeability(const mfem::Vector& x,
     for (int l = 0; l < vdim; ++l)
     {
         val[l] = inverse_permeability_[offset + N_all_ * l];
+        val[l] /= 9.869233e-16; // conversion from milli Darcy to meter^2
     }
 }
 

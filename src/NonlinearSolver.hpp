@@ -85,6 +85,7 @@ public:
     int GetNumIterations() const { return iter_; }
     double GetTiming() const { return timing_; }
     double GetResidualNorm() const { return resid_norm_; }
+    int GetNumLinearIterations() const { return linear_iter_; }
     ///@}
 protected:
     /// Nonlinear iteration step: x is updated, dx stores the change in x
@@ -100,6 +101,8 @@ protected:
     int iter_;
     double timing_;
     bool converged_;
+
+    int linear_iter_;
 
     double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
     double rhs_norm_;

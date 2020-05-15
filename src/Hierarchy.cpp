@@ -448,7 +448,7 @@ void Hierarchy::Debug_tests(int level) const
     auto Check = [&](mfem::Vector & v, mfem::Vector & u, std::string op)
     {
         v -= u;
-        double diff = mfem::ParNormlp(v, 2, comm_) / mfem::ParNormlp(rand_vec, 2, comm_);
+        double diff = mfem::ParNormlp(v, 2, comm_) / mfem::ParNormlp(u, 2, comm_);
         if (diff > tol && myid_ == 0)
         {
             std::cerr << "\nWarning: || " << op << " || = " << diff << " !!!\n";

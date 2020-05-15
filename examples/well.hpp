@@ -257,8 +257,11 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
     point(1, 2) = max_y;
     point(0, 3) = max_x;
     point(1, 3) = max_y;
-    point(0, 4) = ((max_x + ft_) / 2.0) + ft_;
-    point(1, 4) = ((max_y + ft_) / 2.0) + ft_;
+//    point(0, 4) = ((max_x + ft_) / 2.0) + ft_;
+//    point(1, 4) = ((max_y + ft_) / 2.0) + ft_;
+    point(0, 4) = 182.5;
+    point(1, 4) = 335.0; // 258.0; //
+
 
     for (int j = 0; j < well_height; ++j)
     {
@@ -435,15 +438,19 @@ void TwoPhase::CombineReservoirAndWellModel()
 void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor,
                          mfem::Array<int>& partitioning) const
 {
-    mfem::SparseMatrix scaled_vert_edge(vertex_edge_);
-    mfem::Vector weight_sqrt(weight_);
-    for (int i = 0; i < weight_.Size(); ++i)
-    {
-        weight_sqrt[i] = std::sqrt(weight_[i]);
-    }
-    scaled_vert_edge.ScaleColumns(weight_sqrt);
-
     const int dim = mesh_->Dimension();
+
+    mfem::SparseMatrix scaled_vert_edge(vertex_edge_);
+    if (dim == 3)
+    {
+        mfem::Vector weight_sqrt(weight_);
+        for (int i = 0; i < weight_.Size(); ++i)
+        {
+            weight_sqrt[i] = std::sqrt(weight_[i]);
+        }
+        scaled_vert_edge.ScaleColumns(weight_sqrt);
+    }
+
     const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
     const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
 

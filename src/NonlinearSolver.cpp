@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, NLSolverParameters param)
     : comm_(comm), tag_("Nonlinear"), converged_(false),
-      linear_tol_(param.init_linear_tol), param_(param)
+      linear_tol_(param.init_linear_tol), linear_iter_(0), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -58,6 +58,21 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
                           << ", rel resid = " << resid_norm_ / rhs_norm_ << ".\n";
             }
             if ((converged_ = (resid_norm_ < adjusted_tol_))) { break; }
+
+            if (iter_ && sol.Size() < 30000)
+            {
+                const double x_norm = mfem::ParNormlp(sol, 2, comm_);
+                const double dx_norm = mfem::ParNormlp(sol_change, 2, comm_);
+
+                if ((converged_ = ((dx_norm / x_norm) < param_.rtol)))
+                {
+                    std::cout << tag_ << " iter " << iter_ << ": x_norm = " << x_norm
+                              << ", dx_norm = " << dx_norm << ".\n";
+
+                    break;
+                }
+            }
+
             if (iter_ > 0) { UpdateLinearSolveTol(); }
         }
 
@@ -223,13 +238,15 @@ void FAS::MG_Cycle(int l)
 
 void FAS::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
-    if (param_.nl_solve.num_backtrack > 0) { dx.Set(-1.0, x); }
+//    if (param_.nl_solve.num_backtrack > 0)
+    { dx.Set(-1.0, x); }
 
     rhs_[0].SetDataAndSize(rhs.GetData(), rhs.Size());
     sol_[0].SetDataAndSize(x.GetData(), x.Size());
     MG_Cycle(0);
 
-    if (param_.nl_solve.num_backtrack > 0) { dx += x; }
+//    if (param_.nl_solve.num_backtrack > 0)
+    { dx += x; }
 }
 
 } // namespace smoothg

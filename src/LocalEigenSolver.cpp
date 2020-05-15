@@ -80,9 +80,9 @@ LocalEigenSolver::LocalEigenSolver(
     itype_(1),
     diag_('N'),
     num_arnoldi_vectors_(-1),
-    tolerance_(1e-10),
-    max_iterations_(1000),
-    shift_(-1e-2)  // shift_ may need to be adjusted
+    tolerance_(1e-16),
+    max_iterations_(10000),
+    shift_(-1e-10)  // shift_ may need to be adjusted
 {
 }
 
