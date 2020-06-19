@@ -185,6 +185,11 @@ class CoupledSolver : public NonlinearSolver
     void Build_dMdS(const mfem::Vector& flux, const mfem::Vector& S);
     mfem::SparseMatrix Assemble_dMdS(const mfem::Vector& flux, const mfem::Vector& S);
     mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
+
+
+    void BuildHybridSystem(mfem::BlockOperator& op);
+    void BuildHybridRHS(mfem::BlockOperator& op);
+    void HybridSolve(const mfem::Vector& resid, mfem::Vector& dx);
 public:
     CoupledSolver(const MixedMatrix& darcy_system,
 //                  const std::vector<mfem::DenseMatrix>& edge_traces,
@@ -464,6 +469,54 @@ mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
     upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
 
     return upwind_pattern;
+}
+
+std::vector<mfem::DenseMatrix> Build_dTdsigma(const GraphSpace& graph_space,
+                                              const mfem::SparseMatrix& D,
+                                              const mfem::Vector& flux,
+                                              mfem::Vector FS)
+{
+    const Graph& graph = graph_space.GetGraph();
+    const mfem::SparseMatrix& vert_edof = graph_space.VertexToEDof();
+    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+
+    std::vector<mfem::DenseMatrix> out(graph.NumVertices());
+    for (int i = 0; i < graph.NumVertices(); ++i)
+    {
+        const int num_edofs =  graph_space.VertexToEDof().RowSize(i);
+        out[i].SetSize(1, num_edofs);
+        for (int j = 0; j < num_edofs; ++j)
+        {
+            const int edge = vert_edof.GetRowColumns(i)[j];
+
+            if (edge_vert.RowSize(edge) == 2) // edge is interior
+            {
+                const int upwind_vert = flux[edge] > 0.0 ? 0 : 1;
+                if (edge_vert.GetRowColumns(edge)[upwind_vert] == i)
+                {
+                    out[i](0, j) = FS[i] * D(i, edge);
+                }
+            }
+            else
+            {
+                assert(edge_vert.RowSize(edge) == 1);
+                const bool edge_is_owned = e_te_diag.RowSize(edge);
+
+                if ((flux[edge] > 0.0 && edge_is_owned) ||
+                        (flux[edge] <= 0.0 && !edge_is_owned))
+                {
+                    if (edge_vert.GetRowColumns(edge)[0] == i)
+                    {
+                        out[i](0, j) = FS[i] * D(i, edge);
+                    }
+                }
+            }
+        }
+
+    }
+
+    return out;
 }
 
 TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
@@ -1245,6 +1298,102 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     }
 
 
+    {
+        mfem::Array<int> offset_hb(3);
+        offset_hb[0] = 0;
+        offset_hb[1] = darcy_system_.NumEDofs();
+        offset_hb[2] = darcy_system_.NumTotalDofs();
+        mfem::BlockOperator op_hb(offset_hb);
+
+        mfem::SparseMatrix D_proc(darcy_system_.GetD());
+        D_proc *= (dt_ * density_);
+        auto local_dTdsigma = Build_dTdsigma(space, D_proc, blk_x.GetBlock(0),
+                                             FractionalFlow(S));
+
+        // for debug
+        if (false)
+        {
+            mfem::SparseMatrix dTdsig(D_->NumRows(), D_->NumCols());
+            mfem::Array<int> rows, cols;
+            for (unsigned int i = 0; i < local_dTdsigma.size(); ++i)
+            {
+                GetTableRow(space.VertexToVDof(), i, rows);
+                GetTableRow(space.VertexToEDof(), i, cols);
+                dTdsig.AddSubMatrix(rows, cols, local_dTdsigma[i]);
+            }
+            dTdsig.Finalize();
+            dTdsig.Add(-1.0, GetDiag(*dTdsigma));
+            std::cout << "|| dTdsig -= dTdsigma || = "<< FroNorm(dTdsig) <<"\n";
+        }
+
+        HybridSolver hybrid(darcy_system_, &ess_dofs_);
+        hybrid.AssembleHybridTwoPhase(TotalMobility(S), local_dMdS_,
+                                      local_dTdsigma, GetDiag(*dTdS), op_hb);
+
+        auto& A00 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(0, 0));
+        auto& A01 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(0, 1));
+        auto& A10 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(1, 0));
+        auto& A11 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(1, 1));
+
+        A00 *= (dt_ * density_);
+        A01 *= (dt_ * density_);
+//        A10 *= (dt_ * density_);
+
+
+        mfem::HypreBoomerAMG A00_inv(A00);
+        A00_inv.SetPrintLevel(0);
+//        mfem::HypreSmoother A00_inv(A00, mfem::HypreSmoother::l1Jacobi);
+        mfem::HypreSmoother A11_inv(A11, mfem::HypreSmoother::l1Jacobi);
+//        HypreILU A11_inv(A11, 0);
+
+        mfem::BlockLowerTriangularPreconditioner prec(offset_hb);
+        prec.SetDiagonalBlock(0, &A00_inv);
+        prec.SetDiagonalBlock(1, &A11_inv);
+        prec.SetBlock(1, 0, &A10);
+
+        mfem::SparseMatrix diag00 = GetDiag(A00);
+        mfem::SparseMatrix diag01 = GetDiag(A01);
+        mfem::SparseMatrix diag10 = GetDiag(A10);
+        mfem::SparseMatrix diag11 = GetDiag(A11);
+
+        mfem::BlockMatrix mat2(offset_hb);
+        mat2.SetBlock(0, 0, &diag00);
+        mat2.SetBlock(0, 1, &diag01);
+        mat2.SetBlock(1, 0, &diag10);
+        mat2.SetBlock(1, 1, &diag11);
+
+        mono_mat.reset(mat2.CreateMonolithic());
+
+        mfem::Array<int> A_starts;
+        GenerateOffsets(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts);
+        mfem::HypreParMatrix pMonoMat(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts, mono_mat.get());
+
+        unique_ptr<mfem::HypreSolver> ILU_smoother;
+        ILU_smoother.reset(new HypreILU(pMonoMat, 0));
+        TwoStageSolver prec2(prec, *ILU_smoother, op_hb);
+
+        mfem::GMRESSolver gmres3(comm_);
+        gmres3.SetOperator(op_hb);
+        gmres3.SetPreconditioner(prec2);
+
+        gmres3.SetMaxIter(1000);
+        gmres3.SetRelTol(1e-9);
+        gmres3.SetPrintLevel(0);
+        gmres3.SetKDim(100);
+
+        mfem::BlockVector blk_true_resid(true_resid.GetData(), true_blk_offsets_);
+        mfem::BlockVector rhs_hb(offset_hb);
+        rhs_hb.GetBlock(0) = blk_true_resid.GetBlock(0);
+        rhs_hb.GetBlock(1) = blk_true_resid.GetBlock(2);
+        mfem::BlockVector sol_hb(offset_hb);
+        rhs_hb.Randomize(1);
+
+        gmres3.Mult(rhs_hb, sol_hb);
+        if (!myid_) std::cout << "          HB: GMRES took " << gmres3.GetNumIterations()
+                              << " iterations, residual = " << gmres3.GetFinalNorm() << "\n";
+    }
+
+
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
     blk_dx = 0.0;
     auto& dof_truedof = darcy_system_.GetGraphSpace().EDofToTrueEDof();
@@ -1290,6 +1439,11 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         //    const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
     }
+}
+
+void CoupledSolver::BuildHybridSystem(mfem::BlockOperator& op)
+{
+
 }
 
 void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
