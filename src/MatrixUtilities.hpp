@@ -496,6 +496,8 @@ double FroNorm(const mfem::SparseMatrix& mat);
 
 mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A);
 
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

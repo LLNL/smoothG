@@ -64,7 +64,6 @@ public:
     }
 };
 
-
 /// Hypre ILU Preconditioner
 class HypreILU : public mfem::HypreSolver
 {
@@ -101,6 +100,27 @@ public:
    { return (HYPRE_PtrToParSolverFcn) HYPRE_ILUSolve; }
 
    virtual ~HypreILU() { HYPRE_ILUDestroy(ilu_precond); }
+};
+
+class TwoPhaseHybrid : public HybridSolver
+{
+    mfem::Array<int> offsets_;
+    unique_ptr<mfem::BlockOperator> op_;
+
+    std::vector<mfem::DenseMatrix> common_mat_;  // M^{-1} - M^{-1} B^T (BM^{-1}B^T)^{-1} B M^{-1}
+    void Init();
+public:
+    TwoPhaseHybrid(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr = nullptr)
+        : HybridSolver(mgL, ess_attr), offsets_(3), common_mat_(nAggs_)
+    {
+        Init();
+    }
+
+    void AssembleSolver(
+            const mfem::Vector& elem_scaling_inverse,
+            const std::vector<mfem::DenseMatrix>& dMdS,
+            const std::vector<mfem::DenseMatrix>& dTdsigma,
+            const mfem::HypreParMatrix& dTdS);
 };
 
 
@@ -1326,71 +1346,70 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             std::cout << "|| dTdsig -= dTdsigma || = "<< FroNorm(dTdsig) <<"\n";
         }
 
-        HybridSolver hybrid(darcy_system_, &ess_dofs_);
-        hybrid.AssembleHybridTwoPhase(TotalMobility(S), local_dMdS_,
-                                      local_dTdsigma, GetDiag(*dTdS), op_hb);
+        TwoPhaseHybrid hybrid(darcy_system_, &ess_dofs_);
+        hybrid.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma, *dTdS);
 
-        auto& A00 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(0, 0));
-        auto& A01 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(0, 1));
-        auto& A10 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(1, 0));
-        auto& A11 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(1, 1));
+//        auto& A00 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(0, 0));
+//        auto& A01 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(0, 1));
+//        auto& A10 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(1, 0));
+//        auto& A11 = dynamic_cast<mfem::HypreParMatrix&>(op_hb.GetBlock(1, 1));
 
-        A00 *= (dt_ * density_);
-        A01 *= (dt_ * density_);
-//        A10 *= (dt_ * density_);
+//        A00 *= (dt_ * density_);
+//        A01 *= (dt_ * density_);
+////        A10 *= (dt_ * density_);
 
 
-        mfem::HypreBoomerAMG A00_inv(A00);
-        A00_inv.SetPrintLevel(0);
-//        mfem::HypreSmoother A00_inv(A00, mfem::HypreSmoother::l1Jacobi);
-        mfem::HypreSmoother A11_inv(A11, mfem::HypreSmoother::l1Jacobi);
-//        HypreILU A11_inv(A11, 0);
+//        mfem::HypreBoomerAMG A00_inv(A00);
+//        A00_inv.SetPrintLevel(0);
+////        mfem::HypreSmoother A00_inv(A00, mfem::HypreSmoother::l1Jacobi);
+//        mfem::HypreSmoother A11_inv(A11, mfem::HypreSmoother::l1Jacobi);
+////        HypreILU A11_inv(A11, 0);
 
-        mfem::BlockLowerTriangularPreconditioner prec(offset_hb);
-        prec.SetDiagonalBlock(0, &A00_inv);
-        prec.SetDiagonalBlock(1, &A11_inv);
-        prec.SetBlock(1, 0, &A10);
+//        mfem::BlockLowerTriangularPreconditioner prec(offset_hb);
+//        prec.SetDiagonalBlock(0, &A00_inv);
+//        prec.SetDiagonalBlock(1, &A11_inv);
+//        prec.SetBlock(1, 0, &A10);
 
-        mfem::SparseMatrix diag00 = GetDiag(A00);
-        mfem::SparseMatrix diag01 = GetDiag(A01);
-        mfem::SparseMatrix diag10 = GetDiag(A10);
-        mfem::SparseMatrix diag11 = GetDiag(A11);
+//        mfem::SparseMatrix diag00 = GetDiag(A00);
+//        mfem::SparseMatrix diag01 = GetDiag(A01);
+//        mfem::SparseMatrix diag10 = GetDiag(A10);
+//        mfem::SparseMatrix diag11 = GetDiag(A11);
 
-        mfem::BlockMatrix mat2(offset_hb);
-        mat2.SetBlock(0, 0, &diag00);
-        mat2.SetBlock(0, 1, &diag01);
-        mat2.SetBlock(1, 0, &diag10);
-        mat2.SetBlock(1, 1, &diag11);
+//        mfem::BlockMatrix mat2(offset_hb);
+//        mat2.SetBlock(0, 0, &diag00);
+//        mat2.SetBlock(0, 1, &diag01);
+//        mat2.SetBlock(1, 0, &diag10);
+//        mat2.SetBlock(1, 1, &diag11);
 
-        mono_mat.reset(mat2.CreateMonolithic());
+//        mono_mat.reset(mat2.CreateMonolithic());
 
-        mfem::Array<int> A_starts;
-        GenerateOffsets(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts);
-        mfem::HypreParMatrix pMonoMat(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts, mono_mat.get());
+//        mfem::Array<int> A_starts;
+//        GenerateOffsets(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts);
+//        mfem::HypreParMatrix pMonoMat(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts, mono_mat.get());
 
-        unique_ptr<mfem::HypreSolver> ILU_smoother;
-        ILU_smoother.reset(new HypreILU(pMonoMat, 0));
-        TwoStageSolver prec2(prec, *ILU_smoother, op_hb);
+//        unique_ptr<mfem::HypreSolver> ILU_smoother;
+//        ILU_smoother.reset(new HypreILU(pMonoMat, 0));
+//        TwoStageSolver prec2(prec, *ILU_smoother, op_hb);
 
-        mfem::GMRESSolver gmres3(comm_);
-        gmres3.SetOperator(op_hb);
-        gmres3.SetPreconditioner(prec2);
+//        mfem::GMRESSolver gmres3(comm_);
+//        gmres3.SetOperator(op_hb);
+//        gmres3.SetPreconditioner(prec2);
 
-        gmres3.SetMaxIter(1000);
-        gmres3.SetRelTol(1e-9);
-        gmres3.SetPrintLevel(0);
-        gmres3.SetKDim(100);
+//        gmres3.SetMaxIter(1000);
+//        gmres3.SetRelTol(1e-9);
+//        gmres3.SetPrintLevel(0);
+//        gmres3.SetKDim(100);
 
-        mfem::BlockVector blk_true_resid(true_resid.GetData(), true_blk_offsets_);
-        mfem::BlockVector rhs_hb(offset_hb);
-        rhs_hb.GetBlock(0) = blk_true_resid.GetBlock(0);
-        rhs_hb.GetBlock(1) = blk_true_resid.GetBlock(2);
-        mfem::BlockVector sol_hb(offset_hb);
-        rhs_hb.Randomize(1);
+//        mfem::BlockVector blk_true_resid(true_resid.GetData(), true_blk_offsets_);
+//        mfem::BlockVector rhs_hb(offset_hb);
+//        rhs_hb.GetBlock(0) = blk_true_resid.GetBlock(0);
+//        rhs_hb.GetBlock(1) = blk_true_resid.GetBlock(2);
+//        mfem::BlockVector sol_hb(offset_hb);
+//        rhs_hb.Randomize(1);
 
-        gmres3.Mult(rhs_hb, sol_hb);
-        if (!myid_) std::cout << "          HB: GMRES took " << gmres3.GetNumIterations()
-                              << " iterations, residual = " << gmres3.GetFinalNorm() << "\n";
+//        gmres3.Mult(rhs_hb, sol_hb);
+//        if (!myid_) std::cout << "          HB: GMRES took " << gmres3.GetNumIterations()
+//                              << " iterations, residual = " << gmres3.GetFinalNorm() << "\n";
     }
 
 
@@ -1596,6 +1615,144 @@ void TransportSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vecto
     dx *= std::min(1.0, param_.diff_tol / mfem::ParNormlp(dS, mfem::infinity(), comm_));
     x -= dx;
 }
+
+void TwoPhaseHybrid::Init()
+{
+    offsets_[0] = 0;
+    offsets_[1] = multiplier_d_td_->NumCols();
+    offsets_[2] = offsets_[1] + mgL_.NumVDofs();
+    op_.reset(new mfem::BlockOperator(offsets_));
+    op_->owns_blocks = true;
+
+    for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
+    {
+        mfem::DenseMatrix AinvDMinv = smoothg::Mult(Ainv_[iAgg], DMinv_[iAgg]);
+        mfem::DenseMatrix MinvDT(DMinv_[iAgg], 't');
+        common_mat_[iAgg] = smoothg::Mult(MinvDT, AinvDMinv);
+        common_mat_[iAgg] -= Minv_ref_[iAgg];
+        common_mat_[iAgg] *= -1.0;
+    }
+}
+
+void TwoPhaseHybrid::AssembleSolver(const mfem::Vector& elem_scaling_inverse,
+        const std::vector<mfem::DenseMatrix>& dMdS,
+        const std::vector<mfem::DenseMatrix>& dTdsigma,
+        const mfem::HypreParMatrix& dTdS)
+{
+    const auto& Agg_vertexdof = mgL_.GetGraphSpace().VertexToVDof();
+
+    mfem::SparseMatrix A00(num_multiplier_dofs_);
+    mfem::SparseMatrix A01(num_multiplier_dofs_, mgL_.NumVDofs());
+    mfem::SparseMatrix A10(mgL_.NumVDofs(), num_multiplier_dofs_);
+    mfem::SparseMatrix A11_tmp(mgL_.NumVDofs());
+
+    mfem::DenseMatrix A00_el, A01_el, A10_el, A11_el, help;
+    mfem::Array<int> local_vertexdof, local_edgedof, local_multiplier;
+
+    for (int iAgg = 0; iAgg < nAggs_; ++iAgg)
+    {
+        // Extracting the size and global numbering of local dof
+        GetTableRow(Agg_vertexdof, iAgg, local_vertexdof);
+        GetTableRow(Agg_multiplier_, iAgg, local_multiplier);
+
+        A00_el = Hybrid_el_[iAgg];
+        A00_el *= elem_scaling_inverse[iAgg];
+
+        help = smoothg::Mult(C_[iAgg], common_mat_[iAgg]);
+        help *= elem_scaling_inverse[iAgg];
+        A01_el = smoothg::Mult(help, dMdS[iAgg]);
+
+        mfem::DenseMatrix help2(help, 't');
+        A10_el = smoothg::Mult(dTdsigma[iAgg], help2);
+
+        help = smoothg::Mult(dTdsigma[iAgg], common_mat_[iAgg]);
+        A11_el = smoothg::Mult(help, dMdS[iAgg]);
+        A11_el *= elem_scaling_inverse[iAgg];
+
+        A00.AddSubMatrix(local_multiplier, local_multiplier, A00_el);
+        A01.AddSubMatrix(local_multiplier, local_vertexdof, A01_el);
+        A10.AddSubMatrix(local_vertexdof, local_multiplier, A10_el);
+        A11_tmp.AddSubMatrix(local_vertexdof, local_vertexdof, A11_el);
+    }
+
+    A00.Finalize();
+    A01.Finalize();
+    A10.Finalize();
+    A11_tmp.Finalize();
+
+//    auto pA11 = Copy(dTdS);
+//    *pA11 *= -1.0;
+//    GetDiag(*pA11) += A11_tmp;
+    unique_ptr<mfem::SparseMatrix> A11(mfem::Add(1.0, A11_tmp, -1.0, GetDiag(dTdS)));
+
+    mfem::BlockMatrix mat2(offsets_);
+    mat2.SetBlock(0, 0, &A00);
+    mat2.SetBlock(0, 1, &A01);
+    mat2.SetBlock(1, 0, &A10);
+    mat2.SetBlock(1, 1, A11.get());
+    unique_ptr<mfem::SparseMatrix> mono_mat(mat2.CreateMonolithic());
+
+
+
+    auto pA00_tmp = ParMult(*multiplier_td_d_, A00, multiplier_start_);
+    auto pA00 = mfem::ParMult(pA00_tmp.get(), multiplier_d_td_.get());
+    H_elim_.reset(pA00->EliminateRowsCols(ess_true_multipliers_));
+
+    auto Scale = VectorToMatrix(diagonal_scaling_);
+    mfem::HypreParMatrix pScale(comm_, pA00->N(), pA00->GetColStarts(), &Scale);
+    pA00 = smoothg::Mult(pScale, *pA00, pScale);
+    pA00->CopyRowStarts();
+    pA00->CopyColStarts();
+
+    auto pA11 = ToParMatrix(comm_, std::move(*A11));
+//    pA11->Add(-1.0, dTdS);
+    auto pA01_tmp = ParMult(*multiplier_td_d_, A01, mgL_.GetGraph().VertexStarts());
+    auto pA10_tmp = ParMult(A10, *multiplier_d_td_, mgL_.GetGraph().VertexStarts());
+
+    auto pA01 = mfem::ParMult(&pScale, pA01_tmp.get());
+    auto pA10 = mfem::ParMult(pA10_tmp.get(), &pScale);
+
+    op_->SetBlock(0, 0, pA00);
+    op_->SetBlock(0, 1, pA01);
+    op_->SetBlock(1, 0, pA10);
+    op_->SetBlock(1, 1, pA11);
+
+    mfem::HypreBoomerAMG A00_inv(*pA00);
+    A00_inv.SetPrintLevel(0);
+//        mfem::HypreSmoother A00_inv(A00, mfem::HypreSmoother::l1Jacobi);
+    mfem::HypreSmoother A11_inv(*pA11, mfem::HypreSmoother::l1Jacobi);
+//        HypreILU A11_inv(A11, 0);
+
+    mfem::BlockLowerTriangularPreconditioner prec(offsets_);
+    prec.SetDiagonalBlock(0, &A00_inv);
+    prec.SetDiagonalBlock(1, &A11_inv);
+    prec.SetBlock(1, 0, pA10);
+
+    unique_ptr<mfem::HypreParMatrix> pMonoMat(ToParMatrix(comm_, std::move(*mono_mat)));
+    unique_ptr<mfem::HypreSolver> ILU_smoother;
+    ILU_smoother.reset(new HypreILU(*pMonoMat, 0));
+    TwoStageSolver prec2(prec, *ILU_smoother, *op_);
+
+    mfem::GMRESSolver gmres3(comm_);
+    gmres3.SetOperator(*op_);
+    gmres3.SetPreconditioner(prec2);
+
+    gmres3.SetMaxIter(1000);
+    gmres3.SetRelTol(1e-9);
+    gmres3.SetPrintLevel(0);
+    gmres3.SetKDim(100);
+
+    mfem::BlockVector rhs_hb(offsets_);
+    mfem::BlockVector sol_hb(offsets_);
+    rhs_hb.Randomize(1);
+
+    gmres3.Mult(rhs_hb, sol_hb);
+    if (!myid_) std::cout << "          HB: GMRES took " << gmres3.GetNumIterations()
+                          << " iterations, residual = " << gmres3.GetFinalNorm() << "\n";
+
+//    pA11.release();
+}
+
 
 //mfem::Vector TotalMobility(const mfem::Vector& S)
 //{

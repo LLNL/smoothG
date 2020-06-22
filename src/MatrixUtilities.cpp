@@ -1322,4 +1322,19 @@ mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A)
     return A_prec;
 }
 
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A)
+{
+    mfem::Array<int> row_starts, col_starts;
+    GenerateOffsets(comm, A.NumRows(), row_starts);
+    GenerateOffsets(comm, A.NumCols(), col_starts);
+    auto pA = new mfem::HypreParMatrix(comm, A.NumRows(), A.NumCols(),
+                                       row_starts, col_starts, &A);
+    pA->CopyRowStarts();
+    pA->CopyColStarts();
+    pA->SetOwnerFlags(3, 0, 0);
+    A.SetGraphOwner(false);
+    A.SetDataOwner(false);
+    return pA;
+};
+
 } // namespace smoothg

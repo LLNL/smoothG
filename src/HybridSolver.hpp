@@ -125,14 +125,7 @@ public:
 
     virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
                                 const std::vector<mfem::DenseMatrix>& N_el);
-
-    void AssembleHybridTwoPhase(
-            const mfem::Vector& elem_scaling_inverse,
-            const std::vector<mfem::DenseMatrix>& dMdS,
-            const std::vector<mfem::DenseMatrix>& dTdsigma,
-            const mfem::SparseMatrix& dTdS,
-            mfem::BlockOperator& op);
-private:
+protected:
     void Init(const mfem::SparseMatrix& face_edgedof,
               const std::vector<mfem::DenseMatrix>& M_el,
               const mfem::HypreParMatrix& edgedof_d_td,
@@ -187,8 +180,6 @@ private:
     mfem::Vector MakeInitialGuess(const mfem::BlockVector& sol,
                                   const mfem::BlockVector& rhs) const;
 
-    void AssembleTwoPhaseHelper(const mfem::Vector& elem_scaling_inverse);
-
     const MixedMatrix& mgL_;
 
     mfem::SparseMatrix Agg_multiplier_;
@@ -214,8 +205,6 @@ private:
     std::vector<mfem::SparseMatrix> C_;
     std::vector<mfem::DenseMatrix> CM_;
     std::vector<mfem::SparseMatrix> CDT_;
-
-    std::vector<mfem::DenseMatrix> two_phase_core_;
 
     mutable std::vector<mfem::Vector> Minv_g_;
     mutable std::vector<mfem::Vector> local_rhs_;
