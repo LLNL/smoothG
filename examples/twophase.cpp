@@ -106,15 +106,15 @@ class TwoPhaseHybrid : public HybridSolver
 {
     mfem::Array<int> offsets_;
     unique_ptr<mfem::BlockOperator> op_;
+    unique_ptr<mfem::BlockLowerTriangularPreconditioner> stage1_prec_;
+    unique_ptr<HypreILU> stage2_prec_;
 
     std::vector<mfem::DenseMatrix> common_mat_;  // M^{-1} - M^{-1} B^T (BM^{-1}B^T)^{-1} B M^{-1}
     void Init();
 public:
     TwoPhaseHybrid(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr = nullptr)
         : HybridSolver(mgL, ess_attr), offsets_(3), common_mat_(nAggs_)
-    {
-        Init();
-    }
+    { Init(); }
 
     void AssembleSolver(
             const mfem::Vector& elem_scaling_inverse,
@@ -1680,62 +1680,55 @@ void TwoPhaseHybrid::AssembleSolver(const mfem::Vector& elem_scaling_inverse,
     A10.Finalize();
     A11_tmp.Finalize();
 
-//    auto pA11 = Copy(dTdS);
-//    *pA11 *= -1.0;
-//    GetDiag(*pA11) += A11_tmp;
-    unique_ptr<mfem::SparseMatrix> A11(mfem::Add(1.0, A11_tmp, -1.0, GetDiag(dTdS)));
-
-    mfem::BlockMatrix mat2(offsets_);
-    mat2.SetBlock(0, 0, &A00);
-    mat2.SetBlock(0, 1, &A01);
-    mat2.SetBlock(1, 0, &A10);
-    mat2.SetBlock(1, 1, A11.get());
-    unique_ptr<mfem::SparseMatrix> mono_mat(mat2.CreateMonolithic());
-
-
-
-    auto pA00_tmp = ParMult(*multiplier_td_d_, A00, multiplier_start_);
-    auto pA00 = mfem::ParMult(pA00_tmp.get(), multiplier_d_td_.get());
-    H_elim_.reset(pA00->EliminateRowsCols(ess_true_multipliers_));
+    auto pA11 = Copy(dTdS);
+    *pA11 *= -1.0;
+    GetDiag(*pA11) += A11_tmp;
+    auto A11 = GetDiag(*pA11);
+    BuildParallelSystemAndSolver(A00); // system and solver store in H_ and prec_
 
     auto Scale = VectorToMatrix(diagonal_scaling_);
-    mfem::HypreParMatrix pScale(comm_, pA00->N(), pA00->GetColStarts(), &Scale);
-    pA00 = smoothg::Mult(pScale, *pA00, pScale);
-    pA00->CopyRowStarts();
-    pA00->CopyColStarts();
+    mfem::HypreParMatrix pScale(comm_, H_->N(), H_->GetColStarts(), &Scale);
 
-    auto pA11 = ToParMatrix(comm_, std::move(*A11));
-//    pA11->Add(-1.0, dTdS);
+    for (auto mult : ess_true_multipliers_)
+    {
+        A01.EliminateRow(mult);
+        A10.EliminateCol(mult);
+    }
+
     auto pA01_tmp = ParMult(*multiplier_td_d_, A01, mgL_.GetGraph().VertexStarts());
     auto pA10_tmp = ParMult(A10, *multiplier_d_td_, mgL_.GetGraph().VertexStarts());
 
     auto pA01 = mfem::ParMult(&pScale, pA01_tmp.get());
     auto pA10 = mfem::ParMult(pA10_tmp.get(), &pScale);
 
-    op_->SetBlock(0, 0, pA00);
+    auto A11_inv = new mfem::HypreSmoother(*pA11, mfem::HypreSmoother::l1Jacobi);
+
+    stage1_prec_.reset(new mfem::BlockLowerTriangularPreconditioner(offsets_));
+    stage1_prec_->SetDiagonalBlock(0, prec_.release());
+    stage1_prec_->SetDiagonalBlock(1, A11_inv);
+//    stage1_prec_->SetBlock(1, 0, pA10);
+    stage1_prec_->owns_blocks = true;
+
+    mfem::BlockMatrix mat2(offsets_);
+    mat2.SetBlock(0, 0, &A00);
+    mat2.SetBlock(0, 1, &A01);
+    mat2.SetBlock(1, 0, &A10);
+    mat2.SetBlock(1, 1, &A11);
+    unique_ptr<mfem::SparseMatrix> mono_mat(mat2.CreateMonolithic());
+    unique_ptr<mfem::HypreParMatrix> pMonoMat(ToParMatrix(comm_, std::move(*mono_mat)));
+    stage2_prec_.reset(new HypreILU(*pMonoMat, 0));
+
+    prec_.reset(new TwoStageSolver(*stage1_prec_, *stage2_prec_, *op_));
+
+
+    op_->SetBlock(0, 0, H_.release());
     op_->SetBlock(0, 1, pA01);
     op_->SetBlock(1, 0, pA10);
-    op_->SetBlock(1, 1, pA11);
-
-    mfem::HypreBoomerAMG A00_inv(*pA00);
-    A00_inv.SetPrintLevel(0);
-//        mfem::HypreSmoother A00_inv(A00, mfem::HypreSmoother::l1Jacobi);
-    mfem::HypreSmoother A11_inv(*pA11, mfem::HypreSmoother::l1Jacobi);
-//        HypreILU A11_inv(A11, 0);
-
-    mfem::BlockLowerTriangularPreconditioner prec(offsets_);
-    prec.SetDiagonalBlock(0, &A00_inv);
-    prec.SetDiagonalBlock(1, &A11_inv);
-    prec.SetBlock(1, 0, pA10);
-
-    unique_ptr<mfem::HypreParMatrix> pMonoMat(ToParMatrix(comm_, std::move(*mono_mat)));
-    unique_ptr<mfem::HypreSolver> ILU_smoother;
-    ILU_smoother.reset(new HypreILU(*pMonoMat, 0));
-    TwoStageSolver prec2(prec, *ILU_smoother, *op_);
+    op_->SetBlock(1, 1, pA11.release());
 
     mfem::GMRESSolver gmres3(comm_);
     gmres3.SetOperator(*op_);
-    gmres3.SetPreconditioner(prec2);
+    gmres3.SetPreconditioner(*prec_);
 
     gmres3.SetMaxIter(1000);
     gmres3.SetRelTol(1e-9);
@@ -1749,8 +1742,6 @@ void TwoPhaseHybrid::AssembleSolver(const mfem::Vector& elem_scaling_inverse,
     gmres3.Mult(rhs_hb, sol_hb);
     if (!myid_) std::cout << "          HB: GMRES took " << gmres3.GetNumIterations()
                           << " iterations, residual = " << gmres3.GetFinalNorm() << "\n";
-
-//    pA11.release();
 }
 
 
