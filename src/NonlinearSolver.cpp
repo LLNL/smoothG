@@ -25,7 +25,7 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, NLSolverParameters param)
     : comm_(comm), tag_("Nonlinear"), converged_(false),
-      linear_tol_(param.init_linear_tol), linear_iter_(0), param_(param)
+      linear_iter_(0), linear_tol_(param.init_linear_tol), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
