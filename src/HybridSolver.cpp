@@ -384,6 +384,7 @@ mfem::SparseMatrix HybridSolver::AssembleHybridSystem(
         for (int i = 0; i < diagonal_scaling_.Size(); ++i)
         {
             diagonal_scaling_[i] = CDT1_global[i] / CCT_diag_global[i];
+//            diagonal_scaling_[i] = 1.0;
         }
     }
 
