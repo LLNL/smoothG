@@ -98,6 +98,7 @@ class TwoPhaseHybrid : public HybridSolver
 {
     mfem::Array<int> offsets_;
     unique_ptr<mfem::BlockOperator> op_;
+    unique_ptr<mfem::SparseMatrix> mono_mat_;
     unique_ptr<mfem::HypreParMatrix> monolithic_;
     unique_ptr<mfem::BlockLowerTriangularPreconditioner> stage1_prec_;
     unique_ptr<HypreILU> stage2_prec_;
@@ -295,6 +296,9 @@ public:
 };
 
 TwoPhase* problem_ptr;
+int count = 0;
+int num_coarse_lin_iter = 0;
+int num_coarse_lin_solve = 0;
 
 int main(int argc, char* argv[])
 {
@@ -657,11 +661,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         std::cout << "Total nonlinear iterations: " << nonlinear_iter_ << "\n";
         std::cout << "Average nonlinear iterations per time step: "
                   << double(nonlinear_iter_) / double(step-1) << "\n";
-        std::cout << "Total linear iterations: " << linear_iter_ << "\n";
-        std::cout << "Average linear iterations per nonlinear iteration: "
-                  << linear_iter_ / double(nonlinear_iter_) << "\n";
+        std::cout << "Total coarsest linear iterations: " << num_coarse_lin_iter << "\n";
+        std::cout << "Average linear iterations per coarsest level linear solve: "
+                  << num_coarse_lin_iter / double(num_coarse_lin_solve) << "\n";
         std::cout << "Average linear iterations per time step: "
-                  << linear_iter_ / double(step-1) << "\n";
+                  << num_coarse_lin_iter / double(step-1) << "\n";
     }
 
     blk_helper_[level_].GetBlock(0) = x.GetBlock(0);
@@ -861,10 +865,12 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     }
 
 
-//    std::cout << "|| resid 0|| " << mfem::ParNormlp(blk_x.GetBlock(0), 2, comm_) << "\n";
-//    std::cout << "|| resid 1|| " << mfem::ParNormlp(blk_x.GetBlock(1), 2, comm_) << "\n";
-//    std::cout << "|| resid 2|| " << mfem::ParNormlp(blk_x.GetBlock(2), 2, comm_) << "\n";
-
+//    if (Norm(out) > 1e-8)
+//    {
+//        std::cout << "|| resid 0|| " << mfem::ParNormlp(out.GetBlock(0), 2, comm_) << "\n";
+//        std::cout << "|| resid 1|| " << mfem::ParNormlp(out.GetBlock(1), 2, comm_) << "\n";
+//        std::cout << "|| resid 2|| " << mfem::ParNormlp(out.GetBlock(2), 2, comm_) << "\n";
+//    }
 
 //    if (is_first_resid_eval_)
 //    {
@@ -950,8 +956,6 @@ mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::Vector& flux, const 
     return out;
 }
 
-int count = 0;
-
 void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
@@ -973,6 +977,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     true_resid *= -1.0;
 
     mfem::BlockVector true_blk_dx(true_blk_offsets_);
+    true_blk_dx = 0.0;
 
     const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
     auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
@@ -1009,7 +1014,8 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     unique_ptr<mfem::HypreParMatrix> dTdS(mfem::ParMult(D_.get(), U_pwc.get()));
     GetDiag(*dTdS) += Ms_;
 
-    if(false)
+    const bool hybrid = true;
+    if (!hybrid)
     {
 
     mfem::BlockOperator op(true_blk_offsets_);
@@ -1164,7 +1170,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             //    gmres_.iterative_mode = true;
             //        gmres_.SetPrintLevel(1);
 
-            true_blk_dx = 0.0;
+//            true_blk_dx = 0.0;
 
 //            if (op.NumRows() > 30000)
                 gmres_.Mult(true_resid, true_blk_dx);
@@ -1190,16 +1196,43 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
 
 
-//            if (gmres_.GetNumIterations() == 18 && count == 0)
+//            if (gmres_.GetNumIterations() == 18)
 //            {
-//                std::ofstream ofs("good_matrix.txt");
+//                std::ofstream ofs("good_fine_matrix.txt");
 //                mono_mat->PrintMatlab(ofs);
+//                std::ofstream rhs_file("good_fine_rhs.txt");
+//                true_resid.Print(rhs_file, 1);
+//                std::ofstream sol_file("good_fine_sol.txt");
+//                true_blk_dx.Print(sol_file, 1);
 //            }
-//            if (gmres_.GetNumIterations() == 76 && count == 0)
+//            if (gmres_.GetNumIterations() == 76)
 //            {
-//                std::ofstream ofs("bad_matrix.txt");
+//                std::ofstream ofs("bad_fine_matrix.txt");
 //                mono_mat->PrintMatlab(ofs);
+//                std::ofstream rhs_file("bad_fine_rhs.txt");
+//                true_resid.Print(rhs_file, 1);
+//                std::ofstream sol_file("bad_fine_sol.txt");
+//                true_blk_dx.Print(sol_file, 1);
 //            }
+//            if (gmres_.GetNumIterations() == 87)
+//            {
+//                std::ofstream ofs("good_coarse_matrix.txt");
+//                mono_mat->PrintMatlab(ofs);
+//                std::ofstream rhs_file("good_coarse_rhs.txt");
+//                true_resid.Print(rhs_file, 1);
+//                std::ofstream sol_file("good_coarse_sol.txt");
+//                true_blk_dx.Print(sol_file, 1);
+//            }
+//            if (gmres_.GetNumIterations() == 200)
+//            {
+//                std::ofstream ofs("bad_coarse_matrix.txt");
+//                mono_mat->PrintMatlab(ofs);
+//                std::ofstream rhs_file("bad_coarse_rhs.txt");
+//                true_resid.Print(rhs_file, 1);
+//                std::ofstream sol_file("bad_coarse_sol.txt");
+//                true_blk_dx.Print(sol_file, 1);
+//            }
+
 
 ////////////////////////////////////
 
@@ -1213,6 +1246,12 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             linear_iter_ += gmres_.GetNumIterations();
             if (!myid_) std::cout << "    GMRES took " << gmres_.GetNumIterations()
                                   << " iterations, residual = " << gmres_.GetFinalNorm() << "\n";
+
+            if (darcy_system_.NumVDofs() < 300)
+            {
+                num_coarse_lin_iter += gmres_.GetNumIterations();
+                num_coarse_lin_solve++;
+            }
         }
     }
     else
@@ -1324,8 +1363,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
                               << " iterations, residual = " << gmres2.GetFinalNorm() << "\n";
     }
     }
-
-//    if (false)
+    else
     {
         mfem::Array<int> offset_hb(3);
         offset_hb[0] = 0;
@@ -1372,6 +1410,13 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        true_blk_dx_hb = 0.0;
 
         solver.Mult(true_blk_resid, true_blk_dx);
+        linear_iter_ += solver.GetNumIterations();
+
+        if (darcy_system_.NumVDofs() < 30000)
+        {
+            num_coarse_lin_iter += solver.GetNumIterations();
+            num_coarse_lin_solve++;
+        }
 
 //        mfem::Vector for_print(true_blk_dx_hb.GetBlock(0).GetData(), 10);
 //        for_print.Print();
@@ -1400,7 +1445,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //                  << mfem::ParNormlp(true_blk_dx_hb.GetBlock(2), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(2), 2, comm_) << "\n";
 
     }
-
 
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
     blk_dx = 0.0;
@@ -1431,8 +1475,15 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //    std::cout << "|| diff 1|| " << mfem::ParNormlp(diff.GetBlock(1), 2, comm_) << "\n";
 //    std::cout << "|| diff 2|| " << mfem::ParNormlp(diff.GetBlock(2), 2, comm_) << "\n";
 
-//    mfem::socketstream sout;
-//    problem_ptr->VisSetup(sout, diff, 0.0, 0.0, "diff");
+//    if (darcy_system_.NumVDofs()>10000)
+//    {
+//        mfem::socketstream sout;
+//        mfem::BlockVector true_blk_resid(true_resid, true_blk_offsets_);
+//        problem_ptr->VisSetup(sout, true_blk_resid.GetBlock(2), 0.0, 0.0, "diff");
+//    }
+
+//    if (darcy_system_.NumVDofs()>10000)
+//    std::cout<< " blk_x.last = "<<blk_x[blk_x.Size()-1]<<"\n";
 
 //    if (false)
     {
@@ -1443,6 +1494,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             {
                 blk_x.GetBlock(2)[ii]  = 0.0;
             }
+//            if (darcy_system_.NumVDofs()>10000 and blk_x.GetBlock(2)[ii] > 1.0)
+//            {
+//                blk_x.GetBlock(2)[ii]  = 1.0;
+//            }
         }
         //    const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
@@ -1732,8 +1787,8 @@ void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
     block_A.SetBlock(0, 1, &A01);
     block_A.SetBlock(1, 0, &A10);
     block_A.SetBlock(1, 1, A11.get());
-    unique_ptr<mfem::SparseMatrix> mono_mat(block_A.CreateMonolithic());
-    monolithic_.reset(ToParMatrix(comm_, std::move(*mono_mat)));
+    mono_mat_.reset(block_A.CreateMonolithic());
+    monolithic_.reset(ToParMatrix(comm_, *mono_mat_));
     stage2_prec_.reset(new HypreILU(*monolithic_, 0));
 
     op_->SetBlock(0, 0, H_.release());
@@ -2016,11 +2071,52 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
     mfem::BlockVector rhs_hb = MakeHybridRHS(rhs);
 
     mfem::BlockVector sol_hb(offsets_);
+//    sol_hb = 0.0;
 //    rhs_hb.Randomize(1);
 
     solver_->Mult(rhs_hb, sol_hb);
+
+    num_iterations_ = solver_->GetNumIterations();
     if (!myid_) std::cout << "          HB: GMRES took " << solver_->GetNumIterations()
                           << " iterations, residual = " << solver_->GetFinalNorm() << "\n";
+
+//    if (solver_->GetNumIterations() == 18)
+//    {
+//        std::ofstream ofs("good_fine_hybrid_matrix.txt");
+//        mono_mat_->PrintMatlab(ofs);
+//        std::ofstream rhs_file("good_fine_hybrid_rhs.txt");
+//        rhs_hb.Print(rhs_file, 1);
+//        std::ofstream sol_file("good_fine_hybrid_sol.txt");
+//        sol_hb.Print(sol_file, 1);
+//    }
+//    if (solver_->GetNumIterations() == 16)
+//    {
+//        std::ofstream ofs("bad_fine_hybrid_matrix.txt");
+//        mono_mat_->PrintMatlab(ofs);
+//        std::ofstream rhs_file("bad_fine_hybrid_rhs.txt");
+//        rhs_hb.Print(rhs_file, 1);
+//        std::ofstream sol_file("bad_fine_hybrid_sol.txt");
+//        sol_hb.Print(sol_file, 1);
+//    }
+//    if (solver_->GetNumIterations() == 37)
+//    {
+//        std::ofstream ofs("good_coarse_hybrid_matrix.txt");
+//        mono_mat_->PrintMatlab(ofs);
+//        std::ofstream rhs_file("good_coarse_hybrid_rhs.txt");
+//        rhs_hb.Print(rhs_file, 1);
+//        std::ofstream sol_file("good_coarse_hybrid_sol.txt");
+//        sol_hb.Print(sol_file, 1);
+//    }
+//    if (solver_->GetNumIterations() == 25)
+//    {
+//        std::ofstream ofs("bad_coarse_hybrid_matrix.txt");
+//        mono_mat_->PrintMatlab(ofs);
+//        std::ofstream rhs_file("bad_coarse_hybrid_rhs.txt");
+//        rhs_hb.Print(rhs_file, 1);
+//        std::ofstream sol_file("bad_coarse_hybrid_sol.txt");
+//        sol_hb.Print(sol_file, 1);
+//    }
+
 
     BackSubstitute(rhs, sol_hb, sol);
 

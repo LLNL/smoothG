@@ -82,7 +82,7 @@ LocalEigenSolver::LocalEigenSolver(
     num_arnoldi_vectors_(-1),
     tolerance_(1e-16),
     max_iterations_(10000),
-    shift_(-1e-10)  // shift_ may need to be adjusted
+    shift_(-1e-2)  // shift_ may need to be adjusted
 {
 }
 
@@ -453,7 +453,7 @@ int ComputeNCV(int size, int num_evects, int num_arnoldi_vectors)
 {
     int ncv;
     if (num_arnoldi_vectors < 0)
-        ncv = 2 * num_evects + 10;
+        ncv = 2 * num_evects + 20;
     else
         ncv = num_arnoldi_vectors;
     return std::min(size, ncv);

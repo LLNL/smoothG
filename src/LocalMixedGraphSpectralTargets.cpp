@@ -203,6 +203,19 @@ MixedBlockEigensystem::MixedBlockEigensystem(
 {
 }
 
+void DFS(int source, const mfem::SparseMatrix& vert_vert, mfem::Array<int>& visited)
+{
+   visited[source] = 1;
+   for (int j = 0; j < vert_vert.RowSize(source); ++j)
+   {
+      const int target = vert_vert.GetRowColumns(source)[j];
+      if (visited[target] == 0)
+      {
+         DFS(target, vert_vert, visited);
+      }
+   }
+}
+
 void MixedBlockEigensystem::ComputeEigenvectors(
     mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
     mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects)
@@ -239,6 +252,22 @@ void MixedBlockEigensystem::ComputeEigenvectors(
     if (!use_w_)
     {
         CheckMinimalEigenvalue(eval_min_, "vertex");
+
+//        if (std::abs(eval_min_) > zero_eigenvalue_threshold_)
+//        {
+//            mfem::Vector ones(DMinvDt_.Size());
+//            ones = 1.0;
+//            mfem::Vector Aones(ones);
+//            Aones = 0.0;
+//            DMinvDt_.Mult(ones, Aones);
+//            Aones.Print();
+//        }
+
+//        mfem::Array<int> visited(DMinvDt_.NumRows());
+//        visited = 0;
+//        DFS(0, DMinvDt_, visited);
+//        const int num_visited = visited.Sum();
+//        assert(num_visited == DMinvDt_.NumRows());
     }
 }
 

@@ -348,10 +348,29 @@ int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
     return offset_comp.Last();
 }
 
+//void DFS(int source, const mfem::SparseMatrix& vert_vert, mfem::Array<int>& visited)
+//{
+//   visited[source] = 1;
+//   for (int j = 0; j < vert_vert.RowSize(source); ++j)
+//   {
+//      const int target = vert_vert.GetRowColumns(source)[j];
+//      if (visited[target] == 0)
+//      {
+//         DFS(target, vert_vert, visited);
+//      }
+//   }
+//}
+
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
                int num_parts, bool use_edge_weight,
                std::vector<std::vector<int>> iso_verts)
 {
+//    mfem::Array<int> visited(w_table.NumRows());
+//    visited = 0;
+//    DFS(0, w_table, visited);
+//    const int num_visited = visited.Sum();
+//    assert(num_visited == w_table.NumRows());
+
     MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(2);
     partitioner.SetPreIsolateVertices(std::move(iso_verts));

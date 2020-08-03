@@ -68,7 +68,6 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
                 {
                     std::cout << tag_ << " iter " << iter_ << ": x_norm = " << x_norm
                               << ", dx_norm = " << dx_norm << ".\n";
-
                     break;
                 }
             }
