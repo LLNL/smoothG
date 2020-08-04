@@ -398,6 +398,7 @@ problem_ptr = &problem;
     problem.Partition(use_metis, coarsening_factors, part);
     upscale_param.num_iso_verts = problem.NumIsoVerts();
 
+
     Hierarchy hierarchy(problem.GetFVGraph(true), upscale_param,
                         &part, &problem.EssentialAttribute());
     hierarchy.PrintInfo();

@@ -498,6 +498,10 @@ mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A);
 
 mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A);
 
+/// Drop the entries (whether on diagonal or not) that are smaller than tol
+/// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
+HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */
