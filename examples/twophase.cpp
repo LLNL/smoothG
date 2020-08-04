@@ -961,7 +961,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 {
     mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
     const GraphSpace& space = darcy_system_.GetGraphSpace();
-
+    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
 
 //    if (false)
     {
@@ -970,6 +970,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             if (blk_x.GetBlock(2)[ii] < 0.0)
             {
                 blk_x.GetBlock(2)[ii]  = 0.0;
+            }
+            if (S[ii] > 1.0)
+            {
+                blk_x.GetBlock(2)[ii] /= S[ii];
             }
         }
     }
@@ -980,7 +984,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     mfem::BlockVector true_blk_dx(true_blk_offsets_);
     true_blk_dx = 0.0;
 
-    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
     auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
     auto dMdS_proc = Assemble_dMdS(blk_x.GetBlock(0), S);
 
@@ -1488,6 +1491,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
 //    if (false)
     {
+        const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
         {
             //        blk_x.GetBlock(2)[ii] = std::fabs(blk_x.GetBlock(2)[ii]);
@@ -1495,10 +1499,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             {
                 blk_x.GetBlock(2)[ii]  = 0.0;
             }
-//            if (darcy_system_.NumVDofs()>10000 and blk_x.GetBlock(2)[ii] > 1.0)
-//            {
-//                blk_x.GetBlock(2)[ii]  = 1.0;
-//            }
+            if (S2[ii] > 1.0)
+            {
+                blk_x.GetBlock(2)[ii] /= S2[ii];
+            }
         }
         //    const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
