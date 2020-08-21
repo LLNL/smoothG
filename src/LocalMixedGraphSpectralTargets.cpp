@@ -1030,6 +1030,32 @@ void LocalMixedGraphSpectralTargets::NormalizeTraces(std::vector<mfem::DenseMatr
             const double alpha = Dtransfer.InnerProduct(trace, local_constant);
             add(trace, -alpha, PV_trace, trace);
         }
+
+        // debug check
+        if (face_agg.RowSize(i) == 2)
+        {
+            auto DtransferT = smoothg::Transpose(Dtransfer);
+            mfem::Vector oneD = smoothg::Mult(DtransferT, local_constant);
+
+            bool first_sign = (oneD[0]*PV_trace[0] > 0.0);
+            if (oneD[0]*PV_trace[0] == 0.0)
+            {
+                assert(PV_trace.Size() > 1);
+                first_sign = (oneD[1]*PV_trace[1] > 0.0);
+                assert(oneD[1]*PV_trace[1] != 0.0);
+            }
+
+            for (int i = 1; i < PV_trace.Size(); i++)
+            {
+                if ((oneD[i]*PV_trace[i] >= 0.0) != first_sign)
+                {
+                    std::cout<<oneD[0]*PV_trace[0] <<" "<<oneD[i]*PV_trace[i]<<"\n";
+                }
+                assert((oneD[i]*PV_trace[i] >= 0.0) == first_sign);
+            }
+
+        }
+
     }
 }
 

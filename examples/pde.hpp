@@ -840,8 +840,10 @@ void DarcyProblem::VisualizePermeability()
         coeff_gf_[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).FroNorm(center);
     }
 
-    mfem::socketstream soc;
-    VisSetup(soc, coeff_gf_, 0., 0., "", 1);
+//    mfem::socketstream soc;
+//    VisSetup(soc, coeff_gf_, 0., 0., "", 1);
+    std::ofstream coef_file("spe10_bot.gf");
+    coeff_gf_.Save(coef_file);
 }
 
 double hy_g, Ly_g;
@@ -906,6 +908,8 @@ SPE10Problem::SPE10Problem(const char* perm_file, int dim, int spe10_scale, int 
     SetupMeshAndCoeff(perm_file, dim, spe10_scale, use_metis, slice);
 
     InitGraph();
+
+//    VisualizePermeability();
 
     ComputeGraphWeight(unit_weight);
     MakeRHS();

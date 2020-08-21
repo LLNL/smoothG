@@ -180,7 +180,7 @@ class TwoPhaseSolver
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
-    const double porosity_ = 0.3;
+    const double porosity_ = 0.05;
     const double weight_;
 public:
     TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
@@ -193,6 +193,8 @@ public:
 
 class CoupledSolver : public NonlinearSolver
 {
+    mfem::Vector sol_previous_iter;
+
     const MixedMatrix& darcy_system_;
     mfem::GMRESSolver gmres_;
     unique_ptr<mfem::HypreParMatrix> D_;
@@ -296,6 +298,7 @@ public:
 };
 
 TwoPhase* problem_ptr;
+Hierarchy* hie_ptr;
 int count = 0;
 int num_coarse_lin_iter = 0;
 int num_coarse_lin_solve = 0;
@@ -321,9 +324,9 @@ int main(int argc, char* argv[])
     args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
     int well_height = 1;
     args.AddOption(&well_height, "-wh", "--well-height", "Well Height.");
-    double inject_rate = 0.001;
+    double inject_rate = 0.00005;
     args.AddOption(&inject_rate, "-ir", "--inject-rate", "Injector rate.");
-    double bhp = 1.0e5;
+    double bhp = -1.0e6;
     args.AddOption(&bhp, "-bhp", "--bottom-hole-pressure", "Bottom Hole Pressure.");
     args.AddOption(&evolve_param.dt, "-dt", "--delta-t", "Time step.");
     args.AddOption(&evolve_param.total_time, "-time", "--total-time",
@@ -379,8 +382,8 @@ int main(int argc, char* argv[])
 //    fas_param.coarse.atol = 1e-12;
     fas_param.nl_solve.print_level = 1;
     fas_param.nl_solve.max_num_iter = use_vcycle ? max_iter : 1;
-    fas_param.nl_solve.atol = 1e-10;
-    fas_param.nl_solve.rtol = 1e-8;
+    fas_param.nl_solve.atol = 1e-8;
+    fas_param.nl_solve.rtol = 1e-6;
     SetOptions(fas_param, use_vcycle, num_backtrack, diff_tol);
 
     mfem::Array<int> ess_attr(dim == 3 ? 6 : 4);
@@ -402,7 +405,10 @@ problem_ptr = &problem;
     Hierarchy hierarchy(problem.GetFVGraph(true), upscale_param,
                         &part, &problem.EssentialAttribute());
     hierarchy.PrintInfo();
+hie_ptr = &hierarchy;
 
+//std::ofstream mesh_file("spe10_2d.mesh");
+//problem_ptr->GetMesh().PrintWithPartitioning(part.GetData(), mesh_file);
 //    if (upscale_param.hybridization)
 //    {
 //        hierarchy.SetAbsTol(1e-18);
@@ -434,8 +440,19 @@ problem_ptr = &problem;
         Ss[l] = sol.GetBlock(2);
 //        Ss[l].SetSize(sol.BlockSize(2) - 5);
 
-        double norm = mfem::ParNormlp(Ss[l], 1, comm);
-        if (myid == 0) { std::cout << "    || S ||_1 = " << norm << "\n"; }
+        Ss[l][Ss[l].Size()-1] = 0.0;
+        double norm = mfem::ParNormlp(Ss[l], 2, comm);
+        if (myid == 0) { std::cout << "    || S ||_2 = " << norm << "\n"; }
+
+        sol.GetBlock(1)[Ss[l].Size()-1] = (sol.GetBlock(1).Max()+sol.GetBlock(1).Min())/2.;
+        double p_max = sol.GetBlock(1).Max();
+        double p_min = sol.GetBlock(1).Min();
+
+        if (myid == 0) { std::cout << "    min p, max p = " << p_min << ", " << p_max << "\n"; }
+//        mfem::socketstream sout;
+//        problem.VisSetup(sout, sol.GetBlock(1), 0.0, 0.0, "Final");
+
+
 
 //        if (l) { Ss[l] -= Ss[0]; }
 //        double diff = mfem::ParNormlp(Ss[l], 2, comm);
@@ -568,6 +585,8 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
 {
     linear_iter_ = 0;
 
+//    std::cout << "problem.CellVolume() * porosity_ = "<<problem.CellVolume() * porosity_<<"\n";
+
     blk_helper_.reserve(level + 1);
     blk_helper_.emplace_back(hierarchy.BlockOffsets(0));
     blk_helper_[0].GetBlock(0) = problem_.GetEdgeRHS();
@@ -640,6 +659,16 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         time += dt_real;
         done = (time >= evolve_param_.total_time);
 
+//        double x_last = x.GetBlock(1)[x.BlockSize(1)-1];
+//        x.GetBlock(1)[x.BlockSize(1)-1] = (x.GetBlock(1).Max()+x.GetBlock(1).Min())/2.;
+//        double p_max = x.GetBlock(1).Max();
+//        double p_min = x.GetBlock(1).Min();
+//        x.GetBlock(1)[x.BlockSize(1)-1] = x_last;
+
+//        if (myid == 0) { std::cout << "    min p, max p = " << p_min << ", " << p_max << "\n"; }
+
+
+
         if (myid == 0)
         {
             std::cout << "Time step " << step << ": step size = " << dt_real
@@ -654,6 +683,10 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
             }
 
             problem_.VisUpdate(sout, x_blk2);
+
+//            double norm = mfem::ParNormlp(x_blk2, 2, hierarchy_.GetComm());
+//            if (myid == 0) { std::cout << "    || S ||_2 = " << norm << "\n"; }
+
         }
     }
 
@@ -706,18 +739,6 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
-
-//        {
-//            mfem::Vector x_copy(x);
-//            solver.SetMaxIter(1);
-//            solver.Solve(rhs, x_copy);
-//            solver.SetMaxIter(100);
-
-//            auto& scales = ((CoupledSolver&)solver.GetLevelSolver(0)).GetScales();
-//            rhs.GetBlock(0) *= scales[0];
-//            rhs.GetBlock(1) *= scales[1];
-//            rhs.GetBlock(2) *= scales[2];
-//        }
 
 //        x = 0.0;
         solver.Solve(rhs, x);
@@ -796,7 +817,7 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
 
     gmres_.SetMaxIter(10000);
 //    gmres_.SetAbsTol(1e-15);
-    gmres_.SetRelTol(1e-9);
+    gmres_.SetRelTol(1e-8);
     gmres_.SetPrintLevel(0);
     gmres_.SetKDim(100);
 
@@ -961,10 +982,41 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 {
     mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
     const GraphSpace& space = darcy_system_.GetGraphSpace();
-    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
+
+
+    //    if((count == 123)|| (count == 129) || (count == 133) || (count == 155) || (count == 162) || (count == 168))
+    //    if((count == 321)|| (count == 343) || (count == 387) || (count == 431) || (count == 453) || (count == 629))
+    if (count == 475 && blk_x.BlockSize(2) > 13200)
+    {
+//                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
+//        sol_previous_iter -= x;
+//        sol_previous_iter *= -1.0;
+        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
+
+//        mfem::Vector for_print(13201); for_print = 0.0;
+//        hie_ptr->Interpolate(1, blk_dx_print.GetBlock(2), for_print);
+
+        mfem::socketstream sout;
+        problem_ptr->VisSetup(sout, blk_dx_print.GetBlock(2), 0.0, 0.0, "fine sol");
+
+        mfem::Vector for_print_tmp = hie_ptr->Project(0, blk_dx_print.GetBlock(2));
+        mfem::Vector for_print = hie_ptr->Interpolate(1, for_print_tmp);
+        mfem::socketstream sout3;
+        problem_ptr->VisSetup(sout3, for_print, 0.0, 0.0, "fine sol coarse projection");
+
+        sol_previous_iter -= x;
+        sol_previous_iter *= -1.0;
+        mfem::socketstream sout2;
+        problem_ptr->VisSetup(sout2, blk_dx_print.GetBlock(2), 0.0, 0.0, "coarse correction");
+
+    }
+//    std::cout<<"count = "<<count<<"\n";
+    count++;
+
 
 //    if (false)
     {
+        const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
         {
             if (blk_x.GetBlock(2)[ii] < 0.0)
@@ -977,6 +1029,8 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             }
         }
     }
+    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
+
 
     mfem::Vector true_resid = AssembleTrueVector(Residual(x, rhs));
     true_resid *= -1.0;
@@ -1057,6 +1111,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     mfem::Vector Md;
     M->GetDiag(Md);
+
     Md *= -1.0;
     DT_->InvScaleRows(Md);
     unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D_.get(), DT_.get()));
@@ -1197,45 +1252,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //                      << mfem::ParNormlp(sol_diff.GetBlock(1), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(1), 2, comm_) << "\n";
 //            std::cout << "    || linear resid 2|| "
 //                      << mfem::ParNormlp(sol_diff.GetBlock(2), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(2), 2, comm_) << "\n";
-
-
-
-//            if (gmres_.GetNumIterations() == 18)
-//            {
-//                std::ofstream ofs("good_fine_matrix.txt");
-//                mono_mat->PrintMatlab(ofs);
-//                std::ofstream rhs_file("good_fine_rhs.txt");
-//                true_resid.Print(rhs_file, 1);
-//                std::ofstream sol_file("good_fine_sol.txt");
-//                true_blk_dx.Print(sol_file, 1);
-//            }
-//            if (gmres_.GetNumIterations() == 76)
-//            {
-//                std::ofstream ofs("bad_fine_matrix.txt");
-//                mono_mat->PrintMatlab(ofs);
-//                std::ofstream rhs_file("bad_fine_rhs.txt");
-//                true_resid.Print(rhs_file, 1);
-//                std::ofstream sol_file("bad_fine_sol.txt");
-//                true_blk_dx.Print(sol_file, 1);
-//            }
-//            if (gmres_.GetNumIterations() == 87)
-//            {
-//                std::ofstream ofs("good_coarse_matrix.txt");
-//                mono_mat->PrintMatlab(ofs);
-//                std::ofstream rhs_file("good_coarse_rhs.txt");
-//                true_resid.Print(rhs_file, 1);
-//                std::ofstream sol_file("good_coarse_sol.txt");
-//                true_blk_dx.Print(sol_file, 1);
-//            }
-//            if (gmres_.GetNumIterations() == 200)
-//            {
-//                std::ofstream ofs("bad_coarse_matrix.txt");
-//                mono_mat->PrintMatlab(ofs);
-//                std::ofstream rhs_file("bad_coarse_rhs.txt");
-//                true_resid.Print(rhs_file, 1);
-//                std::ofstream sol_file("bad_coarse_sol.txt");
-//                true_blk_dx.Print(sol_file, 1);
-//            }
 
 
 ////////////////////////////////////
@@ -1507,6 +1523,23 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         //    const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
     }
+
+
+    sol_previous_iter = x;
+    if (count == 475 && blk_x.BlockSize(2) < 13200)
+    {
+//                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
+//        sol_previous_iter = x;
+//        sol_previous_iter *= -1.0;
+        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
+
+        mfem::Vector for_print(13201); for_print = 0.0;
+        hie_ptr->Interpolate(1, blk_dx_print.GetBlock(2), for_print);
+
+        mfem::socketstream sout;
+        problem_ptr->VisSetup(sout, for_print, 0.0, 0.0, "coarse sol");
+    }
+
 }
 
 void CoupledSolver::BuildHybridSystem(mfem::BlockOperator& op)
@@ -1688,8 +1721,8 @@ void TwoPhaseHybrid::Init()
 
     solver_ = InitKrylovSolver(GMRES);
 
-    solver_->SetAbsTol(1e-12);
-    solver_->SetRelTol(1e-9);
+    solver_->SetAbsTol(1e-10);
+    solver_->SetRelTol(1e-8);
 }
 
 void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
@@ -1921,8 +1954,8 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
     solver_->Mult(rhs_hb, sol_hb);
 
     num_iterations_ = solver_->GetNumIterations();
-    if (!myid_) std::cout << "          HB: GMRES took " << solver_->GetNumIterations()
-                          << " iterations, residual = " << solver_->GetFinalNorm() << "\n";
+//    if (!myid_) std::cout << "          HB: GMRES took " << solver_->GetNumIterations()
+//                          << " iterations, residual = " << solver_->GetFinalNorm() << "\n";
 
     BackSubstitute(rhs, sol_hb, sol);
 
@@ -2155,6 +2188,7 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
 //}
 
 // case 3
+const double mu_o =  0.0002; // 0.005; //
 mfem::Vector TotalMobility(const mfem::Vector& S)
 {
     mfem::Vector LamS(S.Size());
@@ -2162,7 +2196,7 @@ mfem::Vector TotalMobility(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        LamS(i)  = S_w * S_w / 1e-3 + S_o * S_o / 1e-2;
+        LamS(i)  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
     }
     return LamS;
 }
@@ -2174,8 +2208,8 @@ mfem::Vector dTMinv_dS(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        out(i)  = 2.0 * S_w / 1e-3 - 2.0 * S_o / 1e-2;
-        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / 1e-2;
+        out(i)  = 2.0 * S_w / 1e-3 - 2.0 * S_o / mu_o;
+        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
         out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
     }
     return out;
@@ -2188,7 +2222,7 @@ mfem::Vector FractionalFlow(const mfem::Vector& S)
     {
         double S_w = S(i);
         double S_o = 1.0 - S_w;
-        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / 1e-2;
+        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
         FS(i) = S_w * S_w / 1e-3 / Lam_S;
     }
     return FS;
@@ -2202,8 +2236,8 @@ mfem::Vector dFdS(const mfem::Vector& S)
         double S_w = S(i);
         double S_o = 1.0 - S_w;
         double dLw_dS = 2.0 * S_w / 1e-3;
-        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / 1e-2;
-        double dLam_dS = 2.0 * S_w / 1e-3 - 2.0 * S_o / 1e-2;
+        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
+        double dLam_dS = 2.0 * S_w / 1e-3 - 2.0 * S_o / mu_o;
         out(i) = (dLw_dS * Lam_S - dLam_dS * S_w * S_w / 1e-3) / (Lam_S * Lam_S);
     }
     return out;

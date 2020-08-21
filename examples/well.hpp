@@ -259,8 +259,8 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
     point(1, 3) = max_y;
 //    point(0, 4) = ((max_x + ft_) / 2.0) + ft_;
 //    point(1, 4) = ((max_y + ft_) / 2.0) + ft_;
-    point(0, 4) = 182.5;
-    point(1, 4) = 335.0; // 258.0; //
+    point(0, 4) = 185.5; // 182.5;
+    point(1, 4) = 336.5; // 335.0; // 258.0; //
 
 
     for (int j = 0; j < well_height; ++j)
