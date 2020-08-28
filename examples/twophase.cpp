@@ -166,8 +166,11 @@ class TwoPhaseSolver
     const EvolveParamenters& evolve_param_;
     const FASParameters& solver_param_;
     const TwoPhase& problem_;
-    Hierarchy& hierarchy_;
+    Hierarchy* hierarchy_;
     std::vector<mfem::BlockVector> blk_helper_;
+
+    unique_ptr<Hierarchy> new_hierarchy_;
+
 
     mfem::Array<int> blk_offsets_;
     unique_ptr<mfem::BlockVector> source_;
@@ -299,6 +302,8 @@ public:
 
 TwoPhase* problem_ptr;
 Hierarchy* hie_ptr;
+mfem::Array<int>* part_ptr;
+UpscaleParameters* upscale_param_ptr;
 int count = 0;
 int num_coarse_lin_iter = 0;
 int num_coarse_lin_solve = 0;
@@ -406,6 +411,8 @@ problem_ptr = &problem;
                         &part, &problem.EssentialAttribute());
     hierarchy.PrintInfo();
 hie_ptr = &hierarchy;
+part_ptr = &part;
+upscale_param_ptr = &upscale_param;
 
 //std::ofstream mesh_file("spe10_2d.mesh");
 //problem_ptr->GetMesh().PrintWithPartitioning(part.GetData(), mesh_file);
@@ -580,7 +587,7 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
                                const int level, const EvolveParamenters& evolve_param,
                                const FASParameters& solver_param)
     : level_(level), evolve_param_(evolve_param), solver_param_(solver_param),
-      problem_(problem), hierarchy_(hierarchy), blk_offsets_(4), nonlinear_iter_(0),
+      problem_(problem), hierarchy_(&hierarchy), blk_offsets_(4), nonlinear_iter_(0),
       step_converged_(true), weight_(problem.CellVolume() * porosity_ * density_)
 {
     linear_iter_ = 0;
@@ -612,10 +619,12 @@ TwoPhaseSolver::TwoPhaseSolver(const TwoPhase& problem, Hierarchy& hierarchy,
     D_te_e_ = ParMult(hierarchy.GetMatrix(level).GetD(), e_te_e, starts);
 }
 
+mfem::Vector total_mobility;
+
 mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 {
     int myid;
-    MPI_Comm_rank(hierarchy_.GetComm(), &myid);
+    MPI_Comm_rank(hierarchy_->GetComm(), &myid);
 
     mfem::BlockVector x(blk_offsets_);
 
@@ -628,8 +637,8 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
     for (int l = 0; l < level_; ++l)
     {
-        hierarchy_.Project(l, blk_helper_[l], blk_helper_[l + 1]);
-        x_blk2 = hierarchy_.Project(l, x_blk2);
+        hierarchy_->Project(l, blk_helper_[l], blk_helper_[l + 1]);
+        x_blk2 = hierarchy_->Project(l, x_blk2);
     }
 
     x.GetBlock(0) = blk_helper_[level_].GetBlock(0);
@@ -643,6 +652,23 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     int step;
     for (step = 1; !done; step++)
     {
+//        if (step == 14)
+//        {
+//            Graph new_graph(hierarchy_->GetMatrix(0).GetGraph());
+
+//            std::vector<mfem::Vector> new_split_edge_weight(new_graph.EdgeWeight());
+
+//            total_mobility = TotalMobility(x.GetBlock(2));
+//            for (unsigned int vert = 0; vert < new_split_edge_weight.size(); ++vert)
+//            {
+//                new_split_edge_weight[vert] *= total_mobility[vert];
+//            }
+//            new_graph.SetNewLocalWeight(std::move(new_split_edge_weight));
+//            new_hierarchy_.reset(new Hierarchy(std::move(new_graph), *upscale_param_ptr,
+//                                               part_ptr, &problem_ptr->EssentialAttribute()));
+//            hierarchy_ = new_hierarchy_.get();
+//        }
+
         mfem::BlockVector previous_x(x);
 //        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 345600.);
         dt_real = std::min(dt_real * 2.0, evolve_param_.total_time - time);
@@ -679,7 +705,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
             x_blk2 = x.GetBlock(2);
             for (int l = level_; l > 0; --l)
             {
-                x_blk2 = hierarchy_.Interpolate(l, x_blk2);
+                x_blk2 = hierarchy_->Interpolate(l, x_blk2);
             }
 
             problem_.VisUpdate(sout, x_blk2);
@@ -708,8 +734,8 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
     for (int l = level_; l > 0; --l)
     {
-        hierarchy_.Interpolate(l, blk_helper_[l], blk_helper_[l - 1]);
-        x_blk2 = hierarchy_.Interpolate(l, x_blk2);
+        hierarchy_->Interpolate(l, blk_helper_[l], blk_helper_[l - 1]);
+        x_blk2 = hierarchy_->Interpolate(l, x_blk2);
     }
 
     mfem::BlockVector out(problem_.BlockOffsets());
@@ -722,13 +748,13 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
 void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 {
-    const MixedMatrix& system = hierarchy_.GetMatrix(level_);
+    const MixedMatrix& system = hierarchy_->GetMatrix(level_);
     std::vector<mfem::DenseMatrix> traces;
 
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
 //        CoupledSolver solver(system, dt, weight_, density_, solver_param_.nl_solve);
-        CoupledFAS solver(hierarchy_, dt, weight_, density_, x.GetBlock(2), solver_param_);
+        CoupledFAS solver(*hierarchy_, dt, weight_, density_, x.GetBlock(2), solver_param_);
 
 //solver.SetAbsTol(1e-9);
 //solver.SetRelTol(1e-12);
@@ -749,10 +775,10 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
     else // sequential: solve for flux and pressure first, and then saturation
     {
         const mfem::Vector S = system.PWConstProject(x.GetBlock(2));
-        hierarchy_.RescaleCoefficient(level_, TotalMobility(S));
-        mfem::BlockVector flow_rhs(*source_, hierarchy_.BlockOffsets(level_));
-        mfem::BlockVector flow_sol(x, hierarchy_.BlockOffsets(level_));
-        hierarchy_.Solve(level_, flow_rhs, flow_sol);
+        hierarchy_->RescaleCoefficient(level_, TotalMobility(S));
+        mfem::BlockVector flow_rhs(*source_, hierarchy_->BlockOffsets(level_));
+        mfem::BlockVector flow_sol(x, hierarchy_->BlockOffsets(level_));
+        hierarchy_->Solve(level_, flow_rhs, flow_sol);
 
         auto upwind = BuildUpwindPattern(system.GetGraphSpace(), x.GetBlock(0));
         assert(mfem::ParNormlp(x.GetBlock(0), 2, D_te_e_->GetComm()) < mfem::infinity());
@@ -860,7 +886,17 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     mfem::BlockVector darcy_Rx(out.GetData(), darcy_system_.BlockOffsets());
 
     const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
-    darcy_system_.Mult(TotalMobility(S), darcy_x, darcy_Rx);
+
+    auto total_mobility2 = TotalMobility(S);
+//    if (S.Size() > 10000)
+//    {
+//        for (int tmi = 0; tmi < total_mobility.Size(); ++tmi)
+//        {
+//            total_mobility2[tmi] /= total_mobility[tmi];
+//        }
+//    }
+
+    darcy_system_.Mult(total_mobility2, darcy_x, darcy_Rx);
 
     darcy_Rx.GetBlock(0) *= (1. / dt_ / density_);
     darcy_Rx.GetBlock(1) *= (dt_ * density_);
@@ -986,32 +1022,32 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     //    if((count == 123)|| (count == 129) || (count == 133) || (count == 155) || (count == 162) || (count == 168))
     //    if((count == 321)|| (count == 343) || (count == 387) || (count == 431) || (count == 453) || (count == 629))
-    if (count == 475 && blk_x.BlockSize(2) > 13200)
-    {
-//                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
+//    if (count == 475 && blk_x.BlockSize(2) > 13200)
+//    {
+////                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
+////        sol_previous_iter -= x;
+////        sol_previous_iter *= -1.0;
+//        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
+
+////        mfem::Vector for_print(13201); for_print = 0.0;
+////        hie_ptr->Interpolate(1, blk_dx_print.GetBlock(2), for_print);
+
+//        mfem::socketstream sout;
+//        problem_ptr->VisSetup(sout, blk_dx_print.GetBlock(2), 0.0, 0.0, "fine sol");
+
+//        mfem::Vector for_print_tmp = hie_ptr->Project(0, blk_dx_print.GetBlock(2));
+//        mfem::Vector for_print = hie_ptr->Interpolate(1, for_print_tmp);
+//        mfem::socketstream sout3;
+//        problem_ptr->VisSetup(sout3, for_print, 0.0, 0.0, "fine sol coarse projection");
+
 //        sol_previous_iter -= x;
 //        sol_previous_iter *= -1.0;
-        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
+//        mfem::socketstream sout2;
+//        problem_ptr->VisSetup(sout2, blk_dx_print.GetBlock(2), 0.0, 0.0, "coarse correction");
 
-//        mfem::Vector for_print(13201); for_print = 0.0;
-//        hie_ptr->Interpolate(1, blk_dx_print.GetBlock(2), for_print);
-
-        mfem::socketstream sout;
-        problem_ptr->VisSetup(sout, blk_dx_print.GetBlock(2), 0.0, 0.0, "fine sol");
-
-        mfem::Vector for_print_tmp = hie_ptr->Project(0, blk_dx_print.GetBlock(2));
-        mfem::Vector for_print = hie_ptr->Interpolate(1, for_print_tmp);
-        mfem::socketstream sout3;
-        problem_ptr->VisSetup(sout3, for_print, 0.0, 0.0, "fine sol coarse projection");
-
-        sol_previous_iter -= x;
-        sol_previous_iter *= -1.0;
-        mfem::socketstream sout2;
-        problem_ptr->VisSetup(sout2, blk_dx_print.GetBlock(2), 0.0, 0.0, "coarse correction");
-
-    }
-//    std::cout<<"count = "<<count<<"\n";
-    count++;
+//    }
+////    std::cout<<"count = "<<count<<"\n";
+//    count++;
 
 
 //    if (false)
@@ -1417,7 +1453,16 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
         TwoPhaseHybrid solver(darcy_system_, &(problem_ptr->EssentialAttribute()));
 
-        solver.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma,
+        auto total_mobility2 = TotalMobility(S);
+//        if (S.Size() > 10000)
+//        {
+//            for (int tmi = 0; tmi < total_mobility.Size(); ++tmi)
+//            {
+//                total_mobility2[tmi] /= total_mobility[tmi];
+//            }
+//        }
+
+        solver.AssembleSolver(total_mobility2, local_dMdS_, local_dTdsigma,
                               *dTdS, 1.0);
         mfem::BlockVector true_blk_resid(true_resid, true_blk_offsets_);
 
@@ -1524,21 +1569,35 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
     }
 
+    int local_cnt = 0;
+    if (sol_previous_iter.Size()>0)
+    {
+        for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
+        {
+            if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
+            {
+                local_cnt++;
+//                std::cout<< ii <<"-th position has a different sign!!!\n";
+            }
+        }
+        std::cout<< local_cnt <<" positions have a different sign!!!\n";
+    }
+
 
     sol_previous_iter = x;
-    if (count == 475 && blk_x.BlockSize(2) < 13200)
-    {
-//                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
-//        sol_previous_iter = x;
-//        sol_previous_iter *= -1.0;
-        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
+//    if (count == 475 && blk_x.BlockSize(2) < 13200)
+//    {
+////                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
+////        sol_previous_iter = x;
+////        sol_previous_iter *= -1.0;
+//        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
 
-        mfem::Vector for_print(13201); for_print = 0.0;
-        hie_ptr->Interpolate(1, blk_dx_print.GetBlock(2), for_print);
+//        mfem::Vector for_print(13201); for_print = 0.0;
+//        hie_ptr->Interpolate(1, blk_dx_print.GetBlock(2), for_print);
 
-        mfem::socketstream sout;
-        problem_ptr->VisSetup(sout, for_print, 0.0, 0.0, "coarse sol");
-    }
+//        mfem::socketstream sout;
+//        problem_ptr->VisSetup(sout, for_print, 0.0, 0.0, "coarse sol");
+//    }
 
 }
 

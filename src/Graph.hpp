@@ -133,6 +133,8 @@ public:
     /// Assemble global vector from local vector, then write to file
     void WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const;
 
+    void SetNewLocalWeight(std::vector<mfem::Vector> split_edge_weight);
+
     ///@name Getters for tables/arrays that describe parallel graph
     ///@{
     const mfem::SparseMatrix& VertexToEdge() const { return vertex_edge_local_; }

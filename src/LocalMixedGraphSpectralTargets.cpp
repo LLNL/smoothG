@@ -1051,7 +1051,7 @@ void LocalMixedGraphSpectralTargets::NormalizeTraces(std::vector<mfem::DenseMatr
                 {
                     std::cout<<oneD[0]*PV_trace[0] <<" "<<oneD[i]*PV_trace[i]<<"\n";
                 }
-                assert((oneD[i]*PV_trace[i] >= 0.0) == first_sign);
+//                assert((oneD[i]*PV_trace[i] >= 0.0) == first_sign);
             }
 
         }

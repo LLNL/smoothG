@@ -444,4 +444,9 @@ void Graph::WriteVector(const mfem::Vector& vect, const std::string& filename,
     }
 }
 
+void Graph::SetNewLocalWeight(std::vector<mfem::Vector> split_edge_weight)
+{
+    split_edge_weight_ = std::move(split_edge_weight);
+}
+
 } // namespace smoothg
