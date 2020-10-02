@@ -176,7 +176,7 @@ public:
     }
 
     // TODO: not needed after all?
-//    mfem::SparseMatrix ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg);
+    mfem::SparseMatrix ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg);
     const mfem::SparseMatrix& GetUpwindFlux(int level) const
     {
         return upwind_fluxes_[level];

@@ -957,6 +957,17 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                     collected_sigma.CopyMN(MinvDT_targets, num_iface_edofs,
                                            DT_targets.NumCols() - 1, 0, 1);
                 }
+
+//                if (iface == 6463)
+                if (Dloc_0.NumRows() == 1)
+                {
+//                    Mloc_0.Print();
+//                    Dloc_0.Print();
+                    std::cout<<"agg = "<<neighbor_aggs[0]<<"\n";
+                    PV_sigma_on_face = 1.0;
+
+                }
+
             }
 
             // add PV vector to other vectors and orthogonalize
@@ -1031,30 +1042,45 @@ void LocalMixedGraphSpectralTargets::NormalizeTraces(std::vector<mfem::DenseMatr
             add(trace, -alpha, PV_trace, trace);
         }
 
-        // debug check
-        if (face_agg.RowSize(i) == 2)
+//        assert(!PV_trace.CheckFinite());
+        if (PV_trace.CheckFinite())
         {
-            auto DtransferT = smoothg::Transpose(Dtransfer);
-            mfem::Vector oneD = smoothg::Mult(DtransferT, local_constant);
-
-            bool first_sign = (oneD[0]*PV_trace[0] > 0.0);
-            if (oneD[0]*PV_trace[0] == 0.0)
-            {
-                assert(PV_trace.Size() > 1);
-                first_sign = (oneD[1]*PV_trace[1] > 0.0);
-                assert(oneD[1]*PV_trace[1] != 0.0);
-            }
-
-            for (int i = 1; i < PV_trace.Size(); i++)
-            {
-                if ((oneD[i]*PV_trace[i] >= 0.0) != first_sign)
-                {
-                    std::cout<<oneD[0]*PV_trace[0] <<" "<<oneD[i]*PV_trace[i]<<"\n";
-                }
-//                assert((oneD[i]*PV_trace[i] >= 0.0) == first_sign);
-            }
-
+            std::cout<<"face "<<i<<": PV_trace.CheckFinite() > 0\n";
+            local_edofs.Print();
+            PV_trace.Print();
         }
+
+
+        // debug check
+//        if (face_agg.RowSize(i) == 2)
+//        {
+//            auto DtransferT = smoothg::Transpose(Dtransfer);
+//            mfem::Vector oneD = smoothg::Mult(DtransferT, local_constant);
+
+//            bool first_sign = (oneD[0]*PV_trace[0] > 0.0);
+//            if (oneD[0]*PV_trace[0] == 0.0)
+//            {
+//                assert(PV_trace.Size() > 1);
+//                first_sign = (oneD[1]*PV_trace[1] > 0.0);
+//                assert(oneD[1]*PV_trace[1] != 0.0);
+//                std::cout<<"Face "<<i<<":oneD[0]*PV_trace[0] == 0.0, oneD[1]*PV_trace[1] != 0.0\n";
+//            }
+
+//            for (int ii = 1; ii < PV_trace.Size(); ii++)
+//            {
+//                if ((oneD[ii]*PV_trace[ii] >= 0.0) != first_sign)
+//                {
+//                    std::cout<<"Face "<<i<<": "<<oneD[0]*PV_trace[0] <<" "<<oneD[ii]*PV_trace[ii]<<"\n";
+//                }
+////                assert((oneD[i]*PV_trace[i] >= 0.0) == first_sign);
+//            }
+
+//        }
+//        if (i == 1025)
+//        {
+//            std::cout<<"PV trace 1025:\n";
+//            PV_trace.Print();
+//        }
 
     }
 }

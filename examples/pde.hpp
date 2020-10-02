@@ -517,6 +517,9 @@ public:
                   double range_max = 0.0, const std::string& caption = "",
                   bool coef = false, bool vec_is_cell_based = true) const;
 
+    void VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec,
+                   const std::string& caption = "") const;
+
     /// Update visualization of vertex space vector, VisSetup needs to be called first
     void VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec,
                    bool vec_is_cell_based = true) const;
@@ -581,6 +584,8 @@ protected:
     std::vector<mfem::Vector> local_weight_;
     const mfem::HypreParMatrix* edge_trueedge_;
     mfem::SparseMatrix edge_bdr_;
+
+    mfem::Vector sigma_sign_change_;
 };
 
 DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
@@ -632,6 +637,21 @@ void DarcyProblem::InitGraph()
     rhs_u_.SetSize(vertex_edge_.NumRows());
     rhs_sigma_ = 0.0;
     rhs_u_ = 0.0;
+
+    mfem::DiscreteLinearOperator DivOp(sigma_fes_.get(), u_fes_.get());
+    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
+    DivOp.Assemble();
+    DivOp.Finalize();
+    DivOp.SpMat() *= -1.0;
+
+    mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge_);
+
+    sigma_sign_change_.SetSize(edge_vert.NumRows());
+    for (int edge = 0; edge < edge_vert.NumRows(); edge++)
+    {
+        const int vert = edge_vert.GetRowColumns(edge)[0];
+        sigma_sign_change_ = DivOp.SpMat()(vert, edge) < 0 ? -1.0 : 1.0;
+    }
 }
 
 void DarcyProblem::ComputeGraphWeight(bool unit_weight)
@@ -727,6 +747,53 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
     MPI_Barrier(comm_);
 
     //    vis_v << "keys S\n";         //Screenshot
+
+    MPI_Barrier(comm_);
+}
+
+void DarcyProblem::VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec,
+                             const std::string& caption) const
+{
+    mfem::Vector sign_fixed_vec(vec);
+    smoothg::RescaleVector(sigma_sign_change_, sign_fixed_vec);
+//    sign_fixed_vec *= 100.0;
+    mfem::ParGridFunction gf(sigma_fes_.get(), sign_fixed_vec.GetData());
+
+//    std::ofstream gf_file("basis694.gf");
+//    gf.Save(gf_file);
+
+    const char vishost[] = "localhost";
+    const int  visport   = 19916;
+    vis_v.open(vishost, visport);
+    vis_v.precision(8);
+
+    vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
+    vis_v << "solution\n" << *mesh_ << gf;
+    vis_v << "window_size 500 800\n";
+    vis_v << "window_title 'vertex space unknown'\n";
+    vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
+
+    if (mesh_->SpaceDimension() == 2)
+    {
+        vis_v << "view 0 0\n"; // view from top
+        vis_v << "keys jl\n";  // turn off perspective and light
+        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+    }
+    else
+    {
+        vis_v << "keys ]]]]]]]]]]]]]\n";  // increase size
+    }
+
+    vis_v << "keys c\n"; // colorbar
+
+    if (!caption.empty())
+    {
+        vis_v << "plot_caption '" << caption << "'\n";
+    }
+
+    MPI_Barrier(comm_);
+
+    vis_v << "keys S\n";         //Screenshot
 
     MPI_Barrier(comm_);
 }

@@ -241,6 +241,16 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
     block_offsets_[1] = vertex_edge_.NumCols();
     block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
     block_offsets_[3] = block_offsets_[2] + vertex_edge_.NumRows();
+
+    // no inactive cell
+//    block_offsets_[1] = 50438;
+//    block_offsets_[2] = block_offsets_[1] + 12322;
+//    block_offsets_[3] = block_offsets_[2] + 12322;
+
+    // with all cell
+    block_offsets_[1] = 53085;
+    block_offsets_[2] = block_offsets_[1] + 13201;
+    block_offsets_[3] = block_offsets_[2] + 13201;
 }
 
 void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
@@ -425,6 +435,21 @@ void TwoPhase::CombineReservoirAndWellModel()
 
     rhs_sigma_ = AppendWellData(rhs_sigma_, Producer);
     rhs_u_ = AppendWellData(rhs_u_, Injector);
+
+//    // TODO: temp code for MRST example
+    int num_edges_total = 53085;
+//    int num_edges_total = 50438;         // no inactive cells
+    rhs_sigma_.SetSize(num_edges_total);
+    rhs_sigma_ = 0.0;
+    rhs_sigma_[num_edges_total - 5] = -1e+06;
+    rhs_sigma_[num_edges_total - 4] = -1e+06;
+    rhs_sigma_[num_edges_total - 3] = -1e+06;
+    rhs_sigma_[num_edges_total - 2] = -1e+06;
+
+//    rhs_u_.SetSize(12322); // no inactive cells
+//    rhs_u_ = 0.0;
+//    rhs_u_[12321] = 5e-05;
+
 
     combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
                                                   well_manager_.NumWellCells());
