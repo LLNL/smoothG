@@ -208,6 +208,10 @@ public:
              int slice, bool metis_parition, const mfem::Array<int>& ess_attr,
              int well_height, double inject_rate, double bottom_hole_pressure);
 
+    TwoPhase(std::ifstream& file, bool need_getline, int num_vert_res, int num_edges_res,
+             int num_edges_interior, double inject_rate, double bottom_hole_pressure);
+
+
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
 private:
     // Set up well model (Peaceman's five-spot pattern)
@@ -222,14 +226,13 @@ private:
 
     unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
     WellManager well_manager_;
-    mfem::Array<int> block_offsets_;
 };
 
 TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
                    bool metis_parition, const mfem::Array<int>& ess_attr,
                    int well_height, double inject_rate, double bottom_hole_pressure)
     : SPE10Problem(perm_file, dim, spe10_scale, slice, metis_parition, ess_attr),
-      well_manager_(*mesh_, *kinv_vector_), block_offsets_(4)
+      well_manager_(*mesh_, *kinv_vector_)
 {
     rhs_sigma_ = 0.0;
     rhs_u_ = 0.0;
@@ -237,6 +240,7 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
     SetWells(well_height, inject_rate, bottom_hole_pressure);
     CombineReservoirAndWellModel();
 
+    block_offsets_.SetSize(4);
     block_offsets_[0] = 0;
     block_offsets_[1] = vertex_edge_.NumCols();
     block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
@@ -248,9 +252,9 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
 //    block_offsets_[3] = block_offsets_[2] + 12322;
 
     // with all cell
-    block_offsets_[1] = 53085;
-    block_offsets_[2] = block_offsets_[1] + 13201;
-    block_offsets_[3] = block_offsets_[2] + 13201;
+//    block_offsets_[1] = 53085;
+//    block_offsets_[2] = block_offsets_[1] + 13201;
+//    block_offsets_[3] = block_offsets_[2] + 13201;
 }
 
 void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
@@ -439,12 +443,12 @@ void TwoPhase::CombineReservoirAndWellModel()
 //    // TODO: temp code for MRST example
     int num_edges_total = 53085;
 //    int num_edges_total = 50438;         // no inactive cells
-    rhs_sigma_.SetSize(num_edges_total);
-    rhs_sigma_ = 0.0;
-    rhs_sigma_[num_edges_total - 5] = -1e+06;
-    rhs_sigma_[num_edges_total - 4] = -1e+06;
-    rhs_sigma_[num_edges_total - 3] = -1e+06;
-    rhs_sigma_[num_edges_total - 2] = -1e+06;
+//    rhs_sigma_.SetSize(num_edges_total);
+//    rhs_sigma_ = 0.0;
+//    rhs_sigma_[num_edges_total - 5] = -1e+06;
+//    rhs_sigma_[num_edges_total - 4] = -1e+06;
+//    rhs_sigma_[num_edges_total - 3] = -1e+06;
+//    rhs_sigma_[num_edges_total - 2] = -1e+06;
 
 //    rhs_u_.SetSize(12322); // no inactive cells
 //    rhs_u_ = 0.0;

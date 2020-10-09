@@ -502,7 +502,7 @@ public:
     const mfem::Array<int>& EssentialAttribute() const {return ess_attr_; }
 
     /// Volume of a cell in the mesh (assuming all cells have the same volume)
-    double CellVolume() const { return mesh_->GetElementVolume(0); }
+    virtual double CellVolume() const { return mesh_->GetElementVolume(0); }
 
     /// @return number of isolated (graph) vertices
     int NumIsoVerts() const { return iso_vert_count_; }
@@ -537,6 +537,8 @@ public:
 
     /// @return a vector of size number of cells containing z-coordinates of cell centers
     mfem::Vector ComputeZ() const;
+
+    const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
 protected:
     void BuildReservoirGraph();
     void InitGraph();
@@ -586,6 +588,8 @@ protected:
     mfem::SparseMatrix edge_bdr_;
 
     mfem::Vector sigma_sign_change_;
+
+    mfem::Array<int> block_offsets_;
 };
 
 DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
