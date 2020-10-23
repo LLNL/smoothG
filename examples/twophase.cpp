@@ -176,10 +176,15 @@ class TwoPhaseSolver
     unique_ptr<mfem::BlockVector> source_;
     unique_ptr<mfem::HypreParMatrix> D_te_e_;
     int nonlinear_iter_;
+    int coarsest_nonlinear_iter_;
     int linear_iter_;
     bool step_converged_;
 
     std::vector<mfem::Vector> micro_upwind_flux_;
+
+    std::vector<int> step_nonlinear_iter_;
+    std::vector<int> step_num_backtrack_;
+    std::vector<int> step_coarsest_nonlinear_iter_;
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
@@ -251,9 +256,12 @@ public:
     const mfem::Vector& GetScales() const { return  scales_; }
 };
 
+int num_backtrack_debug = 0;
+int coarsest_nonlinear_iter_debug = 0;
 class CoupledFAS : public FAS
 {
     const Hierarchy& hierarchy_;
+    int coarsest_nonlinear_iter_ = 0;
 
     double Norm(int level, const mfem::Vector& vec) const override;
     void Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
@@ -269,6 +277,9 @@ public:
                FASParameters param);
 
     const NonlinearSolver& GetLevelSolver(int level) const { return *solvers_[level]; };
+    int GetNumCoarsestIterations() const { return coarsest_nonlinear_iter_; }
+    int GetNumBackTrack() const { return num_backtrack_debug; }
+
 };
 
 class TransportSolver : public NonlinearSolver
@@ -302,164 +313,6 @@ public:
     }
 };
 
-Graph ReadFVGraph()
-{
-//    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_2d/cell_to_faces.txt");
-//    int num_vert_res = 13200;
-//    int num_vert_total = num_vert_res + 1;
-//    int nnz_res = num_vert_res * 4;
-//    int num_edges_res = 26680;
-//    int num_edges_total = num_edges_res + 5;
-//    int num_edges_interior = 26120;
-//    bool need_getline = true;
-
-
-//    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^3/cell_to_faces.txt");
-//    bool need_getline = false;
-    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d/cell_to_faces.txt");
-    bool need_getline = true;
-    int num_vert_res = 13200;
-    int num_vert_total = num_vert_res + 1;
-    int nnz_res = num_vert_res * 6;
-    int num_edges_res = 53080;
-    int num_edges_total = num_edges_res + 5;
-    int num_edges_interior = 26620;
-
-//    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive/filtered_cell_to_face.txt");
-//    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^5/filtered_cell_to_face.txt");
-//    int num_vert_res = 12321;
-//    int num_vert_total = num_vert_res + 1;
-//    int nnz_res = num_vert_res * 6;
-//    int num_edges_res = 50438;
-//    int num_edges_total = num_edges_res + 5;
-//    int num_edges_interior = 26620;
-//    bool need_getline = false;
-
-    if (!file.is_open())
-    {
-        std::cerr << "Error in opening file " << "cell_to_faces.txt" << std::endl;
-        mfem::mfem_error("File does not exist");
-    }
-
-    std::vector<mfem::Vector> local_weights(num_vert_total);
-    mfem::SparseMatrix vert_edge(num_vert_total, num_edges_total);
-
-    std::string str;
-    if (need_getline) std::getline(file, str);
-
-    int vert, edge;
-    double half_trans;
-
-    auto save_one_line = [&]()
-    {
-        file >> vert;
-        file >> edge;
-        file >> half_trans;
-        vert_edge.Set(vert - 1, edge - 1, half_trans);
-    };
-
-    // TODO: make it to work for elements of mixed types
-    for (int i = 0; i < nnz_res; ++i)
-    {
-        save_one_line();
-    }
-
-    if (need_getline)
-    {
-        std::getline(file, str);
-        std::getline(file, str);
-        std::getline(file, str);
-        std::getline(file, str);
-        std::getline(file, str);
-    }
-
-    for (int i = 0; i < 4; ++i)
-    {
-        save_one_line();
-    }
-
-    if (need_getline)
-    {
-        std::getline(file, str);
-        std::getline(file, str);
-    }
-
-    save_one_line();
-    save_one_line();
-    vert_edge.Set(vert - 1, edge - 1, 1e10); // TODO: this is to match well.hpp, not sure if necessary
-
-    vert_edge.Finalize();
-
-    for (int i = 0; i < vert_edge.NumRows(); i++)
-    {
-        local_weights[i].SetSize(vert_edge.RowSize(i));
-        std::copy_n(vert_edge.GetRowEntries(i), vert_edge.RowSize(i), local_weights[i].GetData());
-    }
-
-//    vert_edge.Print();
-//    std::cout<< vert - 1 << " "<< edge - 1<<"\n";
-
-    vert_edge = 1.0;
-
-    mfem::SparseMatrix edge_bdr(num_edges_total, 5);
-
-    // debug
-    {
-        auto edge_vert = smoothg::Transpose(vert_edge);
-        int edge_count = 0;
-        for (int i = 0; i < num_edges_total; ++i)
-        {
-            if (edge_vert.RowSize(i)!=1 &&edge_vert.RowSize(i)!=2 )
-            {
-                std::cout<<"edge "<<i<<": row nnz = "<<edge_vert.RowSize(i)<<"\n";
-                edge_count++;
-            }
-
-            if (edge_vert.RowSize(i) == 1 && i < num_edges_res)
-            {
-                edge_bdr.Set(i, 0, 1.0);
-                if (i == 11198 || i == 36474 || i == 48795)
-                {
-                    std::cout<<"bdr edges:" << i <<"\n";
-                }
-            }
-
-        }
-        std::cout<<"edge_count = "<<edge_count<<"\n";
-    }
-
-
-//    for (int i = num_edges_interior; i < num_edges_res; i++)
-//    {
-//        edge_bdr.Set(i, 0, 1.0);
-//    }
-
-//    std::ifstream map_file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive/active_face_to_face.txt");
-////    mfem::Array<int> active_to_original(num_edges_res);
-//    int original_face_id;
-//    for (int i = 0; i < num_edges_res; ++i)
-//    {
-//        map_file >> original_face_id;
-//        original_face_id -= 1;
-//        if (original_face_id >= num_edges_interior && original_face_id < 53080)
-//        {
-//            edge_bdr.Set(i, 0, 1.0);
-//        }
-//    }
-
-
-
-    edge_bdr.Set(num_edges_res, 1, 1.0);
-    edge_bdr.Set(num_edges_res+1, 2, 1.0);
-    edge_bdr.Set(num_edges_res+2, 3, 1.0);
-    edge_bdr.Set(num_edges_res+3, 4, 1.0);
-    edge_bdr.Finalize();
-
-    auto e_te = SparseIdentity(num_edges_total);
-    unique_ptr<mfem::HypreParMatrix> edge_trueedge(ToParMatrix(MPI_COMM_WORLD, e_te));
-
-    return Graph(vert_edge, *edge_trueedge, local_weights, &edge_bdr);
-}
 
 class TwoPhaseFromFile : public DarcyProblem
 {
@@ -469,14 +322,16 @@ public:
                      double bottom_hole_pressure, const mfem::Array<int>& ess_attr)
         : DarcyProblem(MPI_COMM_WORLD, 2, ess_attr)
     {
-        std::ifstream file(path+"/cell_to_faces.txt");
+//        std::ifstream file(path+"/filtered_cell_to_face.txt");
+        std::ifstream file(path+"/cell_to_faces_francois.txt");
 
         int num_vert_total = num_vert_res + 1;
-        int num_edges_total = num_edges_res + 5;
+//        int num_edges_total = num_edges_res + 5;
+        int num_edges_total = num_edges_res + 2;
 
         if (!file.is_open())
         {
-            std::cerr << "Error in opening file " << "cell_to_faces.txt" << std::endl;
+            std::cerr << "Error in opening file cell_to_faces.txt\n";
             mfem::mfem_error("File does not exist");
         }
 
@@ -484,7 +339,7 @@ public:
         mfem::SparseMatrix vert_edge(num_vert_total, num_edges_total);
 
         std::string str;
-        if (need_getline) std::getline(file, str);
+//        if (need_getline) std::getline(file, str);
 
         int vert, edge;
         double half_trans;
@@ -512,7 +367,8 @@ public:
             std::getline(file, str);
         }
 
-        for (int i = 0; i < 4; ++i)
+//        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < 1; ++i)
         {
             save_one_line();
         }
@@ -538,11 +394,30 @@ public:
         vert_edge = 1.0;
 
         mfem::SparseMatrix edge_bdr(num_edges_total, 5);
+        {
+            auto edge_vert = smoothg::Transpose(vert_edge);
+            int edge_count = 0;
+            for (int i = 0; i < num_edges_total; ++i)
+            {
+                if (edge_vert.RowSize(i)!=1 &&edge_vert.RowSize(i)!=2 )
+                {
+                    std::cout<<"edge "<<i<<": row nnz = "<<edge_vert.RowSize(i)<<"\n";
+                    edge_count++;
+                }
+
+                if (edge_vert.RowSize(i) == 1 && i < num_edges_res)
+                {
+                    edge_bdr.Set(i, 0, 1.0);
+                }
+
+            }
+            std::cout<<"abnormal edge_count = "<<edge_count<<"\n";
+        }
 
         edge_bdr.Set(num_edges_res, 1, 1.0);
-        edge_bdr.Set(num_edges_res+1, 2, 1.0);
-        edge_bdr.Set(num_edges_res+2, 3, 1.0);
-        edge_bdr.Set(num_edges_res+3, 4, 1.0);
+//        edge_bdr.Set(num_edges_res+1, 2, 1.0);
+//        edge_bdr.Set(num_edges_res+2, 3, 1.0);
+//        edge_bdr.Set(num_edges_res+3, 4, 1.0);
         edge_bdr.Finalize();
 
         auto e_te = SparseIdentity(num_edges_total);
@@ -573,10 +448,16 @@ public:
         rhs_u_[num_vert_total - 1] = inject_rate;
 
         // read cell volume
-        std::ifstream vol_file(path+"/cell_volume_porosity.txt");
-        if (need_getline) std::getline(file, str);
-        vol_file >> cell_volume_; // this is cell ID, would be overwritten
-        vol_file >> cell_volume_;
+//        std::ifstream vol_file(path+"/cell_volume_porosity.txt");
+//        if (!vol_file.is_open())
+//        {
+//            std::cerr << "Error in opening file cell_volume_porosity.txt\n";
+//            mfem::mfem_error("File does not exist");
+//        }
+//        if (need_getline) std::getline(vol_file, str);
+//        vol_file >> vert;
+//        vol_file >> cell_volume_;
+        cell_volume_ = 18;
     }
 
     virtual double CellVolume() const { return cell_volume_; }
@@ -665,7 +546,7 @@ int main(int argc, char* argv[])
     fas_param.fine.max_num_iter = fas_param.mid.max_num_iter = use_vcycle ? 1 : max_iter;
     fas_param.mid.max_num_iter = use_vcycle ? 1 : max_iter;
     fas_param.coarse.max_num_iter = use_vcycle ? 20 : max_iter;
-    fas_param.coarse.print_level = use_vcycle ? -1 : 1;
+    fas_param.coarse.print_level = use_vcycle ? 1 : 1;
     fas_param.fine.print_level = use_vcycle ? -1 : 1;
     fas_param.mid.print_level = use_vcycle ? -1 : 1;
 //    fas_param.coarse.rtol = 1e-10;
@@ -682,46 +563,51 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     bool use_metis = true;
-//    TwoPhase problem(perm_file, dim, 5, slice, use_metis, ess_attr,
-//                     well_height, inject_rate, bhp);
+    TwoPhase problem(perm_file, dim, 5, slice, use_metis, ess_attr,
+                     well_height, inject_rate, bhp);
 
 
-    //    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_2d/cell_to_faces.txt");
-    //    int num_vert_res = 13200;
-    //    int num_vert_total = num_vert_res + 1;
-    //    int nnz_res = num_vert_res * 4;
-    //    int num_edges_res = 26680;
-    //    int num_edges_total = num_edges_res + 5;
-    //    int num_edges_interior = 26120;
-    //    bool need_getline = true;
+//    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_2d";
+//    bool need_getline = true;
+//    int num_vert_res = 13200;
+//    int nnz_res = num_vert_res * 4;
+//    int num_edges_res = 26680;
+
+//    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d";
+//    bool need_getline = true;
+//    int num_vert_res = 13200;
+//    int nnz_res = num_vert_res * 6;
+//    int num_edges_res = 53080;
+//    inject_rate *= 0.6096;
 
 
-    //    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^3/cell_to_faces.txt");
-    //    bool need_getline = false;
-    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d/cell_to_faces.txt");
-    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d";
+//    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive/";
+//    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^5/";
+//    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^3";
+//    bool need_getline = false;
+//    int num_vert_res = 12321;
+//    int nnz_res = num_vert_res * 6;
+//    int num_edges_res = 50438;
+//    inject_rate *= 0.6096;
+
+
+    std::string path = "/Users/lee1029/Downloads/test_1";
+
     bool need_getline = true;
-    int num_vert_res = 13200;
-    int nnz_res = num_vert_res * 6;
-    int num_edges_res = 53080;
-    int num_edges_interior = 26620;
+    int num_vert_res = 16;
+    int nnz_res = num_vert_res * 4;
+    int num_edges_res = 40;
+//    inject_rate = 1e-7;
 
-    //    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive/filtered_cell_to_face.txt");
-    //    std::ifstream file("/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^5/filtered_cell_to_face.txt");
-    //    int num_vert_res = 12321;
-    //    int num_vert_total = num_vert_res + 1;
-    //    int nnz_res = num_vert_res * 6;
-    //    int num_edges_res = 50438;
-    //    int num_edges_total = num_edges_res + 5;
-    //    int num_edges_interior = 26620;
-    //    bool need_getline = false;
+
+    std::cout << "Read data from " << path << "... \n";
 
     mfem::Array<int> ess_attr2(5);
     ess_attr2 = 0;
     ess_attr2[0] = 1;
-    read_from_file = true;
-    TwoPhaseFromFile problem(path, need_getline,  num_vert_res, nnz_res,
-                             num_edges_res, inject_rate, bhp, ess_attr2);
+//    read_from_file = true;
+//    TwoPhaseFromFile problem(path, need_getline, num_vert_res, nnz_res,
+//                             num_edges_res, inject_rate, bhp, ess_attr2);
 
     mfem::Array<int> part;
 problem_ptr = &problem;
@@ -739,10 +625,28 @@ part_ptr = &part;
     {
         upscale_param.num_iso_verts = 1; // TODO: this should be read from file
         part_ptr = nullptr;
+
+        part.SetSize(num_vert_res + 1);
+        if (num_vert_res == 16)
+        {
+            part[1-1] = part[2-1] = part[3-1] = part[5-1] = 0;
+            part[4-1] = part[11-1] = part[8-1] = part[5-1] = 1;
+            part[6-1] = part[9-1] = part[10-1] = part[13-1] = 2;
+            part[12-1] = part[14-1] = part[15-1] = part[16-1] = 3;
+        }
+        else
+        {
+            part[1-1] = part[2-1] = part[3-1] = part[5-1] = part[4-1] = part[8-1] = 0;
+            part[7-1] = part[11-1] = part[12-1] = part[16-1] = 1;
+            part[6-1] = part[9-1] = part[13-1] = part[10-1] = part[14-1] = part[18-1]
+                    = part[15-1] = part[19-1] = part[22-1] = 2;
+            part[17-1] = part[20-1] = part[21-1] = part[23-1] = part[24-1] = part[25-1] = 3;
+        }
+        part.Last() = 4;
     }
 
     Hierarchy hierarchy(problem.GetFVGraph(true), upscale_param,
-                        &part, &problem.EssentialAttribute());
+                        part_ptr, &problem.EssentialAttribute());
 
 //    Graph graph = ReadFVGraph();
 //    mfem::Array<int> ess_attr2(5);
@@ -1163,7 +1067,6 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
                                const FASParameters& solver_param)
     : level_(level), evolve_param_(evolve_param), solver_param_(solver_param),
       problem_(problem), hierarchy_(&hierarchy), blk_offsets_(4), nonlinear_iter_(0),
-//      step_converged_(true), weight_(problem.CellVolume() * 0.6096 * porosity_ * density_)
       step_converged_(true), weight_(problem.CellVolume() * porosity_ * density_)
 {
     linear_iter_ = 0;
@@ -1302,6 +1205,19 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
                   << num_coarse_lin_iter / double(num_coarse_lin_solve) << "\n";
         std::cout << "Average linear iterations per time step: "
                   << num_coarse_lin_iter / double(step-1) << "\n";
+
+        auto PrintVector = [](const std::vector<int>& in, std::string name)
+        {
+            std::cout << name << " & ";
+            for (unsigned int k = 0; k < in.size() - 1; ++k)
+            {
+                std::cout << in[k] << " & ";
+            }
+            std::cout << in.back() << " \\\\ \n";
+        };
+        PrintVector(step_nonlinear_iter_, "# nonlinear iter");
+        PrintVector(step_coarsest_nonlinear_iter_, "# coarsest nonlinear iter");
+        PrintVector(step_num_backtrack_, "# backtrack");
     }
 
     blk_helper_[level_].GetBlock(0) = x.GetBlock(0);
@@ -1341,12 +1257,17 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
+        coarsest_nonlinear_iter_debug = 0;
+        num_backtrack_debug = 0;
 
 //        x = 0.0;
         solver.Solve(rhs, x);
         step_converged_ = solver.IsConverged();
         nonlinear_iter_ += solver.GetNumIterations();
         linear_iter_ += solver.GetLevelSolver(solver_param_.num_levels-1).GetNumLinearIterations();
+        step_coarsest_nonlinear_iter_.push_back(coarsest_nonlinear_iter_debug);
+        step_nonlinear_iter_.push_back(solver.GetNumIterations());
+        step_num_backtrack_.push_back(num_backtrack_debug);
     }
     else // sequential: solve for flux and pressure first, and then saturation
     {
@@ -1485,7 +1406,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 
 //    out.GetBlock(2) *= (1. / dt_ / density_);
 
-    if (blk_x.BlockSize(1) > 10000)
+//    if (blk_x.BlockSize(1) > 10000)
     {
         const GraphSpace& space = darcy_system_.GetGraphSpace();
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
@@ -1495,8 +1416,8 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         D_->Mult(1.0, U_FS, Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
     }
 //    if (blk_x.BlockSize(1) < 10000)
-    else
-//    if (false)
+//    else
+    if (false)
     {
         mfem::SparseMatrix fine_D = hie_ptr->GetMatrix(0).GetD();
         fine_D *= (dt_ * density_);
@@ -1626,6 +1547,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
     const GraphSpace& space = darcy_system_.GetGraphSpace();
 
+    if (darcy_system_.NumVDofs() < 10000)
+    {
+        coarsest_nonlinear_iter_debug++;
+    }
 
     //    if((count == 123)|| (count == 129) || (count == 133) || (count == 155) || (count == 162) || (count == 168))
     //    if((count == 321)|| (count == 343) || (count == 387) || (count == 431) || (count == 453) || (count == 629))
@@ -1712,7 +1637,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     unique_ptr<mfem::SparseMatrix> dTdS_RAP;
     unique_ptr<mfem::HypreParMatrix> dTdsigma;
 
-    if (blk_x.BlockSize(1) > 10000)
+//    if (blk_x.BlockSize(1) > 10000)
     {
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
 
@@ -1727,8 +1652,8 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         dTdS.reset(mfem::ParMult(D_.get(), U_pwc.get()));
     }
 //    if (blk_x.BlockSize(1) < 10000)
-    else
-//    if (false)
+//    else
+    if (false)
     {
         mfem::SparseMatrix fine_D = hie_ptr->GetMatrix(0).GetD();
         fine_D *= (dt_ * density_);
@@ -2149,7 +2074,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         solver.Mult(true_blk_resid, true_blk_dx);
         linear_iter_ += solver.GetNumIterations();
 
-        if (darcy_system_.NumVDofs() < 30000)
+        if (darcy_system_.NumVDofs() < 10000)
         {
             num_coarse_lin_iter += solver.GetNumIterations();
             num_coarse_lin_solve++;
@@ -2243,38 +2168,38 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
 
     int local_cnt = 0;
-//    if (sol_previous_iter.Size()>0 && blk_x.BlockSize(1) < 10000)
-//    {
-//        for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
-//        {
-//            if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
-//            {
-//                local_cnt++;
-////                std::cout<< ii <<"-th position has a different sign!!!\n";
-//            }
-//        }
-//        std::cout<< local_cnt <<" positions have a different sign!!!\n";
+    if (sol_previous_iter.Size()>0 && blk_x.BlockSize(1) < 10000)
+    {
+        for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
+        {
+            if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
+            {
+                local_cnt++;
+//                std::cout<< ii <<"-th position has a different sign!!!\n";
+            }
+        }
+        std::cout<< local_cnt <<" positions have a different sign!!!\n";
 
-//        if (local_cnt < 5 && local_cnt > 0)
-//        {
-//            std::cout<< "sol_previous_iter value: " << blk_x.GetBlock(0).Norml2() <<"\n";
-//            for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
-//            {
+        if (local_cnt < 5 && local_cnt > 0)
+        {
+            std::cout<< "sol_previous_iter value: " << blk_x.GetBlock(0).Norml2() <<"\n";
+            for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
+            {
 
-//                if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
-//                {
-//                    std::cout<< ii <<"-th position has a different sign!!!\n";
-////                    if (ii == 1025)
-//                    {
-//                        std::cout<< "sol_previous_iter value: "<<sol_previous_iter[ii]<<"\n";
-//                        std::cout<< "x value: "<<x[ii]<<"\n";
-//                    }
-//                }
-//            }
+                if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
+                {
+                    std::cout<< ii <<"-th position has a different sign!!!\n";
+//                    if (ii == 1025)
+                    {
+                        std::cout<< "sol_previous_iter value: "<<sol_previous_iter[ii]<<"\n";
+                        std::cout<< "x value: "<<x[ii]<<"\n";
+                    }
+                }
+            }
 
-//            std::cout<< "flux norm: " << blk_x.GetBlock(0).Normlinf() <<"\n";
-//        }
-//    }
+            std::cout<< "flux norm: " << blk_x.GetBlock(0).Normlinf() <<"\n";
+        }
+    }
 
 
     sol_previous_iter = x;
@@ -2304,31 +2229,63 @@ void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_nor
 {
     if (param_.num_backtrack == 0) return;
 
-    x -= dx;
     mfem::BlockVector blk_x(x, true_blk_offsets_);
     mfem::BlockVector blk_dx(dx, true_blk_offsets_);
 
-    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
     const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
+    double max_dS = mfem::ParNormlp(dS, mfem::infinity(), comm_);
 
-    auto violate = (mfem::Vector(1) = mfem::infinity());
-    for (int i = 0; i < S.Size(); ++i)
+    if (max_dS <= param_.diff_tol + 1e-3) { return; }
+
+    std::cout << "    Size = " << blk_x.BlockSize(2) << ", max_dS = "
+              << max_dS << ", backtracking kicks in ...\n\n";
+    num_backtrack_debug++;
+
+    x -= dx;
+    blk_dx *= std::min(1.0, param_.diff_tol / max_dS);
+    x += dx;
+
     {
-//        if (dS[i] < S[i]) violate = std::min(violate, S[i]);
-        if (dS[i] > 1.0 - S[i])
-            violate[0] = std::min(violate[0], (1.0 - S[i]) / dS[i] *.9);
+        const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
+        for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
+        {
+            if (blk_x.GetBlock(2)[ii] < 0.0)
+            {
+                blk_x.GetBlock(2)[ii]  = 0.0;
+            }
+            if (S2[ii] > 1.0)
+            {
+                blk_x.GetBlock(2)[ii] /= S2[ii];
+            }
+        }
     }
 
-    violate = Min(violate = std::min(violate[0], 1.0), comm_);
 
-    if (!myid_ && violate[0] < 1.0)
-        std::cout<< "backtracking = " << violate[0] << "\n";
+//    x -= dx;
+//    mfem::BlockVector blk_x(x, true_blk_offsets_);
+//    mfem::BlockVector blk_dx(dx, true_blk_offsets_);
 
-    blk_dx *= violate[0];
+//    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
+//    const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
 
-    x += blk_dx;
+//    auto violate = (mfem::Vector(1) = mfem::infinity());
+//    for (int i = 0; i < S.Size(); ++i)
+//    {
+////        if (dS[i] < S[i]) violate = std::min(violate, S[i]);
+//        if (dS[i] > 1.0 - S[i])
+//            violate[0] = std::min(violate[0], (1.0 - S[i]) / dS[i] *.9);
+//    }
 
-    resid_norm_ = violate[0] < 1e-2 ? 0.0 : ResidualNorm(x, rhs);
+//    violate = Min(violate = std::min(violate[0], 1.0), comm_);
+
+//    if (!myid_ && violate[0] < 1.0)
+//        std::cout<< "backtracking = " << violate[0] << "\n";
+
+//    blk_dx *= violate[0];
+
+//    x += blk_dx;
+
+//    resid_norm_ = violate[0] < 1e-2 ? 0.0 : ResidualNorm(x, rhs);
 }
 
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,

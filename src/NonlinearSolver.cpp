@@ -51,7 +51,9 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
     {
         if (param_.check_converge)
         {
-            if (!param_.num_backtrack) { resid_norm_ = ResidualNorm(sol, rhs); }
+//            if (!param_.num_backtrack) {
+                resid_norm_ = ResidualNorm(sol, rhs);
+//            }
             if (myid_ == 0 && param_.print_level > 0)
             {
                 std::cout << tag_ << " iter " << iter_ << ": abs resid = " << resid_norm_
