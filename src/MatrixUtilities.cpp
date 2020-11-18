@@ -1047,7 +1047,9 @@ bool IsDiag(const mfem::SparseMatrix& A)
 
 LocalGraphEdgeSolver::LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                                            const mfem::SparseMatrix& D,
-                                           const mfem::Vector& const_rep)
+                                           const mfem::Vector& const_rep,
+                                           bool has_nullity_one)
+    : has_nullity_one_(has_nullity_one)
 {
     M_is_diag_ = IsDiag(M);
     if (M_is_diag_)
@@ -1080,8 +1082,10 @@ void LocalGraphEdgeSolver::Init(const mfem::Vector& M_diag, const mfem::SparseMa
 
     A_ = smoothg::Mult(D, MinvDT_);
 
-    // Eliminate the first unknown so that A_ is invertible
-    A_.EliminateRowCol(0);
+    if (has_nullity_one_)
+    {
+        A_.EliminateRowCol(0);// Eliminate 1 unknown so that A_ is invertible
+    }
     solver_.SetOperator(A_);
 }
 
@@ -1092,12 +1096,17 @@ void LocalGraphEdgeSolver::Init(const mfem::SparseMatrix& M, const mfem::SparseM
     offsets_[1] = M.Height();
     offsets_[2] = M.Height() + D.Height();
 
-    mfem::SparseMatrix D_copy(D, false);
-    D_copy.EliminateRow(0);
-    mfem::SparseMatrix DT = smoothg::Transpose(D_copy);
 
+    mfem::SparseMatrix D_copy(D, false);
     mfem::SparseMatrix W(D.Height(), D.Height());
-    W.Add(0, 0, 1.0);
+
+    if (has_nullity_one_)
+    {
+        D_copy.EliminateRow(0);
+        W.Add(0, 0, 1.0);
+    }
+
+    mfem::SparseMatrix DT = smoothg::Transpose(D_copy);
     W.Finalize();
 
     mfem::BlockMatrix block_A(offsets_);
@@ -1122,7 +1131,10 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sig
     // the elimination is consistent with the original one
     mfem::Vector& rhs_u_copy = const_cast<mfem::Vector&>(rhs_u);
     double rhs_u_0 = rhs_u_copy(0);
-    rhs_u_copy(0) = 0.;
+    if (has_nullity_one_)
+    {
+        rhs_u_copy(0) = 0.;
+    }
 
     if (M_is_diag_)
     {
@@ -1138,7 +1150,10 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_u, mfem::Vector& sol_sig
     }
 
     // Set rhs_u(0) back to its original vale (rhs is const BlockVector)
-    rhs_u_copy(0) = rhs_u_0;
+    if (has_nullity_one_)
+    {
+        rhs_u_copy(0) = rhs_u_0;
+    }
 }
 
 void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vector& rhs_u,
@@ -1149,7 +1164,10 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
         mfem::Vector rhs(rhs_u.Size());
         MinvDT_.MultTranspose(rhs_sigma, rhs);
         add(-1.0, rhs, 1.0, rhs_u, rhs);
-        rhs(0) = 0.0;
+        if (has_nullity_one_)
+        {
+            rhs(0) = 0.0;
+        }
 
         solver_.Mult(rhs, sol_u);
 
@@ -1162,7 +1180,10 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
     {
         rhs_->GetBlock(0) = rhs_sigma;
         rhs_->GetBlock(1) = rhs_u;
-        rhs_->GetBlock(1)[0] = 0.0;
+        if (has_nullity_one_)
+        {
+            rhs_->GetBlock(1)[0] = 0.0;
+        }
 
         solver_.Mult(*rhs_, *sol_);
 
@@ -1171,7 +1192,7 @@ void LocalGraphEdgeSolver::Mult(const mfem::Vector& rhs_sigma, const mfem::Vecto
         sol_u *= -1.0;
     }
 
-    if (const_rep_.Size() > 0)
+    if (const_rep_.Size() > 0 && has_nullity_one_)
     {
         orthogonalize_from_vector(sol_u, const_rep_);
     }

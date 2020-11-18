@@ -24,7 +24,7 @@ namespace smoothg
 {
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, NLSolverParameters param)
-    : comm_(comm), tag_("Nonlinear"), converged_(false),
+    : comm_(comm), tag_("Nonlinear"), iter_(0), converged_(false),
       linear_iter_(0), linear_tol_(param.init_linear_tol), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
@@ -61,18 +61,18 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
             }
             if ((converged_ = (resid_norm_ < adjusted_tol_))) { break; }
 
-            if (iter_ && sol.Size() < 30000)
-            {
-                const double x_norm = mfem::ParNormlp(sol, 2, comm_);
-                const double dx_norm = mfem::ParNormlp(sol_change, 2, comm_);
+//            if (iter_ && sol.Size() < 30000)
+//            {
+//                const double x_norm = mfem::ParNormlp(sol, 2, comm_);
+//                const double dx_norm = mfem::ParNormlp(sol_change, 2, comm_);
 
-                if ((converged_ = ((dx_norm / x_norm) < param_.rtol)))
-                {
-                    std::cout << tag_ << " iter " << iter_ << ": x_norm = " << x_norm
-                              << ", dx_norm = " << dx_norm << ".\n";
-                    break;
-                }
-            }
+//                if ((converged_ = ((dx_norm / x_norm) < param_.rtol)))
+//                {
+//                    std::cout << tag_ << " iter " << iter_ << ": x_norm = " << x_norm
+//                              << ", dx_norm = " << dx_norm << ".\n";
+//                    break;
+//                }
+//            }
 
             if (iter_ > 0) { UpdateLinearSolveTol(); }
         }

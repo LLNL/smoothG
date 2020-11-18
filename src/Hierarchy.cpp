@@ -134,6 +134,9 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     agg_vert_.push_back(std::move(topology.Agg_vertex_));
 
     upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
+
+    face_edge_.push_back(std::move(topology.face_edge_));
+
 #ifdef SMOOTHG_DEBUG
     Debug_tests(level);
 #endif

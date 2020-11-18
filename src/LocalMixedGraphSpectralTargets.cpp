@@ -447,7 +447,8 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
     // solve eigenvalue problem on each extended aggregate, our (3.1)
     // ---
     const bool edge_eigensystem = (dual_target_ && !use_w && max_loc_edofs_ > 1);
-    const int max_evects = std::max(max_loc_vdofs_, edge_eigensystem ? 1 : max_loc_edofs_);
+//    const int max_evects = std::max(max_loc_vdofs_, edge_eigensystem ? 1 : max_loc_edofs_);
+    const int max_evects = std::max(max_loc_vdofs_, max_loc_edofs_);
 
     MixedBlockEigensystem mbe(max_evects, max_loc_edofs_, rel_tol_, scaled_dual_, energy_dual_);
     for (int agg = 0; agg < num_aggs; ++agg)
@@ -500,7 +501,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, col_map_, evects_restricted_T);
         evects_restricted.Transpose(evects_restricted_T);
 
-//        evects_restricted = 1.0 / std::sqrt(loc_vdofs.Size());
+        evects_restricted = 1.0 / std::sqrt(loc_vdofs.Size());
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
@@ -937,8 +938,21 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
 
                 // solve saddle point problem for PV and restrict to face
                 PV_sigma.SetSize(Mloc_0.Height());
-                LocalGraphEdgeSolver solver(Mloc_0, Dloc_0);
+                LocalGraphEdgeSolver solver(Mloc_0, Dloc_0, mfem::Vector(0),
+                                            OneNegOne.Size() > num_vdofs_nb0);
                 solver.Mult(OneNegOne, PV_sigma);
+
+
+////                if (iface == 11422)
+//                if (iface == 14966)
+//                {
+////                    const mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc_0);
+////                    Mloc_0.Print();
+////                    DlocT.Print();
+//                    PV_sigma.Print(std::cout, 1);
+////                    PV_sigma = 1.0;
+//                }
+
 
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
 
@@ -965,9 +979,13 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
 //                    Dloc_0.Print();
                     std::cout<<"agg = "<<neighbor_aggs[0]<<"\n";
                     PV_sigma_on_face = 1.0;
-
                 }
 
+            }
+
+            if (collected_sigma.NumCols() > 0)
+            {
+                collected_sigma *= (1.0 / collected_sigma.FNorm());
             }
 
             // add PV vector to other vectors and orthogonalize

@@ -82,7 +82,7 @@ LocalEigenSolver::LocalEigenSolver(
     num_arnoldi_vectors_(-1),
     tolerance_(1e-16),
     max_iterations_(10000),
-    shift_(-1e-6)  // shift_ may need to be adjusted
+    shift_(-1e-1)  // shift_ may need to be adjusted
 {
 }
 

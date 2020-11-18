@@ -169,6 +169,7 @@ public:
     void DumpDebug(const std::string& prefix) const;
 
     const mfem::SparseMatrix& GetAggVert(int level) const { return agg_vert_[level]; }
+    const mfem::SparseMatrix& GetFaceEdge(int level) const { return face_edge_[level]; }
 
     const std::vector<mfem::DenseMatrix>& GetTraces(int level) const
     {
@@ -205,6 +206,7 @@ private:
     const mfem::Array<int>* ess_attr_;
 
     std::vector<mfem::SparseMatrix > agg_vert_;
+    std::vector<mfem::SparseMatrix > face_edge_;
     UpscaleParameters param_;
 };
 

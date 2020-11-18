@@ -148,15 +148,27 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
                        const mfem::BlockVector& x,
                        mfem::BlockVector& y) const
 {
-    y.GetBlock(0) = mbuilder_->Mult(scale, x.GetBlock(0));
+    mfem::Vector x_blk0_copy(x.GetBlock(0));
+    for (int i = 0; i < ess_edofs_.Size(); ++i)
+    {
+        if (ess_edofs_[i]) { x_blk0_copy[i] = 0.0; }
+    }
+    y.GetBlock(0) = mbuilder_->Mult(scale, x_blk0_copy);
+
+
+//    y.GetBlock(0) = mbuilder_->Mult(scale, x.GetBlock(0));
     D_.AddMultTranspose(x.GetBlock(1), y.GetBlock(0));
+
     for (int i = 0; i < ess_edofs_.Size(); ++i)
     {
         if (ess_edofs_[i])
+        {
             y[i] = x[i];
+        }
     }
 
-    D_.Mult(x.GetBlock(0), y.GetBlock(1));
+//    D_.Mult(x.GetBlock(0), y.GetBlock(1));
+    D_.Mult(x_blk0_copy, y.GetBlock(1));
 }
 
 mfem::Vector MixedMatrix::PWConstProject(const mfem::Vector& x) const

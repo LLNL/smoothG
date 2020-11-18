@@ -395,7 +395,8 @@ public:
     */
     LocalGraphEdgeSolver(const mfem::SparseMatrix& M,
                          const mfem::SparseMatrix& D,
-                         const mfem::Vector& const_rep = mfem::Vector());
+                         const mfem::Vector& const_rep = mfem::Vector(),
+                         bool has_nullity_one = true);
 
     /**
        @brief Solves \f$ (D M^{-1} D^T) u = f\f$, \f$ \sigma = M^{-1} D^T u \f$.
@@ -444,6 +445,7 @@ private:
     mutable std::unique_ptr<mfem::BlockVector> rhs_;
     mutable std::unique_ptr<mfem::BlockVector> sol_;
     mfem::Vector const_rep_;
+    bool has_nullity_one_;
 };
 
 /**

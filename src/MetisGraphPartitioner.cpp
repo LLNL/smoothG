@@ -371,6 +371,30 @@ void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning
 //    const int num_visited = visited.Sum();
 //    assert(num_visited == w_table.NumRows());
 
+
+//    std::vector<std::vector<int>> final_iso_verts(iso_verts.size()+10);
+//    final_iso_verts = iso_verts;
+
+//    int count_loc = 0;
+//    for (std::vector<int>& verts : iso_verts)
+//    {
+//        for (int& vert : verts)
+//        {
+//            for (int i = 0; i < w_table.RowSize(vert); ++i)
+//            {
+//                if (w_table.GetRowColumns(vert)[i] != vert)
+//                {
+//                    assert(count_loc < 10);
+//                    count_loc++;
+//                    std::vector<int> new_iso_vert(1, w_table.GetRowColumns(vert)[i]);
+//                    final_iso_verts.push_back(new_iso_vert);
+//                }
+//            }
+//        }
+//    }
+//    std::cout<< "number of newly added isolated vert = "<<count_loc<<"\n";
+
+
     MetisGraphPartitioner partitioner;
     partitioner.setUnbalanceTol(2);
     partitioner.SetPreIsolateVertices(std::move(iso_verts));
