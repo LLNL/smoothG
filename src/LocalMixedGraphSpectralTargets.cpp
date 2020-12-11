@@ -224,6 +224,7 @@ void MixedBlockEigensystem::ComputeEigenvectors(
         }
         DlocT_.ScaleRows(Mloc_diag_inv_);
         DMinvDt_ = smoothg::Mult(Dloc, DlocT_);
+
         if (use_w_)
         {
             DMinvDt_.Add(-1.0, Wloc);
@@ -468,8 +469,10 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         // Extract local matrices
         auto Mloc = ExtractRowAndColumns(M_ext, ext_loc_edofs,
                                          ext_loc_edofs, col_map_);
+        Mloc *= 1.0 / FroNorm(Mloc); // TODO: is this a good way?
         auto Dloc = ExtractRowAndColumns(D_ext, ext_loc_vdofs,
                                          ext_loc_edofs, col_map_);
+
         mfem::SparseMatrix Wloc;
         if (use_w)
         {
@@ -501,7 +504,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, col_map_, evects_restricted_T);
         evects_restricted.Transpose(evects_restricted_T);
 
-        evects_restricted = 1.0 / std::sqrt(loc_vdofs.Size());
+//        evects_restricted = 1.0 / std::sqrt(loc_vdofs.Size());
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
