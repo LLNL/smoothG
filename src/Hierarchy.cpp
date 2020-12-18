@@ -131,6 +131,30 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     Proj_sigma_.push_back(coarsener.BuildEdgeProjection());
     mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level]));
 
+    // tmp, need a better way
+    {
+//        auto agg_sizes = Mult(topology.Agg_vertex_, mgL.GetVertexSizes());
+//        auto tmp = smoothg::Mult(mgL.GetPWConstProj(), Pu_[level]);
+//        tmp.ScaleRows(mgL.GetVertexSizes());
+//        auto P_pwc = smoothg::Mult(topology.Agg_vertex_, tmp);
+//        for (int i = 0; i < P_pwc.NumRows(); ++i)
+//        {
+//            P_pwc.ScaleRow(i, 1.0 / agg_sizes[i]);
+//        }
+
+        mfem::SparseMatrix PWC_proj = mixed_systems_.back().GetPWConstProj();
+        for (int i = 0; i < PWC_proj.NumRows(); ++i)
+        {
+            PWC_proj.GetRowEntries(i)[0] = 1.0;
+            for (int j = 1; j < PWC_proj.RowSize(i); ++j)
+            {
+                PWC_proj.GetRowEntries(i)[j] = 0.0;
+            }
+        }
+        auto PWC_projT = smoothg::Transpose(PWC_proj);
+        Ps_.push_back(smoothg::Mult(Pu_.back(), PWC_projT));
+    }
+
     agg_vert_.push_back(std::move(topology.Agg_vertex_));
 
     upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
@@ -241,12 +265,17 @@ mfem::BlockVector Hierarchy::Restrict(int level, const mfem::BlockVector& x) con
 
 void Hierarchy::Project(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-    Restrict(level, x, y);
+//    Restrict(level, x, y);
+    Ps_[level].MultTranspose(x, y);
 }
 
 mfem::Vector Hierarchy::Project(int level, const mfem::Vector& x) const
 {
-    return Restrict(level, x);
+//    return Restrict(level, x);
+    mfem::Vector y(Ps_[level].NumCols());
+    y = 0.0;
+    Ps_[level].MultTranspose(x, y);
+    return y;
 }
 
 void Hierarchy::Project(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
