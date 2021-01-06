@@ -109,6 +109,9 @@ std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::HypreParMatrix& A,
 {
     assert(A.NumCols() == B.NumRows());
     int* B_rowpart = const_cast<int*>(A.ColPart());
+//    mfem::Array<int> B_rowpart_arr(B_rowpart, 2); B_rowpart_arr.Print();
+//    B_colpart.Print();
+//    std::cout<<"row col = "<< B.NumRows() << " "<< B.NumCols()<<"\n";
     mfem::SparseMatrix* B_ptr = const_cast<mfem::SparseMatrix*>(&B);
     mfem::HypreParMatrix pB(A.GetComm(), A.N(), B_colpart.Last(), B_rowpart,
                             const_cast<mfem::Array<int>&>(B_colpart), B_ptr);
@@ -122,6 +125,8 @@ std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
     assert(A.NumCols() == B.NumRows());
     mfem::Array<int>& rowpart = const_cast<mfem::Array<int>&>(A_rowpart);
     mfem::SparseMatrix* A_ptr = const_cast<mfem::SparseMatrix*>(&A);
+//    mfem::Array<int> B_rowpart_arr(const_cast<int*>(B.RowPart()), 2); B_rowpart_arr.Print();
+
     mfem::HypreParMatrix pA(B.GetComm(), A_rowpart.Last(), B.M(), rowpart,
                             const_cast<int*>(B.RowPart()), A_ptr);
     return unique_ptr<mfem::HypreParMatrix>(mfem::ParMult(&pA, &B));

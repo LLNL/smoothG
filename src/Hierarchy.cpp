@@ -265,17 +265,17 @@ mfem::BlockVector Hierarchy::Restrict(int level, const mfem::BlockVector& x) con
 
 void Hierarchy::Project(int level, const mfem::Vector& x, mfem::Vector& y) const
 {
-//    Restrict(level, x, y);
-    Ps_[level].MultTranspose(x, y);
+    Restrict(level, x, y);
+//    Ps_[level].MultTranspose(x, y);
 }
 
 mfem::Vector Hierarchy::Project(int level, const mfem::Vector& x) const
 {
-//    return Restrict(level, x);
-    mfem::Vector y(Ps_[level].NumCols());
-    y = 0.0;
-    Ps_[level].MultTranspose(x, y);
-    return y;
+    return Restrict(level, x);
+//    mfem::Vector y(Ps_[level].NumCols());
+//    y = 0.0;
+//    Ps_[level].MultTranspose(x, y);
+//    return y;
 }
 
 void Hierarchy::Project(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const
