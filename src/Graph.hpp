@@ -135,6 +135,8 @@ public:
 
     void SetNewLocalWeight(std::vector<mfem::Vector> split_edge_weight);
 
+    void SetVertexWeight(mfem::Vector weight) { vertex_weight_ = std::move(weight); }
+
     ///@name Getters for tables/arrays that describe parallel graph
     ///@{
     const mfem::SparseMatrix& VertexToEdge() const { return vertex_edge_local_; }
@@ -143,6 +145,7 @@ public:
     const mfem::HypreParMatrix& EdgeToTrueEdgeToEdge() const { return *edge_trueedge_edge_; }
     const mfem::HypreParMatrix& VertexToTrueEdge() const { return *vertex_trueedge_; }
     const std::vector<mfem::Vector>& EdgeWeight() const { return split_edge_weight_; }
+    const mfem::Vector& VertexWeight() const { return vertex_weight_; }
     const mfem::SparseMatrix& EdgeToBdrAtt() const { return edge_bdratt_; }
     const mfem::Array<HYPRE_Int>& VertexStarts() const { return vertex_starts_; }
     const mfem::Array<HYPRE_Int>& EdgeStarts() const { return edge_starts_; }
@@ -151,8 +154,9 @@ public:
     MPI_Comm GetComm() const { return edge_trueedge_->GetComm(); }
     ///@}
 
-    /// Indicate if the graph has "boundary"
-    bool HasBoundary() const { return edge_bdratt_.Width() > 0; }
+    /// Indicate if the graph has "boundary", which is the set of edges
+    /// that have only one end point.
+    bool HasBoundary() const { return edge_bdratt_.NumCols() > 0; }
 private:
     void Init(const mfem::HypreParMatrix& edge_trueedge,
               const mfem::SparseMatrix* edge_bdratt);
@@ -187,7 +191,10 @@ private:
     mfem::SparseMatrix vertex_edge_local_;
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_;
     std::vector<mfem::Vector> split_edge_weight_;
-    mfem::SparseMatrix edge_bdratt_; // edge to "boundary attribute"
+    mfem::Vector vertex_weight_; // this can be cell volume for graphs in finite volume
+
+    // edge to "boundary attribute", attributes form a nonoverlapping partition of the boundary
+    mfem::SparseMatrix edge_bdratt_;
 
     mfem::SparseMatrix edge_vertex_local_;
     std::unique_ptr<mfem::HypreParMatrix> edge_trueedge_edge_;

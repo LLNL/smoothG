@@ -77,6 +77,7 @@ Graph::Graph(mfem::SparseMatrix edge_vertex_local,
              const mfem::SparseMatrix* edge_bdratt)
     : vertex_edge_local_(smoothg::Transpose(edge_vertex_local)),
       edge_trueedge_(std::move(edge_trueedge)),
+      vertex_weight_(vertex_edge_local_.NumRows()),
       edge_vertex_local_(std::move(edge_vertex_local)),
       edge_trueedge_edge_(AAt(*edge_trueedge_))
 {
@@ -91,12 +92,15 @@ Graph::Graph(mfem::SparseMatrix edge_vertex_local,
 
     vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
     edge_vertex_local_.SortColumnIndices();
+
+    vertex_weight_ = 1.0;
 }
 
 Graph::Graph(const Graph& other) noexcept
     : vertex_edge_local_(other.vertex_edge_local_),
       edge_trueedge_(Copy(*other.edge_trueedge_)),
       split_edge_weight_(other.split_edge_weight_),
+      vertex_weight_(other.vertex_weight_),
       edge_bdratt_(other.edge_bdratt_),
       edge_vertex_local_(other.edge_vertex_local_),
       edge_trueedge_edge_(Copy(*other.edge_trueedge_edge_)),
@@ -134,6 +138,7 @@ void swap(Graph& lhs, Graph& rhs) noexcept
     mfem::Swap(lhs.edge_loc_to_glo_, rhs.edge_loc_to_glo_);
     mfem::Swap(lhs.vertex_starts_, rhs.vertex_starts_);
     mfem::Swap(lhs.edge_starts_, rhs.edge_starts_);
+    mfem::Swap(lhs.vertex_weight_, rhs.vertex_weight_);
 }
 
 void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
@@ -166,6 +171,9 @@ void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
     GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
 
     vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
+
+    vertex_weight_.SetSize(vertex_edge_local_.NumRows());
+    vertex_weight_ = 1.0;
 }
 
 void Graph::Distribute(MPI_Comm comm,
