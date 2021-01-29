@@ -1499,6 +1499,27 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
     }
 }
 
+double ParNorm(const mfem::Vector& vec, MPI_Comm comm)
+{
+    return mfem::ParNormlp(vec, mfem::infinity(), comm);
+}
+
+void LocalChopping(const MixedMatrix& darcy_system, mfem::Vector& x)
+{
+    const mfem::Vector S = PWConstProject(darcy_system, x);
+    for (int i = 0; i < x.Size(); ++i)
+    {
+        if (S[i] < 0.0)
+        {
+            x[i] = 0.0;
+        }
+        if (S[i] > 1.0)
+        {
+            x[i] /= S[i];
+        }
+    }
+}
+
 CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
                              int level,
                              const MixedMatrix& darcy_system,
@@ -1587,11 +1608,6 @@ mfem::Vector CoupledSolver::AssembleTrueVector(const mfem::Vector& vec) const
     blk_true_v.GetBlock(2) = blk_v.GetBlock(2);
 
     return true_v;
-}
-
-double ParNorm(const mfem::Vector& vec, MPI_Comm comm)
-{
-    return mfem::ParNormlp(vec, mfem::infinity(), comm);
 }
 
 mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
@@ -1807,18 +1823,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //    if (false)
     if (level_ == 0)
     {
-        const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
-        for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
-        {
-            if (blk_x.GetBlock(2)[ii] < 0.0)
-            {
-                blk_x.GetBlock(2)[ii]  = 0.0;
-            }
-            if (S[ii] > 1.0)
-            {
-                blk_x.GetBlock(2)[ii] /= S[ii];
-            }
-        }
+        LocalChopping(darcy_system_, blk_x.GetBlock(2));
     }
     const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
 
@@ -2335,55 +2340,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     const mfem::Vector dS = PWConstProject(darcy_system_, blk_dx.GetBlock(2));
     blk_dx *= std::min(1.0, param_.diff_tol / mfem::ParNormlp(dS, mfem::infinity(), comm_));
 
-//    std::cout << "|| S ||_inf " << mfem::ParNormlp(dS, mfem::infinity(), comm_) << "\n";
-
-//    for (int dof : ess_dofs_)
-//    {
-//        assert(std::fabs(blk_dx[dof]) < 1e-12);
-//    }
-//    SetZeroAtMarker(ess_dofs_, blk_dx);
-
-    if (false)
-    {
-        double backtrack_length = 1.0;
-        const mfem::Vector dS = PWConstProject(darcy_system_, blk_dx.GetBlock(2));
-        for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
-        {
-            if (std::abs(dS[ii]) > 0.0)
-            {
-                double ratio = std::abs((1.0 - S[ii]) / dS[ii]);
-                if ( dS[ii] > 1.0 - S[ii] && ratio < backtrack_length)
-                {
-                    backtrack_length = ratio/2.;
-
-//                    std::cout<< "original value: "<< dS[ii] << " " << S[ii] << " " << backtrack_length <<"\n";
-                    std::cout<< "original value: "<< dS[ii] + S[ii]<<"\n";
-                    std::cout<< "corrected value: "<< dS[ii]*backtrack_length + S[ii]<<"\n";
-                }
-            }
-        }
-//        assert(backtrack_length == 1.0);
-//        blk_dx *= backtrack_length;
-    }
-
-
     x += blk_dx;
-
-//    std::cout << "|| x0 || " << mfem::ParNormlp(blk_x.GetBlock(0), 2, comm_) << "\n";
-//    std::cout << "|| x1 || " << mfem::ParNormlp(blk_x.GetBlock(1), 2, comm_) << "\n";
-//    std::cout << "|| x2 || " << mfem::ParNormlp(blk_x.GetBlock(2), 2, comm_) << "\n";
-
-
-//    std::cout << "|| dx0 || " << mfem::ParNormlp(blk_dx.GetBlock(0), 2, comm_) << "\n";
-//    std::cout << "|| dx1 || " << mfem::ParNormlp(blk_dx.GetBlock(1), 2, comm_) << "\n";
-//    std::cout << "|| dx2 || " << mfem::ParNormlp(blk_dx.GetBlock(2), 2, comm_) << "\n";
-
-
-//    diff -= true_blk_dx;
-//    std::cout << "|| diff 0|| " << mfem::ParNormlp(diff.GetBlock(0), 2, comm_) << "\n";
-//    std::cout << "|| diff 1|| " << mfem::ParNormlp(diff.GetBlock(1), 2, comm_) << "\n";
-//    std::cout << "|| diff 2|| " << mfem::ParNormlp(diff.GetBlock(2), 2, comm_) << "\n";
-
 
 
     if (level_ > 0)
@@ -2395,25 +2352,9 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             std::cout<< "         Coarse S after Newton update: min = "<< S_min << ", max = " << S_max <<"\n";
     }
 
-
-//    if (false)
     if (level_ == 0)
     {
-        const mfem::Vector S2 = PWConstProject(darcy_system_, blk_x.GetBlock(2));
-        for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
-        {
-            //        blk_x.GetBlock(2)[ii] = std::fabs(blk_x.GetBlock(2)[ii]);
-            if (blk_x.GetBlock(2)[ii] < 0.0)
-            {
-                blk_x.GetBlock(2)[ii]  = 0.0;
-            }
-            if (S2[ii] > 1.0)
-            {
-                blk_x.GetBlock(2)[ii] /= S2[ii];
-            }
-        }
-        //    const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
-        //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
+        LocalChopping(darcy_system_, blk_x.GetBlock(2));
     }
 
 
@@ -2479,20 +2420,7 @@ void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_nor
 //    blk_dx *= std::min(1.0, param_.diff_tol / max_dS);
 //    x += dx;
 
-    {
-//        const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
-        for (int ii = 0; ii < blk_x.BlockSize(2); ++ii)
-        {
-            if (blk_x.GetBlock(2)[ii] < 0.0)
-            {
-                blk_x.GetBlock(2)[ii]  = 0.0;
-            }
-            if (S[ii] > 1.0)
-            {
-                blk_x.GetBlock(2)[ii] /= S[ii];
-            }
-        }
-    }
+    LocalChopping(darcy_system_, blk_x.GetBlock(2));
 
 
 //    x -= dx;
