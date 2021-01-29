@@ -525,7 +525,6 @@ UpscaleParameters* upscale_param_ptr;
 int count = 0;
 int num_coarse_lin_iter = 0;
 int num_coarse_lin_solve = 0;
-mfem::Array<int> change_sign_pos;
 
 
 mfem::Vector dR0dx0(num_time_steps_);
@@ -772,12 +771,6 @@ Graph graph = problem->GetFVGraph(true);
     Hierarchy hierarchy(std::move(graph), upscale_param,
                         part_ptr, &problem->EssentialAttribute());
     hierarchy.PrintInfo();
-
-    if (upscale_param.max_levels > 1)
-    {
-        change_sign_pos.SetSize(hierarchy.GetMatrix(1).NumEDofs());
-        change_sign_pos = 0;
-    }
 
 
 hie_ptr = &hierarchy;
@@ -2841,38 +2834,6 @@ if (0)
         }
         //    const mfem::Vector S2 = darcy_system_.PWConstProject(blk_x.GetBlock(2));
         //    std::cout<< " after: min(S) max(S) = "<< S2.Min() << " " << S2.Max() <<"\n";
-    }
-
-
-    int local_cnt = 0;
-    if (sol_previous_iter.Size()>0 && blk_x.BlockSize(1) < num_fine_vdofs)
-    {
-        for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
-        {
-            if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
-            {
-                local_cnt++;
-            }
-        }
-//        std::cout<< local_cnt <<" positions have a different sign!!!\n";
-
-        if (local_cnt < 5 && local_cnt > 0)
-        {
-            for (int ii = 0; ii < blk_x.BlockSize(0); ++ii)
-            {
-                if (blk_x[ii] * sol_previous_iter[ii] < 0.0)
-                {
-//                    std::cout<< ii <<"-th position has a different sign!!!\n";
-////                    if (ii == 1025)
-//                    {
-//                        std::cout<< "sol_previous_iter value: "<<sol_previous_iter[ii]<<"\n";
-//                        std::cout<< "x value: "<<x[ii]<<"\n";
-//                    }
-                    change_sign_pos[ii]++;
-                }
-            }
-//            std::cout<< "flux norm: " << blk_x.GetBlock(0).Norml1() / blk_x.BlockSize(0) <<"\n";
-        }
     }
 
 
