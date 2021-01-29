@@ -199,7 +199,7 @@ int LocalEigenSolver::Compute(
 
 template<>
 void LocalEigenSolver::Compute(
-    mfem::DenseMatrix& A, mfem::Vector& evals, mfem::DenseMatrix& evects)
+   const  mfem::DenseMatrix& A, mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     const int n = A.Size();
 
@@ -217,7 +217,7 @@ void LocalEigenSolver::Compute(
 
 template<>
 void LocalEigenSolver::Compute(
-    mfem::DenseMatrix& A,  mfem::DenseMatrix& B,
+    const mfem::DenseMatrix& A, const mfem::DenseMatrix& B,
     mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     const int n = A.Size();
@@ -249,14 +249,13 @@ void LocalEigenSolver::Compute(
 
 template<>
 void LocalEigenSolver::BlockCompute(
-    mfem::DenseMatrix& M, mfem::DenseMatrix& D,
+    const mfem::DenseMatrix& M, const mfem::DenseMatrix& D,
     mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
-    M.Invert();
-    mfem::DenseMatrix DMinv(D.Height(), M.Width());
-    mfem::Mult(D, M, DMinv);
-    mfem::DenseMatrix DMinvDt(D.Height());
-    MultABt(DMinv, D, DMinvDt);
+    mfem::DenseMatrixInverse Minv(M);
+    mfem::DenseMatrix Dt(D, 't');
+    mfem::DenseMatrix MinvDt = smoothg::Mult(Minv, Dt);
+    mfem::DenseMatrix DMinvDt = smoothg::Mult(D, MinvDt);
 
     Compute(DMinvDt, evals, evects);
 }
@@ -471,7 +470,7 @@ void CheckNotConverged(int num_evects, int num_converged)
 
 template<>
 void LocalEigenSolver::Compute(
-    mfem::SparseMatrix& A, mfem::Vector& evals, mfem::DenseMatrix& evects)
+    const mfem::SparseMatrix& A, mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     int n = A.Size();
     int max_num_evects = max_num_evects_ == -1 ? n : std::min(n, max_num_evects_);
@@ -504,7 +503,7 @@ void LocalEigenSolver::Compute(
 
 template<>
 void LocalEigenSolver::Compute(
-    mfem::SparseMatrix& A, mfem::SparseMatrix& B,
+    const mfem::SparseMatrix& A, const mfem::SparseMatrix& B,
     mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     int n = A.Height();
@@ -541,7 +540,7 @@ void LocalEigenSolver::Compute(
 
 template<>
 void LocalEigenSolver::BlockCompute(
-    mfem::SparseMatrix& M, mfem::SparseMatrix& D,
+    const mfem::SparseMatrix& M, const mfem::SparseMatrix& D,
     mfem::Vector& evals, mfem::DenseMatrix& evects)
 {
     int n = D.Height();
@@ -574,7 +573,7 @@ void LocalEigenSolver::BlockCompute(
 }
 #endif // SMOOTHG_USE_ARPACK
 
-double LocalEigenSolver::Compute(mfem::SparseMatrix& A, mfem::DenseMatrix& evects)
+double LocalEigenSolver::Compute(const mfem::SparseMatrix& A, mfem::DenseMatrix& evects)
 {
 #if SMOOTHG_USE_ARPACK
     if (A.Size() > size_offset_)
@@ -591,7 +590,7 @@ double LocalEigenSolver::Compute(mfem::SparseMatrix& A, mfem::DenseMatrix& evect
 }
 
 double LocalEigenSolver::Compute(
-    mfem::SparseMatrix& A, mfem::SparseMatrix& B, mfem::DenseMatrix& evects)
+   const mfem::SparseMatrix& A, const mfem::SparseMatrix& B, mfem::DenseMatrix& evects)
 {
 #if SMOOTHG_USE_ARPACK
     if (A.Size() > size_offset_)
@@ -609,7 +608,7 @@ double LocalEigenSolver::Compute(
 }
 
 double LocalEigenSolver::Compute(
-    std::vector<mfem::SparseMatrix>& mat, mfem::DenseMatrix& evects)
+    const std::vector<mfem::SparseMatrix>& mat, mfem::DenseMatrix& evects)
 {
     assert(mat.size() == 1 || mat.size() == 2);
     if (mat.size() == 1)
@@ -623,7 +622,7 @@ double LocalEigenSolver::Compute(
 }
 
 double LocalEigenSolver::BlockCompute(
-    mfem::SparseMatrix& M, mfem::SparseMatrix& D, mfem::DenseMatrix& evects)
+    const mfem::SparseMatrix& M, const mfem::SparseMatrix& D, mfem::DenseMatrix& evects)
 {
 #if SMOOTHG_USE_ARPACK
     if (D.NumRows() > size_offset_)

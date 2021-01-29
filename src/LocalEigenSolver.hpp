@@ -57,7 +57,7 @@ public:
        @param evects (out) eigenvectors
     */
     template<typename T>
-    void Compute(T& A, mfem::Vector& evals, mfem::DenseMatrix& evects);
+    void Compute(const T& A, mfem::Vector& evals, mfem::DenseMatrix& evects);
 
     /**
        Given symmetric matrices \f$ A, B \f$, find the eigenpairs
@@ -70,7 +70,7 @@ public:
        @param evects (out) eigenvectors
     */
     template<typename T>
-    void Compute(T& A, T& B, mfem::Vector& evals, mfem::DenseMatrix& evects);
+    void Compute(const T& A, const T& B, mfem::Vector& evals, mfem::DenseMatrix& evects);
 
 
     /**
@@ -87,7 +87,7 @@ public:
        @param evects (out) eigenvectors
     */
     template<typename T>
-    void BlockCompute(T& M, T& D, mfem::Vector& evals, mfem::DenseMatrix& evects);
+    void BlockCompute(const T& M, const T& D, mfem::Vector& evals, mfem::DenseMatrix& evects);
 
     /**
        Given a symmetric matrix \f$ A \f$, find the eigenvectors
@@ -100,7 +100,7 @@ public:
        @param evects (out) eigenvectors
        @return smallest eigenvalue
     */
-    double Compute(mfem::SparseMatrix& A, mfem::DenseMatrix& evects);
+    double Compute(const mfem::SparseMatrix& A, mfem::DenseMatrix& evects);
 
     /**
        Given symmetric matrices \f$ A, B \f$, find the eigenvectors
@@ -116,7 +116,7 @@ public:
        @return smallest eigenvalue
     */
     double Compute(
-        mfem::SparseMatrix& A, mfem::SparseMatrix& B, mfem::DenseMatrix& evects);
+        const mfem::SparseMatrix& A, const mfem::SparseMatrix& B, mfem::DenseMatrix& evects);
 
     /**
        If mat has 1 element, solve \f$ mat[0] x = \lambda x \f$
@@ -130,7 +130,7 @@ public:
        @return smallest eigenvalue
     */
     double Compute(
-        std::vector<mfem::SparseMatrix>& mat, mfem::DenseMatrix& evects);
+        const std::vector<mfem::SparseMatrix>& mat, mfem::DenseMatrix& evects);
 
     /**
        Given matrices \f$ M, D \f$, find the eigenvectors corresponding to the
@@ -146,7 +146,7 @@ public:
        @return smallest eigenvalue
     */
     double BlockCompute(
-        mfem::SparseMatrix& M, mfem::SparseMatrix& D, mfem::DenseMatrix& evects);
+        const mfem::SparseMatrix& M, const mfem::SparseMatrix& D, mfem::DenseMatrix& evects);
 
     ~LocalEigenSolver() = default;
 private:
