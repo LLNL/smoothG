@@ -148,8 +148,8 @@ public:
 
     /// compute eigenvectors of the matrix DM^{-1}D^T + W
     void ComputeEigenvectors(
-        mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
-        mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects);
+        const mfem::SparseMatrix& Mloc, const mfem::SparseMatrix& Dloc,
+        const mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects);
 
     /// @todo should scaled_dual and energy_dual be arguments here?
     mfem::DenseMatrix ComputeEdgeTraces(const mfem::DenseMatrix& evects,
@@ -205,8 +205,8 @@ MixedBlockEigensystem::MixedBlockEigensystem(
 }
 
 void MixedBlockEigensystem::ComputeEigenvectors(
-    mfem::SparseMatrix& Mloc, mfem::SparseMatrix& Dloc,
-    mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects)
+    const mfem::SparseMatrix& Mloc, const mfem::SparseMatrix& Dloc,
+    const mfem::SparseMatrix& Wloc, mfem::DenseMatrix& evects)
 {
     use_w_ = (Wloc.Height() > 0);
     Dloc_ref_.MakeRef(Dloc);
