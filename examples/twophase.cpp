@@ -526,23 +526,6 @@ int count = 0;
 int num_coarse_lin_iter = 0;
 int num_coarse_lin_solve = 0;
 
-
-mfem::Vector dR0dx0(num_time_steps_);
-mfem::Vector dR1dx0(num_time_steps_);
-mfem::Vector dR2dx0(num_time_steps_);
-mfem::Vector dR0dx1(num_time_steps_);
-mfem::Vector dR0dx2(num_time_steps_);
-mfem::Vector dR2dx2(num_time_steps_);
-
-mfem::Vector cdR0dx0(num_time_steps_);
-mfem::Vector cdR1dx0(num_time_steps_);
-mfem::Vector cdR2dx0(num_time_steps_);
-mfem::Vector cdR0dx1(num_time_steps_);
-mfem::Vector cdR0dx2(num_time_steps_);
-mfem::Vector cdR2dx2(num_time_steps_);
-
-mfem::Array<int> num_evals(num_time_steps_);
-mfem::Array<int> coarse_num_evals(num_time_steps_);
 mfem::Vector CFL_consts(num_time_steps_);
 
 int time_step;
@@ -841,39 +824,6 @@ problem_ptr->GetMesh().PrintWithPartitioning(part.GetData(), mesh_file);
 //        problem2.SaveFigure(Ss[l], "final_sat", true);
 
 
-//        for (int i = 0; i < num_time_steps_; i++)
-//        {
-//            dR0dx0[i] /= num_evals[i];
-//            dR1dx0[i] /= num_evals[i];
-//            dR2dx0[i] /= num_evals[i];
-//            dR0dx1[i] /= num_evals[i];
-//            dR0dx2[i] /= num_evals[i];
-//            dR2dx2[i] /= num_evals[i];
-
-//            cdR0dx0[i] /= coarse_num_evals[i];
-//            cdR1dx0[i] /= coarse_num_evals[i];
-//            cdR2dx0[i] /= coarse_num_evals[i];
-//            cdR0dx1[i] /= coarse_num_evals[i];
-//            cdR0dx2[i] /= coarse_num_evals[i];
-//            cdR2dx2[i] /= coarse_num_evals[i];
-//        }
-
-//        dR0dx0.Print(std::cout, num_time_steps_);
-//        dR1dx0.Print(std::cout, num_time_steps_);
-//        dR2dx0.Print(std::cout, num_time_steps_);
-//        dR0dx1.Print(std::cout, num_time_steps_);
-//        dR0dx2.Print(std::cout, num_time_steps_);
-//        dR2dx2.Print(std::cout, num_time_steps_);
-
-//        cdR0dx0.Print(std::cout, num_time_steps_);
-//        cdR1dx0.Print(std::cout, num_time_steps_);
-//        cdR2dx0.Print(std::cout, num_time_steps_);
-//        cdR0dx1.Print(std::cout, num_time_steps_);
-//        cdR0dx2.Print(std::cout, num_time_steps_);
-//        cdR2dx2.Print(std::cout, num_time_steps_);
-
-//        num_evals.Print(std::cout, num_time_steps_);
-//        coarse_num_evals.Print(std::cout, num_time_steps_);
 
         auto LatexPrint = [](const mfem::Vector& vec)
         {
@@ -887,23 +837,7 @@ problem_ptr->GetMesh().PrintWithPartitioning(part.GetData(), mesh_file);
         std::cout<< " CFL const";
         std::cout.precision(3);
         LatexPrint(CFL_consts);
-
-//        std::cout.precision(3);
-//        LatexPrint(dR0dx0);
-//        LatexPrint(dR1dx0);
-//        LatexPrint(dR2dx0);
-//        LatexPrint(dR0dx1);
-//        LatexPrint(dR0dx2);
-//        LatexPrint(dR2dx2);
-
-//        LatexPrint(cdR0dx0);
-//        LatexPrint(cdR1dx0);
-//        LatexPrint(cdR2dx0);
-//        LatexPrint(cdR0dx1);
-//        LatexPrint(cdR0dx2);
-//        LatexPrint(cdR2dx2);
-
-//        std::cout.precision(6);
+        std::cout.precision(6);
 
 
         if (l) { Ss[l] -= Ss[0]; }
@@ -1253,21 +1187,6 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
     linear_iter_ = 0;
 
 //    std::cout << "problem.CellVolume() * porosity_ = "<<problem.CellVolume() * porosity_<<"\n";
-    num_evals = 0;
-    coarse_num_evals = 0;
-    dR0dx0 = 0.0;
-    dR1dx0 = 0.0;
-    dR2dx0 = 0.0;
-    dR0dx1 = 0.0;
-    dR0dx2 = 0.0;
-    dR2dx2 = 0.0;
-    cdR0dx0 = 0.0;
-    cdR1dx0 = 0.0;
-    cdR2dx0 = 0.0;
-    cdR0dx1 = 0.0;
-    cdR0dx2 = 0.0;
-    cdR2dx2 = 0.0;
-
 
     blk_helper_.reserve(level + 1);
     blk_helper_.emplace_back(hierarchy.BlockOffsets(0));
@@ -2252,138 +2171,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     bool true_cpr = false;
 
     mfem::BlockVector sol_diff(true_blk_dx);
-
-// check Jacobian error
-if (0)
-{
-    mfem::BlockVector rand_vec(true_blk_dx);
-    mfem::BlockVector J_d(true_blk_dx);
-
-    if (darcy_system_.NumVDofs() > num_fine_vdofs)
-    {
-        num_evals[time_step]++;
-    }
-    else
-    {
-        coarse_num_evals[time_step]++;
-    }
-
-    for (int jj = 0; jj < 3; ++jj)
-    {
-        auto check_Jacob = [&](double eps, int ii)
-        {
-            std::cout<< "                     Check Jacobian: eps = "<<eps<<"\n";
-
-            mfem::BlockVector x_perturb(blk_x); // x + eps * d
-            x_perturb.GetBlock(jj).Add(eps, rand_vec.GetBlock(jj));
-
-//            mfem::BlockVector x_diff(x_perturb); // x + eps * d
-//            x_diff -= blk_x;
-//            mfem::Vector rand_jj(rand_vec.GetBlock(jj)); // x + eps * d
-//            rand_jj *= eps;
-//            if (ii == 0 && jj == 1) {
-//                std::cout<< "                    || rand || = "<<blk_x.GetBlock(jj).Norml2()<<"\n";
-//                std::cout<< "                    || rand || = "<<x_perturb.GetBlock(jj).Norml2()<<"\n";
-//                std::cout<< "                    || rand || = "<<x_diff.GetBlock(jj).Norml2()<<"\n";
-//                std::cout<< "                    || rand || = "<<rand_jj.Norml2()<<"\n";}
-
-            mfem::BlockVector resid_diff(J_d);  // ( R(x + eps * d) - R(x) ) / eps
-            ((mfem::Vector&)resid_diff) = AssembleTrueVector(Residual(x_perturb, rhs));
-            resid_diff += true_resid; // because true_resid *= -1.0; before
-            resid_diff /= eps;
-
-            std::cout<< "                     ";
-            std::cout<< "|| ( R(x + eps * d) - R(x) ) / eps || = " << resid_diff.GetBlock(ii).Norml2() <<"\n";
-
-            mfem::BlockVector J_diff(J_d);
-            J_diff -= resid_diff;
-            std::cout<< "                     ";
-            std::cout<< "|| J(d) - ( R(x + eps * d) - R(x) ) / eps || / || J(d) || = "
-                     << J_diff.GetBlock(ii).Norml2() / J_d.GetBlock(ii).Norml2() <<"\n";
-
-            if (darcy_system_.NumVDofs() > num_fine_vdofs)
-            {
-                if (jj == 0)
-                {
-                    mfem::Vector* dRdx = ii == 0 ? &dR0dx0 : (ii == 1 ? &dR1dx0 : & dR2dx0);
-                    if (J_d.GetBlock(ii).Norml2() > 0.0)
-                        (*dRdx)(time_step) += J_diff.GetBlock(ii).Norml2() / J_d.GetBlock(ii).Norml2();
-                }
-                if (jj == 1)
-                {
-                    dR0dx1(time_step) += J_diff.GetBlock(0).Norml2() / J_d.GetBlock(0).Norml2();
-                }
-                else
-                {
-                    mfem::Vector* dRdx = ii == 0 ? &dR0dx2 : &dR2dx2;
-                    if (J_d.GetBlock(ii).Norml2() > 0.0)
-                        (*dRdx)(time_step) += J_diff.GetBlock(ii).Norml2() / J_d.GetBlock(ii).Norml2();
-                }
-            }
-            else
-            {
-                if (jj == 0)
-                {
-                    mfem::Vector* dRdx = ii == 0 ? &cdR0dx0 : (ii == 1 ? &cdR1dx0 : & cdR2dx0);
-                    (*dRdx)(time_step) += J_diff.GetBlock(ii).Norml2() / J_d.GetBlock(ii).Norml2();
-                }
-                if (jj == 1)
-                {
-                    cdR0dx1(time_step) += J_diff.GetBlock(0).Norml2() / J_d.GetBlock(0).Norml2();
-                }
-                else
-                {
-                    mfem::Vector* dRdx = ii == 0 ? &cdR0dx2 : &cdR2dx2;
-                    (*dRdx)(time_step) += J_diff.GetBlock(ii).Norml2() / J_d.GetBlock(ii).Norml2();
-                }
-            }
-
-        };
-
-
-        std::cout << "\n";
-        std::cout << "           Adding random pertubation in block "<<jj<<":\n";
-
-        rand_vec = 0.0;
-        rand_vec.GetBlock(jj).Randomize();
-//        rand_vec /= rand_vec.Norml2();
-
-        double normalize_const = blk_x.GetBlock(jj).Norml1() / blk_x.BlockSize(jj);  // no needed
-        if (normalize_const != 0.0) { rand_vec.GetBlock(jj) *= normalize_const; }
-
-//        double normalize_const = blk_resid.GetBlock(jj).Norml2();  // no needed?
-//        if (normalize_const != 0.0) { rand_vec.GetBlock(jj) *= normalize_const; }
-
-        if (jj == 0) { SetZeroAtMarker(ess_dofs_, rand_vec); }
-
-        J_d = 0.0;
-        op.Mult(rand_vec, J_d);
-
-
-        for (int ii = 0; ii < 3; ++ii)
-        {
-            std::string op_name;
-            if (ii == 0 && jj == 0) { op_name = "M"; }
-            else if (ii == 0 && jj == 1) { op_name = "D^T"; }
-            else if (ii == 0 && jj == 2) { op_name = "dM/dS"; }
-            else if (ii == 1 && jj == 0) { op_name = "D"; }
-            else if (ii == 2 && jj == 0) { op_name = "dTdsigma"; }
-            else if (ii == 2 && jj == 2) { op_name = "dT/dS"; }
-            else { continue; }
-
-            std::cout<< "\n";
-            std::cout<< "                     Block(" << ii << ", " << jj << "): J = " << op_name << "\n";
-            std::cout<< "                     ";
-            std::cout<< "|| J(d) || = " << J_d.GetBlock(ii).Norml2() <<"\n";
-
-            //        check_Jacob(1e-6);
-            double J_norm = FroNorm(GetDiag(static_cast<mfem::HypreParMatrix&>(op.GetBlock(ii, jj))));
-            if (J_norm > 0.0)
-                check_Jacob(1e-8 * J_norm, ii);
-            //    check_Jacob(std::numeric_limits<double>::min());
-        }
-    }
-}
 
 
     if (!true_cpr)
