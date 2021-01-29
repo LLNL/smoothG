@@ -200,7 +200,7 @@ MixedBlockEigensystem::MixedBlockEigensystem(
     edge_eigs_(max_traces, spec_tol),
     scaled_dual_(scaled_dual),
     energy_dual_(energy_dual),
-    zero_eigenvalue_threshold_(1.e-8)
+    zero_eigenvalue_threshold_(1.e-5)
 {
 }
 
@@ -946,17 +946,6 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                 solver.Mult(OneNegOne, PV_sigma);
 
 
-////                if (iface == 11422)
-//                if (iface == 14966)
-//                {
-////                    const mfem::SparseMatrix DlocT = smoothg::Transpose(Dloc_0);
-////                    Mloc_0.Print();
-////                    DlocT.Print();
-//                    PV_sigma.Print(std::cout, 1);
-////                    PV_sigma = 1.0;
-//                }
-
-
                 PV_sigma_on_face.SetDataAndSize(PV_sigma.GetData(), num_iface_edofs);
 
                 const int edof_1st = face_edof.GetRowColumns(iface)[0];
@@ -975,12 +964,9 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                                            DT_targets.NumCols() - 1, 0, 1);
                 }
 
-//                if (iface == 6463)
                 if (Dloc_0.NumRows() == 1)
                 {
-//                    Mloc_0.Print();
-//                    Dloc_0.Print();
-                    std::cout<<"agg = "<<neighbor_aggs[0]<<"\n";
+                    std::cout<<"ComputeEdgeTargets: agg = "<<neighbor_aggs[0]<<"\n";
                     PV_sigma_on_face = 1.0;
                 }
 

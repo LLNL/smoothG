@@ -389,7 +389,7 @@ public:
         mfem::SparseMatrix vert_edge(num_vert_total, num_edges_total);
 
         std::string str;
-//        if (need_getline) std::getline(file, str);
+        if (need_getline) std::getline(file, str);
 
         int vert, edge;
         double half_trans;
@@ -513,7 +513,7 @@ public:
             std::cerr << "Error in opening file cell_volume_porosity.txt\n";
             mfem::mfem_error("File does not exist");
         }
-//        if (need_getline) std::getline(vol_file, str);
+        if (need_getline) std::getline(vol_file, str);
         vol_file >> vert;
         vol_file >> cell_volume_;
     }
@@ -525,7 +525,6 @@ private:
 };
 
 Hierarchy* hie_ptr;
-UpscaleParameters* upscale_param_ptr;
 int count = 0;
 int num_coarse_lin_iter = 0;
 int num_coarse_lin_solve = 0;
@@ -655,7 +654,7 @@ int main(int argc, char* argv[])
         }
         else if (path == "/Users/lee1029/Downloads/spe10_top_layer_3d")
         {
-            ////    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d";
+            //    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d";
             num_vert_res = 13200;
             nnz_res = num_vert_res * 6;
             num_edges_res = 53080;
@@ -693,6 +692,7 @@ int main(int argc, char* argv[])
             num_edges_res = 155268;
             inject_rate *= 10000.6096;
             num_attr_from_file = 6;
+            upscale_param.num_iso_verts = 6; // TODO: this should be read from file
         }
         else if (path != "/Users/lee1029/Downloads/spe10_bottom_layer_2d")
         {
@@ -729,14 +729,7 @@ int main(int argc, char* argv[])
 
 
 hie_ptr = &hierarchy;
-upscale_param_ptr = &upscale_param;
 
-
-//    if (upscale_param.hybridization)
-//    {
-//        hierarchy.SetAbsTol(1e-18);
-//        hierarchy.SetRelTol(1e-15);
-//    }
 
     // Fine scale transport based on fine flux
     std::vector<mfem::Vector> Ss(upscale_param.max_levels);
