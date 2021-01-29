@@ -523,7 +523,6 @@ private:
 };
 
 Hierarchy* hie_ptr;
-mfem::Array<int>* part_ptr;
 UpscaleParameters* upscale_param_ptr;
 int count = 0;
 int num_coarse_lin_iter = 0;
@@ -699,37 +698,29 @@ int main(int argc, char* argv[])
                                            num_edges_res, inject_rate, bhp, ess_attr));
     }
 
-    mfem::Array<int> part;
-problem_ptr = path == "/Users/lee1029/Downloads/egg" ? problem_for_plot.get() : problem.get();
-part_ptr = &part;
+    problem_ptr = path == "/Users/lee1029/Downloads/egg" ? problem_for_plot.get() : problem.get();
 
-Graph graph = problem->GetFVGraph(true);
+
+    Graph graph = problem->GetFVGraph(true);
+
+    unique_ptr<mfem::Array<int>> partition(read_from_file ? nullptr : new mfem::Array<int>);
 
     if (read_from_file == false)
     {
         mfem::Array<int> coarsening_factors(dim);
         coarsening_factors = 1;
         coarsening_factors[0] = upscale_param.coarse_factor;
-        problem->Partition(use_metis, coarsening_factors, part);
+        problem->Partition(use_metis, coarsening_factors, *partition);
         upscale_param.num_iso_verts = problem->NumIsoVerts();
     }
-    else
-    {
-        part_ptr = nullptr;
-    }
 
-    Hierarchy hierarchy(std::move(graph), upscale_param, part_ptr, &ess_attr);
+    Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr);
     hierarchy.PrintInfo();
 
 
 hie_ptr = &hierarchy;
 upscale_param_ptr = &upscale_param;
 
-if (read_from_file == false)
-{
-std::ofstream mesh_file("spe10_2d.mesh");
-problem_ptr->GetMesh().PrintWithPartitioning(part.GetData(), mesh_file);
-}
 
 //    if (upscale_param.hybridization)
 //    {
