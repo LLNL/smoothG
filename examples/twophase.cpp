@@ -35,7 +35,6 @@
 
 using namespace smoothg;
 
-bool PWConst_S_ = false;
 const int num_time_steps_ = 17; // 17: 471855600, 15
 
 mfem::Vector PWConstProject(const MixedMatrix& darcy_system, const mfem::Vector& x)
@@ -283,7 +282,6 @@ public:
     const mfem::Vector& GetScales() const { return  scales_; }
 };
 
-int num_backtrack_debug = 0;
 int coarsest_nonlinear_iter_debug = 0;
 class CoupledFAS : public FAS
 {
@@ -306,8 +304,6 @@ public:
 
     const NonlinearSolver& GetLevelSolver(int level) const { return *solvers_[level]; };
     int GetNumCoarsestIterations() const { return coarsest_nonlinear_iter_; }
-    int GetNumBackTrack() const { return num_backtrack_debug; }
-
 };
 
 class TransportSolver : public NonlinearSolver
@@ -333,8 +329,7 @@ public:
         gmres_.SetRelTol(1e-9);
 //        gmres_.SetPrintLevel(1);
 
-        int S_size = PWConst_S_ ? darcy_system.GetGraph().NumVertices() : darcy_system.NumVDofs();
-        GenerateOffsets(comm_, S_size, starts_);
+        GenerateOffsets(comm_, Adv_.NumRows(), starts_);
     }
 
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
@@ -1146,7 +1141,7 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
     }
 
     auto& darcy_system = hierarchy.GetMatrix(level);
-    int S_size = PWConst_S_ ? darcy_system.GetGraph().NumVertices() : darcy_system.NumVDofs();
+    const int S_size = darcy_system.GetPWConstProj().NumCols();
     blk_offsets_[0] = 0;
     blk_offsets_[1] = hierarchy.BlockOffsets(level)[1];
     blk_offsets_[2] = hierarchy.BlockOffsets(level)[2];
@@ -1155,12 +1150,12 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
     source_.reset(new mfem::BlockVector(blk_offsets_));
     source_->GetBlock(0) = blk_helper_[level].GetBlock(0);
     source_->GetBlock(1) = blk_helper_[level].GetBlock(1);
-    if (PWConst_S_)
+    if (S_size != darcy_system.NumVDofs())
     {
         mfem::Vector tmp_helper(problem_.GetVertexRHS());
         for (int l = 0; l < level_; ++l)
         {
-            tmp_helper = hierarchy.Project(l, tmp_helper);
+            tmp_helper = smoothg::MultTranspose(hierarchy.GetPs(l), tmp_helper);
         }
         source_->GetBlock(2)  = tmp_helper;
     }
@@ -1279,27 +1274,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         if (evolve_param_.vis_step && (done || step % evolve_param_.vis_step == 0))
         {
             x_blk2 = x.GetBlock(2);
-            if (PWConst_S_)
+            for (int l = level_; l > 0; --l)
             {
-                for (int l = level_; l > 0; --l)
-                {
-                    auto& Ps = hierarchy_->GetPs(l-1);
-                    x_blk2 = MatVec(Ps, x_blk2);
-                }
+                x_blk2 = MatVec(hierarchy_->GetPs(l-1), x_blk2);
             }
-            else
-            {
-                for (int l = level_; l > 0; --l)
-                {
-                    x_blk2 = hierarchy_->Interpolate(l, x_blk2);
-                }
-            }
-
             problem_ptr->VisUpdate(sout, x_blk2);
-
-//            double norm = mfem::ParNormlp(x_blk2, 2, hierarchy_.GetComm());
-//            if (myid == 0) { std::cout << "    || S ||_2 = " << norm << "\n"; }
-
         }
     }
 
@@ -1335,14 +1314,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     for (int l = level_; l > 0; --l)
     {
         hierarchy_->Interpolate(l, blk_helper_[l], blk_helper_[l - 1]);
-        if (PWConst_S_)
-        {
-            x_blk2 = MatVec(hierarchy_->GetPs(l-1), x_blk2);
-        }
-        else
-        {
-            x_blk2 = hierarchy_->Interpolate(l, x_blk2);
-        }
+        x_blk2 = MatVec(hierarchy_->GetPs(l-1), x_blk2);
     }
 
     mfem::BlockVector out(problem_.BlockOffsets());
@@ -1450,7 +1422,6 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
         coarsest_nonlinear_iter_debug = 0;
-        num_backtrack_debug = 0;
 
 //        x = 0.0;
         solver.Solve(rhs, x);
@@ -1551,7 +1522,7 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
 
     GenerateOffsets(comm_, D_->NumCols(), true_edof_starts_);
 
-    int S_size = PWConst_S_ ? darcy_system.GetGraph().NumVertices() : darcy_system.NumVDofs();
+    const int S_size = darcy_system.GetPWConstProj().NumCols();
     blk_offsets_[0] = 0;
     blk_offsets_[1] = darcy_system.NumEDofs();
     blk_offsets_[2] = blk_offsets_[1] + darcy_system.NumVDofs();
@@ -1568,12 +1539,12 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
     gmres_.SetPrintLevel(0);
     gmres_.SetKDim(100);
 
-    if (PWConst_S_ && level_ > 0)
-    {
-        auto PsT= smoothg::Transpose(hierarchy_.GetPs(0));
-        Ms_ = smoothg::Mult(PsT, hierarchy_.GetPs(0));
-        Ms_ *= weight;
-    }
+//    if (PWConst_S_ && level_ > 0)
+//    {
+//        auto PsT= smoothg::Transpose(hierarchy_.GetPs(0));
+//        Ms_ = smoothg::Mult(PsT, hierarchy_.GetPs(0));
+//        Ms_ *= weight;
+//    }
 
     normalizer_.SetSize(D_->NumRows()); // TODO: need to have one for each block
     normalizer_ = 800. * (weight_ / density_);
@@ -1654,7 +1625,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 //        auto fine_upwind = BuildUpwindPattern(hierarchy_.GetMatrix(0).GetGraphSpace(), fine_flux);
         auto fine_upwind = BuildWeightedUpwindPattern(hierarchy_.GetMatrix(0).GetGraphSpace(), fine_flux);
 
-        auto& Pu = PWConst_S_ ? hierarchy_.GetPs(0) : hierarchy_.GetPu(0);
+        auto& Pu = hierarchy_.GetPs(0);
         auto PuT = smoothg::Transpose(Pu);
 
         auto fine_S = MatVec(Pu, blk_x.GetBlock(2));
@@ -1766,12 +1737,12 @@ void CoupledSolver::Build_dMdS(const mfem::Vector& flux, const mfem::Vector& S)
         M_el[i].Mult(sigma_loc, Msigma_vec);
         mfem::DenseMatrix Msigma_loc(Msigma_vec.GetData(), M_el[i].Size(), 1);
 
-        if (PWConst_S_)
-        {
-            local_dMdS_[i] = Msigma_loc;
-            local_dMdS_[i] *= dTMinv_dS_vec[i];
-            continue;
-        }
+//        if (PWConst_S_)
+//        {
+//            local_dMdS_[i] = Msigma_loc;
+//            local_dMdS_[i] *= dTMinv_dS_vec[i];
+//            continue;
+//        }
 
         proj_pwc_loc.SetSize(1, local_vdofs.Size());
         proj_pwc_loc = 0.0;
@@ -1791,12 +1762,12 @@ mfem::SparseMatrix CoupledSolver::Assemble_dMdS(const mfem::Vector& flux, const 
     auto& vert_vdof = darcy_system_.GetGraphSpace().VertexToVDof();
     mfem::Array<int> local_edofs, local_vdofs;
 
-    int S_size = PWConst_S_ ? darcy_system_.GetGraph().NumVertices() : darcy_system_.NumVDofs();
+    const int S_size = darcy_system_.GetPWConstProj().NumCols();
     mfem::SparseMatrix out(darcy_system_.NumEDofs(), S_size);
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
         GetTableRow(vert_edof, i, local_edofs);
-        if (PWConst_S_)
+        if (S_size == darcy_system_.NumVDofs())
         {
             local_vdofs.SetSize(1, i);
         }
@@ -1861,13 +1832,9 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     unique_ptr<mfem::SparseMatrix> dTdS_RAP;
     unique_ptr<mfem::HypreParMatrix> dTdsigma;
 
-//    if (blk_x.BlockSize(1) > num_fine_vdofs)
+    if (level_ == 0 || blk_x.BlockSize(2) == space.GetGraph().NumVertices())
     {
-//        int init_reuse_iter = 1;
-//        bool reuse_flux = iter_ > init_reuse_iter && darcy_system_.NumVDofs() < num_fine_vdofs;
-
         auto upwind = BuildUpwindPattern(space, blk_x.GetBlock(0));
-//                        reuse_flux ? initial_flux_ : blk_x.GetBlock(0));
 
         auto U_FS = MatVec(space.TrueEDofToEDof(), MatVec(upwind, FractionalFlow(S)));
         dTdsigma = ParMult(*D_, SparseDiag(std::move(U_FS)), true_edof_starts_);
@@ -1892,10 +1859,9 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        auto fine_upwind = BuildUpwindPattern(hierarchy_.GetMatrix(0).GetGraphSpace(), fine_flux);
         auto fine_upwind = BuildWeightedUpwindPattern(hierarchy_.GetMatrix(0).GetGraphSpace(), fine_flux);
 
-//        auto& Pu = hierarchy_.GetPu(0);
-        auto& Pu = PWConst_S_ ? hierarchy_.GetPs(0) : hierarchy_.GetPu(0);
+        auto& Ps = hierarchy_.GetPs(0);
 
-        auto fine_S = MatVec(Pu, blk_x.GetBlock(2));
+        auto fine_S = MatVec(Ps, blk_x.GetBlock(2));
 
         auto& Psigma = hierarchy_.GetPsigma(0);
         auto U_FS = MatVec(fine_upwind, FractionalFlow(fine_S));
@@ -1903,7 +1869,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        mfem::Array<int> fine_edof_starts;
 //        GenerateOffsets(comm_, D_fine_.NumCols(), fine_edof_starts);
         auto dTdsigma_fine = smoothg::Mult(D_fine_, SparseDiag(std::move(U_FS)));
-        dTdS_RAP.reset(mfem::RAP(Pu, dTdsigma_fine, Psigma));
+        dTdS_RAP.reset(mfem::RAP(Ps, dTdsigma_fine, Psigma));
         dTdsigma.reset(ToParMatrix(comm_, *dTdS_RAP));
 
         fine_upwind.ScaleRows(fine_flux);
@@ -1912,28 +1878,24 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
         auto fine_dTdS = smoothg::Mult(D_fine_, fine_upwind);
 
-        dTdS_RAP.reset(mfem::RAP(Pu, fine_dTdS, Pu));
+        dTdS_RAP.reset(mfem::RAP(Ps, fine_dTdS, Ps));
 
-        auto dTdS_diag = GetDiag(*dTdS);
-        dTdS_RAP->Add(-1.0, dTdS_diag);
-//        dTdS_diag.Add(-1.0, *dTdS_RAP);
-
-//        double dtds_diff = FroNorm(dTdS_diag) / FroNorm(*dTdS_RAP);
-        double dtds_diff = FroNorm(*dTdS_RAP) / FroNorm(dTdS_diag);
-//        if (dtds_diff > 1e-13)
+        if (dTdS)
         {
-//            dTdS_RAP->Threshold(1e-3);
-//            dTdS_RAP->Print();
-//            dTdS_diag.Threshold(1e-8);
-//            dTdS_diag.Print();
-            std::cout<<"|| upwind - upwind_RAP ||_F = "<< dtds_diff <<"\n";
+            auto dTdS_diag = GetDiag(*dTdS);
+//            dTdS_RAP->Add(-1.0, dTdS_diag);
+            dTdS_diag.Add(-1.0, *dTdS_RAP);
+
+            double dtds_diff = FroNorm(dTdS_diag) / FroNorm(*dTdS_RAP);
+//            double dtds_diff = FroNorm(*dTdS_RAP) / FroNorm(dTdS_diag);
+            if (dtds_diff > 1e-13)
+            {
+                std::cout<<"|| upwind - upwind_RAP ||_F = "<< dtds_diff <<"\n";
+            }
+            assert(dtds_diff < 1e-13);
         }
-//        assert(dtds_diff < 1e-13);
 
         dTdS.reset(ToParMatrix(comm_, *dTdS_RAP));
-
-//        dTdS_diag = 0.0;
-//        dTdS_diag.Add(1.0, *dTdS_RAP);
     }
 
 
@@ -1988,8 +1950,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     auto M_inv = make_unique<mfem::HypreDiagScale>(*M);
     unique_ptr<mfem::HypreBoomerAMG> schur_inv(BoomerAMG(*schur));
 
-//    unique_ptr<mfem::HypreBoomerAMG> dTdS_inv(BoomerAMG(*dTdS));
-
     dMdS->InvScaleRows(Md);
     unique_ptr<mfem::HypreParMatrix> tmp11(mfem::ParMult(dTdsigma.get(), dMdS.get()));
     dMdS->ScaleRows(Md);
@@ -1997,7 +1957,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     auto type22 = mfem::HypreSmoother::Type::l1Jacobi;
     auto dTdS_inv = make_unique<mfem::HypreSmoother>(*schur22, type22);
-//    auto dTdS_inv = make_unique<HypreILU>(*schur22, 0);
 
 //    mfem::BlockVector diff(true_blk_dx);
     const bool use_direct_solver = true;
@@ -2010,36 +1969,30 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     if (!true_cpr)
     {
+        mfem::SparseMatrix M_diag = GetDiag(*M);
+        mfem::SparseMatrix DT_diag = GetDiag(*DT_);
+        mfem::SparseMatrix D_diag = GetDiag(*D_);
+        mfem::SparseMatrix dMdS_diag = GetDiag(*dMdS);
+        mfem::SparseMatrix dTdsigma_diag = GetDiag(*dTdsigma);
+        mfem::SparseMatrix dTdS_diag = GetDiag(*dTdS);
+
+        mfem::BlockMatrix mat(true_blk_offsets_);
+        mat.SetBlock(0, 0, &M_diag);
+        mat.SetBlock(0, 1, &DT_diag);
+        mat.SetBlock(1, 0, &D_diag);
+        mat.SetBlock(0, 2, &dMdS_diag);
+        mat.SetBlock(2, 0, &dTdsigma_diag);
+        mat.SetBlock(2, 2, &dTdS_diag);
+
+        mono_mat.reset(mat.CreateMonolithic());
+        mfem::SparseMatrix mono_copy(*mono_mat);
+
         if (use_direct_solver)
         {
-            mfem::SparseMatrix M_diag = GetDiag(*M);
-            mfem::SparseMatrix DT_diag = GetDiag(*DT_);
-            mfem::SparseMatrix D_diag = GetDiag(*D_);
-            mfem::SparseMatrix dMdS_diag = GetDiag(*dMdS);
-            mfem::SparseMatrix dTdsigma_diag = GetDiag(*dTdsigma);
-            mfem::SparseMatrix dTdS_diag = GetDiag(*dTdS);
-
-            mfem::BlockMatrix mat(true_blk_offsets_);
-            mat.SetBlock(0, 0, &M_diag);
-            mat.SetBlock(0, 1, &DT_diag);
-            mat.SetBlock(1, 0, &D_diag);
-            mat.SetBlock(0, 2, &dMdS_diag);
-            mat.SetBlock(2, 0, &dTdsigma_diag);
-            mat.SetBlock(2, 2, &dTdS_diag);
-
-            mono_mat.reset(mat.CreateMonolithic());
-
-//            if (mat.NumRows() < 30000)
-//            {
-                mfem::SparseMatrix mono_copy(*mono_mat);
-                mfem::UMFPackSolver direct_solve(mono_copy);
-                mfem::BlockVector direct_sol(true_blk_dx);
-                direct_sol = 0.0;
-                direct_solve.Mult(true_resid, true_blk_dx);
-
-//                sol_diff = direct_sol;
-//            }
-
+            mfem::UMFPackSolver direct_solve(mono_copy);
+            mfem::BlockVector direct_sol(true_blk_dx);
+            direct_sol = 0.0;
+            direct_solve.Mult(true_resid, true_blk_dx);
         }
         else
         {
@@ -2084,14 +2037,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             //    gmres_.iterative_mode = true;
             //        gmres_.SetPrintLevel(1);
 
-//            true_blk_dx = 0.0;
-
-//            if (op.NumRows() > 30000)
-                gmres_.Mult(true_resid, true_blk_dx);
-//            else
-//                true_blk_dx = sol_diff;
-
-//            sol_diff -= true_blk_dx;
+            gmres_.Mult(true_resid, true_blk_dx);
 
 
 //////////////////////////////////
@@ -2180,7 +2126,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        mfem::IdentityOperator Id(dTdS->NumRows());
 //        prec2.SetDiagonalBlock(1, &Id);
 
-
         mfem::SparseMatrix diag00 = GetDiag(*schur);
         mfem::SparseMatrix diag01 = GetDiag(*schur01);
         mfem::SparseMatrix diag10 = GetDiag(*schur10);
@@ -2226,11 +2171,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         DT_->Mult(-1.0, true_blk_dx.GetBlock(1), 1.0, true_blk_dx.GetBlock(0));
         dMdS->Mult(-1.0, true_blk_dx.GetBlock(2), 1.0, true_blk_dx.GetBlock(0));
         InvRescaleVector(Md, true_blk_dx.GetBlock(0));
-
-//        true_blk_dx_copy -= true_blk_dx;
-//        std::cout<<"||diff 0 = ||"<<true_blk_dx_copy.GetBlock(0).Norml2() / true_blk_dx.GetBlock(0).Norml2()<<"\n";
-//        std::cout<<"||diff 1 = ||"<<true_blk_dx_copy.GetBlock(1).Norml2() / true_blk_dx.GetBlock(1).Norml2()<<"\n";
-//        std::cout<<"||diff 2 = ||"<<true_blk_dx_copy.GetBlock(2).Norml2() / true_blk_dx.GetBlock(2).Norml2()<<"\n";
 
 //        std::cout << "this level has " << dTdS->N() << " dofs\n";
         linear_iter_ += gmres2.GetNumIterations();
@@ -2302,25 +2242,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             num_coarse_lin_solve++;
         }
 
-//        mfem::Vector for_print(true_blk_dx_hb.GetBlock(0).GetData(), 10);
-//        for_print.Print();
-//        mfem::Vector for_print2(true_blk_dx.GetBlock(0).GetData(), 10);
-//        for_print2.Print();
-
-//        true_blk_dx_hb -= true_blk_dx;
-
-//        mfem::socketstream sout;
-////        true_blk_dx_hb.GetBlock(2) -= true_blk_dx.GetBlock(2);
-//        if (true_blk_resid.BlockSize(0) > num_fine_vdofs)
-//        {problem_ptr->VisSetup(sout, true_blk_dx_hb.GetBlock(2), 0.0, 0.0, "HB diff"); }
-
-//        SetZeroAtMarker(ess_dofs_, true_blk_dx_hb.GetBlock(0));
-
-//        std::ofstream mfile("full_system.txt");
-//            if (mono_mat->NumRows()<50000)
-//            mono_mat->PrintMatlab(mfile);
-
-
 //        std::cout << "    || hb sol diff 0|| "
 //                  << mfem::ParNormlp(true_blk_dx_hb.GetBlock(0), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(0), 2, comm_) << "\n";
 //        std::cout << "    || hb sol diff 1|| "
@@ -2357,31 +2278,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         LocalChopping(darcy_system_, blk_x.GetBlock(2));
     }
 
-
-//    if (((time_step+1) == 13  ) && coarsest_nonlinear_iter_debug > 0 &&
-//            coarsest_nonlinear_iter_debug < 10 && blk_x.BlockSize(2) < num_fine_vdofs)
-//    {
-//        std::cout.precision(3);
-//        sol_previous_iter.Print(std::cout, 20);
-//        blk_dx.Print(std::cout, 20);
-//        blk_x.Print(std::cout, 20);
-//    }
-
     sol_previous_iter = x;
-//    if (count == 475 && blk_x.BlockSize(2) < 13200)
-//    {
-////                std::cout<<"dS size = "<<blk_x.BlockSize(2)<<"\n";
-////        sol_previous_iter = x;
-////        sol_previous_iter *= -1.0;
-//        mfem::BlockVector blk_dx_print(sol_previous_iter.GetData(), blk_offsets_);
-
-//        mfem::Vector for_print(13201); for_print = 0.0;
-//        hierarchy_.Interpolate(1, blk_dx_print.GetBlock(2), for_print);
-
-//        mfem::socketstream sout;
-//        problem_ptr->VisSetup(sout, for_print, 0.0, 0.0, "coarse sol");
-//    }
-
 }
 
 
@@ -2392,62 +2289,7 @@ void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_nor
 
     mfem::BlockVector blk_x(x, true_blk_offsets_);
     mfem::BlockVector blk_dx(dx, true_blk_offsets_);
-
-
-    if (level_ > 0) { return; }
-
-    const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
-    const double min_S = S.Min();
-    const double max_S = S.Max();
-
-    if ((min_S >= 0.0) && (max_S <= 1.0)) { return; }
-
-    num_backtrack_debug++;
-//    x -= dx;
-//    return;
-
-
-//    const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
-//    double max_dS = mfem::ParNormlp(dS, mfem::infinity(), comm_);
-
-//    if (max_dS <= param_.diff_tol + 1e-3) { return; }
-
-//    std::cout << "    Size = " << blk_x.BlockSize(2) << ", max_dS = "
-//              << max_dS << ", backtracking kicks in ...\n\n";
-//    num_backtrack_debug++;
-
-//    x -= dx;
-//    blk_dx *= std::min(1.0, param_.diff_tol / max_dS);
-//    x += dx;
-
     LocalChopping(darcy_system_, blk_x.GetBlock(2));
-
-
-//    x -= dx;
-//    mfem::BlockVector blk_x(x, true_blk_offsets_);
-//    mfem::BlockVector blk_dx(dx, true_blk_offsets_);
-
-//    const mfem::Vector S = darcy_system_.PWConstProject(blk_x.GetBlock(2));
-//    const mfem::Vector dS = darcy_system_.PWConstProject(blk_dx.GetBlock(2));
-
-//    auto violate = (mfem::Vector(1) = mfem::infinity());
-//    for (int i = 0; i < S.Size(); ++i)
-//    {
-////        if (dS[i] < S[i]) violate = std::min(violate, S[i]);
-//        if (dS[i] > 1.0 - S[i])
-//            violate[0] = std::min(violate[0], (1.0 - S[i]) / dS[i] *.9);
-//    }
-
-//    violate = Min(violate = std::min(violate[0], 1.0), comm_);
-
-//    if (!myid_ && violate[0] < 1.0)
-//        std::cout<< "backtracking = " << violate[0] << "\n";
-
-//    blk_dx *= violate[0];
-
-//    x += blk_dx;
-
-//    resid_norm_ = violate[0] < 1e-2 ? 0.0 : ResidualNorm(x, rhs);
 }
 
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
@@ -2463,7 +2305,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
 
     for (int l = 0; l < param_.num_levels; ++l)
     {
-        if (l > 0) { S_prev_l = hierarchy.Project(l-1, S_prev_l); }
+        if (l > 0) { S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l); }
 
         auto& system_l = hierarchy.GetMatrix(l);
 
@@ -2475,7 +2317,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
                                             upwind_flux_l, dt, weight, density, S, param_l));
 //        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 1);
 
-        int S_size = PWConst_S_ ? system_l.GetGraph().NumVertices() : system_l.NumVDofs();
+        const int S_size = system_l.GetPWConstProj().NumCols();
         if (l > 0)
         {
             rhs_[l].SetSize(system_l.NumTotalDofs() + S_size);
@@ -2501,14 +2343,7 @@ void CoupledFAS::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coa
     mfem::BlockVector blk_coarse(coarse.GetData(), solver_c.BlockOffsets());
     hierarchy_.Restrict(level, blk_fine, blk_coarse);
 
-    if (PWConst_S_)
-    {
-        hierarchy_.GetPs(0).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
-    }
-    else
-    {
-        hierarchy_.Restrict(level, blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
-    }
+    hierarchy_.GetPs(level).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
 //    auto S = hierarchy_.PWConstProject(level + 1, blk_coarse.GetBlock(2));
 //    blk_coarse.GetBlock(2) = hierarchy_.PWConstInterpolate(level + 1, S);
 }
@@ -2523,16 +2358,7 @@ void CoupledFAS::Interpolate(int level, const mfem::Vector& coarse, mfem::Vector
 
 //    auto S = hierarchy_.PWConstProject(level, blk_coarse.GetBlock(2));
 //    blk_coarse.GetBlock(2) = hierarchy_.PWConstInterpolate(level, S);
-//    hierarchy_.Interpolate(level, blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
-
-    if (PWConst_S_)
-    {
-        hierarchy_.GetPs(0).Mult(blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
-    }
-    else
-    {
-        hierarchy_.Interpolate(level, blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
-    }
+    hierarchy_.GetPs(level - 1).Mult(blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
 }
 
 //mfem::Vector CoupledFAS::ProjectS(int level, const mfem::Vector& x) const
@@ -2561,14 +2387,8 @@ void CoupledFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coar
     mfem::BlockVector blk_coarse(coarse.GetData(), solver_c.BlockOffsets());
     hierarchy_.Project(level, blk_fine, blk_coarse);
 
-    if (PWConst_S_)
-    {
-        hierarchy_.GetPs(0).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
-    }
-    else
-    {
-        hierarchy_.Project(level, blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
-    }
+    hierarchy_.GetPs(level).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
+
 //    blk_coarse.GetBlock(2) = ProjectS(level, blk_fine.GetBlock(2));
 
 //    auto S = hierarchy_.PWConstProject(level + 1, blk_coarse.GetBlock(2));
