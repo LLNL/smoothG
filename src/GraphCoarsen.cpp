@@ -506,7 +506,7 @@ mfem::SparseMatrix GraphCoarsen::BuildCoarseW(const mfem::SparseMatrix& Pvertice
 MixedMatrix GraphCoarsen::BuildCoarseMatrix(const MixedMatrix& fine_mgL,
                                             const mfem::SparseMatrix& Pvertices)
 {
-    auto agg_sizes = Mult(topology_.Agg_vertex_, fine_mgL.GetVertexSizes());
+    auto agg_sizes = MatVec(topology_.Agg_vertex_, fine_mgL.GetVertexSizes());
 
     auto tmp = smoothg::Mult(fine_mgL.GetPWConstProj(), Pvertices);
     tmp.ScaleRows(fine_mgL.GetVertexSizes());

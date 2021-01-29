@@ -189,7 +189,6 @@ class TwoPhaseSolver
 
     unique_ptr<Hierarchy> new_hierarchy_;
 
-
     mfem::Array<int> blk_offsets_;
     unique_ptr<mfem::BlockVector> source_;
     unique_ptr<mfem::HypreParMatrix> D_te_e_;
@@ -208,7 +207,6 @@ class TwoPhaseSolver
     const double density_ = 1e3;
     const double porosity_ = 0.28; //problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
     const double weight_;
-
 
     double EvalCFL(double dt, const mfem::BlockVector& x) const;
 public:
@@ -1290,7 +1288,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
                 for (int l = level_; l > 0; --l)
                 {
                     auto& Ps = hierarchy_->GetPs(l-1);
-                    x_blk2 = smoothg::Mult(Ps, x_blk2);
+                    x_blk2 = MatVec(Ps, x_blk2);
                 }
             }
             else
@@ -1343,7 +1341,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         hierarchy_->Interpolate(l, blk_helper_[l], blk_helper_[l - 1]);
         if (PWConst_S_)
         {
-            x_blk2 = smoothg::Mult(hierarchy_->GetPs(l-1), x_blk2);
+            x_blk2 = MatVec(hierarchy_->GetPs(l-1), x_blk2);
         }
         else
         {
@@ -1490,7 +1488,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         else
         {
 
-            auto fine_flux = smoothg::Mult(hie_ptr->GetPsigma(0), x.GetBlock(0));
+            auto fine_flux = MatVec(hie_ptr->GetPsigma(0), x.GetBlock(0));
 
     //        auto fine_upwind = BuildUpwindPattern(hie_ptr->GetMatrix(0).GetGraphSpace(), fine_flux);
             auto fine_upwind = BuildWeightedUpwindPattern(hie_ptr->GetMatrix(0).GetGraphSpace(), fine_flux);
@@ -1523,7 +1521,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
         {
             mfem::Vector dSdt(source_->GetBlock(2));
-            D_te_e_->Mult(-1.0, Mult(upwind, FractionalFlow(S)), 1.0, dSdt);
+            D_te_e_->Mult(-1.0, MatVec(upwind, FractionalFlow(S)), 1.0, dSdt);
             x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
             step_converged_ = true;
         }
@@ -1683,9 +1681,9 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_,  blk_x.GetBlock(0));
 //                        reuse_flux ? initial_flux_ : blk_x.GetBlock(0));
 
-        auto upw_FS = Mult(upwind, FractionalFlow(S));
+        auto upw_FS = MatVec(upwind, FractionalFlow(S));
         RescaleVector(blk_x.GetBlock(0), upw_FS);
-        auto U_FS = Mult(space.TrueEDofToEDof(), upw_FS);
+        auto U_FS = MatVec(space.TrueEDofToEDof(), upw_FS);
         D_->Mult(1.0, U_FS, Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
     }
 //    if (blk_x.BlockSize(1) < num_fine_vdofs)
@@ -1696,7 +1694,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 //        fine_D *= (dt_ * density_);
 //        fine_D.EliminateCols(hie_ptr->GetMatrix(0).GetEssDofs());
 
-        auto fine_flux = smoothg::Mult(hie_ptr->GetPsigma(0), blk_x.GetBlock(0));
+        auto fine_flux = MatVec(hie_ptr->GetPsigma(0), blk_x.GetBlock(0));
 
 //        auto fine_upwind = BuildUpwindPattern(hie_ptr->GetMatrix(0).GetGraphSpace(), fine_flux);
         auto fine_upwind = BuildWeightedUpwindPattern(hie_ptr->GetMatrix(0).GetGraphSpace(), fine_flux);
@@ -1704,12 +1702,12 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         auto& Pu = PWConst_S_ ? hie_ptr->GetPs(0) : hie_ptr->GetPu(0);
         auto PuT = smoothg::Transpose(Pu);
 
-        auto fine_S = smoothg::Mult(Pu, blk_x.GetBlock(2));
+        auto fine_S = MatVec(Pu, blk_x.GetBlock(2));
 
-        auto upw_FS = Mult(fine_upwind, FractionalFlow(fine_S));
+        auto upw_FS = MatVec(fine_upwind, FractionalFlow(fine_S));
         RescaleVector(fine_flux, upw_FS);
-        auto fine_D_upw_FS = Mult(D_fine_, upw_FS);
-        auto D_upw_FS = Mult(PuT, fine_D_upw_FS);
+        auto fine_D_upw_FS = MatVec(D_fine_, upw_FS);
+        auto D_upw_FS = MatVec(PuT, fine_D_upw_FS);
 
         out.GetBlock(2) *= Ms_(0, 0);
         out.GetBlock(2) += D_upw_FS;
@@ -1992,7 +1990,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
 //                        reuse_flux ? initial_flux_ : blk_x.GetBlock(0));
 
-        auto U_FS = Mult(space.TrueEDofToEDof(), Mult(upwind, FractionalFlow(S)));
+        auto U_FS = MatVec(space.TrueEDofToEDof(), MatVec(upwind, FractionalFlow(S)));
         dTdsigma = ParMult(*D_, SparseDiag(std::move(U_FS)), true_edof_starts_);
 
         upwind.ScaleRows(blk_x.GetBlock(0));
@@ -2010,7 +2008,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        fine_D *= (dt_ * density_);
 //        fine_D.EliminateCols(hie_ptr->GetMatrix(0).GetEssDofs());
 
-        auto fine_flux = smoothg::Mult(hie_ptr->GetPsigma(0), blk_x.GetBlock(0));
+        auto fine_flux = MatVec(hie_ptr->GetPsigma(0), blk_x.GetBlock(0));
 
 //        auto fine_upwind = BuildUpwindPattern(hie_ptr->GetMatrix(0).GetGraphSpace(), fine_flux);
         auto fine_upwind = BuildWeightedUpwindPattern(hie_ptr->GetMatrix(0).GetGraphSpace(), fine_flux);
@@ -2018,10 +2016,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        auto& Pu = hie_ptr->GetPu(0);
         auto& Pu = PWConst_S_ ? hie_ptr->GetPs(0) : hie_ptr->GetPu(0);
 
-        auto fine_S = smoothg::Mult(Pu, blk_x.GetBlock(2));
+        auto fine_S = MatVec(Pu, blk_x.GetBlock(2));
 
         auto& Psigma = hie_ptr->GetPsigma(0);
-        auto U_FS = Mult(fine_upwind, FractionalFlow(fine_S));
+        auto U_FS = MatVec(fine_upwind, FractionalFlow(fine_S));
 
 //        mfem::Array<int> fine_edof_starts;
 //        GenerateOffsets(comm_, D_fine_.NumCols(), fine_edof_starts);

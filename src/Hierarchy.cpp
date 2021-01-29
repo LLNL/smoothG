@@ -529,18 +529,18 @@ void Hierarchy::Debug_tests(int level) const
 
     // Compute D * pi_sigma * random vector
     const mfem::SparseMatrix& D = GetMatrix(level).GetD();
-    mfem::Vector Proj_sigma_rand = Mult(Proj_sigma_[level], rand_vec);
-    mfem::Vector pi_sigma_rand = Mult(Psigma_[level], Proj_sigma_rand);
-    mfem::Vector D_pi_sigma_rand = Mult(D, pi_sigma_rand);
+    mfem::Vector Proj_sigma_rand = MatVec(Proj_sigma_[level], rand_vec);
+    mfem::Vector pi_sigma_rand = MatVec(Psigma_[level], Proj_sigma_rand);
+    mfem::Vector D_pi_sigma_rand = MatVec(D, pi_sigma_rand);
 
     // Compute pi_u * D * random vector
-    mfem::Vector PuT_D_rand = Restrict(level, Mult(D, rand_vec));
-    mfem::Vector pi_u_D_rand = Mult(Pu_[level], PuT_D_rand);
+    mfem::Vector PuT_D_rand = Restrict(level, MatVec(D, rand_vec));
+    mfem::Vector pi_u_D_rand = MatVec(Pu_[level], PuT_D_rand);
     Check(pi_u_D_rand, D_pi_sigma_rand, "pi_u * D - D * pi_sigma");
 
     rand_vec.SetSize(Proj_sigma_rand.Size());
-    mfem::Vector Psigma_rand = Mult(Psigma_[level], rand_vec);
-    mfem::Vector Proj_sigma_Psigma_rand = Mult(Proj_sigma_[level], Psigma_rand);
+    mfem::Vector Psigma_rand = MatVec(Psigma_[level], rand_vec);
+    mfem::Vector Proj_sigma_Psigma_rand = MatVec(Proj_sigma_[level], Psigma_rand);
     Check(Proj_sigma_Psigma_rand, rand_vec, "Proj_sigma * Psigma - I");
 }
 

@@ -172,7 +172,7 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
 
 mfem::Vector MixedMatrix::PWConstProject(const mfem::Vector& x) const
 {
-    return smoothg::Mult(P_pwc_, x);
+    return smoothg::MatVec(P_pwc_, x);
 }
 
 mfem::Vector MixedMatrix::PWConstInterpolate(const mfem::Vector& x) const

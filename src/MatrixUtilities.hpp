@@ -105,7 +105,7 @@ std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
     @return the product AB.
 */
 mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B);
-mfem::Vector Mult(const mfem::Operator& A, const mfem::Vector& B);
+mfem::Vector MatVec(const mfem::Operator& A, const mfem::Vector& B);
 
 /**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and

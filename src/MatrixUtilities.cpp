@@ -270,7 +270,7 @@ mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B)
     return out;
 }
 
-mfem::Vector Mult(const mfem::Operator& A, const mfem::Vector& B)
+mfem::Vector MatVec(const mfem::Operator& A, const mfem::Vector& B)
 {
     mfem::Vector out(A.NumRows());
     A.Mult(B, out);
