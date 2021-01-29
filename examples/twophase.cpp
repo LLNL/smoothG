@@ -1474,44 +1474,8 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         hierarchy_->Solve(level_, flow_rhs, flow_sol);
 
         unique_ptr<mfem::HypreParMatrix> Adv_c;
-        mfem::SparseMatrix upwind;
-        if (x.BlockSize(2) > num_fine_vdofs)
-        {
-            upwind = BuildUpwindPattern(system.GetGraphSpace(), x.GetBlock(0));
-
-            assert(mfem::ParNormlp(x.GetBlock(0), 2, D_te_e_->GetComm()) < mfem::infinity());
-            upwind.ScaleRows(x.GetBlock(0));
-        }
-        else
-        {
-
-            auto fine_flux = MatVec(hierarchy_->GetPsigma(0), x.GetBlock(0));
-
-    //        auto fine_upwind = BuildUpwindPattern(hierarchy_.GetMatrix(0).GetGraphSpace(), fine_flux);
-            auto fine_upwind = BuildWeightedUpwindPattern(hierarchy_->GetMatrix(0).GetGraphSpace(), fine_flux);
-            auto& Pu = PWConst_S_ ? hierarchy_->GetPs(0) : hierarchy_->GetPu(0);
-
-            fine_upwind.ScaleRows(fine_flux);
-
-            auto& e_te_e = hierarchy_->GetMatrix(0).GetGraph().EdgeToTrueEdgeToEdge();
-            auto& starts = hierarchy_->GetMatrix(0).GetGraph().VertexStarts();
-            auto D_te_e_fine = ParMult(hierarchy_->GetMatrix(0).GetD(), e_te_e, starts);
-
-            mfem::Array<int> vdof_starts;
-            GenerateOffsets(hierarchy_->GetMatrix(1).GetComm(), hierarchy_->GetMatrix(1).NumVDofs(), vdof_starts);
-            auto Adv_fine = ParMult(*D_te_e_fine, fine_upwind, starts);
-            auto tmp = ParMult(*Adv_fine, Pu, vdof_starts);
-
-            auto PWCInterp = system.GetPWConstProj();
-            PWCInterp.ScaleRows(system.GetVertexSizes());
-            auto PWCInterpT = smoothg::Transpose(PWCInterp);
-//            auto& sdof_starts = PWConst_S_ ? system.GetGraph().VertexStarts() : vdof_starts;
-            auto tmp2 = ParMult(*tmp, PWCInterpT, system.GetGraph().VertexStarts());
-
-            auto PuT = smoothg::Transpose(Pu);
-            Adv_c = ParMult(PuT, *tmp2, vdof_starts);
-        }
-
+        mfem::SparseMatrix upwind = BuildUpwindPattern(system.GetGraphSpace(), x.GetBlock(0));
+        upwind.ScaleRows(x.GetBlock(0));
 
         if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
         {
@@ -1879,71 +1843,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     mfem::Vector true_resid = AssembleTrueVector(Residual(x, rhs));
     true_resid *= -1.0;
     mfem::BlockVector blk_resid(true_resid.GetData(), blk_offsets_);
-
-
-////    if (((time_step+1) == 11 || (time_step+1) == 11 ) && coarsest_nonlinear_iter_debug > 0 &&
-////            coarsest_nonlinear_iter_debug < 11 && blk_x.BlockSize(2) < num_fine_vdofs)
-    if (false) {
-    if (((time_step+1) == 11 || (time_step+1) == 11 ) && (coarsest_nonlinear_iter_debug == 10 ||
-        coarsest_nonlinear_iter_debug == 14 || coarsest_nonlinear_iter_debug == 16) && blk_x.BlockSize(2) < num_fine_vdofs)
-
-    {
-        std::cout<<"coarsest_nonlinear_iter_debug = "<<coarsest_nonlinear_iter_debug<<"\n";
-
-        mfem::Vector for_print(hierarchy_.GetMatrix(0).NumVDofs());
-//        hierarchy_.Interpolate(1, blk_resid.GetBlock(1), for_print);
-
-//        std::ofstream p_file("coarse_pres_resid_"+std::to_string(time_step+1)+"_"+
-//                             std::to_string(coarsest_nonlinear_iter_debug)+".txt");
-//        for_print.Print(p_file, 1);
-
-//        mfem::socketstream sout;
-//        problem_ptr->VisSetup(sout, for_print, 0.0, 0.0, "pressure residual"+std::to_string(coarsest_nonlinear_iter_debug));
-
-        hierarchy_.Interpolate(1, blk_resid.GetBlock(2), for_print);
-        mfem::socketstream sout2;
-        problem_ptr->VisSetup(sout2, for_print, 0.0, 0.0, "step "+std::to_string(time_step+1)+
-                              " coarse saturation residual "+std::to_string(coarsest_nonlinear_iter_debug));
-
-//        std::ofstream s_file("coarse_sat_resid_"+std::to_string(time_step+1)+"_"+
-//                             std::to_string(coarsest_nonlinear_iter_debug)+".txt");
-//        for_print.Print(s_file, 1);
-
-//        mfem::Array<int> elems_with_large_resid;
-//        for (int i = 0; i < blk_resid.BlockSize(2); ++i)
-//        {
-//            if (std::abs(blk_resid.GetBlock(2)[i]) > 5.0)
-//            {
-//                elems_with_large_resid.Append(i);
-//            }
-//        }
-
-//        mfem::Vector flux_for_print(hierarchy_.GetMatrix(0).NumEDofs());
-//        hierarchy_.GetPsigma(0).Mult(blk_resid.GetBlock(0), flux_for_print);
-//        mfem::Vector flux_selected(hierarchy_.GetMatrix(0).NumEDofs());
-//        flux_selected = 0.0;
-//        const mfem::SparseMatrix& face_edge = hierarchy_.GetFaceEdge(0);
-//        const mfem::SparseMatrix& elem_face = hierarchy_.GetMatrix(1).GetGraph().VertexToEdge();
-
-//        for (int elem : elems_with_large_resid)
-//        {
-//            for (int i = 0; i < elem_face.RowSize(elem); ++i)
-//            {
-//                int face = elem_face.GetRowColumns(elem)[i];
-
-//                for (int j = 0; j < face_edge.RowSize(face); ++j)
-//                {
-//                    int edge_on_face = face_edge.GetRowColumns(face)[j];
-//                    flux_selected[edge_on_face] = flux_for_print[edge_on_face];
-//                }
-//            }
-//        }
-
-//        mfem::socketstream sout3;
-//        problem_ptr->VisSetup2(sout3, flux_for_print, "coarse flux residual "+std::to_string(coarsest_nonlinear_iter_debug));
-    }
-    }
-
 
 
     mfem::BlockVector true_blk_dx(true_blk_offsets_);
