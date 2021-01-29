@@ -67,7 +67,10 @@ struct SAAMGeParam
    @param max_traces maximum number of edge traces to keep per coarse face
    @param trace_method methods for getting edge trace samples
    @param hybridization use hybridization as solver
-   @param coefficient use coarse coefficient rescaling construction
+   @param coarse_components store components for rescaled coarse M construction
+   @param add_Pvertices_pwc additionally store a "piecewise-constant" Pvertices
+   @param coarse_factor average number of vertices in an aggregate
+   @param num_iso_verts number of (pre-)isolated vertices in vertex partitioning
    @param rescale_iter number of iteration to compute scaling in hybridization
    @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
           coarse hybridized system if saamge_param is not nullptr
@@ -84,6 +87,7 @@ public:
     bool energy_dual;
     bool hybridization;
     bool coarse_components;
+    bool add_Pvertices_pwc;
     int coarse_factor;
     int num_iso_verts;
     int rescale_iter;
@@ -99,6 +103,7 @@ public:
         energy_dual(false),
         hybridization(false),
         coarse_components(false),
+        add_Pvertices_pwc(false),
         coarse_factor(64),
         num_iso_verts(0),
         rescale_iter(-1),
@@ -125,6 +130,8 @@ public:
                        "--no-energy-dual", "Use energy matrix in trace generation.");
         args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
                        "--no-coarse-components", "Store trace, bubble components of coarse M.");
+        args.AddOption(&add_Pvertices_pwc, "-add-pwc-Pvertices", "--add-pwc-Pvertices", "-no-pwc-Pvertices",
+                       "--no-pwc-Pvertices", "Store a piecewise-constant Pvertices.");
         args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
                        "Coarsening factor for metis agglomeration.");
         args.AddOption(&num_iso_verts, "--num-iso-verts", "--num-iso-verts",

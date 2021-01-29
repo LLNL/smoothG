@@ -277,6 +277,13 @@ mfem::Vector Mult(const mfem::Operator& A, const mfem::Vector& B)
     return out;
 }
 
+mfem::Vector MultTranspose(const mfem::Operator& A, const mfem::Vector& B)
+{
+    mfem::Vector out(A.NumRows());
+    A.MultTranspose(B, out);
+    return out;
+}
+
 void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                               mfem::DenseMatrix& C)
 {

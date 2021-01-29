@@ -129,30 +129,15 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     Pu_.push_back(coarsener.BuildPVertices());
     Psigma_.push_back(coarsener.BuildPEdges(param.coarse_components));
     Proj_sigma_.push_back(coarsener.BuildEdgeProjection());
-    mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level]));
 
-    // tmp, need a better way
+    if (param.add_Pvertices_pwc)
     {
-//        auto agg_sizes = Mult(topology.Agg_vertex_, mgL.GetVertexSizes());
-//        auto tmp = smoothg::Mult(mgL.GetPWConstProj(), Pu_[level]);
-//        tmp.ScaleRows(mgL.GetVertexSizes());
-//        auto P_pwc = smoothg::Mult(topology.Agg_vertex_, tmp);
-//        for (int i = 0; i < P_pwc.NumRows(); ++i)
-//        {
-//            P_pwc.ScaleRow(i, 1.0 / agg_sizes[i]);
-//        }
-
-        mfem::SparseMatrix PWC_proj = mixed_systems_.back().GetPWConstProj();
-        for (int i = 0; i < PWC_proj.NumRows(); ++i)
-        {
-            PWC_proj.GetRowEntries(i)[0] = 1.0;
-            for (int j = 1; j < PWC_proj.RowSize(i); ++j)
-            {
-                PWC_proj.GetRowEntries(i)[j] = 0.0;
-            }
-        }
-        auto PWC_projT = smoothg::Transpose(PWC_proj);
-        Ps_.push_back(smoothg::Mult(Pu_.back(), PWC_projT));
+        Ps_.push_back(MakeMinimalPvertices(Pu_[level], vert_targets));
+        mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Ps_[level]));
+    }
+    else
+    {
+        mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level]));
     }
 
     agg_vert_.push_back(std::move(topology.Agg_vertex_));
@@ -164,6 +149,22 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 #ifdef SMOOTHG_DEBUG
     Debug_tests(level);
 #endif
+}
+
+mfem::SparseMatrix Hierarchy::MakeMinimalPvertices(
+        const mfem::SparseMatrix& Pvertices,
+        const std::vector<mfem::DenseMatrix>& vert_targets)
+{
+    mfem::SparseMatrix select(Pvertices.NumCols(), vert_targets.size());
+
+    int dof_counter = 0;
+
+    for (unsigned int i = 0; i < vert_targets.size(); ++i)
+    {
+        select.Set(dof_counter, i, 1.0);
+        dof_counter += vert_targets[i].NumCols();
+    }
+    return smoothg::Mult(Pvertices, select);
 }
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)

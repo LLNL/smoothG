@@ -187,6 +187,10 @@ private:
     void Coarsen(int level, const UpscaleParameters& param,
                  const mfem::Array<int>* partitioning);
 
+    mfem::SparseMatrix MakeMinimalPvertices(
+            const mfem::SparseMatrix& Pvertices,
+            const std::vector<mfem::DenseMatrix>& vert_targets);
+
     /// Test if Proj_sigma_ * Psigma_ = identity
     void Debug_tests(int level) const;
 
