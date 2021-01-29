@@ -101,7 +101,6 @@ public:
 
     /// Project vertex space vector to average of finest vertices in coarse vertex (aggregate)
     mfem::Vector PWConstProject(const mfem::Vector& x) const;
-    mfem::Vector PWConstProjectS(const mfem::Vector& x) const;
 
     mfem::Vector PWConstInterpolate(const mfem::Vector& x) const;
 
@@ -134,7 +133,6 @@ public:
 
     /// Get piecewise constant projector
     const mfem::SparseMatrix& GetPWConstProj() const { return P_pwc_; }
-    const mfem::SparseMatrix& GetPWConstProjS() const { return Ps_pwc_; }
 
     /**
        @brief Interpret vertex at this level as aggregate of fine level vertices,
@@ -179,8 +177,6 @@ private:
        MLMC simulations and nonlinear multigrids without visiting finest level.
     */
     mfem::SparseMatrix P_pwc_;
-
-    mfem::SparseMatrix Ps_pwc_;
 
     bool W_is_nonzero_;
 

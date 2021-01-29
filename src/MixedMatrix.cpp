@@ -41,8 +41,6 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
     Init();
     constant_rep_ = 1.0;
 //    trace_fluxes_ = 1.0;
-
-    Ps_pwc_ = P_pwc_;
 }
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
@@ -75,15 +73,6 @@ MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuil
 //        }
 //    }
 
-
-// special PWC project
-    {
-        auto P_pwcT = smoothg::Transpose(P_pwc_);
-        P_pwcT = 1.0;
-        auto Ps_pwc_tmp = smoothg::Mult(P_pwc_, P_pwcT);
-        Ps_pwc_ = Ps_pwc_tmp;
-    }
-
 }
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
@@ -99,7 +88,6 @@ MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
     vertex_sizes_.Swap(other.vertex_sizes_);
     trace_fluxes_.Swap(other.trace_fluxes_);
     P_pwc_.Swap(other.P_pwc_);
-    Ps_pwc_.Swap(other.Ps_pwc_);
     W_is_nonzero_ = other.W_is_nonzero_;
 }
 
@@ -185,11 +173,6 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
 mfem::Vector MixedMatrix::PWConstProject(const mfem::Vector& x) const
 {
     return smoothg::Mult(P_pwc_, x);
-}
-
-mfem::Vector MixedMatrix::PWConstProjectS(const mfem::Vector& x) const
-{
-    return smoothg::Mult(Ps_pwc_, x);
 }
 
 mfem::Vector MixedMatrix::PWConstInterpolate(const mfem::Vector& x) const
