@@ -206,7 +206,7 @@ class TwoPhaseSolver
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
-    const double porosity_ = problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
+    const double porosity_ = 0.28; //problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
     const double weight_;
 
 
@@ -371,8 +371,10 @@ public:
         std::ifstream file(c2f_filename);
         std::ifstream vol_file(vol_filename);
 
-        const int num_injectors = num_vert_res == 18553 ? 8 : 1; // egg 8 // other 1
-        const int num_producers = num_vert_res < 50 ? 1 : 4; // small case 1 // other 4
+        int num_injectors = num_vert_res == 18553 ? 8 : 1; // egg 8 // other 1
+        int num_producers = num_vert_res < 50 ? 1 : 4; // small case 1 // other 4
+
+        if (num_edges_res == 155268) { num_injectors = 6; num_producers = 5; }
 
         int num_vert_total = num_vert_res + num_injectors;
         int num_edges_total = num_edges_res + num_injectors + num_producers;
@@ -683,6 +685,14 @@ int main(int argc, char* argv[])
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel(0, 0, ess_attr));
+        }
+        else if (path == "/Users/lee1029/Downloads/norne")
+        {
+            num_vert_res = 44915;
+            nnz_res = 291244;
+            num_edges_res = 155268;
+            inject_rate *= 10000.6096;
+            num_attr_from_file = 6;
         }
         else if (path != "/Users/lee1029/Downloads/spe10_bottom_layer_2d")
         {
