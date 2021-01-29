@@ -225,6 +225,7 @@ class CoupledSolver : public NonlinearSolver
     mfem::Vector sol_previous_iter;
 
     const MixedMatrix& darcy_system_;
+    const mfem::Array<int>& ess_attr_;
     mfem::GMRESSolver gmres_;
     unique_ptr<mfem::HypreParMatrix> D_;
     unique_ptr<mfem::HypreParMatrix> DT_;
@@ -261,6 +262,7 @@ class CoupledSolver : public NonlinearSolver
     void HybridSolve(const mfem::Vector& resid, mfem::Vector& dx);
 public:
     CoupledSolver(const MixedMatrix& darcy_system,
+                  const mfem::Array<int>& ess_attr,
 //                  const std::vector<mfem::DenseMatrix>& edge_traces,
                   const mfem::SparseMatrix& micro_upwind_flux,
                   const double dt,
@@ -294,6 +296,7 @@ class CoupledFAS : public FAS
 //    mfem::Vector ProjectS(int level, const mfem::Vector& S) const;
 public:
     CoupledFAS(const Hierarchy& hierarchy,
+               const mfem::Array<int>& ess_attr,
                const double dt,
                const double weight,
                const double density,
@@ -621,13 +624,11 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     int num_attr_from_file = 5;
-    mfem::Array<int> ess_attr_from_file;
     upscale_param.num_iso_verts = 1; // TODO: this should be read from file
 
     // Setting up finite volume discretization problem
     std::string path(base_dir + problem_dir);
-    unique_ptr<DarcyProblem> problem;
-    unique_ptr<DarcyProblem> problem_for_plot;
+    unique_ptr<DarcyProblem> problem, problem_for_plot;
     if (path == "/Users/lee1029/Downloads/")
     {
         problem.reset(new TwoPhase(perm_file, dim, 5, slice, use_metis, ess_attr,
@@ -689,13 +690,13 @@ int main(int argc, char* argv[])
             mfem::mfem_error("Unknown model problem!");
         }
 
-        ess_attr_from_file.SetSize(num_attr_from_file, 0);
-        ess_attr_from_file[0] = 1;
+        ess_attr.SetSize(num_attr_from_file, 0);
+        ess_attr[0] = 1;
 
         read_from_file = true;
         std::cout << "Read data from " << path << "... \n";
         problem.reset(new TwoPhaseFromFile(path, need_getline, num_vert_res, nnz_res,
-                                           num_edges_res, inject_rate, bhp, ess_attr_from_file));
+                                           num_edges_res, inject_rate, bhp, ess_attr));
     }
 
     mfem::Array<int> part;
@@ -717,8 +718,7 @@ Graph graph = problem->GetFVGraph(true);
         part_ptr = nullptr;
     }
 
-    Hierarchy hierarchy(std::move(graph), upscale_param,
-                        part_ptr, &problem->EssentialAttribute());
+    Hierarchy hierarchy(std::move(graph), upscale_param, part_ptr, &ess_attr);
     hierarchy.PrintInfo();
 
 
@@ -1446,8 +1446,11 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
         auto S = PWConstProject(system, x.GetBlock(2));
-        CoupledSolver solver(system, hierarchy_->GetUpwindFlux(level_), dt, weight_, density_, S, solver_param_.nl_solve);
-//        CoupledFAS solver(*hierarchy_, dt, weight_, density_, x.GetBlock(2), solver_param_);
+//        CoupledSolver solver(system, problem_.EssentialAttribute(),
+//                             hierarchy_->GetUpwindFlux(level_), dt, weight_,
+//                             density_, S, solver_param_.nl_solve);
+        CoupledFAS solver(*hierarchy_, problem_.EssentialAttribute(), dt, weight_,
+                          density_, x.GetBlock(2), solver_param_);
 
 //solver.SetAbsTol(1e-9);
 //solver.SetRelTol(1e-12);
@@ -1552,6 +1555,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 }
 
 CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
+                             const mfem::Array<int>& ess_attr,
 //                             const std::vector<mfem::DenseMatrix>& edge_traces,
                              const mfem::SparseMatrix& micro_upwind_flux,
                              const double dt,
@@ -1560,7 +1564,7 @@ CoupledSolver::CoupledSolver(const MixedMatrix& darcy_system,
                              const mfem::Vector& S_prev,
                              NLSolverParameters param)
     : NonlinearSolver(darcy_system.GetComm(), param), darcy_system_(darcy_system),
-      gmres_(comm_), local_dMdS_(darcy_system.GetGraph().NumVertices()),
+      ess_attr_(ess_attr), gmres_(comm_), local_dMdS_(darcy_system.GetGraph().NumVertices()),
       Ms_(SparseIdentity(darcy_system.NumVDofs()) *= weight),
       blk_offsets_(4), true_blk_offsets_(4), ess_dofs_(darcy_system.GetEssDofs()),
 //      vert_starts_(darcy_system.GetGraph().VertexStarts()),
@@ -2407,7 +2411,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
         (*dTdS) *= (1. / dt_ / density_);
 
-        TwoPhaseHybrid solver(darcy_system_, &(problem_ptr->EssentialAttribute()));
+        TwoPhaseHybrid solver(darcy_system_, &ess_attr_);
 
         auto total_mobility2 = TotalMobility(S);
 //        if (S.Size() > num_fine_vdofs)
@@ -2693,6 +2697,7 @@ void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_nor
 }
 
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
+                       const mfem::Array<int>& ess_attr,
                        const double dt,
                        const double weight,
                        const double density,
@@ -2712,7 +2717,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
 
         auto& upwind_flux_l = hierarchy.GetUpwindFlux(l);
         auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
-        solvers_[l].reset(new CoupledSolver(system_l, upwind_flux_l, dt, weight, density, S, param_l));
+        solvers_[l].reset(new CoupledSolver(system_l, ess_attr, upwind_flux_l, dt, weight, density, S, param_l));
 //        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 1);
 
         int S_size = PWConst_S_ ? system_l.GetGraph().NumVertices() : system_l.NumVDofs();
