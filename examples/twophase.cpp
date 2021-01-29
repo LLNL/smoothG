@@ -714,41 +714,7 @@ Graph graph = problem->GetFVGraph(true);
     }
     else
     {
-        if (graph.NumVertices() > 50)
-        {
-            part_ptr = nullptr;
-//            std::vector<std::vector<int>> iso_verts;
-//            iso_verts.push_back(std::vector<int>(1, 1-1));
-//            iso_verts.push_back(std::vector<int>(1, 56-1));
-//            iso_verts.push_back(std::vector<int>(1, 12270-1));
-//            iso_verts.push_back(std::vector<int>(1, 12321-1));
-//            iso_verts.push_back(std::vector<int>(1, 6112-1));
-//            iso_verts.push_back(std::vector<int>(1, 12322-1));
-////            iso_verts.push_back(std::vector<int>(1, 13201-1));
-
-//            PartitionAAT(graph.VertexToEdge(), part, upscale_param.coarse_factor, false, iso_verts);
-//            part_ptr = &part;
-        }
-        else
-        {
-            part.SetSize(graph.NumVertices());
-            if (graph.NumVertices() == 17)
-            {
-                part[1-1] = part[2-1] = part[3-1] = part[5-1] = 0;
-                part[4-1] = part[11-1] = part[8-1] = part[7-1] = 1;
-                part[6-1] = part[9-1] = part[10-1] = part[13-1] = 2;
-                part[12-1] = part[14-1] = part[15-1] = part[16-1] = 3;
-            }
-            else if (graph.NumVertices() == 26)
-            {
-                part[1-1] = part[2-1] = part[3-1] = part[5-1] = part[4-1] = part[8-1] = 0;
-                part[7-1] = part[11-1] = part[12-1] = part[16-1] = 1;
-                part[6-1] = part[9-1] = part[13-1] = part[10-1] = part[14-1] = part[18-1]
-                        = part[15-1] = part[19-1] = part[22-1] = 2;
-                part[17-1] = part[20-1] = part[21-1] = part[23-1] = part[24-1] = part[25-1] = 3;
-            }
-            part.Last() = 4;
-        }
+        part_ptr = nullptr;
     }
 
     Hierarchy hierarchy(std::move(graph), upscale_param,
@@ -811,13 +777,6 @@ problem_ptr->GetMesh().PrintWithPartitioning(part.GetData(), mesh_file);
 //        mfem::socketstream sout;
 //        problem2.VisSetup(sout, sol.GetBlock(1), 0.0, 0.0, "Final");
 
-//        for (int i = 0; i < change_sign_pos.Size(); ++i)
-//        {
-//            if (change_sign_pos[i] > 2)
-//            {
-//                std::cout<<"  flux at "<<i<<"-th face changed signs "<< change_sign_pos[i]<<" times\n";
-//            }
-//        }
 
         std::ofstream s_file("final_sat_active.txt");
         Ss[l].Print(s_file, 1);
