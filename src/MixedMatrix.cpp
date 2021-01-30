@@ -179,7 +179,7 @@ mfem::Vector MixedMatrix::PWConstInterpolate(const mfem::Vector& x) const
 {
     mfem::Vector scaled_x(x);
     RescaleVector(vertex_sizes_, scaled_x);
-    mfem::Vector out(NumVDofs());
+    mfem::Vector out(P_pwc_.NumCols());
     P_pwc_.MultTranspose(scaled_x, out);
     return out;
 }

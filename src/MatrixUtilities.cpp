@@ -279,7 +279,7 @@ mfem::Vector MatVec(const mfem::Operator& A, const mfem::Vector& B)
 
 mfem::Vector MultTranspose(const mfem::Operator& A, const mfem::Vector& B)
 {
-    mfem::Vector out(A.NumRows());
+    mfem::Vector out(A.NumCols());
     A.MultTranspose(B, out);
     return out;
 }

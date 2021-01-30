@@ -368,6 +368,7 @@ public:
         int num_producers = num_vert_res < 50 ? 1 : 4; // small case 1 // other 4
 
         if (num_edges_res == 155268) { num_injectors = 6; num_producers = 5; }
+        if (num_edges_res == 264305) { num_injectors = 5; num_producers = 5; }
 
         int num_vert_total = num_vert_res + num_injectors;
         int num_edges_total = num_edges_res + num_injectors + num_producers;
@@ -382,7 +383,7 @@ public:
         mfem::SparseMatrix vert_edge(num_vert_total, num_edges_total);
 
         std::string str;
-//        if (need_getline) std::getline(file, str);
+        if (need_getline) std::getline(file, str);
 
         int vert, edge;
         double half_trans;
@@ -506,7 +507,7 @@ public:
             std::cerr << "Error in opening file cell_volume_porosity.txt\n";
             mfem::mfem_error("File does not exist");
         }
-//        if (need_getline) std::getline(vol_file, str);
+        if (need_getline) std::getline(vol_file, str);
         vol_file >> vert;
         vol_file >> cell_volume_;
     }
@@ -684,6 +685,15 @@ int main(int argc, char* argv[])
             inject_rate *= 10000.6096;
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 6; // TODO: this should be read from file
+        }
+        else if (path == "/Users/lee1029/Downloads/saigup")
+        {
+            num_vert_res = 78720;
+            nnz_res = 505918;
+            num_edges_res = 264305;
+            inject_rate *= 100.6096;
+            num_attr_from_file = 6;
+            upscale_param.num_iso_verts = 5; // TODO: this should be read from file
         }
         else if (path != "/Users/lee1029/Downloads/spe10_bottom_layer_2d")
         {

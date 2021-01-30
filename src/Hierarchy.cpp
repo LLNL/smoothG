@@ -155,15 +155,15 @@ mfem::SparseMatrix Hierarchy::MakeMinimalPvertices(
         const mfem::SparseMatrix& Pvertices,
         const std::vector<mfem::DenseMatrix>& vert_targets)
 {
-    mfem::SparseMatrix select(Pvertices.NumCols(), vert_targets.size());
-
     int dof_counter = 0;
-
+    mfem::SparseMatrix select(Pvertices.NumCols(), vert_targets.size());
     for (unsigned int i = 0; i < vert_targets.size(); ++i)
     {
         select.Set(dof_counter, i, 1.0);
         dof_counter += vert_targets[i].NumCols();
     }
+    select.Finalize();
+
     return smoothg::Mult(Pvertices, select);
 }
 
