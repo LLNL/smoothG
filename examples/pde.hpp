@@ -591,6 +591,8 @@ protected:
     mfem::Vector sigma_sign_change_;
 
     mfem::Array<int> block_offsets_;
+
+    unique_ptr<mfem::SparseMatrix> vertex_reorder_map_; // for plotting purpose
 };
 
 DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
@@ -605,7 +607,7 @@ DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_a
 DarcyProblem::DarcyProblem(const mfem::ParMesh& mesh, const mfem::Array<int>& ess_attr)
     : DarcyProblem(mesh.GetComm(), mesh.Dimension(), ess_attr)
 {
-    mesh_ = make_unique<mfem::ParMesh>(mesh, false);
+    mesh_ = make_unique<mfem::ParMesh>(mesh, true);
     InitGraph();
     kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
     ComputeGraphWeight();
@@ -627,6 +629,7 @@ void DarcyProblem::BuildReservoirGraph()
     vertex_edge_ = TableToMatrix(v_e_table);
     edge_trueedge_ = sigma_fes_->Dof_TrueDof_Matrix();
     edge_bdr_ = GenerateEdgeToBoundary(*mesh_);
+
     assert(edge_bdr_.NumCols() == ess_attr_.Size());
 }
 
@@ -655,7 +658,7 @@ void DarcyProblem::InitGraph()
     for (int edge = 0; edge < edge_vert.NumRows(); edge++)
     {
         const int vert = edge_vert.GetRowColumns(edge)[0];
-        sigma_sign_change_ = DivOp.SpMat()(vert, edge) < 0 ? -1.0 : 1.0;
+        sigma_sign_change_[edge] = DivOp.SpMat()(vert, edge) < 0 ? -1.0 : 1.0;
     }
 }
 
@@ -708,7 +711,21 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
                             bool coef, bool vec_is_cell_based) const
 {
     auto& fes = vec_is_cell_based ? u_fes_ : sigma_fes_;
-    mfem::ParGridFunction gf(fes.get(), vec.GetData());
+    mfem::ParGridFunction gf(fes.get());
+    if (vec_is_cell_based)
+    {
+        if (vertex_reorder_map_)
+        {
+            const int vec_original_size = vec.Size();
+            vec.SetSize(vertex_reorder_map_->NumCols());
+            vertex_reorder_map_->Mult(vec, gf);
+            vec.SetSize(vec_original_size);
+        }
+        else
+        {
+            gf.MakeRef(fes.get(), vec.GetData());
+        }
+    }
 
     const char vishost[] = "localhost";
     const int  visport   = 19916;
@@ -807,7 +824,21 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec,
                              bool vec_is_cell_based) const
 {
     auto& fes = vec_is_cell_based ? u_fes_ : sigma_fes_;
-    mfem::ParGridFunction gf(fes.get(), vec.GetData());
+    mfem::ParGridFunction gf(fes.get());
+    if (vec_is_cell_based)
+    {
+        if (vertex_reorder_map_)
+        {
+            const int vec_original_size = vec.Size();
+            vec.SetSize(vertex_reorder_map_->NumCols());
+            vertex_reorder_map_->Mult(vec, gf);
+            vec.SetSize(vec_original_size);
+        }
+        else
+        {
+            gf.MakeRef(fes.get(), vec.GetData());
+        }
+    }
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *mesh_ << gf;
