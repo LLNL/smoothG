@@ -1178,15 +1178,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     for (int l = 0; l < level_; ++l)
     {
         hierarchy_->Project(l, blk_helper_[l], blk_helper_[l + 1]);
-//        if (PWConst_S_)
-//        {
-
-//            hierarchy_->GetPs(level_-1).MultTranspose(x_blk2)
-//        }
-//        else
-//        {
-            x_blk2 = hierarchy_->Project(l, x_blk2);
-//        }
+        x_blk2 = MultTranspose(hierarchy_->GetPs(level_-1), x_blk2);
     }
 
     x.GetBlock(0) = blk_helper_[level_].GetBlock(0);
@@ -1200,26 +1192,9 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     int step;
     for (step = 1; !done; step++)
     {
-//        if (step == 14)
-//        {
-//            Graph new_graph(hierarchy_->GetMatrix(0).GetGraph());
-
-//            std::vector<mfem::Vector> new_split_edge_weight(new_graph.EdgeWeight());
-
-//            total_mobility = TotalMobility(x.GetBlock(2));
-//            for (unsigned int vert = 0; vert < new_split_edge_weight.size(); ++vert)
-//            {
-//                new_split_edge_weight[vert] *= total_mobility[vert];
-//            }
-//            new_graph.SetNewLocalWeight(std::move(new_split_edge_weight));
-//            new_hierarchy_.reset(new Hierarchy(std::move(new_graph), *upscale_param_ptr,
-//                                               part_ptr, &problem_ptr->EssentialAttribute()));
-//            hierarchy_ = new_hierarchy_.get();
-//        }
 
         mfem::BlockVector previous_x(x);
 //        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 345600.);
-//        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 34560.);
         dt_real = std::min(dt_real * 2.0, evolve_param_.total_time - time);
         step_converged_ = false;
 
@@ -1234,19 +1209,10 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         time += dt_real;
         done = (time >= evolve_param_.total_time);
 
-//        double x_last = x.GetBlock(1)[x.BlockSize(1)-1];
-//        x.GetBlock(1)[x.BlockSize(1)-1] = (x.GetBlock(1).Max()+x.GetBlock(1).Min())/2.;
-//        double p_max = x.GetBlock(1).Max();
-//        double p_min = x.GetBlock(1).Min();
-//        x.GetBlock(1)[x.BlockSize(1)-1] = x_last;
-
-//        if (myid == 0) { std::cout << "    min p, max p = " << p_min << ", " << p_max << "\n"; }
-
         step_CFL_const_.push_back(EvalCFL(dt_real, x));
 
         if (myid == 0)
         {
-//            std::cout << "CFL constant =  " << CFL_consts[time_step] << "\n";
             std::cout << "Time step " << step << ": step size = " << dt_real
                       << ", time = " << time << ".\n\n";
         }
@@ -1293,7 +1259,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         PrintForLatexTable(step_nonlinear_iter_, "# nonlinear iter");
         PrintForLatexTable(step_coarsest_nonlinear_iter_, "# coarsest nonlinear iter");
         PrintForLatexTable(step_CFL_const_, "# coarsest nonlinear iter");
-//        PrintVector(step_num_backtrack_, "# backtrack");
+//        PrintForLatexTable(step_num_backtrack_, "# backtrack");
     }
 
     blk_helper_[level_].GetBlock(0) = x.GetBlock(0);
