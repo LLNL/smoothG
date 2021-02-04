@@ -504,26 +504,6 @@ public:
 void NorneModel::SetupMesh()
 {
     std::ifstream imesh("/Users/lee1029/Downloads/norne_new/new_norne_HEX.vtk");
-    mfem::Mesh mesh(imesh, 1, 1);
-
-//    mfem::Array<int> parts(mesh.GetNE());
-//    parts = 0;
-    mesh_.reset(new mfem::ParMesh(comm_, mesh));
-
-    std::ifstream file("/Users/lee1029/Downloads/norne_new/MrstCellIdToGrdeclCellId.txt");
-    if (!file.is_open())
-    {
-        std::cerr << "NorneModel: error in opening reorder_map!\n";
-        mfem::mfem_error("File does not exist");
-    }
-
-//    int cell_id_in_mesh, vertex_id;
-//    vertex_reorder_map_.reset(new mfem::SparseMatrix(mesh.GetNE(), 44915));
-//    for (int i = 0; i < 44915; ++i)
-//    {
-//        file >> vertex_id;
-//        file >> cell_id_in_mesh;
-//        vertex_reorder_map_->Set(cell_id_in_mesh - 1, vertex_id - 1, 1.0);
-//    }
-//    vertex_reorder_map_->Finalize();
+    mfem::Mesh serial_mesh(imesh, 1, 1);
+    mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
 };
