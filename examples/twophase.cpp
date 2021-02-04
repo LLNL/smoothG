@@ -344,7 +344,7 @@ public:
                      double bottom_hole_pressure, const mfem::Array<int>& ess_attr)
         : DarcyProblem(MPI_COMM_WORLD, 2, ess_attr)
     {
-        std::string c2f_filename = path+"/cell_to_faces_positive.txt";
+        std::string c2f_filename = path+"/cell_to_faces.txt";
         std::string vol_filename = path+"/cell_volume_porosity.txt";
         if (path == "/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive")
         {
@@ -380,7 +380,7 @@ public:
         mfem::SparseMatrix vert_edge(num_vert_total, num_edges_total);
 
         std::string str;
-        if (need_getline) std::getline(file, str);
+        if (need_getline && (num_vert_res != 18553)) std::getline(file, str);
 
         int vert, edge;
         double half_trans;
@@ -457,7 +457,6 @@ public:
                 {
                     edge_bdr.Set(i, 0, 1.0);
                 }
-
             }
             std::cout<<"abnormal edge_count = "<<edge_count<<"\n";
             assert(edge_count == 0);
@@ -505,7 +504,7 @@ public:
             std::cerr << "Error in opening file cell_volume_porosity.txt\n";
             mfem::mfem_error("File does not exist");
         }
-        if (need_getline) std::getline(vol_file, str);
+        if (need_getline && (num_vert_res != 18553)) std::getline(vol_file, str);
         vol_file >> vert;
         vol_file >> cell_volume_;
     }
@@ -1441,7 +1440,7 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
     : NonlinearSolver(darcy_system.GetComm(), param), hierarchy_(hierarchy),
       level_(level), darcy_system_(darcy_system), ess_attr_(ess_attr),
       gmres_(comm_), local_dMdS_(darcy_system.GetGraph().NumVertices()),
-      Ms_(SparseIdentity(darcy_system.NumVDofs()) *= weight),
+      Ms_(SparseIdentity(darcy_system.GetPWConstProj().NumCols()) *= weight),
       blk_offsets_(4), true_blk_offsets_(4), ess_dofs_(darcy_system.GetEssDofs()),
 //      vert_starts_(darcy_system.GetGraph().VertexStarts()),
 //      traces_(edge_traces),
@@ -1696,7 +1695,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     mfem::BlockVector blk_x(x.GetData(), blk_offsets_);
     const GraphSpace& space = darcy_system_.GetGraphSpace();
 
-//    if (false)
     if (level_ == 0)
     {
         LocalChopping(darcy_system_, blk_x.GetBlock(2));
@@ -1714,8 +1712,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     auto M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
     auto dMdS_proc = Assemble_dMdS(blk_x.GetBlock(0), S);
-
-//    std::cout<< " before: min(S) max(S) = "<< S.Min() << " " << S.Max() <<"\n";
 
     for (int mm = 0; mm < ess_dofs_.Size(); ++mm)
     {
@@ -1807,12 +1803,9 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
                             std::cout<< "Row: "<<ii<<", Column: "<< col
                                         << ", Entry:" <<dTdS_diag(ii, col)
                             << ", Entry (RAP):" <<dTdS_RAP->Elem(ii, col)<<"\n";
-
                         }
                     }
                 }
-
-
                 std::cout<<"|| upwind - upwind_RAP ||_F = "<< dtds_diff <<"\n";
             }
 //            assert(dtds_diff < 1e-13);
@@ -1858,18 +1851,16 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     *dTdS *= scales_[2];
 
     // preconditioner
-
     mfem::Vector Md;
     M->GetDiag(Md);
-//    std::cout<<"Md.Max()="<<Md.Max()<<", Md.Min()="<<Md.Min()<<"\n";
-
     Md *= -1.0;
+
     DT_->InvScaleRows(Md);
     unique_ptr<mfem::HypreParMatrix> schur(mfem::ParMult(D_.get(), DT_.get()));
     DT_->ScaleRows(Md);
 
 
-    const bool use_direct_solver = false; // level_ > 0;
+    const bool use_direct_solver = level_ > 0;
     unique_ptr<mfem::SparseMatrix> mono_mat;
 
     bool true_cpr = false;
@@ -1929,11 +1920,9 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //            mfem::IdentityOperator Id(dTdS->NumRows());
 //            prec.SetDiagonalBlock(2, &Id);
 
-
             mfem::Array<int> A_starts;
             GenerateOffsets(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts);
             mfem::HypreParMatrix pMonoMat(darcy_system_.GetComm(), mono_mat->NumRows(), A_starts, mono_mat.get());
-
 
             unique_ptr<mfem::HypreSolver> ILU_smoother;
 //            if (level_ == 0)
