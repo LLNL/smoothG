@@ -544,6 +544,8 @@ void Hierarchy::Debug_tests(int level) const
     Check(Proj_sigma_Psigma_rand, rand_vec, "Proj_sigma * Psigma - I");
 }
 
+
+// TODO: look at ComputeEdgeTargets to determine right direction in parallel
 mfem::SparseMatrix
 Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
 {
@@ -559,12 +561,30 @@ Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
         trace_vec.SetSubVector(edofs, traces[i].GetData());
     }
 
+
+
     auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
-    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
-    auto UPu = smoothg::Mult(U, vert_agg);
+//    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
+//    auto UPu = smoothg::Mult(U, vert_agg);
+    auto UPu = smoothg::Mult(U, Ps_.size() ? Ps_[level - 1] : Pu_[level - 1]);
     UPu.ScaleRows(trace_vec);
 
-    auto out = smoothg::Mult(GetQsigma(level - 1), UPu);
+    auto Q_pwc = smoothg::Transpose(GetMatrix(level).GetPWConstProj());
+    Q_pwc.ScaleColumns(GetMatrix(level).GetVertexSizes());
+    auto UPuQ_pwc = smoothg::Mult(UPu, Q_pwc);
+
+
+//    auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
+//    auto UPu = smoothg::Mult(U, Ps_[level - 1]);
+
+//    mfem::Vector ones(Psigma_[level - 1].NumCols());
+//    ones = 1.0;
+//    mfem::Vector Psigma_ones = MatVec(Psigma_[level - 1], ones);
+//    mfem::SparseMatrix diag_Psigma_ones = SparseDiag(Psigma_ones);
+//    UPu.ScaleRows(trace_vec);
+
+    auto out = smoothg::Mult(GetQsigma(level - 1), UPuQ_pwc);
+    out.SortColumnIndices();
 //    out.Print();
     return out;
 }

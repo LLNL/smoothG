@@ -190,6 +190,9 @@ mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
 
     mfem::SparseMatrix DT(graph.EdgeToVertex());
 
+    mfem::SparseMatrix DT2(graph.EdgeToVertex());
+    DT2.SortColumnIndices();
+
     // Change the second entries of each row with two nonzeros to -1
     // If the edge is shared, change the nonzero to -1 if the edge is not owned
     double* DT_data = DT.GetData();

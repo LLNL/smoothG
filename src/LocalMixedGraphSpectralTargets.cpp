@@ -496,6 +496,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         }
 
         int nevects = evects.Width();
+//        evects = 1.0 / std::sqrt(ext_loc_vdofs.Size());
 
         // restricting vertex dofs on extended region to the original aggregate
         GetTableRow(dof_agg_.agg_vdof_, agg, loc_vdofs);
@@ -504,7 +505,6 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         ExtractColumns(evects_T, ext_loc_vdofs, loc_vdofs, col_map_, evects_restricted_T);
         evects_restricted.Transpose(evects_restricted_T);
 
-//        evects_restricted = 1.0 / std::sqrt(loc_vdofs.Size());
 
         // Apply SVD to the restricted vectors (first vector is always kept)
         evects_restricted.GetColumn(0, first_evect);
@@ -969,7 +969,6 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
                     std::cout<<"ComputeEdgeTargets: agg = "<<neighbor_aggs[0]<<"\n";
                     PV_sigma_on_face = 1.0;
                 }
-
             }
 
             if (collected_sigma.NumCols() > 0)

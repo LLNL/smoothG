@@ -141,6 +141,8 @@ public:
     mfem::Vector Residual(const mfem::Vector& x, const mfem::Vector& y) override;
 
     double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
+
+    int GetNumCoarsestIterations() const { return coarsest_nonlinear_iter_; }
 protected:
     virtual double Norm(int level, const mfem::Vector& vec) const = 0;
 
@@ -156,6 +158,8 @@ protected:
     void Smoothing(int level, const mfem::Vector& in, mfem::Vector& out);
     void MG_Cycle(int level);
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
+
+    int coarsest_nonlinear_iter_ = 0;
 
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;

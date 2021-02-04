@@ -151,7 +151,7 @@ void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
     }
 
     edge_vertex_local_ = smoothg::Transpose(vertex_edge_local_);
-    edge_vertex_local_.SortColumnIndices();
+//    edge_vertex_local_.SortColumnIndices(); // transpose automatically sorted?
 
     edge_starts_.SetSize(3);
     edge_starts_[0] = edge_trueedge.GetRowStarts()[0];

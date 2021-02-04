@@ -505,6 +505,8 @@ mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A);
 /// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
 HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol);
 
+double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

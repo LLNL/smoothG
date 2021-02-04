@@ -503,7 +503,7 @@ public:
 
 void NorneModel::SetupMesh()
 {
-    std::ifstream imesh("/Users/lee1029/Downloads/norne_new/new_norne_HEX.vtk");
+    std::ifstream imesh("/Users/lee1029/Downloads/norne/new_norne_HEX.vtk");
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
 };

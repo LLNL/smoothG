@@ -1476,4 +1476,16 @@ HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol)
    return hypre_error_flag;
 }
 
+double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2)
+{
+    mfem::Vector rand_vec(op1.NumCols());
+    rand_vec.Randomize();
+
+    mfem::Vector op1_rand = MatVec(op1, rand_vec);
+    mfem::Vector op2_rand = MatVec(op2, rand_vec);
+
+    op2_rand -= op1_rand;
+    return op2_rand.Norml2() / op1_rand.Norml2();
+}
+
 } // namespace smoothg

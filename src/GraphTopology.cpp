@@ -259,6 +259,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
 
     mfem::SparseMatrix tmp_face_Agg(face_Agg_i, face_Agg_j, face_Agg_data, nfaces, nAggs);
     auto face_Agg = smoothg::Mult(face_reorder_map, tmp_face_Agg);
+    face_Agg.SortColumnIndices();
 
     auto reordered_face_edge = smoothg::Mult(face_reorder_map, tmp_face_edge);
     face_edge_.Swap(reordered_face_edge);

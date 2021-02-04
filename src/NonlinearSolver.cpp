@@ -177,6 +177,11 @@ void FAS::MG_Cycle(int l)
     if (param_.cycle == V_CYCLE || l == param_.num_levels - 1)
     {
         Smoothing(l, rhs_[l], sol_[l]); // Pre-smoothing
+
+       if (l == param_.num_levels - 1)
+       {
+           coarsest_nonlinear_iter_ += solvers_[l]->GetNumIterations();
+       }
     }
 
     if (l == param_.num_levels - 1) { return; } // terminate if coarsest level

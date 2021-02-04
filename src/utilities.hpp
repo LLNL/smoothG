@@ -251,6 +251,18 @@ bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm);
 /// Set entries in vec corresponding to nonzero entries of marker to be 0
 void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec);
 
+/// Print a std::vector for producing tables in Latex
+template<typename T>
+void PrintForLatexTable(const std::vector<T>& in, std::string tag)
+{
+    std::cout << tag;
+    for (unsigned int i = 0; i < in.size(); ++i)
+    {
+        std::cout << " & " << in[i];
+    }
+    std::cout << " \\\\ \n";
+};
+
 } // namespace smoothg
 
 #endif /* __UTILITIES_HPP */
