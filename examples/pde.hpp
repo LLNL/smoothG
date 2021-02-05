@@ -583,10 +583,12 @@ protected:
     mfem::Array<int> ess_attr_;
 
     mfem::SparseMatrix vertex_edge_;
-    mfem::Vector weight_;
+    mfem::Vector weight_; // edge weight
     std::vector<mfem::Vector> local_weight_;
     const mfem::HypreParMatrix* edge_trueedge_;
     mfem::SparseMatrix edge_bdr_;
+
+    mfem::Vector vert_weight_;
 
     mfem::Vector sigma_sign_change_;
 
@@ -617,9 +619,13 @@ Graph DarcyProblem::GetFVGraph(bool use_local_weight)
 {
     if (use_local_weight && local_weight_.size() > 0)
     {
-        return Graph(vertex_edge_, *edge_trueedge_, local_weight_, &edge_bdr_);
+        Graph out(vertex_edge_, *edge_trueedge_, local_weight_, &edge_bdr_);
+        out.SetVertexWeight(vert_weight_);
+        return out;
     }
-    return Graph(vertex_edge_, *edge_trueedge_, weight_, &edge_bdr_);
+    Graph out(vertex_edge_, *edge_trueedge_, weight_, &edge_bdr_);
+    out.SetVertexWeight(vert_weight_);
+    return out;
 }
 
 void DarcyProblem::BuildReservoirGraph()

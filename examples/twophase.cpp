@@ -35,8 +35,6 @@
 
 using namespace smoothg;
 
-const int num_time_steps_ = 17; // 17: 471855600, 15
-
 mfem::Vector PWConstProject(const MixedMatrix& darcy_system, const mfem::Vector& x)
 {
     mfem::Vector S;
@@ -204,8 +202,8 @@ class TwoPhaseSolver
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1e3;
-    const double porosity_ = 0.28; //problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
-    const double weight_;
+    const double porosity_ = problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
+    mfem::SparseMatrix weight_;
 
     double EvalCFL(double dt, const mfem::BlockVector& x) const;
 public:
@@ -240,8 +238,8 @@ class CoupledSolver : public NonlinearSolver
     const mfem::SparseMatrix& micro_upwind_flux_;
 
     const double dt_;
-    const double weight_;
     const double density_;
+    mfem::SparseMatrix weight_;
 
     mfem::Vector normalizer_;
     bool is_first_resid_eval_;
@@ -266,7 +264,7 @@ public:
 //                  const std::vector<mfem::DenseMatrix>& edge_traces,
                   const mfem::SparseMatrix& micro_upwind_flux,
                   const double dt,
-                  const double weight,
+                  mfem::SparseMatrix weight,
                   const double density,
                   const mfem::Vector& S_prev,
                   NLSolverParameters param);
@@ -295,7 +293,7 @@ public:
     CoupledFAS(const Hierarchy& hierarchy,
                const mfem::Array<int>& ess_attr,
                const double dt,
-               const double weight,
+               const mfem::SparseMatrix& weight,
                const double density,
                const mfem::Vector& S_prev,
                FASParameters param);
@@ -498,21 +496,37 @@ public:
             rhs_u_[num_vert_res + i] = inject_rate;
         }
 
-        // read cell volume
+        // read cell volume and porosity
+        vert_weight_.SetSize(num_vert_total);
+        vert_weight_ = 1.0;
         if (!vol_file.is_open())
         {
             std::cerr << "Error in opening file cell_volume_porosity.txt\n";
             mfem::mfem_error("File does not exist");
         }
         if (need_getline && (num_vert_res != 18553)) std::getline(vol_file, str);
-        vol_file >> vert;
-        vol_file >> cell_volume_;
+        for (int i = 0; i < num_vert_res; ++i)
+        {
+            vol_file >> vert;
+            vol_file >> cell_volume_;
+            vol_file >> porosity_;
+            vol_file >> trash_;
+            if (i < 1) std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
+            vert_weight_[i] = cell_volume_ * porosity_;
+        }
+        for (int i = num_vert_res; i < num_vert_total; ++i)
+        {
+            if (i == num_vert_res) std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
+            vert_weight_[i] = cell_volume_ * porosity_;
+        }
     }
 
     virtual double CellVolume() const { return cell_volume_; }
 private:
     unique_ptr<mfem::HypreParMatrix> edge_trueedge_read_;
     double cell_volume_;
+    double porosity_;
+    double trash_;
 };
 
 int num_coarse_lin_iter = 0;
@@ -675,7 +689,7 @@ int main(int argc, char* argv[])
             num_vert_res = 44915;
             nnz_res = 291244;
             num_edges_res = 155268;
-            inject_rate *= 800.0;
+            inject_rate *= 5000.0;
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 6; // TODO: this should be read from file
 
@@ -690,7 +704,6 @@ int main(int argc, char* argv[])
             inject_rate *= 1000.6096;
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 5; // TODO: this should be read from file
-
         }
         else if (path != "/Users/lee1029/Downloads/spe10_bottom_layer_2d")
         {
@@ -769,7 +782,6 @@ int main(int argc, char* argv[])
 
         std::ofstream s_file("final_sat_active.txt");
         Ss[l].Print(s_file, 1);
-//        problem2.SaveFigure(Ss[l], "final_sat", true);
 
         flux_s[l] = sol.GetBlock(0);
         pres_s[l] = sol.GetBlock(1);
@@ -1104,10 +1116,10 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
                                const FASParameters& solver_param)
     : level_(level), evolve_param_(evolve_param), solver_param_(solver_param),
       problem_(problem), hierarchy_(&hierarchy), blk_offsets_(4), nonlinear_iter_(0),
-      step_converged_(true), weight_(problem.CellVolume() * porosity_ * density_)
+      step_converged_(true), weight_(SparseDiag(hierarchy.GetMatrix(0).GetGraph().VertexWeight()))
 {
+    weight_ *= density_;
     linear_iter_ = 0;
-
 //    std::cout << "problem.CellVolume() * porosity_ = "<<problem.CellVolume() * porosity_<<"\n";
 
     blk_helper_.reserve(level + 1);
@@ -1362,7 +1374,9 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(0) *= (1. / dt / density_);
         rhs.GetBlock(1) *= (dt * density_);
-        add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
+//        add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
+        rhs.GetBlock(2) *= (dt * density_);
+        weight_.AddMult(x.GetBlock(2), rhs.GetBlock(2));
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
 
@@ -1378,6 +1392,8 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
     }
     else // sequential: solve for flux and pressure first, and then saturation
     {
+        mfem::mfem_error("usage of weight need to be fixed!\n");
+
         const mfem::Vector S = PWConstProject(system, x.GetBlock(2));
         hierarchy_->RescaleCoefficient(level_, TotalMobility(S));
         mfem::BlockVector flow_rhs(*source_, hierarchy_->BlockOffsets(level_));
@@ -1392,18 +1408,18 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         {
             mfem::Vector dSdt(source_->GetBlock(2));
             D_te_e_->Mult(-1.0, MatVec(upwind, FractionalFlow(S)), 1.0, dSdt);
-            x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
+//            x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
             step_converged_ = true;
         }
         else // implicit: new_S solves new_S = S + dt W^{-1} (b - Adv F(new_S))
         {
             auto Adv = ParMult(*D_te_e_, upwind, system.GetGraph().VertexStarts());
 
-            const double scaling = weight_ / density_ / dt;
+            const double scaling = weight_(0, 0) / density_ / dt;
             TransportSolver solver(*Adv, system, scaling, solver_param_.nl_solve);
 
             mfem::Vector rhs(source_->GetBlock(2));
-            rhs.Add(weight_ / density_ / dt, x.GetBlock(2));
+//            rhs.Add(weight_ / density_ / dt, x.GetBlock(2));
             solver.Solve(rhs, x.GetBlock(2));
             step_converged_ = solver.IsConverged();
             nonlinear_iter_ += solver.GetNumIterations();
@@ -1433,19 +1449,19 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
 //                             const std::vector<mfem::DenseMatrix>& edge_traces,
                              const mfem::SparseMatrix& micro_upwind_flux,
                              const double dt,
-                             const double weight,
+                             mfem::SparseMatrix weight,
                              const double density,
                              const mfem::Vector& S_prev,
                              NLSolverParameters param)
     : NonlinearSolver(darcy_system.GetComm(), param), hierarchy_(hierarchy),
       level_(level), darcy_system_(darcy_system), ess_attr_(ess_attr),
       gmres_(comm_), local_dMdS_(darcy_system.GetGraph().NumVertices()),
-      Ms_(SparseIdentity(darcy_system.GetPWConstProj().NumCols()) *= weight),
+      Ms_(std::move(weight)),
       blk_offsets_(4), true_blk_offsets_(4), ess_dofs_(darcy_system.GetEssDofs()),
 //      vert_starts_(darcy_system.GetGraph().VertexStarts()),
 //      traces_(edge_traces),
       micro_upwind_flux_(micro_upwind_flux),
-      dt_(dt), weight_(weight), density_(density), is_first_resid_eval_(false),
+      dt_(dt), density_(density), is_first_resid_eval_(false),
       scales_(3), D_fine_(hierarchy_.GetMatrix(0).GetD())
 {
     mfem::SparseMatrix D_proc(darcy_system_.GetD());
@@ -1482,7 +1498,7 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
 //    }
 
     normalizer_.SetSize(D_->NumRows()); // TODO: need to have one for each block
-    normalizer_ = 800. * (weight_ / density_);
+    normalizer_ = 800. * (weight(0, 0) / density_);
 
     if (false) // TODO: define a way to normalize for higher order coarsening
     {
@@ -1490,7 +1506,7 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
         normalizer_ -= 1.0;
         normalizer_ *= -800.0;
         normalizer_.Add(1000.0, S_prev);
-        normalizer_ *= (weight_ / density_); // weight_ / density_ = vol * porosity
+        normalizer_ *= (weight(0, 0) / density_); // weight_ / density_ = vol * porosity
     }
 
     scales_ = 1.0;
@@ -1544,7 +1560,10 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         auto upw_FS = MatVec(upwind, FractionalFlow(S));
         RescaleVector(blk_x.GetBlock(0), upw_FS);
         auto U_FS = MatVec(space.TrueEDofToEDof(), upw_FS);
-        D_->Mult(1.0, U_FS, Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
+//        D_->Mult(1.0, U_FS, Ms_(0, 0), out.GetBlock(2)); //TODO: Ms_
+        out.GetBlock(2) = MatVec(Ms_, out.GetBlock(2));
+        D_->Mult(1.0, U_FS, 1.0, out.GetBlock(2));
+
     }
     else
 //    if (false)
@@ -1568,7 +1587,8 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         auto fine_D_upw_FS = MatVec(D_fine_, upw_FS);
         auto D_upw_FS = MatVec(PuT, fine_D_upw_FS);
 
-        out.GetBlock(2) *= Ms_(0, 0);
+//        out.GetBlock(2) *= Ms_(0, 0);
+        out.GetBlock(2) = MatVec(Ms_, out.GetBlock(2));
         out.GetBlock(2) += D_upw_FS;
     }
 
@@ -2161,17 +2181,22 @@ void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_nor
 CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
                        const mfem::Array<int>& ess_attr,
                        const double dt,
-                       const double weight,
+                       const mfem::SparseMatrix& weight,
                        const double density,
                        const mfem::Vector& S_prev,
                        FASParameters param)
     : FAS(hierarchy.GetComm(), param), hierarchy_(hierarchy)
 {
     mfem::Vector S_prev_l(S_prev);
+    unique_ptr<mfem::SparseMatrix> weight_l(new mfem::SparseMatrix(weight));
 
     for (int l = 0; l < param_.num_levels; ++l)
     {
-        if (l > 0) { S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l); }
+        if (l > 0)
+        {
+            S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l);
+            weight_l.reset(mfem::RAP(*weight_l, hierarchy.GetPs(l-1)));
+        }
 
         auto& system_l = hierarchy.GetMatrix(l);
 
@@ -2180,7 +2205,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
         auto& upwind_flux_l = hierarchy.GetUpwindFlux(l);
         auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
         solvers_[l].reset(new CoupledSolver(hierarchy, l, system_l, ess_attr,
-                                            upwind_flux_l, dt, weight, density, S, param_l));
+                                            upwind_flux_l, dt, *weight_l, density, S, param_l));
 //        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 1);
 
         const int S_size = system_l.GetPWConstProj().NumCols();
@@ -2784,7 +2809,7 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
 //}
 
 // case 3
-const double mu_o =  0.0002; // 0.005; //
+const double mu_o = 0.0002; // 0.005; //
 mfem::Vector TotalMobility(const mfem::Vector& S)
 {
     mfem::Vector LamS(S.Size());
