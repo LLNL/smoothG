@@ -2195,7 +2195,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
         if (l > 0)
         {
             S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l);
-            weight_l.reset(mfem::RAP(*weight_l, hierarchy.GetPs(l-1)));
+            weight_l.reset(mfem::RAP(hierarchy.GetPs(l-1), *weight_l, hierarchy.GetPs(l-1)));
         }
 
         auto& system_l = hierarchy.GetMatrix(l);
