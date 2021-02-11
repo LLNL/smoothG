@@ -113,6 +113,8 @@ class TwoPhaseHybrid : public HybridSolver
     unique_ptr<mfem::BlockOperator> op_;
     unique_ptr<mfem::SparseMatrix> mono_mat_;
     unique_ptr<mfem::HypreParMatrix> monolithic_;
+    unique_ptr<mfem::Solver> A00_inv_;
+    unique_ptr<mfem::Solver> A11_inv_;
     unique_ptr<mfem::BlockLowerTriangularPreconditioner> stage1_prec_;
     unique_ptr<HypreILU> stage2_prec_;
 
@@ -132,6 +134,8 @@ class TwoPhaseHybrid : public HybridSolver
     const std::vector<mfem::DenseMatrix>* dTdsigma_;
     const std::vector<mfem::DenseMatrix>* dMdS_;
 
+    mutable double resid_norm_;
+
     void Init();
     mfem::BlockVector MakeHybridRHS(const mfem::BlockVector& rhs) const;
     void BackSubstitute(const mfem::BlockVector& rhs,
@@ -146,9 +150,10 @@ public:
                         const std::vector<mfem::DenseMatrix>& dMdS,
                         const std::vector<mfem::DenseMatrix>& dTdsigma,
                         const mfem::HypreParMatrix& dTdS,
-                        double dt_density_);
+                        double dt_density_ = 1.0);
 
     void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const override;
+    double GetResidualNorm() const { return resid_norm_; }
 };
 
 enum SteppingScheme { IMPES = 1, SequentiallyImplicit, FullyImplcit };
@@ -263,9 +268,9 @@ class CoupledSolver : public NonlinearSolver
                     const mfem::BlockVector& true_resid,
                     mfem::BlockVector& true_dx);
 
-    void HybridSolve(mfem::HypreParMatrix& dTdS,
-                     const mfem::BlockVector& blk_x, const mfem::Vector& S,
-                     mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx);
+    void HybridSolve(const mfem::HypreParMatrix& dTdS, const mfem::Vector& flux,
+                     const mfem::Vector& S, const mfem::BlockVector& true_resid,
+                      mfem::BlockVector& true_dx);
 
     void PrimalSolve(const mfem::BlockOperator& op_ref,
                      const mfem::BlockVector& true_resid,
@@ -529,11 +534,16 @@ public:
             if (i < 1) std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
             vert_weight_[i] = cell_volume_ * porosity_;
         }
+        std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
         for (int i = num_vert_res; i < num_vert_total; ++i)
         {
-            if (i == num_vert_res) std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
             vert_weight_[i] = cell_volume_ * porosity_;
         }
+        vol_file >> vert;
+        vol_file >> cell_volume_;
+        vol_file >> porosity_;
+        std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
+        assert(cell_volume_ == -1.0 && porosity_ == -1.0);
     }
 
     virtual double CellVolume() const { return cell_volume_; }
@@ -590,6 +600,9 @@ int main(int argc, char* argv[])
     double diff_tol = -1.0;
     args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
                    "Tolerance for coefficient change.");
+    int print_level = -1;
+    args.AddOption(&print_level, "-print-level", "--print-level",
+                   "Solver print level (-1 = no to print, 0 = final error, 1 = all errors.");
     UpscaleParameters upscale_param;
     upscale_param.spect_tol = 1.0;
     upscale_param.max_evects = 1;
@@ -618,9 +631,9 @@ int main(int argc, char* argv[])
     fas_param.fine.max_num_iter = use_vcycle ? 1 : max_iter;
     fas_param.mid.max_num_iter = use_vcycle ? 1 : max_iter;
     fas_param.coarse.max_num_iter = use_vcycle ? 15 : max_iter;
-    fas_param.coarse.print_level = use_vcycle ? 1 : 1;
-    fas_param.fine.print_level = use_vcycle ? -1 : 1;
-    fas_param.mid.print_level = use_vcycle ? -1 : 1;
+    fas_param.coarse.print_level = use_vcycle ? print_level : print_level;
+    fas_param.fine.print_level = use_vcycle ? -1 : print_level;
+    fas_param.mid.print_level = use_vcycle ? -1 : print_level;
 //    fas_param.coarse.rtol = 1e-10;
 //    fas_param.coarse.atol = 1e-12;
     fas_param.nl_solve.print_level = 1;
@@ -1810,14 +1823,6 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     GetDiag(*dTdS) += Ms_;
 
-    mfem::BlockOperator op(true_blk_offsets_);
-    op.SetBlock(0, 0, M.get());
-    op.SetBlock(0, 1, DT_.get());
-    op.SetBlock(1, 0, D_.get());
-    op.SetBlock(0, 2, dMdS.get());
-    op.SetBlock(2, 0, dTdsigma.get());
-    op.SetBlock(2, 2, dTdS.get());
-
     const bool use_hybrid_solver = (up_param.hybridization && lowest_order);
     if (!use_hybrid_solver)
     {
@@ -1826,7 +1831,15 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         *dTdsigma *= scales_[2];
         *dTdS *= scales_[2];
 
-        const bool use_direct_solver = false;
+        mfem::BlockOperator op(true_blk_offsets_);
+        op.SetBlock(0, 0, M.get());
+        op.SetBlock(0, 1, DT_.get());
+        op.SetBlock(1, 0, D_.get());
+        op.SetBlock(0, 2, dMdS.get());
+        op.SetBlock(2, 0, dTdsigma.get());
+        op.SetBlock(2, 2, dTdS.get());
+
+        const bool use_direct_solver = true;
         const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)
@@ -1837,25 +1850,25 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
                 mfem::UMFPackSolver direct_solve(*mono_op);
                 direct_solve.Mult(true_resid, true_blk_dx);
             }
-            else
-            {
-                MixedSolve(op, true_blk_resid, true_blk_dx);
-            }
+            else { MixedSolve(op, true_blk_resid, true_blk_dx); }
         }
-        else
-        {
-            PrimalSolve(op, true_blk_resid, true_blk_dx);
+        else { PrimalSolve(op, true_blk_resid, true_blk_dx);
         }
         linear_iter_ += gmres_.GetNumIterations();
-        if (!myid_ && param_.print_level)
+        if (!myid_ && param_.print_level > 1 && (solve_on_primal_form || !use_direct_solver))
         {
-            std::cout << "  GMRES took " << gmres_.GetNumIterations()
+            std::string name = solve_on_primal_form? "Primal" : "Mixed";
+            std::cout << "    " << name << " solver: GMRES took " << gmres_.GetNumIterations()
                       << " iterations, residual = " << gmres_.GetFinalNorm() << "\n";
         }
     }
     else
     {
-        HybridSolve(*dTdS, blk_x, S, true_blk_resid, true_blk_dx);
+        *dTdS *= (1. / dt_ / density_);
+        true_blk_resid.GetBlock(0) *= (dt_ * density_);
+        true_blk_resid.GetBlock(1) /= (dt_ * density_);
+        true_blk_resid.GetBlock(2) /= (dt_ * density_);
+        HybridSolve(*dTdS, blk_x.GetBlock(0), S, true_blk_resid, true_blk_dx);
     }
 
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
@@ -1951,49 +1964,29 @@ void CoupledSolver::MixedSolve(const mfem::BlockOperator& op,
     gmres_.Mult(true_resid, true_dx);
 }
 
-void CoupledSolver::HybridSolve(mfem::HypreParMatrix& dTdS,
-                                const mfem::BlockVector& blk_x, const mfem::Vector& S,
-                                mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx)
+void CoupledSolver::HybridSolve(const mfem::HypreParMatrix& dTdS, const mfem::Vector &flux,
+                                const mfem::Vector& S, const mfem::BlockVector& true_resid,
+                                mfem::BlockVector& true_dx)
 {
     mfem::Array<int> offset_hb(3);
     offset_hb[0] = 0;
     offset_hb[1] = darcy_system_.NumEDofs();
     offset_hb[2] = offset_hb[1] + darcy_system_.GetPWConstProj().NumCols();
-    mfem::BlockOperator op_hb(offset_hb);
 
-    mfem::SparseMatrix D_proc(darcy_system_.GetD());
-    //        D_proc *= (dt_ * density_);
-    auto local_dTdsigma = Build_dTdsigma(darcy_system_.GetGraphSpace(), D_proc,
-                                         blk_x.GetBlock(0), FractionalFlow(S));
-
-    // for debug
-    //        if (false)
-    //        {
-    //            mfem::SparseMatrix dTdsig(D_->NumRows(), D_->NumCols());
-    //            mfem::Array<int> rows, cols;
-    //            for (unsigned int i = 0; i < local_dTdsigma.size(); ++i)
-    //            {
-    //                GetTableRow(space.VertexToVDof(), i, rows);
-    //                GetTableRow(space.VertexToEDof(), i, cols);
-    //                dTdsig.AddSubMatrix(rows, cols, local_dTdsigma[i]);
-    //            }
-    //            dTdsig.Finalize();
-    //            dTdsig *= (dt_ * density_);
-    //            unique_ptr<mfem::SparseMatrix> A_diff(Add(1.0, dTdsig, -1.0, GetDiag(*dTdsigma)));
-    //            std::cout << "|| dTdsig -= dTdsigma || = "<< FroNorm(*A_diff) <<"\n";
-    //        }
-
-    dTdS *= (1. / dt_ / density_);
+    auto& space = darcy_system_.GetGraphSpace();
+    auto& D = darcy_system_.GetD();
+    auto local_dTdsigma = Build_dTdsigma(space, D, flux, FractionalFlow(S));
 
     TwoPhaseHybrid solver(darcy_system_, &ess_attr_);
-    solver.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma, dTdS, 1.0);
+    solver.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma, dTdS);
 
-    true_blk_resid.GetBlock(0) *= (dt_ * density_);
-    true_blk_resid.GetBlock(1) /= (dt_ * density_);
-    true_blk_resid.GetBlock(2) /= (dt_ * density_);
-
-    solver.Mult(true_blk_resid, true_blk_dx);
+    solver.Mult(true_resid, true_dx);
     linear_iter_ += solver.GetNumIterations();
+    if (!myid_ && param_.print_level > 1)
+    {
+        std::cout << "    Hybrid solver: GMRES took " << solver.GetNumIterations()
+                  << " iterations, residual = " << solver.GetResidualNorm() << "\n";
+    }
 }
 
 void CoupledSolver::PrimalSolve(const mfem::BlockOperator& op,
@@ -2210,7 +2203,6 @@ void TwoPhaseHybrid::Init()
     op_->owns_blocks = true;
 
     stage1_prec_.reset(new mfem::BlockLowerTriangularPreconditioner(offsets_));
-    stage1_prec_->owns_blocks = true;
 
     for (int agg = 0; agg < nAggs_; ++agg)
     {
@@ -2222,7 +2214,6 @@ void TwoPhaseHybrid::Init()
     }
 
     solver_ = InitKrylovSolver(GMRES);
-
     solver_->SetAbsTol(1e-10);
     solver_->SetRelTol(1e-8);
 }
@@ -2254,7 +2245,7 @@ void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
 
         A00_el = Hybrid_el_[agg];
         A00_el *= elem_scaling_inverse[agg];
-        A00_el *= dt_density_;
+//        A00_el *= dt_density_;
 
         help = smoothg::Mult(C_[agg], B00_[agg]);
         help *= elem_scaling_inverse[agg];
@@ -2262,12 +2253,12 @@ void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
 
         help.Transpose();
         A10_el = smoothg::Mult(dTdsigma[agg], help);
-        A10_el *= (dt_density_ * dt_density_);
+//        A10_el *= (dt_density_ * dt_density_);
 
         help = smoothg::Mult(dTdsigma[agg], B00_[agg]);
         A11_el = smoothg::Mult(help, dMdS[agg]);
         A11_el *= elem_scaling_inverse[agg];
-        A11_el *= (dt_density_);
+//        A11_el *= (dt_density_);
 
         A00.AddSubMatrix(local_mult, local_mult, A00_el);
         A01.AddSubMatrix(local_mult, local_vdof, A01_el);
@@ -2303,25 +2294,20 @@ void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
     auto pA01 = mfem::ParMult(&pScale, pA01_tmp.get());
     auto pA10 = mfem::ParMult(pA10_tmp.get(), &pScale);
 
-    auto A11_inv = new mfem::HypreSmoother(*pA11, mfem::HypreSmoother::l1Jacobi);
-
-    stage1_prec_->SetDiagonalBlock(0, prec_.release());
-    stage1_prec_->SetDiagonalBlock(1, A11_inv);
-//    stage1_prec_->SetBlock(1, 0, pA10);
-
-    mfem::BlockMatrix block_A(offsets_);
-    block_A.SetBlock(0, 0, &A00);
-    block_A.SetBlock(0, 1, &A01);
-    block_A.SetBlock(1, 0, &A10);
-    block_A.SetBlock(1, 1, A11.get());
-    mono_mat_.reset(block_A.CreateMonolithic());
-    monolithic_.reset(ToParMatrix(comm_, *mono_mat_));
-    stage2_prec_.reset(new HypreILU(*monolithic_, 0));
+    A11_inv_.reset(new mfem::HypreSmoother(*pA11, mfem::HypreSmoother::l1Jacobi));
+    A00_inv_.reset(prec_.release());
+    stage1_prec_->SetDiagonalBlock(0, A00_inv_.get());
+    stage1_prec_->SetDiagonalBlock(1, A11_inv_.get());
+    stage1_prec_->SetBlock(1, 0, pA10);
 
     op_->SetBlock(0, 0, H_.release());
     op_->SetBlock(0, 1, pA01);
     op_->SetBlock(1, 0, pA10);
     op_->SetBlock(1, 1, pA11.release());
+
+    mono_mat_ = BlockGetDiag(*op_);
+    monolithic_.reset(ToParMatrix(comm_, *mono_mat_));
+    stage2_prec_.reset(new HypreILU(*monolithic_, 0));
 
 //    prec_ = std::move(stage1_prec_);//
     prec_.reset(new TwoStageSolver(*stage1_prec_, *stage2_prec_, *op_));
@@ -2363,7 +2349,7 @@ mfem::BlockVector TwoPhaseHybrid::MakeHybridRHS(const mfem::BlockVector& rhs) co
         helper.SetSize(local_edof.Size());
         B00_[agg].Mult(sub_vec, helper);
         helper /= elem_scaling_[agg];
-        helper *= dt_density_;
+//        helper *= dt_density_;
 
         rhs.GetBlock(1).GetSubVector(local_vdof, sub_vec);
         B01_[agg].AddMult_a(1.0 / dt_density_, sub_vec, helper);
@@ -2374,7 +2360,7 @@ mfem::BlockVector TwoPhaseHybrid::MakeHybridRHS(const mfem::BlockVector& rhs) co
 
         local_rhs.SetSize(local_vdof.Size());
         (*dTdsigma_)[agg].Mult(helper, local_rhs);
-        local_rhs *= dt_density_;
+//        local_rhs *= dt_density_;
         out.GetBlock(1).AddElementVector(local_vdof, local_rhs);
     }
 
@@ -2408,8 +2394,8 @@ void TwoPhaseHybrid::BackSubstitute(const mfem::BlockVector& rhs,
         Ainv_[agg].Mult(sub_vec, local_sol1);
         local_sol1 *= elem_scaling_[agg];
 
-        local_sol0 /= dt_density_;
-        local_sol1 /= (-1.0 * dt_density_);
+//        local_sol0 /= dt_density_;
+//        local_sol1 /= (-1.0 * dt_density_);
 
         rhs.GetSubVector(local_edof, helper);
         for (int i = 0; i < local_edof.Size(); ++i)
@@ -2444,55 +2430,13 @@ void TwoPhaseHybrid::BackSubstitute(const mfem::BlockVector& rhs,
 
 void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
 {
-    mfem::BlockVector rhs_hb = MakeHybridRHS(rhs);
-
     mfem::BlockVector sol_hb(offsets_);
     sol_hb = 0.0;
-
+    const mfem::BlockVector rhs_hb = MakeHybridRHS(rhs);
     solver_->Mult(rhs_hb, sol_hb);
-
-    num_iterations_ = solver_->GetNumIterations();
-    if (!myid_) std::cout << "          HB: GMRES took " << solver_->GetNumIterations()
-                          << " iterations, residual = " << solver_->GetFinalNorm() << "\n";
-
     BackSubstitute(rhs, sol_hb, sol);
-
-//    if (solver_->GetNumIterations() == 18)
-//    {
-//        std::ofstream ofs("good_fine_hybrid_matrix.txt");
-//        mono_mat_->PrintMatlab(ofs);
-//        std::ofstream rhs_file("good_fine_hybrid_rhs.txt");
-//        rhs_hb.Print(rhs_file, 1);
-//        std::ofstream sol_file("good_fine_hybrid_sol.txt");
-//        sol_hb.Print(sol_file, 1);
-//    }
-//    if (solver_->GetNumIterations() == 16)
-//    {
-//        std::ofstream ofs("bad_fine_hybrid_matrix.txt");
-//        mono_mat_->PrintMatlab(ofs);
-//        std::ofstream rhs_file("bad_fine_hybrid_rhs.txt");
-//        rhs_hb.Print(rhs_file, 1);
-//        std::ofstream sol_file("bad_fine_hybrid_sol.txt");
-//        sol_hb.Print(sol_file, 1);
-//    }
-//    if (solver_->GetNumIterations() == 37)
-//    {
-//        std::ofstream ofs("good_coarse_hybrid_matrix.txt");
-//        mono_mat_->PrintMatlab(ofs);
-//        std::ofstream rhs_file("good_coarse_hybrid_rhs.txt");
-//        rhs_hb.Print(rhs_file, 1);
-//        std::ofstream sol_file("good_coarse_hybrid_sol.txt");
-//        sol_hb.Print(sol_file, 1);
-//    }
-//    if (solver_->GetNumIterations() == 25)
-//    {
-//        std::ofstream ofs("bad_coarse_hybrid_matrix.txt");
-//        mono_mat_->PrintMatlab(ofs);
-//        std::ofstream rhs_file("bad_coarse_hybrid_rhs.txt");
-//        rhs_hb.Print(rhs_file, 1);
-//        std::ofstream sol_file("bad_coarse_hybrid_sol.txt");
-//        sol_hb.Print(sol_file, 1);
-//    }
+    num_iterations_ = solver_->GetNumIterations();
+    resid_norm_ = solver_->GetFinalNorm();
 }
 
 
