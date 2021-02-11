@@ -1819,7 +1819,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         const bool use_direct_solver = false;
         unique_ptr<mfem::SparseMatrix> mono_mat;
 
-        const bool solve_on_primal_form = false;
+        const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)
         {
@@ -1943,27 +1943,30 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     sol_previous_iter = x;
 }
 
+unique_ptr<mfem::SparseMatrix> GetBlockDiag(const mfem::BlockOperator& op_ref)
+{
+    auto& op = const_cast<mfem::BlockOperator&>(op_ref);
+    mfem::BlockMatrix op_diag(op.RowOffsets(), op.ColOffsets());
+    op_diag.owns_blocks = true;
+    for (int i = 0; i < op.NumRowBlocks(); ++i)
+    {
+        for (int j = 0; j < op.NumColBlocks(); ++j)
+        {
+            if (op.IsZeroBlock(i, j)) { continue; }
+            auto& block = dynamic_cast<mfem::HypreParMatrix&>(op.GetBlock(i, j));
+            auto block_diag = new mfem::SparseMatrix;
+            block_diag->MakeRef(GetDiag(block));
+            op_diag.SetBlock(i, j, block_diag);
+        }
+    }
+    return unique_ptr<mfem::SparseMatrix>(op_diag.CreateMonolithic());
+}
+
 void CoupledSolver::MixedSolve(
         const mfem::HypreParMatrix& M, const mfem::HypreParMatrix& dMdS,
         const mfem::HypreParMatrix& dTdsigma, const mfem::HypreParMatrix& dTdS,
         const mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx)
 {
-    mfem::SparseMatrix M_diag = GetDiag(M);
-    mfem::SparseMatrix DT_diag = GetDiag(*DT_);
-    mfem::SparseMatrix D_diag = GetDiag(*D_);
-    mfem::SparseMatrix dMdS_diag = GetDiag(dMdS);
-    mfem::SparseMatrix dTdsigma_diag = GetDiag(dTdsigma);
-    mfem::SparseMatrix dTdS_diag = GetDiag(dTdS);
-
-    mfem::BlockMatrix mat(true_blk_offsets_);
-    mat.SetBlock(0, 0, &M_diag);
-    mat.SetBlock(0, 1, &DT_diag);
-    mat.SetBlock(1, 0, &D_diag);
-    mat.SetBlock(0, 2, &dMdS_diag);
-    mat.SetBlock(2, 0, &dTdsigma_diag);
-    mat.SetBlock(2, 2, &dTdS_diag);
-    unique_ptr<mfem::SparseMatrix> mono_mat(mat.CreateMonolithic());
-
     mfem::BlockOperator op(true_blk_offsets_);
     op.SetBlock(0, 0, const_cast<mfem::HypreParMatrix*>(&M));
     op.SetBlock(0, 1, DT_.get());
@@ -1999,6 +2002,7 @@ void CoupledSolver::MixedSolve(
     prec.SetBlock(2, 0, const_cast<mfem::HypreParMatrix*>(&dTdsigma));
     prec.SetBlock(2, 1, schur21.get());
 
+    unique_ptr<mfem::SparseMatrix> mono_mat = GetBlockDiag(op);
     auto par_mono_mat = ToParMatrix(comm_, std::move(*mono_mat));
     HypreILU ILU_smoother(*par_mono_mat, 0); // equiv to Euclid
     TwoStageSolver prec_prod(prec, ILU_smoother, op);
@@ -2015,20 +2019,19 @@ void CoupledSolver::PrimalSolve(
 {
     mfem::Vector Md;
     M.GetDiag(Md);
-    Md *= -1.0;
 
     DT_->InvScaleRows(Md);
     unique_ptr<mfem::HypreParMatrix> schur10(mfem::ParMult(&dTdsigma, DT_.get()));
     unique_ptr<mfem::HypreParMatrix> schur00(mfem::ParMult(D_.get(), DT_.get()));
-    *schur00 *= -1.0;
+    *schur10 *= -1.0;
     DT_->ScaleRows(Md);
 
     const_cast<mfem::HypreParMatrix&>(dMdS).InvScaleRows(Md);
-    unique_ptr<mfem::HypreParMatrix> tmp11(mfem::ParMult(&dTdsigma, &dMdS));
     unique_ptr<mfem::HypreParMatrix> schur01(mfem::ParMult(D_.get(), &dMdS));
-    (*schur01) *= -1.0;
-    const_cast<mfem::HypreParMatrix&>(dMdS).ScaleRows(Md);
+    unique_ptr<mfem::HypreParMatrix> tmp11(mfem::ParMult(&dTdsigma, &dMdS));
+    (*tmp11) *= -1.0;
     unique_ptr<mfem::HypreParMatrix> schur11(ParAdd(dTdS, *tmp11));
+    const_cast<mfem::HypreParMatrix&>(dMdS).ScaleRows(Md);
 
     mfem::Array<int> primal_true_blk_offsets(3);
     primal_true_blk_offsets[0] = 0;
@@ -2046,23 +2049,11 @@ void CoupledSolver::PrimalSolve(
     auto schur11_inv = make_unique<mfem::HypreSmoother>(*schur11, smoother_type);
 
     mfem::BlockLowerTriangularPreconditioner prec(primal_true_blk_offsets);
-
     prec.SetDiagonalBlock(0, schur00_inv.get());
     prec.SetDiagonalBlock(1, schur11_inv.get());
     prec.SetBlock(1, 0, schur10.get());
 
-    mfem::SparseMatrix diag00 = GetDiag(*schur00);
-    mfem::SparseMatrix diag01 = GetDiag(*schur01);
-    mfem::SparseMatrix diag10 = GetDiag(*schur10);
-    mfem::SparseMatrix diag11 = GetDiag(*schur11);
-
-    mfem::BlockMatrix mat_diag(primal_true_blk_offsets);
-    mat_diag.SetBlock(0, 0, &diag00);
-    mat_diag.SetBlock(0, 1, &diag01);
-    mat_diag.SetBlock(1, 0, &diag10);
-    mat_diag.SetBlock(1, 1, &diag11);
-    unique_ptr<mfem::SparseMatrix> mono_mat(mat_diag.CreateMonolithic());
-
+    auto mono_mat = GetBlockDiag(op);
     auto par_mono_mat = ToParMatrix(comm_, std::move(*mono_mat));
     HypreILU ILU_smoother(*par_mono_mat, 0);
     TwoStageSolver prec_prod(prec, ILU_smoother, op);
@@ -2078,7 +2069,7 @@ void CoupledSolver::PrimalSolve(
     dTdsigma.Mult(-1.0, true_blk_resid.GetBlock(0), 1.0, primal_true_resid.GetBlock(1));
     RescaleVector(Md, const_cast<mfem::Vector&>(true_blk_resid.GetBlock(0)));
 
-    mfem::BlockVector primal_true_blk_dx(true_blk_dx+Md.Size(), primal_true_blk_offsets);
+    mfem::BlockVector primal_true_blk_dx(true_blk_dx + Md.Size(), primal_true_blk_offsets);
     primal_true_blk_dx = 0.0;
     gmres_.Mult(primal_true_resid, primal_true_blk_dx);
 
