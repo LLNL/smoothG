@@ -130,7 +130,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     Psigma_.push_back(coarsener.BuildPEdges(param.coarse_components));
     Proj_sigma_.push_back(coarsener.BuildEdgeProjection());
 
-    if (param.add_Pvertices_pwc)
+    if (param.max_evects > 1 && param.add_Pvertices_pwc)
     {
         Ps_.push_back(MakeMinimalPvertices(Pu_[level], vert_targets));
         mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Ps_[level]));
@@ -560,8 +560,6 @@ Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
         GetTableRow(dof_agg.face_edof_, i, edofs);
         trace_vec.SetSubVector(edofs, traces[i].GetData());
     }
-
-
 
     auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
 //    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));

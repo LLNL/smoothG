@@ -208,10 +208,6 @@ public:
              int slice, bool metis_parition, const mfem::Array<int>& ess_attr,
              int well_height, double inject_rate, double bottom_hole_pressure);
 
-    TwoPhase(std::ifstream& file, bool need_getline, int num_vert_res, int num_edges_res,
-             int num_edges_interior, double inject_rate, double bottom_hole_pressure);
-
-
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
 private:
     // Set up well model (Peaceman's five-spot pattern)
@@ -255,6 +251,9 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
 //    block_offsets_[1] = 53085;
 //    block_offsets_[2] = block_offsets_[1] + 13201;
 //    block_offsets_[3] = block_offsets_[2] + 13201;
+
+    vert_weight_.SetSize(vertex_edge_.NumRows());
+    vert_weight_ = 1.0;
 }
 
 void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)

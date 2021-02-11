@@ -35,8 +35,8 @@ struct NLSolverParameters
 {
     int print_level = 0;
     int max_num_iter = 50;
-    double rtol = 1e-8;
-    double atol = 1e-10;
+    double rtol = 1e-6;
+    double atol = 1e-8;
 
     bool check_converge = true;
     Linearization linearization = Newton;
