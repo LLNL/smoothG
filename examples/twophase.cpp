@@ -64,7 +64,7 @@ protected:
 
 public:
     virtual void SetOperator(const Operator &op) override { }
-    TwoStageSolver(const mfem::Operator & solver1, const mfem::Operator& solver2, const mfem::Operator& op) :
+    TwoStageSolver(const mfem::Operator& solver1, const mfem::Operator& solver2, const mfem::Operator& op) :
         solver1_(solver1), solver2_(solver2), op_(op),  tmp1(op.NumRows()), tmp2(op.NumRows()) { }
 
     void Mult(const mfem::Vector & x, mfem::Vector & y) const override
@@ -263,9 +263,9 @@ class CoupledSolver : public NonlinearSolver
                     const mfem::BlockVector& true_resid,
                     mfem::BlockVector& true_dx);
 
-    void HybridSolve(const mfem::HypreParMatrix& M, const mfem::HypreParMatrix& dMdS,
-                     const mfem::HypreParMatrix& dTdsigma, const mfem::HypreParMatrix& dTdS,
-                     const mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx);
+    void HybridSolve(mfem::HypreParMatrix& dTdS,
+                     const mfem::BlockVector& blk_x, const mfem::Vector& S,
+                     mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx);
 
     void PrimalSolve(const mfem::BlockOperator& op_ref,
                      const mfem::BlockVector& true_resid,
@@ -1684,7 +1684,7 @@ unique_ptr<mfem::SparseMatrix> BlockGetDiag(const mfem::BlockOperator& op_ref)
         for (int j = 0; j < op.NumColBlocks(); ++j)
         {
             if (op.IsZeroBlock(i, j)) { continue; }
-            auto& block = dynamic_cast<mfem::HypreParMatrix&>(op.GetBlock(i, j));
+            auto& block = static_cast<mfem::HypreParMatrix&>(op.GetBlock(i, j));
             auto block_diag = new mfem::SparseMatrix;
             block_diag->MakeRef(GetDiag(block));
             op_diag.SetBlock(i, j, block_diag);
@@ -1855,54 +1855,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     }
     else
     {
-        mfem::Array<int> offset_hb(3);
-        offset_hb[0] = 0;
-        offset_hb[1] = darcy_system_.NumEDofs();
-        offset_hb[2] = darcy_system_.NumTotalDofs();
-        mfem::BlockOperator op_hb(offset_hb);
-
-        mfem::SparseMatrix D_proc(darcy_system_.GetD());
-//        D_proc *= (dt_ * density_);
-        auto local_dTdsigma = Build_dTdsigma(space, D_proc, blk_x.GetBlock(0),
-                                             FractionalFlow(S));
-
-        // for debug
-//        if (false)
-//        {
-//            mfem::SparseMatrix dTdsig(D_->NumRows(), D_->NumCols());
-//            mfem::Array<int> rows, cols;
-//            for (unsigned int i = 0; i < local_dTdsigma.size(); ++i)
-//            {
-//                GetTableRow(space.VertexToVDof(), i, rows);
-//                GetTableRow(space.VertexToEDof(), i, cols);
-//                dTdsig.AddSubMatrix(rows, cols, local_dTdsigma[i]);
-//            }
-//            dTdsig.Finalize();
-//            dTdsig *= (dt_ * density_);
-//            unique_ptr<mfem::SparseMatrix> A_diff(Add(1.0, dTdsig, -1.0, GetDiag(*dTdsigma)));
-//            std::cout << "|| dTdsig -= dTdsigma || = "<< FroNorm(*A_diff) <<"\n";
-//        }
-
-        (*dTdS) *= (1. / dt_ / density_);
-
-        TwoPhaseHybrid solver(darcy_system_, &ess_attr_);
-        solver.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma, *dTdS, 1.0);
-        mfem::BlockVector true_blk_resid(true_resid, true_blk_offsets_);
-
-        true_blk_resid.GetBlock(0) *= (dt_ * density_);
-        true_blk_resid.GetBlock(1) /= (dt_ * density_);
-        true_blk_resid.GetBlock(2) /= (dt_ * density_);
-
-        solver.Mult(true_blk_resid, true_blk_dx);
-        linear_iter_ += solver.GetNumIterations();
-
-//        sol_diff -= true_blk_dx;
-//        std::cout << "    || hb sol diff 0|| "
-//                  << mfem::ParNormlp(sol_diff.GetBlock(0), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(0), 2, comm_) << "\n";
-//        std::cout << "    || hb sol diff 1|| "
-//                  << mfem::ParNormlp(sol_diff.GetBlock(1), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(1), 2, comm_) << "\n";
-//        std::cout << "    || hb sol diff 2|| "
-//                  << mfem::ParNormlp(sol_diff.GetBlock(2), 2, comm_) / mfem::ParNormlp(true_blk_dx.GetBlock(2), 2, comm_) << "\n";
+        HybridSolve(*dTdS, blk_x, S, true_blk_resid, true_blk_dx);
     }
 
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
@@ -1979,11 +1932,11 @@ void CoupledSolver::MixedSolve(const mfem::BlockOperator& op,
     auto op_array = To2DArray(const_cast<mfem::BlockOperator&>(op));
     auto schur = ApproximateSchurComplement(op_array);
 
-    auto type = mfem::HypreSmoother::Type::l1Jacobi;
+    auto smooth_t = mfem::HypreSmoother::Type::l1Jacobi;
     mfem::BlockLowerTriangularPreconditioner prec(true_blk_offsets_);
     prec.SetDiagonalBlock(0, new mfem::HypreDiagScale(*op_array(0, 0)));
     prec.SetDiagonalBlock(1, BoomerAMG(*schur(1, 1)));
-    prec.SetDiagonalBlock(2, new mfem::HypreSmoother(*schur(2, 2), type));
+    prec.SetDiagonalBlock(2, new mfem::HypreSmoother(*schur(2, 2), smooth_t));
     prec.SetBlock(1, 0, op_array(1, 0));
     prec.SetBlock(2, 0, op_array(2, 0));
     prec.SetBlock(2, 1, schur(2,1));
@@ -1996,6 +1949,51 @@ void CoupledSolver::MixedSolve(const mfem::BlockOperator& op,
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec_prod);
     gmres_.Mult(true_resid, true_dx);
+}
+
+void CoupledSolver::HybridSolve(mfem::HypreParMatrix& dTdS,
+                                const mfem::BlockVector& blk_x, const mfem::Vector& S,
+                                mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx)
+{
+    mfem::Array<int> offset_hb(3);
+    offset_hb[0] = 0;
+    offset_hb[1] = darcy_system_.NumEDofs();
+    offset_hb[2] = offset_hb[1] + darcy_system_.GetPWConstProj().NumCols();
+    mfem::BlockOperator op_hb(offset_hb);
+
+    mfem::SparseMatrix D_proc(darcy_system_.GetD());
+    //        D_proc *= (dt_ * density_);
+    auto local_dTdsigma = Build_dTdsigma(darcy_system_.GetGraphSpace(), D_proc,
+                                         blk_x.GetBlock(0), FractionalFlow(S));
+
+    // for debug
+    //        if (false)
+    //        {
+    //            mfem::SparseMatrix dTdsig(D_->NumRows(), D_->NumCols());
+    //            mfem::Array<int> rows, cols;
+    //            for (unsigned int i = 0; i < local_dTdsigma.size(); ++i)
+    //            {
+    //                GetTableRow(space.VertexToVDof(), i, rows);
+    //                GetTableRow(space.VertexToEDof(), i, cols);
+    //                dTdsig.AddSubMatrix(rows, cols, local_dTdsigma[i]);
+    //            }
+    //            dTdsig.Finalize();
+    //            dTdsig *= (dt_ * density_);
+    //            unique_ptr<mfem::SparseMatrix> A_diff(Add(1.0, dTdsig, -1.0, GetDiag(*dTdsigma)));
+    //            std::cout << "|| dTdsig -= dTdsigma || = "<< FroNorm(*A_diff) <<"\n";
+    //        }
+
+    dTdS *= (1. / dt_ / density_);
+
+    TwoPhaseHybrid solver(darcy_system_, &ess_attr_);
+    solver.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma, dTdS, 1.0);
+
+    true_blk_resid.GetBlock(0) *= (dt_ * density_);
+    true_blk_resid.GetBlock(1) /= (dt_ * density_);
+    true_blk_resid.GetBlock(2) /= (dt_ * density_);
+
+    solver.Mult(true_blk_resid, true_blk_dx);
+    linear_iter_ += solver.GetNumIterations();
 }
 
 void CoupledSolver::PrimalSolve(const mfem::BlockOperator& op,
@@ -2019,13 +2017,10 @@ void CoupledSolver::PrimalSolve(const mfem::BlockOperator& op,
     schur_op.SetBlock(1, 0, schur(2, 1));
     schur_op.SetBlock(1, 1, schur(2, 2));
 
-    unique_ptr<mfem::HypreBoomerAMG> prec_00(BoomerAMG(*schur(1, 1)));
-    auto smoother_type = mfem::HypreSmoother::Type::l1Jacobi;
-    auto prec_11 = make_unique<mfem::HypreSmoother>(*schur(2, 2), smoother_type);
-
+    auto smooth_t = mfem::HypreSmoother::Type::l1Jacobi;
     mfem::BlockLowerTriangularPreconditioner prec(primal_offsets);
-    prec.SetDiagonalBlock(0, prec_00.get());
-    prec.SetDiagonalBlock(1, prec_11.get());
+    prec.SetDiagonalBlock(0, BoomerAMG(*schur(1, 1)));
+    prec.SetDiagonalBlock(1, new mfem::HypreSmoother(*schur(2, 2), smooth_t));
     prec.SetBlock(1, 0, schur(2, 1));
 
     auto mono_schur = BlockGetDiag(schur_op);
