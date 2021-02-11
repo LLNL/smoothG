@@ -746,7 +746,6 @@ int main(int argc, char* argv[])
 
     problem_ptr = problem_for_plot ? problem_for_plot.get() : problem.get();
 
-
     Graph graph = problem->GetFVGraph(true);
     auto& ess_attr_final = problem->EssentialAttribute();
 
@@ -1120,7 +1119,6 @@ std::vector<mfem::DenseMatrix> Build_dTdsigma(const GraphSpace& graph_space,
                 }
             }
         }
-
     }
 
     return out;
@@ -1304,9 +1302,14 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
 double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
 {
-    double CFL_const = 0.0;
     const auto& darcy_system = hierarchy_->GetMatrix(0);
     const auto& D = darcy_system.GetD();
+    const auto& graph = darcy_system.GetGraph();
+    const auto& edge_vert = graph.EdgeToVertex();
+    auto& pore_volume = graph.VertexWeight();
+
+    double CFL_const = 0.0;
+
     mfem::Vector S = PWConstProject(darcy_system, x.GetBlock(2));
     for (int ii = 0; ii < S.Size(); ++ii)
     {
@@ -1321,12 +1324,10 @@ double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
     {
         GetTableRow(D, i, edofs);
         x.GetSubVector(edofs, local_flux);
-        double local_CFL_const = df_ds[i] * dt * local_flux.Norml1() / problem_.CellVolume() / porosity_;
+        double local_CFL_const = df_ds[i] * dt * local_flux.Norml1() / pore_volume(i);
         CFL_const = std::max(CFL_const, local_CFL_const);
     }
 
-    const auto& graph = darcy_system.GetGraph();
-    const auto& edge_vert = graph.EdgeToVertex();
     mfem::Vector inflow_CFL_consts(S.Size()), outflow_CFL_consts(S.Size());
     inflow_CFL_consts = 0.0;
     outflow_CFL_consts = 0.0;
@@ -1358,12 +1359,11 @@ double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
     }
     for (int i = 0; i < darcy_system.NumVDofs(); ++i)
     {
-        double outflow_CFL_const = df_ds[i] * dt * outflow_CFL_consts[i] / problem_.CellVolume() / porosity_;
-        double inflow_CFL_const = df_ds[i] * dt * inflow_CFL_consts[i] / problem_.CellVolume() / porosity_;
+        double outflow_CFL_const = df_ds[i] * dt * outflow_CFL_consts[i] / pore_volume(i);
+        double inflow_CFL_const = df_ds[i] * dt * inflow_CFL_consts[i] / pore_volume(i);
         double local_CFL_const = std::max(inflow_CFL_const, outflow_CFL_const);
         CFL_const2 = std::max(CFL_const2, local_CFL_const);
     }
-
     std::cout<< "CFL const = "<<CFL_const<<", CFL const (separate inflow and outflow) = "<<CFL_const2<<"\n";
 
     return CFL_const2;
@@ -1823,7 +1823,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     GetDiag(*dTdS) += Ms_;
 
-    const bool use_hybrid_solver = (up_param.hybridization && lowest_order);
+    const bool use_hybrid_solver = (up_param.hybridization && lowest_order && level_);
     if (!use_hybrid_solver)
     {
         *M *= scales_[0];
@@ -1839,7 +1839,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         op.SetBlock(2, 0, dTdsigma.get());
         op.SetBlock(2, 2, dTdS.get());
 
-        const bool use_direct_solver = true;
+        const bool use_direct_solver = !lowest_order;
         const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)
