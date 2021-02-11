@@ -260,16 +260,16 @@ class CoupledSolver : public NonlinearSolver
 //    void HybridSolve(const mfem::Vector& resid, mfem::Vector& dx);
 
     void MixedSolve(const mfem::BlockOperator& op_ref,
-                    const mfem::BlockVector& true_blk_resid,
-                    mfem::BlockVector& true_blk_dx);
+                    const mfem::BlockVector& true_resid,
+                    mfem::BlockVector& true_dx);
 
     void HybridSolve(const mfem::HypreParMatrix& M, const mfem::HypreParMatrix& dMdS,
                      const mfem::HypreParMatrix& dTdsigma, const mfem::HypreParMatrix& dTdS,
                      const mfem::BlockVector& true_blk_resid, mfem::BlockVector& true_blk_dx);
 
     void PrimalSolve(const mfem::BlockOperator& op_ref,
-                     const mfem::BlockVector& true_blk_resid,
-                     mfem::BlockVector& true_blk_dx);
+                     const mfem::BlockVector& true_resid,
+                     mfem::BlockVector& true_dx);
 public:
     CoupledSolver(const Hierarchy& hierarchy,
                   int level,
@@ -1935,44 +1935,58 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     sol_previous_iter = x;
 }
 
-void CoupledSolver::MixedSolve(const mfem::BlockOperator& op_ref,
-                               const mfem::BlockVector& true_blk_resid,
-                               mfem::BlockVector& true_blk_dx)
+mfem::Array2D<mfem::HypreParMatrix*> To2DArray(mfem::BlockOperator& op)
 {
-    auto& op = const_cast<mfem::BlockOperator&>(op_ref);
-    auto& op_00 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(0, 0));
-    auto& op_01 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(0, 1));
-    auto& op_10 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(1, 0));
-    auto& op_02 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(0, 2));
-    auto& op_20 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(2, 0));
-    auto& op_22 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(2, 2));
+    const int num_blks = op.NumRowBlocks();
+    mfem::Array2D<mfem::HypreParMatrix*> out(num_blks, num_blks);
+    for (int i = 0; i < num_blks; ++i)
+    {
+        for (int j = 0; j < num_blks; ++j)
+        {
+            if (op.IsZeroBlock(i, j)) { out(i, j) = nullptr; continue; }
+            out(i, j) = static_cast<mfem::HypreParMatrix*>(&op.GetBlock(i, j));
+        }
+    }
+    return out;
+}
 
+mfem::Array2D<mfem::HypreParMatrix*>
+ApproximateSchurComplement(mfem::Array2D<mfem::HypreParMatrix*>& op)
+{
     mfem::Vector op_00_diag;
-    op_00.GetDiag(op_00_diag);
+    op(0, 0)->GetDiag(op_00_diag);
     op_00_diag *= -1.0;
 
-    op_01.InvScaleRows(op_00_diag);
-    unique_ptr<mfem::HypreParMatrix> schur_11(mfem::ParMult(&op_10, &op_01));
-    unique_ptr<mfem::HypreParMatrix> schur_21(mfem::ParMult(&op_20, &op_01));
-    op_01.ScaleRows(op_00_diag);
+    mfem::Array2D<mfem::HypreParMatrix*> out(op.NumRows(), op.NumCols());
+    for (int j = 1; j < op.NumCols(); ++j)
+    {
+        op(0, j)->InvScaleRows(op_00_diag);
+        for (int i = 1; i < op.NumRows(); ++i)
+        {
+            unique_ptr<mfem::HypreParMatrix> tmp(mfem::ParMult(op(i, 0), op(0, j)));
+            if (op(i, j) == nullptr) { out(i, j) = tmp.release(); continue; }
+            out(i, j) = ParAdd(*op(i, j), *tmp);
+        }
+        op(0, j)->ScaleRows(op_00_diag);
+    }
+    return out;
+}
 
-    op_02.InvScaleRows(op_00_diag);
-    unique_ptr<mfem::HypreParMatrix> tmp_22(mfem::ParMult(&op_20, &op_02));
-    unique_ptr<mfem::HypreParMatrix> schur_22(ParAdd(op_22, *tmp_22));
-    op_02.ScaleRows(op_00_diag);
+void CoupledSolver::MixedSolve(const mfem::BlockOperator& op,
+                               const mfem::BlockVector& true_resid,
+                               mfem::BlockVector& true_dx)
+{
+    auto op_array = To2DArray(const_cast<mfem::BlockOperator&>(op));
+    auto schur = ApproximateSchurComplement(op_array);
 
-    auto smoother_type = mfem::HypreSmoother::Type::l1Jacobi;
-    mfem::HypreDiagScale prec_00(op_00);
-    unique_ptr<mfem::HypreBoomerAMG> prec_11(BoomerAMG(*schur_11));
-    auto prec_22 = make_unique<mfem::HypreSmoother>(*schur_22, smoother_type);
-
+    auto type = mfem::HypreSmoother::Type::l1Jacobi;
     mfem::BlockLowerTriangularPreconditioner prec(true_blk_offsets_);
-    prec.SetDiagonalBlock(0, &prec_00);
-    prec.SetDiagonalBlock(1, prec_11.get());
-    prec.SetDiagonalBlock(2, prec_22.get());
-    prec.SetBlock(1, 0, &op_10);
-    prec.SetBlock(2, 0, &op_20);
-    prec.SetBlock(2, 1, schur_21.get());
+    prec.SetDiagonalBlock(0, new mfem::HypreDiagScale(*op_array(0, 0)));
+    prec.SetDiagonalBlock(1, BoomerAMG(*schur(1, 1)));
+    prec.SetDiagonalBlock(2, new mfem::HypreSmoother(*schur(2, 2), type));
+    prec.SetBlock(1, 0, op_array(1, 0));
+    prec.SetBlock(2, 0, op_array(2, 0));
+    prec.SetBlock(2, 1, schur(2,1));
 
     unique_ptr<mfem::SparseMatrix> mono_op = BlockGetDiag(op);
     auto par_mono_op = ToParMatrix(comm_, std::move(*mono_op));
@@ -1981,81 +1995,63 @@ void CoupledSolver::MixedSolve(const mfem::BlockOperator& op_ref,
 
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec_prod);
-    gmres_.Mult(true_blk_resid, true_blk_dx);
+    gmres_.Mult(true_resid, true_dx);
 }
 
-void CoupledSolver::PrimalSolve(const mfem::BlockOperator& op_ref,
-                                const mfem::BlockVector& true_blk_resid,
-                                mfem::BlockVector& true_blk_dx)
+void CoupledSolver::PrimalSolve(const mfem::BlockOperator& op,
+                                const mfem::BlockVector& true_resid,
+                                mfem::BlockVector& true_dx)
 {
-    auto& op = const_cast<mfem::BlockOperator&>(op_ref);
-    auto& op_00 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(0, 0));
-    auto& op_01 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(0, 1));
-    auto& op_10 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(1, 0));
-    auto& op_02 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(0, 2));
-    auto& op_20 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(2, 0));
-    auto& op_22 = static_cast<mfem::HypreParMatrix&>(op.GetBlock(2, 2));
+    auto op_array = To2DArray(const_cast<mfem::BlockOperator&>(op));
+    auto schur = ApproximateSchurComplement(op_array);
 
     mfem::Vector op_00_diag;
-    op_00.GetDiag(op_00_diag);
-
-    op_01.InvScaleRows(op_00_diag);
-    unique_ptr<mfem::HypreParMatrix> schur_00(mfem::ParMult(&op_10, &op_01));
-    unique_ptr<mfem::HypreParMatrix> schur_10(mfem::ParMult(&op_20, &op_01));
-    *schur_10 *= -1.0;
-    op_01.ScaleRows(op_00_diag);
-
-    op_02.InvScaleRows(op_00_diag);
-    unique_ptr<mfem::HypreParMatrix> schur_01(mfem::ParMult(&op_10, &op_02));
-    unique_ptr<mfem::HypreParMatrix> tmp_11(mfem::ParMult(&op_20, &op_02));
-    (*tmp_11) *= -1.0;
-    unique_ptr<mfem::HypreParMatrix> schur_11(ParAdd(op_22, *tmp_11));
-    op_02.ScaleRows(op_00_diag);
+    op_array(0, 0)->GetDiag(op_00_diag);
 
     mfem::Array<int> primal_offsets(3);
     primal_offsets[0] = 0;
     primal_offsets[1] = true_blk_offsets_[2] - true_blk_offsets_[1];
     primal_offsets[2] = true_blk_offsets_[3] - true_blk_offsets_[1];
 
-    mfem::BlockOperator schur(primal_offsets);
-    schur.SetBlock(0, 0, schur_00.get());
-    schur.SetBlock(0, 1, schur_01.get());
-    schur.SetBlock(1, 0, schur_10.get());
-    schur.SetBlock(1, 1, schur_11.get());
+    mfem::BlockOperator schur_op(primal_offsets);
+    schur_op.SetBlock(0, 0, schur(1, 1));
+    schur_op.SetBlock(0, 1, schur(1, 2));
+    schur_op.SetBlock(1, 0, schur(2, 1));
+    schur_op.SetBlock(1, 1, schur(2, 2));
 
-    unique_ptr<mfem::HypreBoomerAMG> prec_00(BoomerAMG(*schur_00));
+    unique_ptr<mfem::HypreBoomerAMG> prec_00(BoomerAMG(*schur(1, 1)));
     auto smoother_type = mfem::HypreSmoother::Type::l1Jacobi;
-    auto prec_11 = make_unique<mfem::HypreSmoother>(*schur_11, smoother_type);
+    auto prec_11 = make_unique<mfem::HypreSmoother>(*schur(2, 2), smoother_type);
 
     mfem::BlockLowerTriangularPreconditioner prec(primal_offsets);
     prec.SetDiagonalBlock(0, prec_00.get());
     prec.SetDiagonalBlock(1, prec_11.get());
-    prec.SetBlock(1, 0, schur_10.get());
+    prec.SetBlock(1, 0, schur(2, 1));
 
-    auto mono_schur = BlockGetDiag(schur);
+    auto mono_schur = BlockGetDiag(schur_op);
     auto par_mono_schur = ToParMatrix(comm_, std::move(*mono_schur));
     HypreILU ILU_smoother(*par_mono_schur, 0);
-    TwoStageSolver prec_prod(prec, ILU_smoother, schur);
-    gmres_.SetOperator(schur);
+    TwoStageSolver prec_prod(prec, ILU_smoother, schur_op);
+    gmres_.SetOperator(schur_op);
     gmres_.SetPreconditioner(prec_prod);
 
     mfem::BlockVector primal_resid(primal_offsets);
-    primal_resid.GetBlock(0) = true_blk_resid.GetBlock(1);
-    primal_resid.GetBlock(1) = true_blk_resid.GetBlock(2);
+    primal_resid.GetBlock(0) = true_resid.GetBlock(1);
+    primal_resid.GetBlock(1) = true_resid.GetBlock(2);
 
-    InvRescaleVector(op_00_diag, const_cast<mfem::Vector&>(true_blk_resid.GetBlock(0)));
-    op_10.Mult(1.0, true_blk_resid.GetBlock(0), -1.0, primal_resid.GetBlock(0));
-    op_20.Mult(-1.0, true_blk_resid.GetBlock(0), 1.0, primal_resid.GetBlock(1));
-    RescaleVector(op_00_diag, const_cast<mfem::Vector&>(true_blk_resid.GetBlock(0)));
+    InvRescaleVector(op_00_diag, const_cast<mfem::Vector&>(true_resid.GetBlock(0)));
+    op_array(1, 0)->Mult(-1.0, true_resid.GetBlock(0), 1.0, primal_resid.GetBlock(0));
+    op_array(2, 0)->Mult(-1.0, true_resid.GetBlock(0), 1.0, primal_resid.GetBlock(1));
+    RescaleVector(op_00_diag, const_cast<mfem::Vector&>(true_resid.GetBlock(0)));
 
-    mfem::BlockVector primal_dx(true_blk_dx + op_00.NumRows(), primal_offsets);
+    mfem::BlockVector primal_dx(true_dx.GetBlock(1), primal_offsets);
     primal_dx = 0.0;
     gmres_.Mult(primal_resid, primal_dx);
 
-    true_blk_dx.GetBlock(0) = true_blk_resid.GetBlock(0);
-    op_01.Mult(-1.0, true_blk_dx.GetBlock(1), 1.0, true_blk_dx.GetBlock(0));
-    op_02.Mult(-1.0, true_blk_dx.GetBlock(2), 1.0, true_blk_dx.GetBlock(0));
-    InvRescaleVector(op_00_diag, true_blk_dx.GetBlock(0));
+    true_dx.GetBlock(0) = true_resid.GetBlock(0);
+    op_array(0, 1)->Mult(-1.0, true_dx.GetBlock(1), 1.0, true_dx.GetBlock(0));
+    op_array(0, 2)->Mult(-1.0, true_dx.GetBlock(2), 1.0, true_dx.GetBlock(0));
+    InvRescaleVector(op_00_diag, true_dx.GetBlock(0));
 }
 
 void CoupledSolver::BackTracking(const mfem::Vector& rhs,  double prev_resid_norm,
