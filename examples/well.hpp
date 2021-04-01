@@ -296,6 +296,12 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
         if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
     }
 
+//    for (int i = 0; i < num_wells; ++i)
+//    {
+//        double value = (i == num_wells - 1) ? inject_rate : (inject_rate / -4.0);
+//        if (cells[i].size()) { well_manager_.AddWell(Injector, value, cells[i]); }
+//    }
+
     //    for (int i = 0; i < num_wells; ++i)
     //    {
     //        double value = (i == num_wells - 1) ? 1e6 : 1e5;
@@ -438,21 +444,6 @@ void TwoPhase::CombineReservoirAndWellModel()
 
     rhs_sigma_ = AppendWellData(rhs_sigma_, Producer);
     rhs_u_ = AppendWellData(rhs_u_, Injector);
-
-//    // TODO: temp code for MRST example
-    int num_edges_total = 53085;
-//    int num_edges_total = 50438;         // no inactive cells
-//    rhs_sigma_.SetSize(num_edges_total);
-//    rhs_sigma_ = 0.0;
-//    rhs_sigma_[num_edges_total - 5] = -1e+06;
-//    rhs_sigma_[num_edges_total - 4] = -1e+06;
-//    rhs_sigma_[num_edges_total - 3] = -1e+06;
-//    rhs_sigma_[num_edges_total - 2] = -1e+06;
-
-//    rhs_u_.SetSize(12322); // no inactive cells
-//    rhs_u_ = 0.0;
-//    rhs_u_[12321] = 5e-05;
-
 
     combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
                                                   well_manager_.NumWellCells());

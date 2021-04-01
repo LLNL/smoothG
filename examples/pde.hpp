@@ -540,6 +540,8 @@ public:
     mfem::Vector ComputeZ() const;
 
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
+
+    const mfem::SparseMatrix* VertReorderMap() const { return vertex_reorder_map_.get(); }
 protected:
     void BuildReservoirGraph();
     void InitGraph();
@@ -636,7 +638,7 @@ void DarcyProblem::BuildReservoirGraph()
     edge_trueedge_ = sigma_fes_->Dof_TrueDof_Matrix();
     edge_bdr_ = GenerateEdgeToBoundary(*mesh_);
 
-    assert(edge_bdr_.NumCols() == ess_attr_.Size());
+//    assert(edge_bdr_.NumCols() == ess_attr_.Size()); // TODO: tmp disabled for using Francois's data
 }
 
 void DarcyProblem::InitGraph()
@@ -741,11 +743,22 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
     vis_v << "solution\n" << *mesh_ << gf;
-    vis_v << "window_size 500 800\n"; // Richard's example 800 250
+
+    if (mesh_->GetGlobalNE() == 18553) // Egg model
+    {
+        vis_v << "window_size 1200 800\n"; // Richard's example 800 250
+    }
+    else
+    {
+        vis_v << "window_size 1000 800\n";
+    }
+
     vis_v << "window_title 'vertex space unknown'\n";
-    vis_v << "autoscale off\n"; // update value-range; keep mesh-extents fixed
+    vis_v << "autoscale value\n"; // update value-range;
+
     if (range_max > range_min)
     {
+        vis_v << "autoscale off\n"; // keep value-range, mesh-extents fixed
         vis_v << "valuerange " << range_min << " " << range_max << "\n";
     }
 
@@ -753,7 +766,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
     {
         vis_v << "view 0 0\n"; // view from top
         vis_v << "keys jl\n";  // turn off perspective and light
-        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
+        vis_v << "keys ]]]]]]]]]]]]]]]]]]]]]]]\n";  // increase size
     }
     else
     {
@@ -761,6 +774,13 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
     }
 
     vis_v << "keys c\n"; // colorbar
+
+    if (mesh_->GetGlobalNE() != 13200) // non-SPE10 (e.g., Egg model)
+    {
+        vis_v << "keys RRRRRR\n"; // angle
+    }
+
+    vis_v << "keys m\n"; // show mesh
 
     if (coef)
     {
@@ -774,7 +794,7 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
 
     MPI_Barrier(comm_);
 
-    //    vis_v << "keys S\n";         //Screenshot
+    vis_v << "keys S\n";         //Screenshot
 
     MPI_Barrier(comm_);
 }
@@ -787,8 +807,6 @@ void DarcyProblem::VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec,
 //    sign_fixed_vec *= 100.0;
     mfem::ParGridFunction gf(sigma_fes_.get(), sign_fixed_vec.GetData());
 
-//    std::ofstream gf_file("basis694.gf");
-//    gf.Save(gf_file);
 
     const char vishost[] = "localhost";
     const int  visport   = 19916;
@@ -851,7 +869,7 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec,
 
     MPI_Barrier(comm_);
 
-    //    vis_v << "keys S\n";         //Screenshot
+    vis_v << "keys S\n";         //Screenshot
 
     MPI_Barrier(comm_);
 }

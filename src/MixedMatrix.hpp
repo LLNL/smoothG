@@ -107,6 +107,9 @@ public:
     /// Determine if W block is nonzero
     bool CheckW() const { return W_is_nonzero_; }
 
+    void SetDs(mfem::SparseMatrix Ds) { Ds_.Swap(Ds); }
+    void SetMs(mfem::SparseMatrix Ms) { Ms_.Swap(Ms); }
+
     ///@name Getters
     ///@{
     MPI_Comm GetComm() const { return graph_space_.GetGraph().GetComm(); }
@@ -118,6 +121,8 @@ public:
     const MBuilder& GetMBuilder() const { return *mbuilder_; }
     const mfem::SparseMatrix& GetD() const { return D_; }
     const mfem::SparseMatrix& GetW() const { return W_; }
+    const mfem::SparseMatrix& GetDs() const { return Ds_; }
+    const mfem::SparseMatrix& GetMs() const { return Ms_; }
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
     const mfem::Array<int>& BlockTrueOffsets() const { return block_true_offsets_; }
     ///@}
@@ -152,6 +157,9 @@ private:
     mfem::SparseMatrix M_;
     mfem::SparseMatrix D_;
     mfem::SparseMatrix W_;
+
+    mfem::SparseMatrix Ds_;
+    mfem::SparseMatrix Ms_;
 
     GraphSpace graph_space_;
 

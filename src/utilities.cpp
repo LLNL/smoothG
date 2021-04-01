@@ -390,6 +390,7 @@ double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result
 
 void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
 {
+    assert(scaling.Size() == vec.Size());
     for (int i = 0; i < vec.Size(); i++)
     {
         vec[i] *= scaling[i];
@@ -398,6 +399,7 @@ void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
 
 void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec)
 {
+    assert(scaling.Size() == vec.Size());
     for (int i = 0; i < vec.Size(); i++)
     {
         vec[i] /= scaling[i];

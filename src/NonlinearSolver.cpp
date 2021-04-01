@@ -201,7 +201,7 @@ void FAS::MG_Cycle(int l)
         prev_resid_norm_ = resid_norm_;
     }
 
-    if (l || resid_norm_ > rhs_norm_ * param_.coarse_correct_tol)
+    if (l || (iter_ < 5 && resid_norm_ > param_.coarse_correct_tol))// * rhs_norm_)//
     {
         // Compute FAS coarser level rhs
         // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)

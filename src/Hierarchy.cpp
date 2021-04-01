@@ -89,6 +89,8 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
         edge_traces_[0][edge] = 1.0;
     }
 
+    mixed_system.SetDs(mixed_system.GetD());
+//    mixed_system.SetMs(SparseDiag(mixed_system.GetGraph().VertexWeight()));
     mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
     if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
@@ -139,6 +141,13 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     {
         mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level]));
     }
+
+    std::unique_ptr<mfem::SparseMatrix> coarse_Ds(
+            mfem::RAP(GetPs(level), mgL.GetDs(), Psigma_[level]));
+//    std::unique_ptr<mfem::SparseMatrix> coarse_Ms(
+//            mfem::RAP(GetPs(level), mgL.GetMs(), GetPs(level)));
+    mixed_systems_[level+1].SetDs(*coarse_Ds);
+//    mixed_systems_[level+1].SetMs(*coarse_Ms);
 
     agg_vert_.push_back(std::move(topology.Agg_vertex_));
 

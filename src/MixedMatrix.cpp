@@ -81,6 +81,8 @@ MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
     M_.Swap(other.M_);
     D_.Swap(other.D_);
     W_.Swap(other.W_);
+    Ds_.Swap(other.Ds_);
+    Ms_.Swap(other.Ms_);
     swap(graph_space_, other.graph_space_);
     mfem::Swap(block_offsets_, other.block_offsets_);
     mfem::Swap(block_true_offsets_, other.block_true_offsets_);
