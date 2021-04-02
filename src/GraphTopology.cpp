@@ -56,9 +56,9 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
 //            i_friend = (i_friend == i) ? vert_vert.GetRowColumns(i)[1] : i_friend;
 //            iso_verts.push_back(std::vector<int>(1, i_friend));
 
-            for (int j = 0; j < vert_vert.RowSize(i); ++j)
+            for (int j = 0; j < vert_vert2.RowSize(i); ++j)
             {
-                const int i_friend = vert_vert.GetRowColumns(i)[j];
+                const int i_friend = vert_vert2.GetRowColumns(i)[j];
                 if (i_friend != i) { iso_verts.push_back(std::vector<int>(1, i_friend)); }
             }
         }
@@ -67,18 +67,18 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
     const bool isolate_production_well_cells = true;
     if (isolate_production_well_cells && fine_graph.EdgeToBdrAtt().NumCols() > 1)
     {
-        int num_well_edges = (fine_graph.EdgeToBdrAtt().NumCols()-1) + num_iso_verts;
-        for (int i = edge_vert.NumRows() - num_well_edges; i < edge_vert.NumRows() - num_iso_verts; ++i)
+        int num_prodution_well_edges = (fine_graph.EdgeToBdrAtt().NumCols()-1);
+        for (int i = edge_vert.NumRows() - num_prodution_well_edges; i < edge_vert.NumRows(); ++i)
         {
             assert(edge_vert.RowSize(i) == 1);
             int production_well_cell = edge_vert.GetRowColumns(i)[0];
             iso_verts.push_back(std::vector<int>(1, production_well_cell));
 
-//            for (int j = 0; j < vert_vert.RowSize(production_well_cell); ++j)
-//            {
-//                const int i_friend = vert_vert.GetRowColumns(production_well_cell)[j];
-//                if (i_friend != production_well_cell) { iso_verts.push_back(std::vector<int>(1, i_friend)); }
-//            }
+            for (int j = 0; j < vert_vert.RowSize(production_well_cell); ++j)
+            {
+                const int i_friend = vert_vert.GetRowColumns(production_well_cell)[j];
+                if (i_friend != production_well_cell) { iso_verts.push_back(std::vector<int>(1, i_friend)); }
+            }
         }
     }
 
@@ -128,13 +128,12 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
 
     // nfaces_bdr = number of global boundary faces in this processor
     int nfaces_bdr = 0;
-    mfem::SparseMatrix aggregate_boundaryattr;
+    mfem::SparseMatrix boundaryattr_aggregate;
     if (fine_graph.HasBoundary())
     {
-        auto tmp = smoothg::Mult(aggregate_edge, edge_bdratt);
-        aggregate_boundaryattr.Swap(tmp);
-
-        nfaces_bdr = aggregate_boundaryattr.NumNonZeroElems();
+        auto aggregate_bdrattr = smoothg::Mult(aggregate_edge, edge_bdratt);
+        nfaces_bdr = aggregate_bdrattr.NumNonZeroElems();
+        boundaryattr_aggregate = smoothg::Transpose(aggregate_bdrattr);
     }
 
     // nfaces = number of all coarse faces (interior + shared + boundary)
@@ -189,24 +188,8 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
                 face_edge_nnz++;
     }
 
-    // Counting the coarse faces on the global boundary
     int* agg_edge_i = aggregate_edge.GetI();
     int* agg_edge_j = aggregate_edge.GetJ();
-    if (fine_graph.HasBoundary())
-    {
-        int* agg_bdr_i = aggregate_boundaryattr.GetI();
-        int* agg_bdr_j = aggregate_boundaryattr.GetJ();
-        for (int i = 0; i < nAggs; i++)
-            for (int j = agg_bdr_i[i]; j < agg_bdr_i[i + 1]; j++)
-            {
-                face_edge_i[count] = face_edge_nnz;
-                for (int k = agg_edge_i[i]; k < agg_edge_i[i + 1]; k++)
-                    if (edge_bdratt.Elem(agg_edge_j[k], agg_bdr_j[j]))
-                        face_edge_nnz++;
-                face_Agg_j[nfaces_int + (count++)] = i;
-                face_Agg_i[count] = nfaces_int + count;
-            }
-    }
 
     // Counting the faces shared between processors
     auto Agg_shareattr_map = ((hypre_ParCSRMatrix*) *Agg_Agg)->col_map_offd;
@@ -236,6 +219,25 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
             face_Agg_i[count] = nfaces_int + count;
         }
     }
+
+    // Counting the coarse faces on the global boundary
+    if (fine_graph.HasBoundary())
+    {
+        int* bdr_agg_i = boundaryattr_aggregate.GetI();
+        int* bdr_agg_j = boundaryattr_aggregate.GetJ();
+        for (int i = 0; i < boundaryattr_aggregate.NumRows(); i++)
+            for (int j = bdr_agg_i[i]; j < bdr_agg_i[i + 1]; j++)
+            {
+                const int agg = bdr_agg_j[j];
+                face_edge_i[count] = face_edge_nnz;
+                for (int k = agg_edge_i[agg]; k < agg_edge_i[agg + 1]; k++)
+                    if (edge_bdratt.Elem(agg_edge_j[k], i))
+                        face_edge_nnz++;
+                face_Agg_j[nfaces_int + (count++)] = agg;
+                face_Agg_i[count] = nfaces_int + count;
+            }
+    }
+
     face_edge_i[nfaces] = face_edge_nnz;
     assert(count == nfaces);
 
@@ -247,18 +249,6 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
         for (int j = intface_Agg_edge_i[i]; j < intface_Agg_edge_i[i + 1]; j++)
             if (intface_Agg_edge_data[j] == 2.0)
                 face_edge_j[face_edge_nnz++] = intface_Agg_edge_j[j];
-
-    // Insert edges to the coarse faces on the global boundary
-    if (fine_graph.HasBoundary())
-    {
-        int* agg_bdr_i = aggregate_boundaryattr.GetI();
-        int* agg_bdr_j = aggregate_boundaryattr.GetJ();
-        for (int i = 0; i < nAggs; i++)
-            for (int j = agg_bdr_i[i]; j < agg_bdr_i[i + 1]; j++)
-                for (int k = agg_edge_i[i]; k < agg_edge_i[i + 1]; k++)
-                    if (edge_bdratt.Elem(agg_edge_j[k], agg_bdr_j[j]))
-                        face_edge_j[face_edge_nnz++] = agg_edge_j[k];
-    }
 
     // Insert edges to the faces shared between processors
     for (int i = 0; i < Agg_Agg_o->num_rows; i++)
@@ -279,6 +269,22 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
             }
         }
     }
+
+    // Insert edges to the coarse faces on the global boundary
+    if (fine_graph.HasBoundary())
+    {
+        int* bdr_agg_i = boundaryattr_aggregate.GetI();
+        int* bdr_agg_j = boundaryattr_aggregate.GetJ();
+        for (int i = 0; i < boundaryattr_aggregate.NumRows(); i++)
+            for (int j = bdr_agg_i[i]; j < bdr_agg_i[i + 1]; j++)
+            {
+                const int agg = bdr_agg_j[j];
+                for (int k = agg_edge_i[agg]; k < agg_edge_i[agg + 1]; k++)
+                    if (edge_bdratt.Elem(agg_edge_j[k], i))
+                        face_edge_j[face_edge_nnz++] = agg_edge_j[k];
+            }
+    }
+
     double* face_edge_data = new double [face_edge_nnz];
     std::fill_n(face_edge_data, face_edge_nnz, 1.0);
 

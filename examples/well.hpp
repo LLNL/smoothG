@@ -266,14 +266,20 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 
     mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
     point = ft_;
-    point(0, 1) = max_x;
-    point(1, 2) = max_y;
-    point(0, 3) = max_x;
+//    point(0, 1) = max_x;
+//    point(1, 2) = max_y;
+//    point(0, 3) = max_x;
+//    point(1, 3) = max_y;
+////    point(0, 4) = ((max_x + ft_) / 2.0) + ft_;
+////    point(1, 4) = ((max_y + ft_) / 2.0) + ft_;
+//    point(0, 4) = 185.5; // 182.5;
+//    point(1, 4) = 336.5; // 335.0; // 258.0; //
+    point(0, 2) = max_x;
     point(1, 3) = max_y;
-//    point(0, 4) = ((max_x + ft_) / 2.0) + ft_;
-//    point(1, 4) = ((max_y + ft_) / 2.0) + ft_;
-    point(0, 4) = 185.5; // 182.5;
-    point(1, 4) = 336.5; // 335.0; // 258.0; //
+    point(0, 4) = max_x;
+    point(1, 4) = max_y;
+    point(0, 0) = 185.5; // 182.5;
+    point(1, 0) = 336.5; // 335.0; // 258.0; //
 
 
     for (int j = 0; j < well_height; ++j)
@@ -291,8 +297,10 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 
     for (int i = 0; i < num_wells; ++i)
     {
-        WellType type = (i == num_wells - 1) ? Injector : Producer;
-        double value = (i == num_wells - 1) ? inject_rate : bhp;
+//        WellType type = (i == num_wells - 1) ? Injector : Producer;
+//        double value = (i == num_wells - 1) ? inject_rate : bhp;
+        WellType type = (i == 0) ? Injector : Producer;
+        double value = (i == 0) ? inject_rate : bhp;
         if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
     }
 

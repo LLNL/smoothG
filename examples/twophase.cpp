@@ -472,13 +472,13 @@ public:
         int vert, edge;
         double half_trans;
 
-        auto save_one_line = [&]()
+        auto save_one_line = [&](int edge_offset = 0)
         {
             file >> vert;
             file >> edge;
             file >> half_trans;
 //            if (half_trans < 0.0) { std::cout<< "negative data " << vert<<" "<<edge<<" "<<half_trans<<"\n";}
-            vert_edge.Set(vert - 1, edge - 1, std::fabs(half_trans));//half_trans);//
+            vert_edge.Set(vert - 1, edge - 1 + edge_offset, std::fabs(half_trans));//half_trans);//
         };
 
         // TODO: make it to work for elements of mixed types
@@ -499,7 +499,7 @@ public:
 
         for (int i = 0; i < num_producers; ++i)
         {
-            save_one_line();
+            save_one_line(num_injectors);
         }
         std::cout<<" debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
 
@@ -511,9 +511,9 @@ public:
 
         for (int i = 0; i < num_injectors; ++i)
         {
-            save_one_line();
-            save_one_line();
-            vert_edge.Set(vert - 1, edge - 1, 1e10); // TODO: this is to match well.hpp, not sure if necessary
+            save_one_line(-num_producers);
+            save_one_line(-num_producers);
+            vert_edge.Set(vert - 1, edge - 1 - num_producers, 1e10); // TODO: this is to match well.hpp, not sure if necessary
         }
         std::cout<<" debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
 
@@ -549,9 +549,10 @@ public:
             assert(edge_count == 0);
         }
 
+        std::cout<<" num_producers = "<<num_producers<<"\n";
         for (int i = 0; i < num_producers; ++i)
         {
-            edge_bdr.Set(num_edges_res + i, 1 + i, 1.0);
+            edge_bdr.Set(num_edges_res + num_injectors + i, 1 + i, 1.0);
         }
         edge_bdr.Finalize();
 
@@ -575,7 +576,7 @@ public:
         rhs_sigma_ = 0.0;
         for (int i = 0; i < num_producers; ++i)
         {
-            rhs_sigma_[num_edges_res + i] = bottom_hole_pressure;
+            rhs_sigma_[num_edges_res + num_injectors + i] = bottom_hole_pressure;
         }
 
         rhs_u_.SetSize(num_vert_total);
@@ -635,9 +636,10 @@ private:
 
 void ShowAggregates(const std::vector<Graph>& graphs,
                     const std::vector<GraphTopology>& topos,
-                    const mfem::ParMesh& mesh,
+                    const DarcyProblem& problem,
                     int num_injectors)
 {
+    const mfem::ParMesh& mesh = problem.GetMesh();
     mfem::L2_FECollection fec(0, mesh.SpaceDimension());
     mfem::ParFiniteElementSpace fespace(const_cast<mfem::ParMesh*>(&mesh), &fec);
     mfem::ParGridFunction attr(&fespace);
@@ -664,6 +666,12 @@ void ShowAggregates(const std::vector<Graph>& graphs,
         for (int j = 0; j < vertex_Agg.Height()-num_injectors; j++)
         {
             attr(j) = (colors[partitioning[j]] + mesh.GetMyRank()) % num_colors;
+        }
+
+        if (problem.VertReorderMap())
+        {
+            mfem::Vector attr_graph(attr);
+            problem.VertReorderMap()->Mult(attr_graph, attr);
         }
 
         char vishost[] = "localhost";
@@ -969,7 +977,7 @@ int main(int argc, char* argv[])
 //        graphs.push_back(topologies[i].Coarsen(graphs[i],
 //                upscale_param.coarse_factor, upscale_param.num_iso_verts));
 //    }
-//    ShowAggregates(graphs, topologies, problem_ptr->GetMesh(), upscale_param.num_iso_verts);
+//    ShowAggregates(graphs, topologies, *problem_ptr, upscale_param.num_iso_verts);
 //return 0;
 
     Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr_final);
