@@ -36,6 +36,8 @@
 using namespace smoothg;
 
 double mu_o = 0.005; //0.0002; //
+double mu_w = 1e-3;
+int relperm_order = 2;
 
 mfem::Vector PWConstProject(const MixedMatrix& darcy_system, const mfem::Vector& x)
 {
@@ -208,6 +210,8 @@ class TwoPhaseSolver
     std::vector<int> step_num_backtrack_;
     std::vector<int> step_coarsest_nonlinear_iter_;
     std::vector<int> step_average_coarsest_linear_iter_;
+    std::vector<double> step_time_;
+    std::vector<double> cumulative_step_time_;
     std::vector<double> step_CFL_const_;
 
     // TODO: these should be defined in / extracted from the problem, not here
@@ -365,7 +369,7 @@ public:
                      double bottom_hole_pressure, const mfem::Array<int>& ess_attr)
         : DarcyProblem(MPI_COMM_WORLD, 2, ess_attr)
     {
-        std::string c2f_filename = path+"/cell_to_faces.txt";
+        std::string c2f_filename = path+"/cell_to_faces_more_heterogeneous.txt";
         std::string vol_filename = path+"/cell_volume_porosity.txt";
         if (path == "/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive")
         {
@@ -388,6 +392,7 @@ public:
         if (num_edges_res == 155268) { num_injectors = 6; num_producers = 5; }
         if (num_edges_res == 155268) { c2f_filename = path+"/cell_to_faces_positive.txt"; }
         if (num_edges_res == 264305) { num_injectors = 5; num_producers = 5; }
+        if (num_edges_res == 2000742) { num_injectors = 5; num_producers = 5; }
 
         int num_vert_total = num_vert_res + num_injectors;
         int num_edges_total = num_edges_res + num_injectors + num_producers;
@@ -589,6 +594,9 @@ public:
         // read cell volume and porosity
         vert_weight_.SetSize(num_vert_total);
         vert_weight_ = 0.2;
+
+        volumes_.SetSize(num_vert_res);
+
         if (!vol_file.is_open())
         {
             std::cerr << "Error in opening file cell_volume_porosity.txt\n";
@@ -603,7 +611,13 @@ public:
             vol_file >> trash_;
             if (i < 1) std::cout << "volume: " << cell_volume_ << ", porosity: " << porosity_ <<"\n";
             vert_weight_[i] = cell_volume_ * porosity_;
+            volumes_[i] = cell_volume_;
         }
+
+        std::cout << "sum of cell volumes = " << volumes_.Sum() << "\n";
+        volumes_ = vert_weight_;
+        volumes_.SetSize(num_vert_res);
+        std::cout << "sum of pore volumes = " << volumes_.Sum() << "\n";
 
         if (need_getline)
         {
@@ -632,6 +646,7 @@ private:
     double cell_volume_;
     double porosity_;
     double trash_;
+    mfem::Vector volumes_;
 };
 
 void ShowAggregates(const std::vector<Graph>& graphs,
@@ -771,6 +786,8 @@ int main(int argc, char* argv[])
     bool smeared_front = true;
     args.AddOption(&smeared_front, "-smeared-front", "--smeared-front", "-sharp-front",
                    "--sharp-front", "Control density to produce smeared or sharp saturation front.");
+    args.AddOption(&relperm_order, "-ro", "--relperm-order",
+                   "Exponent of relperm function.");
     UpscaleParameters upscale_param;
     upscale_param.spect_tol = 1.0;
     upscale_param.max_evects = 1;
@@ -793,7 +810,7 @@ int main(int argc, char* argv[])
 
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
 
-    const int max_iter = upscale_param.max_levels > 1 ? 500 : 100;
+    const int max_iter = upscale_param.max_levels > 1 ? 100 : 500;
     mu_o = smeared_front ? 0.005 : 0.0002;
 
     FASParameters fas_param;
@@ -875,7 +892,8 @@ int main(int argc, char* argv[])
             num_vert_res = 18553;
             nnz_res = num_vert_res * 6;
             num_edges_res = 59205;
-            inject_rate = 3e-4;
+//            inject_rate = 5e-4;
+//            inject_rate = 2e-3;
             upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
             ess_attr.SetSize(3, 1);
@@ -901,6 +919,21 @@ int main(int argc, char* argv[])
             inject_rate *= 1.0;
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 5; // TODO: this should be read from file
+
+            mfem::Array<int> ess_attr2(1); ess_attr2 = 1;
+            problem_for_plot.reset(new SaigupModel(comm, false, ess_attr2));
+        }
+        else if (path == "/Users/lee1029/Downloads/refined_saigup")
+        {
+            num_vert_res = 629760;
+            nnz_res = 3913208;
+            num_edges_res = 2000742;
+            inject_rate *= 1.0;
+            num_attr_from_file = 6;
+            upscale_param.num_iso_verts = 5; // TODO: this should be read from file
+
+            ess_attr.SetSize(1, 1);
+            problem_for_plot.reset(new SaigupModel(comm, true, ess_attr));
         }
         else if (path != "/Users/lee1029/Downloads/spe10_bottom_layer_2d")
         {
@@ -1009,10 +1042,15 @@ int main(int argc, char* argv[])
         }
 
         Ss[l] = sol.GetBlock(2);
-        Ss[l].SetSize(sol.BlockSize(2) - upscale_param.num_iso_verts);
+//        Ss[l].SetSize(sol.BlockSize(2) - upscale_param.num_iso_verts);
+        for (int ii = 0; ii < upscale_param.num_iso_verts; ++ii)
+        {
+            Ss[l][sol.BlockSize(2) - 1 - ii] = 0.0;
+        }
 
-        double norm = mfem::ParNormlp(Ss[l], 1, comm);
-        if (myid == 0) { std::cout << "    || S ||_2 = " << norm << "\n"; }
+//        double norm = mfem::ParNormlp(Ss[l], 1, comm);
+        double norm = (Ss[l] * hierarchy.GetGraph(0).VertexWeight());
+        if (myid == 0) { std::cout << "    || S ||_1 = " << norm << "\n"; }
 
         std::ofstream s_file("final_sat_active.txt");
         Ss[l].Print(s_file, 1);
@@ -1409,9 +1447,12 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
     mfem::SparseMatrix D = hierarchy.GetMatrix(level).GetD();
 //    D_te_e_ = ParMult(D, *e_te_e, starts);
     D_te_e_.reset(ToParMatrix(hierarchy.GetComm(), std::move(D)));
+
+    cumulative_step_time_.push_back(0.0);
 }
 
 int step_global = 0;
+int step_local = 0;
 mfem::Vector pres_resid;
 mfem::Vector sat_resid;
 
@@ -1444,7 +1485,9 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
     double time = 0.0;
     double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time) / 2.0;
+//    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time);
 
+    std::vector<double> cumulative_time;
     bool done = false;
     int step;
     for (step = 1; !done; step++)
@@ -1453,8 +1496,10 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
         mfem::BlockVector previous_x(x);
 //        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 345600.);
-//        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 2.94912e7);
+//        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 1.10592e7*2);
         dt_real = std::min(dt_real * 2.0, evolve_param_.total_time - time);
+//        dt_real = std::min(dt_real, evolve_param_.total_time - time);
+
         step_converged_ = false;
 
         TimeStepping(dt_real, x);
@@ -1467,6 +1512,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
         time += dt_real;
         done = (time >= evolve_param_.total_time);
+        cumulative_time.push_back(time);
 
         step_CFL_const_.push_back(EvalCFL(dt_real, x));
 
@@ -1475,6 +1521,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
             std::cout << "Time step " << step << ": step size = " << dt_real
                       << ", time = " << time << ".\n\n";
         }
+
         if (evolve_param_.vis_step && (done || step % evolve_param_.vis_step == 0))
         {
             x_blk2 = x.GetBlock(2);
@@ -1535,10 +1582,14 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         std::cout << "Average linear iterations per coarsest level linear solve: "
                   << num_coarse_lin_iter_ / double(num_coarse_lin_solve_) << "\n";
 
-        PrintForLatexTable(step_nonlinear_iter_, "# nonlinear iter");
-        PrintForLatexTable(step_coarsest_nonlinear_iter_, "# coarsest nonlinear iter");
-        PrintForLatexTable(step_average_coarsest_linear_iter_, "# average coarsest linear iter");
-        PrintForLatexTable(step_CFL_const_, "CFL constants");
+        PrintTable(step_nonlinear_iter_, "# nonlinear iter");
+        PrintTable(step_coarsest_nonlinear_iter_, "# coarsest nonlinear iter");
+        PrintTable(step_average_coarsest_linear_iter_, "# average coarsest linear iter");
+        PrintTable(step_time_, "solving_time", false);
+        std::vector<double> cumu_step_time(cumulative_step_time_.begin()+1, cumulative_step_time_.end());
+        PrintTable(cumu_step_time, "cumulative_solving_time", false);
+        PrintTable(cumulative_time, "cumulative_time", false);
+        PrintTable(step_CFL_const_, "CFL constants");
 //        PrintForLatexTable(step_num_backtrack_, "# backtrack");
     }
 
@@ -1647,10 +1698,10 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 
         mfem::Vector res(x.GetBlock(2));
         res = 0.0;
-        if (0 && step_global >= 6)
-        {
-            problem_ptr->VisSetup(sout_resid_[step_global], res, 0.0, 0.0, "Resid "+std::to_string(step_global));
-        }
+//        if (1 && step_global >= 6)
+//        {
+//            problem_ptr->VisSetup(sout_resid_[step_global], res, 0.0, 0.0, "Resid "+std::to_string(step_global));
+//        }
 
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(0) *= (1. / dt / density_);
@@ -1678,6 +1729,8 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         step_converged_ = solver.IsConverged();
         num_coarse_lin_iter_ += num_coarse_lin_iter;
         num_coarse_lin_solve_ += step_coarsest_nonlinear_iter_.back();
+        step_time_.push_back(solver.GetTiming());
+        cumulative_step_time_.push_back(cumulative_step_time_.back()+solver.GetTiming());
     }
     else // sequential: solve for flux and pressure first, and then saturation
     {
@@ -2224,14 +2277,14 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     x += blk_dx;
 
 
-    if (level_ > 0)
-    {
-        const mfem::Vector S2 = PWConstProject(darcy_system_, blk_x.GetBlock(2));
-        const double S_min = S2.Min();
-        const double S_max = S2.Max();
-        if (S_min < -1e-16 || S_max > 1.0)
-            std::cout<< "         Coarse S after Newton update: min = "<< S_min << ", max = " << S_max <<"\n";
-    }
+//    if (level_ > 0)
+//    {
+//        const mfem::Vector S2 = PWConstProject(darcy_system_, blk_x.GetBlock(2));
+//        const double S_min = S2.Min();
+//        const double S_max = S2.Max();
+//        if (S_min < -1e-16 || S_max > 1.0)
+//            std::cout<< "         Coarse S after Newton update: min = "<< S_min << ", max = " << S_max <<"\n";
+//    }
 
     if (level_ == 0)
     {
@@ -2239,43 +2292,24 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     }
 
 
-
-    mfem::Vector true_resid2 = AssembleTrueVector(Residual(x, rhs));
-    mfem::BlockVector true_blk_resid2(true_resid2.GetData(), blk_offsets_);
-
-//    if (step_global == 16 && level_ == 0)
-//    {
-//        mfem::Vector x_blk2 = true_blk_resid2.GetBlock(2);
-//        for (int l = level_; l > 0; --l)
-//        {
-//            x_blk2 = MatVec(hierarchy_.GetPs(l-1), x_blk2);
-//        }
-
-//        is_odd++;
-//        std::string smooth = is_odd % 2 ? " pre-smoothing" : " post-smoothing";
-//        std::string msg = " at time step " + std::to_string(step_global) + " v-cycle " + std::to_string((is_odd+1)/2) + smooth;
-//        mfem::socketstream sout;
-//        problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, "resid"+msg);
-////        mfem::socketstream sout2;
-////        problem_ptr->VisSetup(sout2, x_blk2, 0.0, 0.0, "saturation"+msg);
-//    }
-
-
-    const int num_injectors = hierarchy_.GetUpscaleParameters().num_iso_verts;
-
-    InvRescaleVector(normalizer_, true_blk_resid2.GetBlock(1));
-    InvRescaleVector(normalizer_, true_blk_resid2.GetBlock(2));
-    pres_resid = true_blk_resid2.GetBlock(1);
-    pres_resid.SetSize(pres_resid.Size() - num_injectors);
-
-//    mfem::Vector resid_blk2(true_blk_resid2.GetBlock(2));
-    sat_resid = true_blk_resid2.GetBlock(2);
-    sat_resid.SetSize(sat_resid.Size() - num_injectors);
-
-    mfem::Vector resid_blk3(true_blk_resid2.GetBlock(2).GetData()+sat_resid.Size(), num_injectors);
-
-    if (0)
+    if (0) // debug
     {
+        mfem::Vector true_resid2 = AssembleTrueVector(Residual(x, rhs));
+        mfem::BlockVector true_blk_resid2(true_resid2.GetData(), blk_offsets_);
+
+        const int num_injectors = hierarchy_.GetUpscaleParameters().num_iso_verts;
+
+        InvRescaleVector(normalizer_, true_blk_resid2.GetBlock(1));
+        InvRescaleVector(normalizer_, true_blk_resid2.GetBlock(2));
+        pres_resid = true_blk_resid2.GetBlock(1);
+        pres_resid.SetSize(pres_resid.Size() - num_injectors);
+
+    //    mfem::Vector resid_blk2(true_blk_resid2.GetBlock(2));
+        sat_resid = true_blk_resid2.GetBlock(2);
+        sat_resid.SetSize(sat_resid.Size() - num_injectors);
+
+        mfem::Vector resid_blk3(true_blk_resid2.GetBlock(2).GetData()+sat_resid.Size(), num_injectors);
+
         std::cout << "Level "<<level_<<": \n";
         std::cout<<"|| resid0 || = " << ParNorm(true_blk_resid2.GetBlock(0), comm_)<<"\n";
         std::cout<<"|| resid1 || = " << ParNorm(true_blk_resid2.GetBlock(1), comm_)<<"\n";
@@ -2298,7 +2332,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             std::cout<< blk_x(blk_x.BlockSize(0)-num_injectors+i) <<" ";
         }
         std::cout<<"\n";
-    }
+
 
 //    std::ofstream r2_file("egg_resid_sat_"+std::to_string(step_global)+".vtk");
 //    r2_file.precision(8);
@@ -2323,16 +2357,30 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //                  << blk_x.GetBlock(2)[13140] << " " << blk_x.GetBlock(2)[13199] << "\n";
 //    }
 
-    if (0 && step_global >= 6)
-    {
-//        if (true_blk_resid2.GetBlock(2).Norml2() > 1e2)
+        if (step_global == 9 && step_local < 12 && level_ == 0)
         {
-            mfem::Vector x_blk2 = true_blk_resid2.GetBlock(2);
-            for (int l = level_; l > 0; --l)
+            //        if (true_blk_resid2.GetBlock(2).Norml2() > 1e2)
             {
-                x_blk2 = MatVec(hierarchy_.GetPs(l-1), x_blk2);
+                mfem::Vector x_blk2 = true_blk_resid2.GetBlock(2);
+                for (int l = level_; l > 0; --l)
+                {
+                    x_blk2 = MatVec(hierarchy_.GetPs(l-1), x_blk2);
+                }
+                //            problem_ptr->VisUpdate(sout_resid_[step_global], x_blk2);
+
+
+                is_odd++;
+                std::string smooth = is_odd % 2 ? " pre-smoothing" : " post-smoothing";
+                //            std::string msg = " at time step " + std::to_string(step_global)
+                //                    + " v-cycle " + std::to_string((is_odd+1)/2) + smooth;
+                std::string msg = " at time step " + std::to_string(step_global)
+                        + " v-cycle " + std::to_string(step_local) + smooth;
+
+                mfem::socketstream sout;
+                problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, "resid" + msg);
             }
-            problem_ptr->VisUpdate(sout_resid_[step_global], x_blk2);
+
+            step_local++;
         }
     }
 
@@ -2532,6 +2580,8 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
         help_[l].SetSize(system_l.NumTotalDofs() + S_size);
         help_[l] = 0.0;
     }
+
+    step_local = 0;
 }
 
 double CoupledFAS::Norm(int level, const mfem::Vector& vec) const
@@ -3068,8 +3118,27 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
 //    return out;
 //}
 
-// case 3
-//const double mu_o =  0.005; //0.0002; //
+//// case 5 any exponent
+double RelPerm(double S, double mu) // relative permeability
+{
+    return std::pow(S, relperm_order) / mu;
+}
+
+double RelPermDerivative(double S, double mu)
+{
+    return relperm_order * std::pow(S, relperm_order - 1) / mu;
+}
+
+double CellMobility(double S_w, double S_o)
+{
+   return RelPerm(S_w, mu_w) + RelPerm(S_o, mu_o);
+}
+
+double CellMobilityDerivative(double S_w, double S_o)
+{
+   return RelPermDerivative(S_w, mu_w) - RelPermDerivative(S_o, mu_o);
+}
+
 mfem::Vector TotalMobility(const mfem::Vector& S)
 {
     mfem::Vector LamS(S.Size());
@@ -3080,7 +3149,7 @@ mfem::Vector TotalMobility(const mfem::Vector& S)
         S_w = S_w < 0.0 ? 0.0 : (S_w > 1.0 ? 1.0 : S_w);
 
         double S_o = 1.0 - S_w;
-        LamS(i)  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
+        LamS(i)  = CellMobility(S_w, S_o);
     }
     return LamS;
 }
@@ -3095,9 +3164,8 @@ mfem::Vector dTMinv_dS(const mfem::Vector& S)
         if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
 
         double S_o = 1.0 - S_w;
-        out(i)  = 2.0 * S_w / 1e-3 - 2.0 * S_o / mu_o;
-        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
-        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
+        double Lam_S  = CellMobility(S_w, S_o);
+        out(i) = -1.0 * CellMobilityDerivative(S_w, S_o) / (Lam_S * Lam_S);
     }
     return out;
 }
@@ -3108,12 +3176,10 @@ mfem::Vector FractionalFlow(const mfem::Vector& S)
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-
         S_w = S_w < 0.0 ? 0.0 : (S_w > 1.0 ? 1.0 : S_w);
 
-        double S_o = 1.0 - S_w;
-        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
-        FS(i) = S_w * S_w / 1e-3 / Lam_S;
+        double Lam_S  = CellMobility(S_w, 1.0 - S_w);
+        FS(i) = RelPerm(S_w, mu_w) / Lam_S;
     }
     return FS;
 }
@@ -3124,16 +3190,13 @@ mfem::Vector dFdS(const mfem::Vector& S)
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-
         if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
 
-        double S_o = 1.0 - S_w;
-        double dLw_dS = 2.0 * S_w / 1e-3;
-        double Lam_S  = S_w * S_w / 1e-3 + S_o * S_o / mu_o;
-        double dLam_dS = 2.0 * S_w / 1e-3 - 2.0 * S_o / mu_o;
-        out(i) = (dLw_dS * Lam_S - dLam_dS * S_w * S_w / 1e-3) / (Lam_S * Lam_S);
+        double Lw = RelPerm(S_w, mu_w);
+        double dLw_dS = RelPermDerivative(S_w, mu_w);
+        double Lam_S  = CellMobility(S_w, 1.0 - S_w);
+        double dLam_dS = CellMobilityDerivative(S_w, 1.0 - S_w);
+        out(i) = (dLw_dS * Lam_S - dLam_dS * Lw) / (Lam_S * Lam_S);
     }
     return out;
 }
-
-
