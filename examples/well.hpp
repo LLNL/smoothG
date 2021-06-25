@@ -505,3 +505,19 @@ void NorneModel::SetupMesh()
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
 };
+
+class SaigupModel : public DarcyProblem
+{
+    void SetupMesh(bool refined);
+public:
+    SaigupModel(MPI_Comm comm, bool refined, const mfem::Array<int>& ess_attr)
+        : DarcyProblem(comm, 3, ess_attr) { SetupMesh(refined); InitGraph(); }
+};
+
+void SaigupModel::SetupMesh(bool refined)
+{
+    std::string file = refined ? "refined_saigup/refined_saigup_HEX.vtk" : "saigup/saigup_HEX.vtk";
+    std::ifstream imesh("/Users/lee1029/Downloads/"+file);
+    mfem::Mesh serial_mesh(imesh, 1, 1);
+    mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
+};

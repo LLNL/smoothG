@@ -61,15 +61,16 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
             }
             if ((converged_ = (resid_norm_ < adjusted_tol_))) { break; }
 
-//            if (iter_ && sol.Size() < 30000)
+////            if (iter_ && sol.Size() < 30000)
+//            if (iter_)
 //            {
 //                const double x_norm = mfem::ParNormlp(sol, 2, comm_);
 //                const double dx_norm = mfem::ParNormlp(sol_change, 2, comm_);
 
-//                if ((converged_ = ((dx_norm / x_norm) < param_.rtol)))
+//                if ((converged_ = ((dx_norm / x_norm) < param_.atol)))
 //                {
-//                    std::cout << tag_ << " iter " << iter_ << ": x_norm = " << x_norm
-//                              << ", dx_norm = " << dx_norm << ".\n";
+////                    std::cout << tag_ << " iter " << iter_ << ": x_norm = " << x_norm
+////                              << ", dx_norm = " << dx_norm << ".\n";
 //                    break;
 //                }
 //            }
@@ -201,7 +202,7 @@ void FAS::MG_Cycle(int l)
         prev_resid_norm_ = resid_norm_;
     }
 
-    if (l || (iter_ < 5 && resid_norm_ > param_.coarse_correct_tol))// * rhs_norm_)//
+    if (l || (iter_ < 20 && resid_norm_ > param_.coarse_correct_tol))// * rhs_norm_)//
     {
         // Compute FAS coarser level rhs
         // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
@@ -211,7 +212,6 @@ void FAS::MG_Cycle(int l)
         rhs_[l + 1] = solvers_[l + 1]->Residual(sol_[l + 1], help_[l + 1]);
 
         // Store projected coarse solution pi x_l
-
         mfem::Vector coarse_sol = sol_[l + 1];
         if (param_.cycle == FMG)
         {
@@ -223,6 +223,7 @@ void FAS::MG_Cycle(int l)
 
         // Compute correction x_l += P( x_{l+1} - pi x_l )
         sol_[l + 1] -= coarse_sol;
+
         Interpolate(l + 1, sol_[l + 1], help_[l]);
         if (param_.cycle == V_CYCLE)
         {

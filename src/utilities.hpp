@@ -253,14 +253,18 @@ void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec);
 
 /// Print a std::vector for producing tables in Latex
 template<typename T>
-void PrintForLatexTable(const std::vector<T>& in, std::string tag)
+void PrintTable(const std::vector<T>& in, std::string tag, bool for_latex = true)
 {
     std::cout << tag;
+    if (!for_latex) { std::cout << " = ["; }
     for (unsigned int i = 0; i < in.size(); ++i)
     {
-        std::cout << " & " << in[i];
+        if (for_latex) { std::cout << " & "; }
+        else { std::cout << " "; }
+        std::cout << in[i];
     }
-    std::cout << " \\\\ \n";
+    if (for_latex) { std::cout << " \\\\ \n"; }
+    else { std::cout << "];\n"; }
 };
 
 } // namespace smoothg

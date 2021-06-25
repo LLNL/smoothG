@@ -53,25 +53,27 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
     mfem::SparseMatrix vert_vert2 = smoothg::Mult(vert_vert, vert_vert);
     mfem::SparseMatrix vert_vert3 = smoothg::Mult(vert_vert, vert_vert2);
 
-    const bool num_well_cell_isolation_layers = 0;
+    const int num_well_cell_isolation_layers = 0;
+
+    std::cout << "Number of layers around well cells to isolate: " << num_well_cell_isolation_layers << "\n";
 
     const bool isolate_injection_well_cells = true;
     if (isolate_injection_well_cells)
     {
         for (int i = vert_edge.NumRows() - num_iso_verts; i < vert_edge.NumRows(); ++i)
         {
-            if (num_well_cell_isolation_layers == 1)
+            if (num_well_cell_isolation_layers == 0)
+            {
+                AddIsoNeighbors(vert_vert, i);
+            }
+            else if (num_well_cell_isolation_layers == 1)
             {
                 AddIsoNeighbors(vert_vert2, i);
-                continue;
             }
             else if (num_well_cell_isolation_layers == 2)
             {
                 AddIsoNeighbors(vert_vert3, i);
-                continue;
             }
-
-            AddIsoNeighbors(vert_vert, i);
         }
     }
 
@@ -91,7 +93,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
             }
             else if (num_well_cell_isolation_layers == 2)
             {
-                AddIsoNeighbors(vert_vert, production_well_cell);
+                AddIsoNeighbors(vert_vert2, production_well_cell);
             }
         }
     }

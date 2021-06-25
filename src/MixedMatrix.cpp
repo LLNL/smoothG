@@ -201,6 +201,10 @@ mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
     for (int i = 0; i < DT.NumRows(); ++i)
     {
         const int row_size = DT.RowSize(i);
+        if ((row_size == 1 || row_size == 2) == false)
+        {
+            std::cout<<"row = "<< i <<", row_size = "<< row_size <<"\n";
+        }
         assert(row_size == 1 || row_size == 2);
 
         if (row_size == 2)

@@ -26,6 +26,95 @@
 namespace smoothg
 {
 
+
+mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
+                                      const mfem::SparseMatrix& micro_upwind_fluxes,
+                                      const mfem::Vector& flux)
+{
+    const Graph& graph = graph_space.GetGraph();
+    const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+    const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
+
+    const int num_edofs = graph_space.VertexToEDof().NumCols();
+    mfem::SparseMatrix upwind_pattern(num_edofs, graph.NumVertices());
+
+    for (int i = 0; i < graph.NumEdges(); ++i)
+    {
+        if (edge_vert.RowSize(i) == 2) // edge is interior
+        {
+            double weight, weight2;
+            if (flux[i] > 0.0)
+            {
+                const int upwind_vert = edge_vert.GetRowColumns(i)[0];
+                const int downwind_vert = edge_vert.GetRowColumns(i)[1];
+                if (upwind_vert == micro_upwind_fluxes.GetRowColumns(i)[0])
+                {
+                    weight = micro_upwind_fluxes.GetRowEntries(i)[0];
+                }
+                else
+                {
+                    weight = micro_upwind_fluxes.GetRowEntries(i)[1];
+                }
+                upwind_pattern.Set(i, upwind_vert, weight);
+
+                if (micro_upwind_fluxes.RowSize(i) == 2)
+                {
+                    if (upwind_vert == micro_upwind_fluxes.GetRowColumns(i)[0])
+                    {
+                        weight2 = micro_upwind_fluxes.GetRowEntries(i)[1];
+                    }
+                    else
+                    {
+                        weight2 = micro_upwind_fluxes.GetRowEntries(i)[0];
+                    }
+                    upwind_pattern.Set(i, downwind_vert, weight2);
+                }
+            }
+
+            if (flux[i] <= 0.0)
+            {
+                const int upwind_vert = edge_vert.GetRowColumns(i)[1];
+                const int downwind_vert = edge_vert.GetRowColumns(i)[0];
+                weight = micro_upwind_fluxes.GetRowEntries(i)[0];
+                if (upwind_vert == micro_upwind_fluxes.GetRowColumns(i)[0])
+                {
+                    upwind_pattern.Set(i, downwind_vert, weight);
+                }
+                else
+                {
+                    upwind_pattern.Set(i, upwind_vert, weight);
+                }
+
+                if (micro_upwind_fluxes.RowSize(i) == 2)
+                {
+                    weight2 = micro_upwind_fluxes.GetRowEntries(i)[1];
+                    if (upwind_vert == micro_upwind_fluxes.GetRowColumns(i)[1])
+                    {
+                        upwind_pattern.Set(i, downwind_vert, weight2);
+                    }
+                    else
+                    {
+                        upwind_pattern.Set(i, upwind_vert, weight2);
+                    }
+                }
+            }
+        }
+        else
+        {
+            assert(edge_vert.RowSize(i) == 1);
+            const bool edge_is_owned = e_te_diag.RowSize(i);
+            if ((flux[i] > 0.0 && edge_is_owned) || (flux[i] <= 0.0 && !edge_is_owned))
+            {
+                const double weight = micro_upwind_fluxes.GetRowEntries(i)[0];
+                upwind_pattern.Set(i, edge_vert.GetRowColumns(i)[0], weight);
+            }
+        }
+    }
+    upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
+
+    return upwind_pattern;
+}
+
 mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
                                       const mfem::Vector& flux)
 {
@@ -151,7 +240,8 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     agg_vert_.push_back(std::move(topology.Agg_vertex_));
 
-    upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
+//    upwind_fluxes_.push_back(ComputeMicroUpwindFlux(level + 1, dof_agg));
+    upwind_fluxes_.push_back(ComputeMicroUpwindFlux2(level + 1));
 
     face_edge_.push_back(std::move(topology.face_edge_));
 
@@ -571,6 +661,8 @@ Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
     }
 
     auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(), trace_vec);
+//    auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(),
+//                                upwind_fluxes_[level - 1], trace_vec);
 //    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
 //    auto UPu = smoothg::Mult(U, vert_agg);
     auto UPu = smoothg::Mult(U, Ps_.size() ? Ps_[level - 1] : Pu_[level - 1]);
@@ -591,6 +683,45 @@ Hierarchy::ComputeMicroUpwindFlux(int level, const DofAggregate& dof_agg)
 //    UPu.ScaleRows(trace_vec);
 
     auto out = smoothg::Mult(GetQsigma(level - 1), UPuQ_pwc);
+    out.SortColumnIndices();
+//    out.Print();
+    return out;
+}
+
+
+// TODO: look at ComputeEdgeTargets to determine right direction in parallel
+mfem::SparseMatrix
+Hierarchy::ComputeMicroUpwindFlux2(int level)
+{
+    mfem::Vector trace_vec(Psigma_[level - 1].NumCols());
+    trace_vec = 1.0;
+//    mfem::Vector trace_vec = MatVec(Psigma_[level - 1], ones);
+    for (int i = level-1; i >= 0 ; --i)
+    {
+        trace_vec = MatVec(GetPsigma(i), trace_vec);
+    }
+
+    auto UPu = BuildUpwindPattern(GetMatrix(0).GetGraphSpace(), trace_vec);
+//    auto U = BuildUpwindPattern(GetMatrix(level - 1).GetGraphSpace(),
+//                                upwind_fluxes_[level - 1], trace_vec);
+//    auto vert_agg = smoothg::Transpose(GetAggVert(level - 1));
+//    auto UPu = smoothg::Mult(U, vert_agg);
+//    auto UPu = smoothg::Mult(U, GetPs(level-1));
+    for (int i = 0; i < level; ++i)
+    {
+        UPu = smoothg::Mult(UPu, GetPs(i));;
+    }
+    UPu.ScaleRows(trace_vec);
+
+    auto Q_pwc = smoothg::Transpose(GetMatrix(level).GetPWConstProj());
+    Q_pwc.ScaleColumns(GetMatrix(level).GetVertexSizes());
+    auto out = smoothg::Mult(UPu, Q_pwc);
+
+//    auto out = smoothg::Mult(GetQsigma(level - 1), UPuQ_pwc);
+    for (int i = 0; i < level; ++i)
+    {
+        out = smoothg::Mult(GetQsigma(i), out);
+    }
     out.SortColumnIndices();
 //    out.Print();
     return out;

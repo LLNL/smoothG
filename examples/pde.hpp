@@ -794,9 +794,9 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
 
     MPI_Barrier(comm_);
 
-    vis_v << "keys S\n";         //Screenshot
+//    vis_v << "keys S\n";         //Screenshot
 
-    MPI_Barrier(comm_);
+//    MPI_Barrier(comm_);
 }
 
 void DarcyProblem::VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec,
@@ -869,9 +869,9 @@ void DarcyProblem::VisUpdate(mfem::socketstream& vis_v, mfem::Vector& vec,
 
     MPI_Barrier(comm_);
 
-    vis_v << "keys S\n";         //Screenshot
+//    vis_v << "keys S\n";         //Screenshot
 
-    MPI_Barrier(comm_);
+//    MPI_Barrier(comm_);
 }
 
 void DarcyProblem::SaveFigure(const mfem::Vector& sol, const std::string& name,
@@ -1306,8 +1306,8 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
     SetupMesh(num_ser_ref, num_par_ref);
     InitGraph();
 
-    SetupCoeff();
-    ComputeGraphWeight();
+//    SetupCoeff();
+//    ComputeGraphWeight();
 
     {
         mfem::LinearForm g(sigma_fes_.get());
@@ -1333,7 +1333,9 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
 
 void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
 {
-    std::ifstream imesh("egg_model.mesh");
+//    std::ifstream imesh("egg_model.mesh");
+    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_2x2x2.vtk");
+//    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_3x3x3.vtk");
     mfem::Mesh mesh(imesh, 1, 1);
 
     for (int i = 0; i < num_ser_ref; i++)
