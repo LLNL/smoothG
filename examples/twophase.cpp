@@ -211,6 +211,8 @@ class TwoPhaseSolver
     std::vector<int> step_num_backtrack_;
     std::vector<int> step_coarsest_nonlinear_iter_;
     std::vector<int> step_average_coarsest_linear_iter_;
+    std::vector<int> step_average_fine_linear_iter_;
+    std::vector<int> step_average_mid_linear_iter_;
     std::vector<double> step_time_;
     std::vector<double> cumulative_step_time_;
     std::vector<double> step_CFL_const_;
@@ -306,6 +308,7 @@ public:
                       mfem::Vector& x, mfem::Vector& dx) override;
 
     const mfem::Vector& GetScales() const { return scales_; }
+    const mfem::SparseMatrix& GetMs() const { return Ms_; }
 };
 
 class CoupledFAS : public FAS
@@ -317,6 +320,7 @@ class CoupledFAS : public FAS
     void Interpolate(int level, const mfem::Vector& coarse, mfem::Vector& fine) const override;
     void Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const override;
 //    mfem::Vector ProjectS(int level, const mfem::Vector& S) const;
+    std::vector<mfem::SparseMatrix> Qs_;
 public:
     CoupledFAS(const Hierarchy& hierarchy,
                const mfem::Array<int>& ess_attr,
@@ -1008,6 +1012,15 @@ int main(int argc, char* argv[])
         upscale_param.num_iso_verts = problem->NumIsoVerts();
     }
 
+
+//    std::ifstream sin_fs("results_for_paper_new/refined_saigup_final_sat.txt");
+//    std::ifstream sin_fs("results_for_paper_new/refined_egg_2x2x2_r4_final_sat.txt");
+//    mfem::socketstream sout_fs;
+//    mfem::Vector final_sat;
+//    final_sat.Load(sin_fs, graph.NumVertices());
+//    problem_for_plot->VisSetup(sout_fs, final_sat, 0.0, 1.0);
+
+//    return 0;
 
     if (1)
     {
@@ -1741,6 +1754,8 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         PrintTable(step_nonlinear_iter_, "# nonlinear iter");
         PrintTable(step_coarsest_nonlinear_iter_, "# coarsest nonlinear iter");
         PrintTable(step_average_coarsest_linear_iter_, "# average coarsest linear iter");
+        PrintTable(step_average_mid_linear_iter_, "# average mid linear iter");
+        PrintTable(step_average_fine_linear_iter_, "# average fine linear iter");
         PrintTable(step_time_, "solving_time", false);
         std::vector<double> cumu_step_time(cumulative_step_time_.begin()+1, cumulative_step_time_.end());
         PrintTable(cumu_step_time, "cumulative_solving_time", false);
@@ -1827,30 +1842,30 @@ double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
         }
     }
 
-    CFL_plot.SetSize(S.Size() - num_injectors);
-    CFL_dfds.SetSize(S.Size() - num_injectors);
-    CFL_influx.SetSize(S.Size() - num_injectors);
-    CFL_outflux.SetSize(S.Size() - num_injectors);
-    CFL_pore_vol.SetSize(S.Size() - num_injectors);
+//    CFL_plot.SetSize(S.Size() - num_injectors);
+//    CFL_dfds.SetSize(S.Size() - num_injectors);
+//    CFL_influx.SetSize(S.Size() - num_injectors);
+//    CFL_outflux.SetSize(S.Size() - num_injectors);
+//    CFL_pore_vol.SetSize(S.Size() - num_injectors);
     for (int i = 0; i < darcy_system.NumVDofs() - num_injectors; ++i)
     {
         double outflow_CFL_const = df_ds[i] * dt * outflow_CFL_consts[i] / pore_volume(i);
         double inflow_CFL_const = df_ds[i] * dt * inflow_CFL_consts[i] / pore_volume(i);
         double local_CFL_const = std::max(inflow_CFL_const, outflow_CFL_const);
-        CFL_plot[i] = local_CFL_const;
-        CFL_dfds[i] = df_ds[i];
-        CFL_influx[i] = inflow_CFL_consts[i];
-        CFL_outflux[i] = outflow_CFL_consts[i];
-        CFL_pore_vol[i] = pore_volume[i];
+//        CFL_plot[i] = local_CFL_const;
+//        CFL_dfds[i] = df_ds[i];
+//        CFL_influx[i] = inflow_CFL_consts[i];
+//        CFL_outflux[i] = outflow_CFL_consts[i];
+//        CFL_pore_vol[i] = pore_volume[i];
 
-        if (local_CFL_const > 100.0)
-        {
-            std::cout<<"CFL debug: " << i << ", " << inflow_CFL_consts[i]
-                       << ", " << outflow_CFL_consts[i] << ", " << df_ds[i]
-                          << ", " << pore_volume[i] << ", " << local_CFL_const
-                          <<", " << inflow_CFL_const << ", " << outflow_CFL_const
-                             << ", " << CFL_const2 << "\n";
-        }
+//        if (local_CFL_const > 100.0)
+//        {
+//            std::cout<<"CFL debug: " << i << ", " << inflow_CFL_consts[i]
+//                       << ", " << outflow_CFL_consts[i] << ", " << df_ds[i]
+//                          << ", " << pore_volume[i] << ", " << local_CFL_const
+//                          <<", " << inflow_CFL_const << ", " << outflow_CFL_const
+//                             << ", " << CFL_const2 << "\n";
+//        }
 
         CFL_const2 = std::max(CFL_const2, local_CFL_const);
     }
@@ -1904,6 +1919,8 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         step_nonlinear_iter_.push_back(solver_param_.cycle == V_CYCLE ? solver.GetNumIterations()
                                                 : solver.GetLevelSolver(0).GetNumIterations());
         int num_coarse_lin_iter = solver.GetLevelSolver(hierarchy_->NumLevels()-1).GetNumLinearIterations();
+        int num_fine_lin_iter = solver.GetLevelSolver(0).GetNumLinearIterations();
+        int num_mid_lin_iter = solver.GetLevelSolver(1).GetNumLinearIterations();
 //        int num_coarse_lin_iter = solver.GetNumLinearIterations();
         double avg_lin = solver.GetNumCoarsestIterations() == 0 ? 0.0 :
                     num_coarse_lin_iter / ((double)solver.GetNumCoarsestIterations());
@@ -1915,6 +1932,13 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         num_coarse_lin_solve_ += step_coarsest_nonlinear_iter_.back();
         step_time_.push_back(solver.GetTiming());
         cumulative_step_time_.push_back(cumulative_step_time_.back()+solver.GetTiming());
+
+        double avg_lin_f = solver.GetNumCoarsestIterations() == 0 ? 0.0 :
+                    num_fine_lin_iter / ((double)solver.GetNumCoarsestIterations());
+        double avg_lin_m = solver.GetNumCoarsestIterations() == 0 ? 0.0 :
+                    num_mid_lin_iter / ((double)solver.GetNumCoarsestIterations());
+        step_average_fine_linear_iter_.push_back(std::round(avg_lin_f));
+        step_average_mid_linear_iter_.push_back(std::round(avg_lin_m));
     }
     else // sequential: solve for flux and pressure first, and then saturation
     {
@@ -2806,13 +2830,24 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
 {
     mfem::Vector S_prev_l(S_prev);
     unique_ptr<mfem::SparseMatrix> weight_l(new mfem::SparseMatrix(weight));
+    Qs_.reserve(hierarchy.NumLevels()-1);
 
     for (int l = 0; l < param_.num_levels; ++l)
     {
         if (l > 0)
         {
             S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l);
+            auto PsT = smoothg::Transpose(hierarchy.GetPs(l-1));
+            Qs_.push_back(smoothg::Mult(PsT, *weight_l));
             weight_l.reset(mfem::RAP(hierarchy.GetPs(l-1), *weight_l, hierarchy.GetPs(l-1)));
+
+            mfem::Vector Wc_inv;
+            weight_l->GetDiag(Wc_inv);
+            for (int i = 0; i < Wc_inv.Size(); ++i)
+            {
+                Wc_inv[i] = 1.0 / Wc_inv[i];
+            }
+            Qs_[l-1].ScaleRows(Wc_inv);
         }
 
         auto& system_l = hierarchy.GetMatrix(l);
@@ -2889,6 +2924,11 @@ void CoupledFAS::Interpolate(int level, const mfem::Vector& coarse, mfem::Vector
 //    return hierarchy_.GetMatrix(level + 1).PWConstInterpolate(S_coarse);
 //}
 
+//mfem::Vector CoupledFAS::ProjectS(int level, const mfem::Vector& x) const
+//{
+
+//}
+
 void CoupledFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coarse) const
 {
     auto& solver_f = static_cast<CoupledSolver&>(*solvers_[level]);
@@ -2897,12 +2937,15 @@ void CoupledFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coar
     mfem::BlockVector blk_coarse(coarse.GetData(), solver_c.BlockOffsets());
     hierarchy_.Project(level, blk_fine, blk_coarse);
 
+
     hierarchy_.GetPs(level).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
 
 //    auto S = hierarchy_.PWConstProject(level + 1, blk_coarse.GetBlock(2));
 //    blk_coarse.GetBlock(2) = hierarchy_.PWConstInterpolate(level + 1, S);
 
 //    blk_coarse.GetBlock(2) = ProjectS(level, blk_fine.GetBlock(2));
+
+//    Qs_[level].Mult(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
 }
 
 mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector& y)
