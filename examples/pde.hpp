@@ -516,7 +516,8 @@ public:
     /// Setup visualization of vertex space vector
     void VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec, double range_min = 0.0,
                   double range_max = 0.0, const std::string& caption = "",
-                  bool coef = false, bool vec_is_cell_based = true) const;
+                  bool coef = false, bool vec_is_cell_based = true,
+                  int* parts = nullptr) const;
 
     void VisSetup2(mfem::socketstream& vis_v, mfem::Vector& vec,
                    const std::string& caption = "") const;
@@ -716,23 +717,21 @@ void DarcyProblem::PrintMeshWithPartitioning(mfem::Array<int>& partition)
 
 void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
                             double range_min, double range_max, const std::string& caption,
-                            bool coef, bool vec_is_cell_based) const
+                            bool coef, bool vec_is_cell_based, int* parts) const
 {
     auto& fes = vec_is_cell_based ? u_fes_ : sigma_fes_;
     mfem::ParGridFunction gf(fes.get());
-    if (vec_is_cell_based)
+
+    if (vertex_reorder_map_ && vec_is_cell_based)
     {
-        if (vertex_reorder_map_)
-        {
-            const int vec_original_size = vec.Size();
-            vec.SetSize(vertex_reorder_map_->NumCols());
-            vertex_reorder_map_->Mult(vec, gf);
-            vec.SetSize(vec_original_size);
-        }
-        else
-        {
-            gf.MakeRef(fes.get(), vec.GetData());
-        }
+        const int vec_original_size = vec.Size();
+        vec.SetSize(vertex_reorder_map_->NumCols());
+        vertex_reorder_map_->Mult(vec, gf);
+        vec.SetSize(vec_original_size);
+    }
+    else
+    {
+        gf.MakeRef(fes.get(), vec.GetData());
     }
 
     const char vishost[] = "localhost";
@@ -742,7 +741,24 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
     vis_v.precision(8);
 
     vis_v << "parallel " << num_procs_ << " " << myid_ << "\n";
-    vis_v << "solution\n" << *mesh_ << gf;
+
+    if (parts)
+    {
+        if (mesh_->SpaceDimension() == 2)
+        {
+            vis_v << "fem2d_gf_data_keys\n";
+        }
+        else
+        {
+            vis_v << "fem3d_gf_data_keys\n";
+        }
+        mesh_->PrintWithPartitioning(parts, vis_v, 1);
+        gf.Save(vis_v);
+    }
+    else
+    {
+        vis_v << "solution\n" << *mesh_ << gf;
+    }
 
     if (mesh_->GetGlobalNE() == 18553) // Egg model
     {
@@ -780,7 +796,8 @@ void DarcyProblem::VisSetup(mfem::socketstream& vis_v, mfem::Vector& vec,
         vis_v << "keys RRRRRR\n"; // angle
     }
 
-    vis_v << "keys m\n"; // show mesh
+//    vis_v << "keys m\n"; // show mesh
+    if (mesh_->SpaceDimension() == 2) { vis_v << "keys b\n"; } // show agg
 
     if (coef)
     {
@@ -1080,7 +1097,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
     IPC::SliceOrientation orient = dim == 2 ? IPC::XY : IPC::NONE;
     kinv_vector_ = make_unique<IPC>(comm_, perm_file, N_, max_N, h, orient, slice);
 //    mfem::Vector constant(dim);
-//    constant = 1.0e3;
+//    constant = 1.0e12;
 //    kinv_vector_ = make_unique<mfem::VectorConstantCoefficient>(constant);
 
     const double Hx = 10 * h(0);
@@ -1333,8 +1350,8 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
 
 void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
 {
-//    std::ifstream imesh("egg_model.mesh");
-    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_2x2x2.vtk");
+    std::ifstream imesh("egg_model.mesh");
+//    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_2x2x2.vtk");
 //    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_3x3x3.vtk");
     mfem::Mesh mesh(imesh, 1, 1);
 
