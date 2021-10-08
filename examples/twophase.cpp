@@ -1093,20 +1093,20 @@ int main(int argc, char* argv[])
     std::vector<mfem::Vector> flux_s(upscale_param.max_levels);
     std::vector<mfem::Vector> pres_s(upscale_param.max_levels);
 
-//        int l = 0;
-    for (int l = 0; l < upscale_param.max_levels; ++l)
+        int l = 0;
+//    for (int l = 0; l < upscale_param.max_levels; ++l)
     {
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
 
 
         mfem::BlockVector sol(initial_value);
-        if (l == 0)
-        {
-            std::ifstream sol_file("fine_sol.txt");
-            sol.Load(sol_file, initial_value.Size());
-        }
-        else
+//        if (l == 0)
+//        {
+//            std::ifstream sol_file("fine_sol.txt");
+//            sol.Load(sol_file, initial_value.Size());
+//        }
+//        else
         {
             fas_param.num_levels = upscale_param.max_levels; //l + 1;
             TwoPhaseSolver solver(*problem, hierarchy, l, evolve_param, fas_param);
@@ -1944,11 +1944,11 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
     {
         const MixedMatrix& system_s = level_ ? hierarchy_->GetMatrix(level_-1) : system;
         auto S = PWConstProject(system_s, x.GetBlock(2));
-        CoupledSolver solver(*hierarchy_, level_, system, problem_.EssentialAttribute(),
-                             hierarchy_->GetUpwindFlux(level_), dt, weight_,
-                             density_, S, solver_param_.nl_solve);
-//        CoupledFAS solver(*hierarchy_, problem_.EssentialAttribute(), dt, weight_,
-//                          density_, x.GetBlock(2), solver_param_);
+//        CoupledSolver solver(*hierarchy_, level_, system, problem_.EssentialAttribute(),
+//                             hierarchy_->GetUpwindFlux(level_), dt, weight_,
+//                             density_, S, solver_param_.nl_solve);
+        CoupledFAS solver(*hierarchy_, problem_.EssentialAttribute(), dt, weight_,
+                          density_, x.GetBlock(2), solver_param_);
 
         mfem::Vector res(x.GetBlock(2));
         res = 0.0;
@@ -1968,7 +1968,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 
         solver.Solve(rhs, x);
 
-//        step_coarsest_nonlinear_iter_.push_back(solver.GetNumCoarsestIterations());
+        step_coarsest_nonlinear_iter_.push_back(solver.GetNumCoarsestIterations());
 ////        step_num_backtrack_.push_back(num_backtrack_debug);
         step_nonlinear_iter_.push_back(solver.GetNumIterations());
 //        step_nonlinear_iter_.push_back(solver_param_.cycle == V_CYCLE ? solver.GetNumIterations()
@@ -3018,16 +3018,22 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
         {
             S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l);
             auto PsT = smoothg::Transpose(hierarchy.GetPs(l-1));
-            Qs_.push_back(smoothg::Mult(PsT, *weight_l));
-            weight_l.reset(mfem::RAP(hierarchy.GetPs(l-1), *weight_l, hierarchy.GetPs(l-1)));
+//            Qs_.push_back(smoothg::Mult(PsT, *weight_l));
+//            weight_l.reset(mfem::RAP(hierarchy.GetPs(l-1), *weight_l, hierarchy.GetPs(l-1)));
 
-            mfem::Vector Wc_inv;
-            weight_l->GetDiag(Wc_inv);
-            for (int i = 0; i < Wc_inv.Size(); ++i)
+//            mfem::Vector Wc_inv;
+//            weight_l->GetDiag(Wc_inv);
+//            for (int i = 0; i < Wc_inv.Size(); ++i)
+//            {
+//                Wc_inv[i] = 1.0 / Wc_inv[i];
+//            }
+//            Qs_[l-1].ScaleRows(Wc_inv);
+            if (l > 1)
             {
-                Wc_inv[i] = 1.0 / Wc_inv[i];
+                const auto& Ps = hierarchy.GetPs(l-2);
+                weight_l.reset(mfem::RAP(Ps, *weight_l, Ps));
             }
-            Qs_[l-1].ScaleRows(Wc_inv);
+
         }
 
         auto& system_l = hierarchy.GetMatrix(l);
