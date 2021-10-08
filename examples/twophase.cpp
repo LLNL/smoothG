@@ -2211,7 +2211,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     out.GetBlock(1) *= (dt_ * density_);
 
     auto& up_param = hierarchy_.GetUpscaleParameters();
-    if (level_ == 0 || (up_param.max_traces == 1 && (up_param.max_evects == 1 || up_param.add_Pvertices_pwc)))
+    if (level_ == 0)// || (up_param.max_traces == 1 && (up_param.max_evects == 1 || up_param.add_Pvertices_pwc)))
     {
         const GraphSpace& space = darcy_system_.GetGraphSpace();
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
@@ -2513,7 +2513,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     auto& up_param = hierarchy_.GetUpscaleParameters();
 //    bool pwc_sat = (up_param.max_evects == 1 || up_param.add_Pvertices_pwc);
     const bool lowest_coarse = (up_param.max_traces == 1 && up_param.max_evects == 1);
-    const bool lowest_order = (level_ == 0 || lowest_coarse);
+    const bool lowest_order = (level_ == 0);// || lowest_coarse);
     if (lowest_order)
     {
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
