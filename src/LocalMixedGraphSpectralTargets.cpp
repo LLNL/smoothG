@@ -1045,6 +1045,8 @@ void LocalMixedGraphSpectralTargets::NormalizeTraces(std::vector<mfem::DenseMatr
         {
             std::cerr << "Warning: oneDpv is closed to zero, oneDpv = "
                       << oneDpv << ", this may be due to bad PV traces!\n";
+            PV_trace.Print();
+            local_constant.Print();
         }
 
         PV_trace /= oneDpv;

@@ -504,21 +504,23 @@ mfem::SparseMatrix GraphCoarsen::BuildCoarseW(const mfem::SparseMatrix& Pvertice
 }
 
 MixedMatrix GraphCoarsen::BuildCoarseMatrix(const MixedMatrix& fine_mgL,
-                                            const mfem::SparseMatrix& Pvertices)
+                                            const mfem::SparseMatrix& Pvertices,
+                                            const mfem::SparseMatrix& Pvertices_min)
 {
     auto agg_sizes = MatVec(topology_.Agg_vertex_, fine_mgL.GetVertexSizes());
 
-    auto tmp = smoothg::Mult(fine_mgL.GetPWConstProj(), Pvertices);
+    auto tmp = smoothg::Mult(fine_mgL.GetPWConstProj(), Pvertices_min);
     tmp.ScaleRows(fine_mgL.GetVertexSizes());
     auto P_pwc = smoothg::Mult(topology_.Agg_vertex_, tmp);
     for (int i = 0; i < P_pwc.NumRows(); ++i)
     {
         P_pwc.ScaleRow(i, 1.0 / agg_sizes[i]);
     }
+    mfem::Vector const_rep = MultTranspose(Pvertices, fine_mgL.GetConstantRep());
 
     return MixedMatrix(std::move(coarse_space_), std::move(coarse_m_builder_),
                        std::move(coarse_D_), BuildCoarseW(Pvertices),
-                       std::move(agg_sizes), std::move(P_pwc));
+                       std::move(const_rep), std::move(agg_sizes), std::move(P_pwc));
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()

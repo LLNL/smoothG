@@ -45,15 +45,17 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
 
 MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
                          mfem::SparseMatrix D, mfem::SparseMatrix W,
+                         mfem::Vector constant_rep,
                          mfem::Vector vertex_sizes,
                          mfem::SparseMatrix P_pwc)
     : mbuilder_(std::move(mbuilder)), D_(std::move(D)), W_(std::move(W)),
-      graph_space_(std::move(graph_space)), vertex_sizes_(std::move(vertex_sizes)),
+      graph_space_(std::move(graph_space)), constant_rep_(std::move(constant_rep)),
+      vertex_sizes_(std::move(vertex_sizes)),
       trace_fluxes_(NumEDofs()), P_pwc_(std::move(P_pwc))
 {
     Init();
-    mfem::Vector ones(P_pwc_.NumRows());
-    constant_rep_ = PWConstInterpolate(ones = 1.0);
+//    mfem::Vector ones(P_pwc_.NumRows());
+//    constant_rep_ = PWConstInterpolate(ones = 1.0);
 
     // TODO: trace_fluxes_ and below probably shouldn't belong to this class
 //    auto P_pwcD = smoothg::Mult(P_pwc_, D_);

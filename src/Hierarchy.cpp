@@ -225,12 +225,8 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     if (param.max_evects > 1 && param.add_Pvertices_pwc)
     {
         Ps_.push_back(MakeMinimalPvertices(Pu_[level], vert_targets));
-        mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Ps_[level]));
     }
-    else
-    {
-        mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level]));
-    }
+    mixed_systems_.push_back(coarsener.BuildCoarseMatrix(mgL, Pu_[level], GetPs(level)));
 
     std::unique_ptr<mfem::SparseMatrix> coarse_Ds(
             mfem::RAP(GetPs(level), mgL.GetDs(), Psigma_[level]));
@@ -264,7 +260,15 @@ mfem::SparseMatrix Hierarchy::MakeMinimalPvertices(
     }
     select.Finalize();
 
-    return smoothg::Mult(Pvertices, select);
+    auto out = smoothg::Mult(Pvertices, select);
+    if (Selects_.size())
+    {
+        auto fine_select_T = smoothg::Transpose(Selects_.back());
+        out = smoothg::Mult(fine_select_T, out);
+    }
+
+    Selects_.push_back(select);
+    return out;
 }
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)

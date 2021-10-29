@@ -209,6 +209,7 @@ private:
     std::vector<std::vector<mfem::DenseMatrix>> edge_traces_;
     std::vector<mfem::SparseMatrix> upwind_fluxes_;
     std::vector<mfem::SparseMatrix> Ps_;
+    std::vector<mfem::SparseMatrix> Selects_;
 
     double setup_time_;
 

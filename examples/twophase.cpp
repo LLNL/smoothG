@@ -267,7 +267,7 @@ class CoupledSolver : public NonlinearSolver
 
     mfem::SparseMatrix D_fine_; // this should not be needed (only for testing)
 
-    bool exact_flow_RAP_ = true;
+    bool exact_flow_RAP_ = false;
 
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
     void Build_dMdS(const MixedMatrix& darcy_system, const mfem::Vector& flux, const mfem::Vector& S);
@@ -867,7 +867,7 @@ int main(int argc, char* argv[])
     fas_param.mid.print_level = use_vcycle ? -1 : print_level;
 //    fas_param.coarse.rtol = 1e-10;
 //    fas_param.coarse.atol = 1e-12;
-    fas_param.nl_solve.print_level = use_vcycle ? 1 : -1;
+    fas_param.nl_solve.print_level = use_vcycle ? -1 : -1;
     fas_param.nl_solve.max_num_iter = use_vcycle ? max_iter : 1;
     fas_param.nl_solve.rtol = 0e-6;
     fas_param.nl_solve.atol = 1e-6;
@@ -2482,7 +2482,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         auto dMdS_fine = Assemble_dMdS(system_0, fine_flux, fine_S);
         auto PsigmaT = smoothg::Transpose(hierarchy_.GetPsigma(0));
         mat_help.reset( mfem::Mult(PsigmaT, dMdS_fine) );
-        for (int i = 1; i < level_-1; ++i)
+        for (int i = 1; i < level_; ++i)
         {
             mat_help.reset(mfem::RAP(hierarchy_.GetPsigma(i), *mat_help, hierarchy_.GetPs(i-1)));
         }
@@ -2564,7 +2564,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             dTdS_RAP.reset(mfem::Mult(dTdsigma_fine, hierarchy_.GetPsigma(0)));
         }
 
-        for (int i = 1; i < level_-1; ++i)
+        for (int i = 1; i < level_; ++i)
         {
             dTdS_RAP.reset(mfem::RAP(hierarchy_.GetPs(i-1), *dTdS_RAP, hierarchy_.GetPsigma(i)));
         }
