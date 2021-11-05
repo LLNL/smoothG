@@ -142,7 +142,7 @@ public:
 
     double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
 
-    int GetNumCoarsestIterations() const { return coarsest_nonlinear_iter_; }
+    int LevelNumNLIter(int level) const { return level_nonlinear_iter_[level]; }
 protected:
     virtual double Norm(int level, const mfem::Vector& vec) const = 0;
 
@@ -159,13 +159,13 @@ protected:
     void MG_Cycle(int level);
     void Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx) override;
 
-    int coarsest_nonlinear_iter_ = 0;
-
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> sol_;
     std::vector<mfem::Vector> help_;
     std::vector<std::unique_ptr<NonlinearSolver>> solvers_;
     FASParameters param_;
+
+    std::vector<int> level_nonlinear_iter_;
 };
 
 } // namespace smoothg

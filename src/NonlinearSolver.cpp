@@ -148,7 +148,8 @@ void NonlinearSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_no
 
 FAS::FAS(MPI_Comm comm, FASParameters param)
     : NonlinearSolver(comm, param.nl_solve), rhs_(param.num_levels),
-      sol_(rhs_.size()), help_(rhs_.size()), solvers_(rhs_.size()), param_(param)
+      sol_(rhs_.size()), help_(rhs_.size()), solvers_(rhs_.size()),
+      param_(param), level_nonlinear_iter_(param.num_levels, 0)
 {
     tag_ = "FAS";
 }
@@ -171,6 +172,7 @@ void FAS::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 {
     solvers_[level]->SetLinearRelTol(linear_tol_);
     solvers_[level]->Solve(in, out);
+    level_nonlinear_iter_[level] += solvers_[level]->GetNumIterations();
 }
 
 void FAS::MG_Cycle(int l)
@@ -178,11 +180,6 @@ void FAS::MG_Cycle(int l)
     if (param_.cycle == V_CYCLE || l == param_.num_levels - 1)
     {
         Smoothing(l, rhs_[l], sol_[l]); // Pre-smoothing
-
-       if (l == param_.num_levels - 1)
-       {
-           coarsest_nonlinear_iter_ += solvers_[l]->GetNumIterations();
-       }
     }
 
     if (l == param_.num_levels - 1) { return; } // terminate if coarsest level

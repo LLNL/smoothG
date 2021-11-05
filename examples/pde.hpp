@@ -1350,8 +1350,8 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
 
 void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
 {
-    std::ifstream imesh("egg_model.mesh");
-//    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_2x2x2.vtk");
+//    std::ifstream imesh("egg_model.mesh");
+    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_2x2x2.vtk");
 //    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_3x3x3.vtk");
     mfem::Mesh mesh(imesh, 1, 1);
 

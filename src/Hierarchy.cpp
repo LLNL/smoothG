@@ -205,7 +205,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     mgL.BuildM();
 
     GraphTopology topology;
-    int coarse_factor = level ? 8 : param.coarse_factor;
+    int coarse_factor = level ? param.coarse_factor : param.coarse_factor;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
                          topology.Coarsen(mgL.GetGraph(), coarse_factor,
                                           param.num_iso_verts);
