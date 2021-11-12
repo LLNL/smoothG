@@ -1289,7 +1289,8 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
 void BooleanMult(const mfem::SparseMatrix& mat, const mfem::Array<int>& vec,
                  mfem::Array<int>& out)
 {
-    out.SetSize(mat.Height(), 0);
+    out.SetSize(mat.Height());
+    out = 0;
     for (int i = 0; i < mat.Height(); i++)
     {
         for (int j = mat.GetI()[i]; j < mat.GetI()[i + 1]; j++)

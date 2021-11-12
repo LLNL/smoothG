@@ -1133,9 +1133,10 @@ unique_ptr<mfem::ParMesh> SPE10Problem::MakeParMesh(mfem::Mesh& mesh, bool metis
         while (num_procs_ % num_procs_x)
             num_procs_x -= 1;
 
-        num_procs_xyz_.SetSize(mesh.SpaceDimension(), 1);
+        num_procs_xyz_.SetSize(mesh.SpaceDimension());
         num_procs_xyz_[0] = num_procs_x;
         num_procs_xyz_[1] = num_procs_ / num_procs_x;
+        if (mesh.SpaceDimension() == 3) { num_procs_xyz_[1] = 1; }
         assert(num_procs_xyz_[0] * num_procs_xyz_[1] == num_procs_);
 
         partition.MakeRef(mesh.CartesianPartitioning(num_procs_xyz_), mesh.GetNE());

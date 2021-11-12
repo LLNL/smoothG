@@ -72,6 +72,7 @@ public:
                 std::unique_ptr<MBuilder> mbuilder,
                 mfem::SparseMatrix D,
                 mfem::SparseMatrix W,
+                mfem::Vector constant_rep,
                 mfem::Vector vertex_sizes,
                 mfem::SparseMatrix P_pwc);
 

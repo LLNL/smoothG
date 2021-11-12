@@ -437,7 +437,8 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
 #endif
 
     // Column map for submatrix extraction
-    col_map_.SetSize(std::max(permute_e->Height(), permute_v->Height()), -1);
+    col_map_.SetSize(std::max(permute_e->Height(), permute_v->Height()));
+    col_map_ = -1;
 
     mfem::Array<int> ext_loc_edofs, ext_loc_vdofs, loc_vdofs;
     mfem::Vector first_evect;
