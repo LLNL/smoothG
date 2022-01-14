@@ -1355,7 +1355,7 @@ mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A)
     return A_prec;
 }
 
-mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A)
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A)
 {
     mfem::Array<int> row_starts, col_starts;
     GenerateOffsets(comm, A.NumRows(), row_starts);
@@ -1368,7 +1368,7 @@ mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A)
     A.SetGraphOwner(false);
     A.SetDataOwner(false);
     return pA;
-};
+}
 
 HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol)
 {

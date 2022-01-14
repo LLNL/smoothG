@@ -569,7 +569,7 @@ void HybridSolver::Mult(const mfem::BlockVector& Rhs, mfem::BlockVector& Sol) co
     multiplier_d_td_->MultTranspose(Hrhs_, trueHrhs_);
 
     H_elim_->Mult(-1.0, trueMu_, 1.0, trueHrhs_);
-    for (int ess_true_mult : ess_true_multipliers_)
+    for (int ess_true_mult : const_cast<mfem::Array<int>&>(ess_true_multipliers_))
     {
         trueHrhs_(ess_true_mult) = trueMu_(ess_true_mult);
     }

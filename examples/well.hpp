@@ -146,7 +146,9 @@ enum AppendType { IOTA, FILL };
 template<typename T>
 T* Append(const T* in, int in_size, int append_size, T value, AppendType type)
 {
-    T* out = new T[in_size + append_size];
+    if ((in_size + append_size) == 0) { return nullptr; }
+//    T* out = new T[in_size + append_size];
+    T* out = hypre_CTAlloc(T, in_size + append_size, HYPRE_MEMORY_HOST);
     std::copy_n(in, in_size, out);
     if (type == FILL) { std::fill_n(out + in_size, append_size, value); }
     else { std::iota(out + in_size, out + in_size + append_size, value); }
@@ -186,15 +188,20 @@ unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
     col_remap = 0;
     MPI_Allreduce(col_change, col_remap, mat.N(), HYPRE_MPI_INT, MPI_SUM, comm);
 
-    HYPRE_Int* colmap = new HYPRE_Int[offd.NumCols()];
+    HYPRE_Int* colmap = nullptr;
+    if (offd.NumCols())
+    {
+        colmap = hypre_CTAlloc(HYPRE_Int, offd.NumCols(), HYPRE_MEMORY_HOST);
+    }
     for (int i = 0; i < offd.NumCols(); ++i)
     {
         colmap[i] = old_colmap[i] + col_remap[old_colmap[i]];
     }
 
+
     auto out = new mfem::HypreParMatrix(comm, row_starts.Last(), col_starts.Last(),
                                         row_starts, col_starts, d_i, d_j, d_data,
-                                        o_i, o_j, o_data, offd.NumCols(), colmap);
+                                        o_i, o_j, o_data, offd.NumCols(), colmap, true);
     out->CopyRowStarts();
     out->CopyColStarts();
 
