@@ -35,10 +35,12 @@
 
 using namespace smoothg;
 
-double mu_o = 0.005; //0.0002; //
-double mu_w = 1e-3;
+double mu_o = 3e-3; //0.005; //0.0002; //
+double mu_w = 3e-4; // 3*centi*poise //1e-3;
 int relperm_order = 2;
-mfem::Vector well_cells;
+mfem::Array<int> well_cells;
+mfem::Array<int> well_perforations;
+mfem::Vector well_cell_gf;
 
 mfem::Vector PWConstProject(const MixedMatrix& darcy_system, const mfem::Vector& x)
 {
@@ -218,7 +220,7 @@ class TwoPhaseSolver
     std::vector<double> step_CFL_const_;
 
     // TODO: these should be defined in / extracted from the problem, not here
-    const double density_ = 1e3;
+    const double density_ = 1.0252e3;  // 64*pound/(ft^3)
     const double porosity_ = problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
     mfem::SparseMatrix weight_;
 
@@ -804,9 +806,9 @@ int main(int argc, char* argv[])
     args.AddOption(&slice, "-s", "--slice", "Slice of SPE10 data for 2D run.");
     int well_height = 1;
     args.AddOption(&well_height, "-wh", "--well-height", "Well Height.");
-    double inject_rate = 0.00005;// * 0.6096;
+    double inject_rate = 5.6544e-04;//0.00005;// * 0.6096;
     args.AddOption(&inject_rate, "-ir", "--inject-rate", "Injector rate.");
-    double bhp = -1.0e6;
+    double bhp = -2.7579e07;//-1.0e6;
     args.AddOption(&bhp, "-bhp", "--bottom-hole-pressure", "Bottom Hole Pressure.");
     args.AddOption(&evolve_param.dt, "-dt", "--delta-t", "Time step.");
     args.AddOption(&evolve_param.total_time, "-time", "--total-time",
@@ -855,8 +857,8 @@ int main(int argc, char* argv[])
 
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
 
-    const int max_iter = upscale_param.max_levels > 1 ? 100 : 500;
-    mu_o = smeared_front ? 0.005 : 0.0002;
+    const int max_iter = upscale_param.max_levels > 1 ? 100 : 100;
+//    mu_o = smeared_front ? 0.005 : 0.0002;
 
     FASParameters fas_param;
     fas_param.fine.max_num_iter = use_vcycle ? 1 : max_iter;
@@ -1037,53 +1039,59 @@ int main(int argc, char* argv[])
 //    final_sat.Load(sin_fs, graph.NumVertices());
 //    problem_for_plot->VisSetup(sout_fs, final_sat, 0.0, 1.0);
 
-//    return 0;
+//    std::ofstream mesh_out_file("spe10_1to5.vtk");
+//    const_cast<mfem::ParMesh&>(problem_ptr->GetMesh()).PrintVTK(mesh_out_file);
 
-    if (0)
+
+    const int num_injectors = 1;
+    const int num_producers = 4;
+    const mfem::SparseMatrix&  vert_edge = graph.VertexToEdge();
+    mfem::SparseMatrix edge_vert = smoothg::Transpose(vert_edge);
+//    if (0)
     {
+
 //        mfem::Vector well_cells(graph.NumVertices() - upscale_param.num_iso_verts);
-        well_cells.SetSize(graph.NumVertices() - upscale_param.num_iso_verts);
-        well_cells = 0.0;
-        const mfem::SparseMatrix&  vert_edge = graph.VertexToEdge();
-        mfem::SparseMatrix edge_vert = smoothg::Transpose(vert_edge);
+        well_cell_gf.SetSize(graph.NumVertices() - upscale_param.num_iso_verts);
+        well_cell_gf = 0.0;
+//        well_cells.SetSize((num_producers+num_injectors)*well_height);
+
         mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
 
-        for (int i = vert_edge.NumRows() - upscale_param.num_iso_verts; i < vert_edge.NumRows(); ++i)
+        for (int i = vert_edge.NumRows() - num_injectors; i < vert_edge.NumRows(); ++i)
         {
-            assert(vert_vert.RowSize(i) == 2);
-            int i_friend = vert_vert.GetRowColumns(i)[0];
-            i_friend = (i_friend == i) ? vert_vert.GetRowColumns(i)[1] : i_friend;
-            well_cells[i_friend] = 1.0;
-            std::cout<<"injection well cell: "<<i_friend<<"\n";
+//            assert(vert_vert.RowSize(i) == 2);
+            for (int j = 0; j < vert_vert.RowSize(i); ++j)
+            {
+                int i_friend = vert_vert.GetRowColumns(i)[j];
+                if (i_friend == i) { continue; }
+//                i_friend = (i_friend == i) ? vert_vert.GetRowColumns(i)[1] : i_friend;
+                well_cell_gf[i_friend] = 1.0;
+                well_cells.Append(i_friend);
+//                std::cout<<"injection well cell: "<<i_friend<<"\n";
+            }
         }
 
 //        int num_injectors = upscale_param.num_iso_verts;
 //        int num_wells = num_attr_from_file - 1 + num_injectors;
-        for (int i = edge_vert.NumRows() - (num_attr_from_file - 1); i < edge_vert.NumRows(); ++i)
+        for (int i = edge_vert.NumRows() - num_producers*well_height; i < edge_vert.NumRows(); ++i)
         {
             assert(edge_vert.RowSize(i) == 1);
-            well_cells[edge_vert.GetRowColumns(i)[0]] = -1.0;
-            std::cout<<"production well cell: "<<edge_vert.GetRowColumns(i)[0]<<"\n";
+            well_cell_gf[edge_vert.GetRowColumns(i)[0]] = -1.0;
+            well_cells.Append(edge_vert.GetRowColumns(i)[0]);
+//            std::cout<<"production well cell: "<<edge_vert.GetRowColumns(i)[0]<<"\n";
         }
+
+//        int num_perforations = (num_producers+num_injectors)*well_height;
+//        for (int i = edge_vert.NumRows() - num_perforations; i < edge_vert.NumRows(); ++i)
+//        {
+//            well_perforations.Append(i);
+//        }
 
 //        mfem::socketstream sout;
 //        problem_ptr->VisSetup(sout, well_cells, 0.0, 0.0, "well cells");
     }
 
-//    std::vector<GraphTopology> topologies(upscale_param.max_levels-1);
-//    std::vector<Graph> graphs;
-//    graphs.reserve(upscale_param.max_levels);
-//    graphs.push_back(graph);
-
-//    graphs.push_back(topologies[0].Coarsen(graphs[0], *partition));
-
-//    for (int i = 1; i < upscale_param.max_levels-1; i++)
-//    {
-//        graphs.push_back(topologies[i].Coarsen(graphs[i],
-//                upscale_param.coarse_factor, upscale_param.num_iso_verts));
-//    }
-//    ShowAggregates(graphs, topologies, *problem_ptr, upscale_param.num_iso_verts);
-//return 0;
+//    return 0;
 
     Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr_final);
     hierarchy.PrintInfo();
@@ -1094,19 +1102,31 @@ int main(int argc, char* argv[])
     std::vector<mfem::Vector> pres_s(upscale_param.max_levels);
 
 //        int l = 0;
+
+    int perf_offset = edge_vert.NumRows() - (num_injectors+num_producers)*well_height;
+    for (int w = 0; w < num_injectors+num_producers; ++w)
+    {
+        for (int i = perf_offset; i < perf_offset+well_height; ++i)
+        {
+            well_perforations.Append(i);
+        }
+        perf_offset += well_height;
+    }
+
     for (int l = 0; l < upscale_param.max_levels; ++l)
     {
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
-
+        initial_value.GetBlock(2) = 0.2;
+        initial_value[initial_value.Size()-1] = 0.8;
 
         mfem::BlockVector sol(initial_value);
-        if (l == 0)
-        {
-            std::ifstream sol_file("fine_sol.txt");
-            sol.Load(sol_file, initial_value.Size());
-        }
-        else
+//        if (l == 0)
+//        {
+//            std::ifstream sol_file("fine_sol.txt");
+//            sol.Load(sol_file, initial_value.Size());
+//        }
+//        else
         {
             fas_param.num_levels = upscale_param.max_levels; //l + 1;
             TwoPhaseSolver solver(*problem, hierarchy, l, evolve_param, fas_param);
@@ -1137,6 +1157,7 @@ int main(int argc, char* argv[])
 
 //        std::ofstream s_file("final_sat_active.txt");
 //        Ss[l].Print(s_file, 1);
+
 
         flux_s[l] = sol.GetBlock(0);
         pres_s[l] = sol.GetBlock(1);
@@ -1662,7 +1683,6 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     std::string msg = "Level "+std::to_string(level_);
     if (evolve_param_.vis_step) { problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, msg); }
 
-
     for (int l = 0; l < level_; ++l)
     {
         hierarchy_->Project(l, blk_helper_[l], blk_helper_[l + 1]);
@@ -1678,8 +1698,8 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
     double dt_multiplier = 2.0;
     double time = 0.0;
-    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time) / dt_multiplier;
-//    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time);
+//    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time) / dt_multiplier;
+    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time);
 
     std::vector<double> cumulative_time;
     bool done = false;
@@ -1690,8 +1710,9 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
         mfem::BlockVector previous_x(x);
 //        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 345600.);
-//        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 1.10592e7*2);
-        dt_real = std::min(dt_real * dt_multiplier, evolve_param_.total_time - time);
+        if (step > 2)
+            dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 2592000.0);
+//        dt_real = std::min(dt_real * dt_multiplier, evolve_param_.total_time - time);
 //        dt_real = std::min(dt_real, evolve_param_.total_time - time);
 
         step_converged_ = false;
@@ -1711,6 +1732,19 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         done = (time >= evolve_param_.total_time);
         cumulative_time.push_back(time / 86400.0);
 
+        mfem::Vector well_flux;
+        {
+            x.GetSubVector(well_perforations, well_flux);
+            std::cout<< "flux at wells" << ":\n";
+            well_flux.Print(std::cout, 5);
+
+            std::cout<< "pressure at wells: "<< x.GetBlock(1)[x.BlockSize(1)-1] << "\n";
+            std::cout<< "saturation at wells: "<< x[x.Size()-1] << "\n";
+            mfem::Vector Ws(x.BlockSize(2));
+            weight_.Mult(x.GetBlock(2), Ws);
+            std::cout<< "sum(Ws) / sum(W): "<<
+                        Ws.Sum() / 11781.6 / density_ / (400.0*std::pow(0.3048, 3)) << "\n";
+        }
 
         if (myid == 0)
         {
@@ -1732,20 +1766,6 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         x_blk2 *= -1.;
         x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
 
-//        std::ofstream p_file("egg_pres_"+std::to_string(step)+".vtk");
-//        p_file.precision(8);
-//        p_file <<  "\nSCALARS pressure double 1\nLOOKUP_TABLE default\n";
-//        p_file << std::fixed;
-//        x_blk2.Print(p_file, 1);
-
-//        x_blk2 = x.GetBlock(2);
-//        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
-//        std::ofstream s_file("egg_sat_"+std::to_string(step)+".vtk");
-//        s_file.precision(8);
-//        s_file << "\nSCALARS saturation double 1\nLOOKUP_TABLE default\n";
-//        s_file << std::fixed;
-//        x_blk2.Print(s_file, 1);
-
         std::ofstream all_file("saigup_CFL_"+std::to_string(step)+".vtk");
         all_file.precision(8);
         all_file <<  "\nSCALARS pressure double 1\nLOOKUP_TABLE default\n";
@@ -1760,37 +1780,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         all_file << std::fixed;
         x_blk2.Print(all_file, 1);
 
-//        all_file << "\nSCALARS pres_block_residual double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        pres_resid.Print(all_file, 1);
-
-//        all_file << "\nSCALARS sat_block_residual double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        sat_resid.Print(all_file, 1);
-
         if (level_ == 0)
         {
             step_CFL_const_.push_back(EvalCFL(dt_real, x));
         }
 
-//        all_file << "\nSCALARS CFL double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        CFL_plot.Print(all_file, 1);
-//        all_file << "\nSCALARS influx double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        CFL_influx.Print(all_file, 1);
-//        all_file << "\nSCALARS outflux double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        CFL_outflux.Print(all_file, 1);
-//        all_file << "\nSCALARS dfds double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        CFL_dfds.Print(all_file, 1);
-//        all_file << "\nSCALARS pore_vol double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        CFL_pore_vol.Print(all_file, 1);
-//        all_file << "\nSCALARS well_cell double 1\nLOOKUP_TABLE default\n";
-//        all_file << std::fixed;
-//        well_cells.Print(all_file, 1);
     }
 
     if (myid == 0)
@@ -1896,41 +1890,16 @@ double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
         }
     }
 
-//    CFL_plot.SetSize(S.Size() - num_injectors);
-//    CFL_dfds.SetSize(S.Size() - num_injectors);
-//    CFL_influx.SetSize(S.Size() - num_injectors);
-//    CFL_outflux.SetSize(S.Size() - num_injectors);
-//    CFL_pore_vol.SetSize(S.Size() - num_injectors);
     for (int i = 0; i < darcy_system.NumVDofs() - num_injectors; ++i)
     {
         double outflow_CFL_const = df_ds[i] * dt * outflow_CFL_consts[i] / pore_volume(i);
         double inflow_CFL_const = df_ds[i] * dt * inflow_CFL_consts[i] / pore_volume(i);
         double local_CFL_const = std::max(inflow_CFL_const, outflow_CFL_const);
-//        CFL_plot[i] = local_CFL_const;
-//        CFL_dfds[i] = df_ds[i];
-//        CFL_influx[i] = inflow_CFL_consts[i];
-//        CFL_outflux[i] = outflow_CFL_consts[i];
-//        CFL_pore_vol[i] = pore_volume[i];
 
-//        if (local_CFL_const > 100.0)
-//        {
-//            std::cout<<"CFL debug: " << i << ", " << inflow_CFL_consts[i]
-//                       << ", " << outflow_CFL_consts[i] << ", " << df_ds[i]
-//                          << ", " << pore_volume[i] << ", " << local_CFL_const
-//                          <<", " << inflow_CFL_const << ", " << outflow_CFL_const
-//                             << ", " << CFL_const2 << "\n";
-//        }
 
         CFL_const2 = std::max(CFL_const2, local_CFL_const);
     }
     std::cout<< "CFL const = "<<CFL_const<<", CFL const (separate inflow and outflow) = "<<CFL_const2<<"\n";
-
-//    mfem::socketstream sout, sout2, sout3;
-//    problem_ptr->VisSetup(sout, CFL_plot, 0.0, 0.0, "CFL");
-//    problem_ptr->VisSetup(sout2, outflow_CFL_consts, 0.0, 0.0, "flux");
-//    problem_ptr->VisSetup(sout2, dfds_plot, 0.0, 0.0, "dF/dS");
-//    problem_ptr->VisSetup(sout2, const_cast<mfem::Vector&>(pore_volume), 0.0, 0.0, "pore vol");
-
 
     return CFL_const2;
 }
@@ -1962,6 +1931,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         rhs.GetBlock(1) *= (dt * density_);
 //        add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
         rhs.GetBlock(2) *= (dt * density_);
+        rhs[rhs.Size()-1] = 0.8;
         weight_.AddMult(x.GetBlock(2), rhs.GetBlock(2));
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
@@ -2264,50 +2234,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         out.GetBlock(2) *= scales_[2];
     }
 
-//    const int num_injectors = hierarchy_.GetUpscaleParameters().num_iso_verts;
-//    for (int i = 0; i < num_injectors; ++i)
-//    {
-//        out[out.Size()-i] = 0.0;
-//    }
-//    out[blk_x.BlockSize(0)] = 0.0;
-
-//    if (out.GetBlock(2).Norml2() > 1e6 && x.Norml2() > 0.0)
-//    {
-//        std::cout << "Level "<<level_<<": \n";
-//        std::cout<<"|| resid0 || = " << out.GetBlock(0).Norml2()<<"\n";
-//        std::cout<<"|| resid1 || = " << out.GetBlock(1).Norml2()<<"\n";
-//        std::cout<<"|| resid2 || = " << out.GetBlock(2).Norml2()<<"\n";
-
-////        std::cout << "nonlin resid values: \n";
-//        mfem::Vector x_blk2 = out.GetBlock(1);
-////        for (int i = 0; i < 9; i++)
-////        {
-////            std::cout << x_blk2[x_blk2.Size()-9+i]<<" ";
-////        }
-////        std::cout << "\n";
-
-////        std::cout << "rhs values: \n";
-////        for (int i = 0; i < 9; i++)
-////        {
-////            std::cout << y[out.BlockSize(0)+x_blk2.Size()-9+i]<<" ";
-////        }
-////        std::cout << "\n";
-
-////        std::cout << "x values: \n";
-//////        for (int i = 0; i < 9; i++)
-////        {
-////            std::cout << x[4941]<<" "<< x[1853]<<" "<< x[2894]<<" "<< x[2320]<<" "<< x[840]<<" "<< x[8373]<<" ";
-////        }
-////        std::cout << "\n";
-
-////        mfem::socketstream sout;
-////        for (int l = level_; l > 0; --l)
-////        {
-////            x_blk2 = MatVec(hierarchy_.GetPs(l-1), x_blk2);
-////        }
-////        problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, "Level "+std::to_string(level_));
-//    }
-
+    out[out.Size()-1] = 0.0;
 
     return out;
 }
@@ -2627,6 +2554,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     dTdS_RAP.reset(mfem::Add(GetDiag(*dTdS), Ms_));
     dTdS.reset(ToParMatrix(comm_, *dTdS_RAP));
 
+
     const bool use_hybrid_solver = (up_param.hybridization && lowest_order && level_);
     if (!use_hybrid_solver)
     {
@@ -2634,6 +2562,18 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         {
             dTdsigma = ParMult(*Ds_, SparseDiag(std::move(U_FS)), true_edof_starts_);
         }
+
+        {
+            mfem::SparseMatrix diag;
+            dTdsigma->GetDiag(diag);
+            diag.EliminateRow(diag.NumRows()-1);
+            dTdS->GetDiag(diag);
+            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
+
+            dMdS->GetDiag(diag);
+            diag.EliminateCol(diag.NumCols()-1);
+        }
+
 
         *M *= scales_[0];
         *dMdS *= scales_[0];
@@ -2666,7 +2606,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //                true_resid[true_blk_dx.BlockSize(0)] = 0.0;
                 mfem::UMFPackSolver direct_solve(*mono_op);
                 direct_solve.Mult(true_resid, true_blk_dx);
-                if (!myid_ && param_.print_level > 1) std::cout << "    Direct solver used\n";
+                if (!myid_ && param_.print_level > 1)
+                {
+                    std::cout << "    Direct solver used\n";
+                }
             }
             else { MixedSolve(op, true_blk_resid, true_blk_dx); }
         }
@@ -2687,24 +2630,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         true_blk_resid.GetBlock(0) *= (dt_ * density_);
         true_blk_resid.GetBlock(1) /= (dt_ * density_);
         true_blk_resid.GetBlock(2) /= (dt_ * density_);
-//        mfem::BlockVector true_blk_dx22(true_blk_dx);
-//        true_blk_dx22 = 0.0;
         HybridSolve(*dTdS, U_FS, blk_x.GetBlock(0), S, true_blk_resid, true_blk_dx);
-
-//        if (true_blk_dx22.BlockSize(1) < 100)
-//        {
-//            std::cout<<"true_blk_dx22:\n";
-//            true_blk_dx22.GetBlock(1).Print();
-//            std::cout<<"\n\n";
-//            std::cout<<"true_blk_dx:\n";
-//            true_blk_dx.GetBlock(1).Print();
-//            std::cout<<"\n\n";
-//        }
-
-//        true_blk_dx22-= true_blk_dx;
-//        std::cout<<"||sol - sol_hb(0) || = "<<true_blk_dx22.GetBlock(0).Norml2() / true_blk_dx.GetBlock(0).Norml2()<<"\n";
-//        std::cout<<"||sol - sol_hb(1) || = "<<true_blk_dx22.GetBlock(1).Norml2() / true_blk_dx.GetBlock(1).Norml2()<<"\n";
-//        std::cout<<"||sol - sol_hb(2) || = "<<true_blk_dx22.GetBlock(2).Norml2() / true_blk_dx.GetBlock(2).Norml2()<<"\n";
     }
 
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
@@ -2720,127 +2646,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
     x += blk_dx;
 
-
-//    if (level_ > 0)
-//    {
-//        const mfem::Vector S2 = PWConstProject(darcy_system_, blk_x.GetBlock(2));
-//        const double S_min = S2.Min();
-//        const double S_max = S2.Max();
-//        if (S_min < -1e-16 || S_max > 1.0)
-//            std::cout<< "       Level: "<<level_<<"         Coarse S after Newton update: min = "<< S_min << ", max = " << S_max <<"\n";
-//    }
-
     if (level_ == 0)
     {
         LocalChopping(darcy_system_, blk_x.GetBlock(2));
     }
-
-//    mfem::Vector x_blk2(blk_x.GetBlock(2));
-//    for (int l = level_; l > 0; --l)
-//    {
-//        x_blk2 = MatVec(hierarchy_.GetPs(l-1), x_blk2);
-//    }
-//    mfem::socketstream sout_debug;
-//    std::string msg = "Iter "+std::to_string(iter_);
-//    problem_ptr->VisSetup(sout_debug, x_blk2, 0.0, 0.0, msg);
-
-
-    if (0) // debug
-    {
-        mfem::Vector true_resid2 = AssembleTrueVector(Residual(x, rhs));
-        mfem::BlockVector true_blk_resid2(true_resid2.GetData(), blk_offsets_);
-
-        const int num_injectors = hierarchy_.GetUpscaleParameters().num_iso_verts;
-
-        InvRescaleVector(normalizer_, true_blk_resid2.GetBlock(1));
-        InvRescaleVector(normalizer_, true_blk_resid2.GetBlock(2));
-        pres_resid = true_blk_resid2.GetBlock(1);
-        pres_resid.SetSize(pres_resid.Size() - num_injectors);
-
-    //    mfem::Vector resid_blk2(true_blk_resid2.GetBlock(2));
-        sat_resid = true_blk_resid2.GetBlock(2);
-        sat_resid.SetSize(sat_resid.Size() - num_injectors);
-
-//        mfem::Vector resid_blk3(true_blk_resid2.GetBlock(2).GetData()+sat_resid.Size(), num_injectors);
-
-//        std::cout << "Level "<<level_<<": \n";
-//        std::cout<<"|| resid0 || = " << ParNorm(true_blk_resid2.GetBlock(0), comm_)<<"\n";
-//        std::cout<<"|| resid1 || = " << ParNorm(true_blk_resid2.GetBlock(1), comm_)<<"\n";
-//        std::cout<<"|| resid2 || = " << ParNorm(true_blk_resid2.GetBlock(2), comm_)<<"\n";
-//        std::cout<<"|| resid2 no injectors || = " << ParNorm(sat_resid, comm_)<<"\n";
-//        std::cout<<"|| resid2 injectors || = " << ParNorm(resid_blk3, comm_)<<"\n";
-//        resid_blk3.Print();
-//        const int num_producers = darcy_system_.GetGraph().EdgeToBdrAtt().NumCols()-1;
-
-//        std::cout<<"Flux at producers:";
-//        for (int i = 0; i < num_producers; i++)
-//        {
-//            std::cout<< blk_x(blk_x.BlockSize(0)-num_injectors-num_producers+i) <<" ";
-//        }
-//        std::cout<<"\n";
-
-//        std::cout<<"Flux at injectors:";
-//        for (int i = 0; i < num_injectors; i++)
-//        {
-//            std::cout<< blk_x(blk_x.BlockSize(0)-num_injectors+i) <<" ";
-//        }
-//        std::cout<<"\n";
-
-
-//    std::ofstream r2_file("egg_resid_sat_"+std::to_string(step_global)+".vtk");
-//    r2_file.precision(8);
-//    r2_file << "\nSCALARS saturation block residual double 1\nLOOKUP_TABLE default\n";
-//    r2_file << std::fixed;
-//    resid_blk2.Print(r2_file, 1);
-
-
-//    mfem::Vector resid_blk1(true_blk_resid2.GetBlock(1));
-//    resid_blk1.SetSize(resid_blk1.Size() - num_injectors);
-
-//    std::ofstream r1_file("egg_resid_pres_"+std::to_string(step_global)+".vtk");
-//    r1_file.precision(8);
-//    r1_file << "\nSCALARS pressure block residual double 1\nLOOKUP_TABLE default\n";
-//    r1_file << std::fixed;
-//    resid_blk2.Print(r1_file, 1);
-
-//    if (level_ == 0)
-//    {
-//        std::cout << "Saturation at production well cells: "
-//                  << blk_x.GetBlock(2)[0] << " " << blk_x.GetBlock(2)[59] << " "
-//                  << blk_x.GetBlock(2)[13140] << " " << blk_x.GetBlock(2)[13199] << "\n";
-//    }
-
-        if (step_global >= 6 && step_local < 120 && level_ == 0)
-        {
-            //        if (true_blk_resid2.GetBlock(2).Norml2() > 1e2)
-            {
-                mfem::Vector x_blk2 = true_blk_resid2.GetBlock(2);
-                for (int l = level_; l > 0; --l)
-                {
-                    x_blk2 = MatVec(hierarchy_.GetPs(l-1), x_blk2);
-                }
-                for (int ii = 0; ii < x_blk2.Size(); ++ii)
-                {
-                    x_blk2[ii] = std::fabs(x_blk2[ii]);
-                }
-                problem_ptr->VisUpdate(sout_resid_[step_global], x_blk2);
-
-
-//                is_odd++;
-//                std::string smooth = is_odd % 2 ? " pre-smoothing" : " post-smoothing";
-//                //            std::string msg = " at time step " + std::to_string(step_global)
-//                //                    + " v-cycle " + std::to_string((is_odd+1)/2) + smooth;
-//                std::string msg = " at time step " + std::to_string(step_global)
-//                        + " v-cycle " + std::to_string(step_local) + smooth;
-
-//                mfem::socketstream sout;
-//                problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, "resid" + msg);
-            }
-
-            step_local++;
-        }
-    }
-
 
     sol_previous_iter_ = x;
 }
@@ -3619,15 +3428,30 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
 //    return out;
 //}
 
+
+double _max_S = 0.8;
+double _min_S = 0.2;
+
 //// case 5 any exponent
 double RelPerm(double S, double mu) // relative permeability
 {
-    return std::pow(S, relperm_order) / mu;
+//    return std::pow(S, relperm_order) / mu;
+
+    // CoreyRelPerm
+    double modified_S = (S-0.2) / (0.6);
+    modified_S = modified_S < 0.0 ? 0.0 : (modified_S > 1.0 ? 1.0 : modified_S);
+    return std::pow(modified_S, relperm_order) / mu;
+
 }
 
 double RelPermDerivative(double S, double mu)
 {
-    return relperm_order * std::pow(S, relperm_order - 1) / mu;
+//    return relperm_order * std::pow(S, relperm_order - 1) / mu;
+
+    // CoreyRelPerm
+    double modified_S = (S-0.2) / (0.6);
+    modified_S = modified_S < 0.0 ? 0.0 : (modified_S > 1.0 ? 1.0 : modified_S);
+    return relperm_order * std::pow(modified_S, relperm_order - 1) / mu / (0.6);
 }
 
 double CellMobility(double S_w, double S_o)
@@ -3647,9 +3471,13 @@ mfem::Vector TotalMobility(const mfem::Vector& S)
     {
         double S_w = S(i);
 
-        S_w = S_w < 0.0 ? 0.0 : (S_w > 1.0 ? 1.0 : S_w);
+        S_w = S_w < _min_S ? _min_S : (S_w > _max_S ? _max_S : S_w);
 
+//        double S_o = 1.0 - S_w;
+
+        // CoreyRelPerm
         double S_o = 1.0 - S_w;
+
         LamS(i)  = CellMobility(S_w, S_o);
     }
     return LamS;
@@ -3662,9 +3490,14 @@ mfem::Vector dTMinv_dS(const mfem::Vector& S)
     {
         double S_w = S(i);
 
-        if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
+//        if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
 
+//        double S_o = 1.0 - S_w;
+
+        // CoreyRelPerm
+        if (S_w < 0.2 || S_w > 0.8) { out(i) = 0.0; continue; }
         double S_o = 1.0 - S_w;
+
         double Lam_S  = CellMobility(S_w, S_o);
         out(i) = -1.0 * CellMobilityDerivative(S_w, S_o) / (Lam_S * Lam_S);
     }
@@ -3677,9 +3510,14 @@ mfem::Vector FractionalFlow(const mfem::Vector& S)
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-        S_w = S_w < 0.0 ? 0.0 : (S_w > 1.0 ? 1.0 : S_w);
+        S_w = S_w < _min_S ? _min_S : (S_w > _max_S ? _max_S : S_w);
 
-        double Lam_S  = CellMobility(S_w, 1.0 - S_w);
+        //        double S_o = 1.0 - S_w;
+
+        // CoreyRelPerm
+        double S_o = 1.0 - S_w;
+
+        double Lam_S  = CellMobility(S_w, S_o);
         FS(i) = RelPerm(S_w, mu_w) / Lam_S;
     }
     return FS;
@@ -3691,12 +3529,18 @@ mfem::Vector dFdS(const mfem::Vector& S)
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-        if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
+//        if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
+
+        //        double S_o = 1.0 - S_w;
+
+        // CoreyRelPerm
+        if (S_w < 0.2 || S_w > 0.8) { out(i) = 0.0; continue; }
+        double S_o = 1.0 - S_w;
 
         double Lw = RelPerm(S_w, mu_w);
         double dLw_dS = RelPermDerivative(S_w, mu_w);
-        double Lam_S  = CellMobility(S_w, 1.0 - S_w);
-        double dLam_dS = CellMobilityDerivative(S_w, 1.0 - S_w);
+        double Lam_S  = CellMobility(S_w, S_o);
+        double dLam_dS = CellMobilityDerivative(S_w, S_o);
         out(i) = (dLw_dS * Lam_S - dLam_dS * Lw) / (Lam_S * Lam_S);
     }
     return out;

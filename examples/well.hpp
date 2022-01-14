@@ -126,6 +126,11 @@ void WellManager::AddWell(const WellType type,
     std::vector<double> well_indices;
     well_indices.reserve(cells.size());
 
+    if (type == WellType::Injector)
+        std::cout<<"Injector:\n";
+    else
+        std::cout<<"Producer:\n";
+
     for (const auto& cell : cells)
     {
         auto Tr = mesh_.GetElementTransformation(cell);
@@ -136,6 +141,7 @@ void WellManager::AddWell(const WellType type,
         double k11 = 1. / perm_inv[perp_dir1];
         double k22 = 1. / perm_inv[perp_dir2];
         well_indices.push_back(WellIndex(cell, k11, k22));
+        std::cout<< "WI at "<<cell<<":"<<well_indices.back()<<"\n";
     }
 
     wells_.push_back({type, value, cells, well_indices});
@@ -212,6 +218,9 @@ public:
 private:
     // Set up well model (Peaceman's five-spot pattern)
     void SetWells(int well_height, double inject_rate, double bot_hole_pres);
+    void SetWells(const std::vector<std::vector<int>>& inj_well_cells,
+                  const std::vector<std::vector<int>>& prod_well_cells,
+                  double inject_rate, double bhp);
     void CombineReservoirAndWellModel();
     void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 
@@ -219,6 +228,7 @@ private:
     mfem::SparseMatrix ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr);
     mfem::Vector AppendWellData(const mfem::Vector& vec, WellType type);
     std::vector<mfem::Vector> AppendWellIndex(const std::vector<mfem::Vector>& loc_weight);
+    mfem::Vector ComputeVertWeight();
 
     unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
     WellManager well_manager_;
@@ -242,18 +252,83 @@ TwoPhase::TwoPhase(const char* perm_file, int dim, int spe10_scale, int slice,
     block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
     block_offsets_[3] = block_offsets_[2] + vertex_edge_.NumRows();
 
-    // no inactive cell
-//    block_offsets_[1] = 50438;
-//    block_offsets_[2] = block_offsets_[1] + 12322;
-//    block_offsets_[3] = block_offsets_[2] + 12322;
+    vert_weight_ = ComputeVertWeight();
+}
 
-    // with all cell
-//    block_offsets_[1] = 53085;
-//    block_offsets_[2] = block_offsets_[1] + 13201;
-//    block_offsets_[3] = block_offsets_[2] + 13201;
+mfem::Vector TwoPhase::ComputeVertWeight()
+{
+    mfem::Array<int> max_N(3);
+    max_N[0] = 60;
+    max_N[1] = 220;
+    max_N[2] = 85;//85;
 
-    vert_weight_.SetSize(vertex_edge_.NumRows());
+    double poro_min = 0.01;
+
+    mfem::Vector vert_weight(vertex_edge_.NumRows());
     vert_weight_ = 1.0;
+
+    // Read Porosity data file
+    std::ifstream poro_file("spe_phi.dat");
+    double* ip = vert_weight.GetData();
+    double unneeded;
+
+//    // map from mfem cell id to mrst cell id
+//    mfem::SparseMatrix mfem_to_mrst_map(mesh_->GetNE(), mesh_->GetNE());
+//    mfem::Array<int> ids;
+//    mfem::Array<mfem::IntegrationPoint> ips;
+//    mfem::DenseMatrix point(mesh_->Dimension(), 1);
+//    int count = 0;
+
+    for (int k = 0; k < N_[2]; k++)
+    {
+//        point(2, 0) = k*2.0*ft_ + ft_;
+        for (int j = 0; j < N_[1]; j++)
+        {
+//            point(1, 0) = j*10.0*ft_ + 5.0*ft_;
+            for (int i = 0; i < N_[0]; i++)
+            {
+                poro_file >> *ip;
+                *ip = std::max(*ip, poro_min);
+                ip++;
+
+//                point(0, 0) = i*20.0*ft_ + 10*ft_;
+//                if (count % 1000 == 0) { std::cout<<"have found IDs for " << count << " cells\n"; }
+//                mesh_->FindPoints(point, ids, ips, false);
+//                if (count < 20) { std::cout << count << " " << ids[0] << "\n"; }
+//                mfem_to_mrst_map.Add(count, ids[0], 1.0);
+//                count++;
+            }
+            for (int i = 0; i < max_N[0] - N_[0]; i++)
+                poro_file >> unneeded; // skip unneeded part
+        }
+        for (int j = 0; j < max_N[1] - N_[1]; j++)
+            for (int i = 0; i < max_N[0]; i++)
+                poro_file >> unneeded;  // skip unneeded part
+    }
+
+//    mfem_to_mrst_map.Finalize();
+//    std::ofstream mat_file("mfem_to_mrst_map.txt");
+//    mfem_to_mrst_map.PrintMatlab(mat_file);
+
+    std::cout << " sum(poro) = " << vert_weight.Sum() << "\n";
+
+    vert_weight *= 20.0 * 10.0 * 2.0 * std::pow(ft_, 3); // cell volume
+
+    return vert_weight;
+}
+
+void TwoPhase::SetWells(const std::vector<std::vector<int>>& inj_well_cells,
+                        const std::vector<std::vector<int>>& prod_well_cells,
+                        double inject_rate, double bhp)
+{
+    for (unsigned int i = 0; i < inj_well_cells.size(); ++i)
+    {
+        well_manager_.AddWell(Injector, inject_rate, inj_well_cells[i]);
+    }
+    for (unsigned int i = 0; i < prod_well_cells.size(); ++i)
+    {
+        well_manager_.AddWell(Producer, bhp, prod_well_cells[i]);
+    }
 }
 
 void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
@@ -275,11 +350,11 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 //    point(0, 4) = 185.5; // 182.5;
 //    point(1, 4) = 336.5; // 335.0; // 258.0; //
     point(0, 2) = max_x;
-    point(1, 3) = max_y;
-    point(0, 4) = max_x;
     point(1, 4) = max_y;
-    point(0, 0) = 185.5; // 182.5;
-    point(1, 0) = 336.5; // 335.0; // 258.0; //
+    point(0, 3) = max_x;
+    point(1, 3) = max_y;
+    point(0, 0) = 182.5; // 185.5; // 182.5;
+    point(1, 0) = 335.0; // 336.5; // 335.0; // 258.0; //
 
 
     for (int j = 0; j < well_height; ++j)
@@ -301,7 +376,10 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
 //        double value = (i == num_wells - 1) ? inject_rate : bhp;
         WellType type = (i == 0) ? Injector : Producer;
         double value = (i == 0) ? inject_rate : bhp;
-        if (cells[i].size()) { well_manager_.AddWell(type, value, cells[i]); }
+        if (cells[i].size())
+        {
+            well_manager_.AddWell(type, value, cells[i], WellDirection::Z, 0.127);
+        }
     }
 
 //    for (int i = 0; i < num_wells; ++i)

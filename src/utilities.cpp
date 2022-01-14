@@ -561,7 +561,7 @@ double Min(const mfem::Vector& vec, MPI_Comm comm)
 bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm)
 {
     bool global_value;
-    MPI_Allreduce(&local_value, &global_value, 1, MPI::BOOL, op, comm);
+    MPI_Allreduce(&local_value, &global_value, 1, MPI_C_BOOL, op, comm);
     return global_value;
 }
 

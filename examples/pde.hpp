@@ -102,13 +102,14 @@ public:
 
     /// Frobenius norm of permeability
     double FroNorm(const mfem::Vector& x);
+
+    void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
 private:
     void ReadPermeabilityFile(const std::string& fileName,
                               const mfem::Array<int>& max_N);
     void ReadPermeabilityFile(MPI_Comm comm, const std::string& fileName,
                               const mfem::Array<int>& max_N);
     void BlankPermeability();
-    void InversePermeability(const mfem::Vector& x, mfem::Vector& val);
 
     mfem::Array<int> N_;
     mfem::Vector h_;
@@ -984,10 +985,45 @@ void DarcyProblem::VisualizePermeability()
         coeff_gf_[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).FroNorm(center);
     }
 
-//    mfem::socketstream soc;
-//    VisSetup(soc, coeff_gf_, 0., 0., "", 1);
-    std::ofstream coef_file("spe10_bot.gf");
+    mfem::socketstream soc;
+    VisSetup(soc, coeff_gf_, 0., 0., "", 1);
+    std::ofstream coef_file("spe10_1to5.gf");
     coeff_gf_.Save(coef_file);
+
+
+//    mfem::Vector inv_perm(3), perm_x(mesh_->GetNE()),
+//            perm_y(mesh_->GetNE()), perm_z(mesh_->GetNE());
+//    for (int i = 0; i < mesh_->GetNE(); ++i)
+//    {
+//        mesh_->GetElement(i)->GetVertices(vertices);
+//        mfem::Vector center(mesh_->Dimension());
+//        center = 0.0;
+//        for (int index = 0; index < mesh_->Dimension(); ++index)
+//        {
+//            for (auto& vertex : vertices)
+//            {
+//                center[index] += mesh_->GetVertex(vertex)[index];
+//            }
+//            center[index] /= vertices.Size();
+//        }
+
+//        ((InversePermeabilityCoefficient&)(*kinv_vector_)).InversePermeability(center, inv_perm);
+//        perm_x[i] = 1./inv_perm[0];
+//        perm_y[i] = 1./inv_perm[1];
+//        perm_z[i] = 1./inv_perm[2];
+//    }
+
+//    coeff_gf_.MakeRef(u_fes_.get(), perm_x);
+//    std::ofstream coefx_file("spe10_1to5_perm_x.vtk");
+//    coeff_gf_.Save(coefx_file);
+
+//    coeff_gf_.MakeRef(u_fes_.get(), perm_y);
+//    std::ofstream coefy_file("spe10_1to5_perm_y.vtk");
+//    coeff_gf_.Save(coefy_file);
+
+//    coeff_gf_.MakeRef(u_fes_.get(), perm_z);
+//    std::ofstream coefz_file("spe10_1to5_perm_z.vtk");
+//    coeff_gf_.Save(coefz_file);
 }
 
 double hy_g, Ly_g;
@@ -1069,7 +1105,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
 
     N_.SetSize(3, 12 * spe10_scale); // 60
     N_[1] = 44 * spe10_scale; // 220
-    N_[2] = max_N[2];//17 * spe10_scale; // 85
+    N_[2] = 5;//max_N[2];//17 * spe10_scale; // 85
 
     // SPE10 grid cell sizes
     mfem::Vector h(3);
