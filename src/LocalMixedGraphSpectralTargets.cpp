@@ -469,14 +469,14 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         // Extract local matrices
         auto Mloc = ExtractRowAndColumns(M_ext, ext_loc_edofs,
                                          ext_loc_edofs, col_map_);
-//        double M_max = Mloc.MaxNorm();
-//        double M_min = M_max;
-//        for (int mm = 0; mm < Mloc.NumNonZeroElems(); ++mm)
-//        {
-//            M_min = std::min(M_min, Mloc.GetData()[mm]);
-//        }
-//        double rescale_const = std::exp((std::log(M_max) + std::log(M_min)) / 2.0);
-//        Mloc *= 1.0 / M_min; // TODO: is this a good way?
+        double M_max = Mloc.MaxNorm();
+        double M_min = M_max;
+        for (int mm = 0; mm < Mloc.NumNonZeroElems(); ++mm)
+        {
+            M_min = std::min(M_min, Mloc.GetData()[mm]);
+        }
+        double rescale_const = std::exp((std::log(M_max) + std::log(M_min)) / 2.0);
+        Mloc *= 1.0 / rescale_const; // TODO: is this a good way?
 
         auto Dloc = ExtractRowAndColumns(D_ext, ext_loc_vdofs,
                                          ext_loc_edofs, col_map_);

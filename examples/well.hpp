@@ -141,7 +141,7 @@ void WellManager::AddWell(const WellType type,
         double k11 = 1. / perm_inv[perp_dir1];
         double k22 = 1. / perm_inv[perp_dir2];
         well_indices.push_back(WellIndex(cell, k11, k22));
-        std::cout<< "WI at "<<cell<<":"<<well_indices.back()<<"\n";
+//        std::cout<< "WI at "<<cell<<":"<<well_indices.back()<<"\n";
     }
 
     wells_.push_back({type, value, cells, well_indices});

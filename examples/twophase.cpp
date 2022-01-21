@@ -36,9 +36,9 @@
 using namespace smoothg;
 
 double mu_o = 3e-3; //0.005; //0.0002; //
-double mu_w = 3e-4; // 3*centi*poise //1e-3;
+double mu_w = 3e-4; // 0.3*centi*poise //1e-3;
 int relperm_order = 2;
-mfem::Array<int> well_cells;
+//mfem::Array<int> well_cells;
 mfem::Array<int> well_perforations;
 mfem::Vector well_cell_gf;
 
@@ -781,6 +781,80 @@ void SetAttrForAggPrint(const DarcyProblem& problem, const mfem::Array<int>& par
 }
 
 
+std::vector<std::vector<int>>
+FindWellCells(const Graph& graph, int num_injectors, int num_producers, int well_height)
+{
+    const mfem::SparseMatrix& vert_edge = graph.VertexToEdge();
+    mfem::SparseMatrix edge_vert = smoothg::Transpose(vert_edge);
+    mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
+
+    std::vector<std::vector<int>> out;
+    for (int i = vert_edge.NumRows() - num_injectors; i < vert_edge.NumRows(); ++i)
+    {
+        std::vector<int> injector_cells;
+        for (int j = 0; j < vert_vert.RowSize(i); ++j)
+        {
+            int i_friend = vert_vert.GetRowColumns(i)[j];
+            if (i_friend == i) { continue; }
+            injector_cells.push_back(i_friend);
+        }
+        out.push_back(injector_cells);
+    }
+
+    for (int w = 0; w < num_producers; ++w)
+    {
+        std::vector<int> producer_cells;
+        int offset = edge_vert.NumRows()-(num_producers-w)*well_height;
+        for (int i = offset; i < offset + well_height; ++i)
+        {
+            assert(edge_vert.RowSize(i) == 1);
+            producer_cells.push_back(edge_vert.GetRowColumns(i)[0]);
+        }
+        out.push_back(producer_cells);
+    }
+
+    return out;
+}
+
+mfem::Array<int> *
+AddWellCellAgg(const mfem::Array<int>& partition,
+               const std::vector<std::vector<int>>& well_cells)
+{
+    auto out = new mfem::Array<int>();
+    partition.Copy(*out);
+
+    const int num_parts = partition.Max()+1;
+
+    mfem::SparseMatrix agg_vert = PartitionToMatrix(partition, num_parts);
+    agg_vert.SortColumnIndices();
+
+    mfem::Array<int> all_aggs(num_parts);
+    std::iota(all_aggs.begin(), all_aggs.end(), 0);
+    int new_agg_id = num_parts;
+
+    for (std::vector<int> cells : well_cells)
+    {
+        mfem::Array<int> cells_arr(cells.data(), cells.size());
+        cells_arr.Sort();
+        std::cout << "isolating well cells:\n";
+        cells_arr.Print(std::cout, 8);
+        auto agg_wellcell = ExtractRowAndColumns(agg_vert, all_aggs, cells_arr);
+
+        for (int r = 0; r < agg_wellcell.NumRows(); ++r)
+        {
+            if (agg_wellcell.RowSize(r) == 0) { continue; }
+            for (int j = 0; j < agg_wellcell.RowSize(r); ++j)
+            {
+                int cell = cells_arr[agg_wellcell.GetRowColumns(r)[j]];
+                (*out)[cell] = new_agg_id;
+            }
+            new_agg_id++;
+        }
+    }
+
+    return out;
+}
+
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -1023,75 +1097,21 @@ int main(int argc, char* argv[])
         mfem::Array<int> coarsening_factors(dim);
         coarsening_factors = 1;
         coarsening_factors[0] = upscale_param.coarse_factor;
-        coarsening_factors[0] = 6;
-        coarsening_factors[1] = 11;
+//        coarsening_factors[0] = 6;
+//        coarsening_factors[1] = 11;
         problem->Partition(use_metis, coarsening_factors, *partition);
         if (!use_metis) { partition->Append(partition->Max()+1); }
         if (use_metis) { upscale_param.num_iso_verts = problem->NumIsoVerts(); }
-        SetAttrForAggPrint(*problem_ptr, *partition);
+//        SetAttrForAggPrint(*problem_ptr, *partition);
     }
-
-
-//    std::ifstream sin_fs("results_for_paper_new/refined_saigup_final_sat.txt");
-//    std::ifstream sin_fs("results_for_paper_new/refined_egg_2x2x2_r4_final_sat.txt");
-//    mfem::socketstream sout_fs;
-//    mfem::Vector final_sat;
-//    final_sat.Load(sin_fs, graph.NumVertices());
-//    problem_for_plot->VisSetup(sout_fs, final_sat, 0.0, 1.0);
-
-//    std::ofstream mesh_out_file("spe10_1to5.vtk");
-//    const_cast<mfem::ParMesh&>(problem_ptr->GetMesh()).PrintVTK(mesh_out_file);
-
 
     const int num_injectors = 1;
     const int num_producers = 4;
-    const mfem::SparseMatrix&  vert_edge = graph.VertexToEdge();
-    mfem::SparseMatrix edge_vert = smoothg::Transpose(vert_edge);
-//    if (0)
-    {
-
-//        mfem::Vector well_cells(graph.NumVertices() - upscale_param.num_iso_verts);
-        well_cell_gf.SetSize(graph.NumVertices() - upscale_param.num_iso_verts);
-        well_cell_gf = 0.0;
-//        well_cells.SetSize((num_producers+num_injectors)*well_height);
-
-        mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
-
-        for (int i = vert_edge.NumRows() - num_injectors; i < vert_edge.NumRows(); ++i)
-        {
-//            assert(vert_vert.RowSize(i) == 2);
-            for (int j = 0; j < vert_vert.RowSize(i); ++j)
-            {
-                int i_friend = vert_vert.GetRowColumns(i)[j];
-                if (i_friend == i) { continue; }
-//                i_friend = (i_friend == i) ? vert_vert.GetRowColumns(i)[1] : i_friend;
-                well_cell_gf[i_friend] = 1.0;
-                well_cells.Append(i_friend);
-//                std::cout<<"injection well cell: "<<i_friend<<"\n";
-            }
-        }
-
-//        int num_injectors = upscale_param.num_iso_verts;
-//        int num_wells = num_attr_from_file - 1 + num_injectors;
-        for (int i = edge_vert.NumRows() - num_producers*well_height; i < edge_vert.NumRows(); ++i)
-        {
-            assert(edge_vert.RowSize(i) == 1);
-            well_cell_gf[edge_vert.GetRowColumns(i)[0]] = -1.0;
-            well_cells.Append(edge_vert.GetRowColumns(i)[0]);
-//            std::cout<<"production well cell: "<<edge_vert.GetRowColumns(i)[0]<<"\n";
-        }
-
-//        int num_perforations = (num_producers+num_injectors)*well_height;
-//        for (int i = edge_vert.NumRows() - num_perforations; i < edge_vert.NumRows(); ++i)
-//        {
-//            well_perforations.Append(i);
-//        }
-
-//        mfem::socketstream sout;
-//        problem_ptr->VisSetup(sout, well_cells, 0.0, 0.0, "well cells");
-    }
-
-//    return 0;
+//    const int num_old_parts = partition->Max()+1;
+//    auto well_cells = FindWellCells(graph, num_injectors, num_producers, well_height);
+//    partition.reset(AddWellCellAgg(*partition, well_cells));
+//    std::cout << "Number of new aggs created because of well cell isolation: "
+//              << partition->Max()+1 - num_old_parts << "\n";
 
     Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr_final);
     hierarchy.PrintInfo();
@@ -1101,9 +1121,7 @@ int main(int argc, char* argv[])
     std::vector<mfem::Vector> flux_s(upscale_param.max_levels);
     std::vector<mfem::Vector> pres_s(upscale_param.max_levels);
 
-//        int l = 0;
-
-    int perf_offset = edge_vert.NumRows() - (num_injectors+num_producers)*well_height;
+    int perf_offset = graph.NumEdges() - (num_injectors+num_producers)*well_height;
     for (int w = 0; w < num_injectors+num_producers; ++w)
     {
         for (int i = perf_offset; i < perf_offset+well_height; ++i)
@@ -1113,7 +1131,9 @@ int main(int argc, char* argv[])
         perf_offset += well_height;
     }
 
-    for (int l = 0; l < upscale_param.max_levels; ++l)
+
+    int l = 0;
+//    for (int l = 0; l < upscale_param.max_levels; ++l)
     {
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
@@ -1173,6 +1193,7 @@ int main(int argc, char* argv[])
         auto base_msg = "level "+std::to_string(l)+", ne = "+std::to_string(upscale_param.max_evects)
                 +", nt = "+std::to_string(upscale_param.max_traces);
 //        if (l)
+        if (0)
         {
 //            mfem::socketstream soutf;
 //            problem_ptr->VisSetup(soutf, flux_s[l], 0.0, 0.0, "Flux, "+base_msg, false, false, partition->GetData());
@@ -1686,10 +1707,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     for (int l = 0; l < level_; ++l)
     {
         hierarchy_->Project(l, blk_helper_[l], blk_helper_[l + 1]);
-        if (l)
-        {
-            x_blk2 = MultTranspose(hierarchy_->GetPs(l-1), x_blk2);
-        }
+        x_blk2 = MultTranspose(hierarchy_->GetPs(l), x_blk2);
     }
 
     x.GetBlock(0) = blk_helper_[level_].GetBlock(0);
@@ -1816,10 +1834,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     for (int l = level_; l > 0; --l)
     {
         hierarchy_->Interpolate(l, blk_helper_[l], blk_helper_[l - 1]);
-        if (l > 1)
-        {
-            x_blk2 = MatVec(hierarchy_->GetPs(l-2), x_blk2);
-        }
+        x_blk2 = MatVec(hierarchy_->GetPs(l-1), x_blk2);
     }
 
     mfem::BlockVector out(problem_.BlockOffsets());
@@ -1911,13 +1926,13 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 
     if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
-        const MixedMatrix& system_s = level_ ? hierarchy_->GetMatrix(level_-1) : system;
-        auto S = PWConstProject(system_s, x.GetBlock(2));
-        CoupledSolver solver(*hierarchy_, level_, system, problem_.EssentialAttribute(),
-                             hierarchy_->GetUpwindFlux(level_), dt, weight_,
-                             density_, S, solver_param_.nl_solve);
-//        CoupledFAS solver(*hierarchy_, problem_.EssentialAttribute(), dt, weight_,
-//                          density_, x.GetBlock(2), solver_param_);
+//        const MixedMatrix& system_s = level_ ? hierarchy_->GetMatrix(level_-1) : system;
+//        auto S = PWConstProject(system, x.GetBlock(2));
+//        CoupledSolver solver(*hierarchy_, level_, system, problem_.EssentialAttribute(),
+//                             hierarchy_->GetUpwindFlux(level_), dt, weight_,
+//                             density_, S, solver_param_.nl_solve);
+        CoupledFAS solver(*hierarchy_, problem_.EssentialAttribute(), dt, weight_,
+                          density_, x.GetBlock(2), solver_param_);
 
         mfem::Vector res(x.GetBlock(2));
         res = 0.0;
@@ -1938,19 +1953,20 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
 
         solver.Solve(rhs, x);
 
-//        step_coarsest_nonlinear_iter_.push_back(solver.GetNumCoarsestIterations());
+        step_coarsest_nonlinear_iter_.push_back(solver.GetNumCoarsestIterations());
 ////        step_num_backtrack_.push_back(num_backtrack_debug);
         step_nonlinear_iter_.push_back(solver.GetNumIterations());
 //        step_nonlinear_iter_.push_back(solver_param_.cycle == V_CYCLE ? solver.GetNumIterations()
 //                                                : solver.GetLevelSolver(0).GetNumIterations());
 //        int num_coarse_lin_iter = solver.GetLevelSolver(hierarchy_->NumLevels()-1).GetNumLinearIterations();
-        int num_fine_lin_iter = solver.GetNumLinearIterations();
+        int num_fine_lin_iter = solver.GetLevelSolver(0).GetNumLinearIterations();
 //        int num_mid_lin_iter = hierarchy_->NumLevels() > 1 ? solver.GetLevelSolver(1).GetNumLinearIterations() : 0;
-////        int num_coarse_lin_iter = solver.GetNumLinearIterations();
-//        double avg_lin = solver.GetNumCoarsestIterations() == 0 ? 0.0 :
-//                    num_coarse_lin_iter / ((double)solver.GetNumCoarsestIterations());
-////                num_coarse_lin_iter / ((double)solver.GetNumIterations());
-//        step_average_coarsest_linear_iter_.push_back(std::round(avg_lin));
+        int c_lvl = hierarchy_->NumLevels() - 1;
+        int num_coarse_lin_iter = solver.GetLevelSolver(c_lvl).GetNumLinearIterations();
+        double avg_lin = solver.GetNumCoarsestIterations() == 0 ? 0.0 :
+                    num_coarse_lin_iter / ((double)solver.GetNumCoarsestIterations());
+//                num_coarse_lin_iter / ((double)solver.GetNumIterations());
+        step_average_coarsest_linear_iter_.push_back(std::round(avg_lin));
         nonlinear_iter_ += step_nonlinear_iter_.back();
         step_converged_ = solver.IsConverged();
 //        num_coarse_lin_iter_ += num_coarse_lin_iter;
@@ -2007,13 +2023,14 @@ double ParNorm(const mfem::Vector& vec, MPI_Comm comm)
     return mfem::ParNormlp(vec, mfem::infinity(), comm);
 }
 
+// TODO: coarse level
 void LocalChopping(const MixedMatrix& darcy_system, mfem::Vector& x)
 {
     const mfem::Vector S = PWConstProject(darcy_system, x);
     for (int i = 0; i < x.Size(); ++i)
     {
-        if (S[i] < 0.0) { x[i] = 0.0; }
-        if (S[i] > 1.0) { x[i] /= S[i]; }
+        if (S[i] < 0.2) { x[i] = 0.2; }
+        if (S[i] > 0.8) { x[i] = 0.8; }
     }
 }
 
@@ -2050,8 +2067,7 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
 
     GenerateOffsets(comm_, D_->NumCols(), true_edof_starts_);
 
-    const int S_size = level ? hierarchy.GetMatrix(level-1).GetPWConstProj().NumCols() :
-                               darcy_system.GetPWConstProj().NumCols();
+    const int S_size = darcy_system.GetPWConstProj().NumCols();
     blk_offsets_[0] = 0;
     blk_offsets_[1] = darcy_system.NumEDofs();
     blk_offsets_[2] = blk_offsets_[1] + darcy_system.NumVDofs();
@@ -2070,12 +2086,11 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
 
     GenerateOffsets(comm_, S_size, sdof_starts_);
 
-    mfem::SparseMatrix Ds_proc(hierarchy.GetMatrix(level? level-1 : 0).GetDs());
+    mfem::SparseMatrix Ds_proc(hierarchy.GetMatrix(level).GetDs());
 
-    const mfem::Array<int>& ess_dofs_f = level ? hierarchy.GetMatrix(level-1).GetEssDofs()
-                                               : ess_dofs_;
+    const mfem::Array<int>& ess_dofs_f = ess_dofs_;
     if (ess_dofs_f.Size()) { Ds_proc.EliminateCols(ess_dofs_f); }
-    auto& edof_trueedof = hierarchy.GetMatrix(level? level-1 : 0).GetGraphSpace().EDofToTrueEDof();
+    auto& edof_trueedof = hierarchy.GetMatrix(level).GetGraphSpace().EDofToTrueEDof();
     Ds_ = ParMult(Ds_proc, edof_trueedof, sdof_starts_);
     *Ds_ *= (dt_ * density_);
 
@@ -2126,9 +2141,9 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     out = 0.0;
 
 
-    mfem::Vector x_blk_2_coarse = level_ ? MultTranspose(hierarchy_.GetPs(level_-1), blk_x.GetBlock(2)) :
-                                           blk_x.GetBlock(2);
-    const mfem::Vector S = PWConstProject(darcy_system_, x_blk_2_coarse);
+//    mfem::Vector x_blk_2_coarse = level_ ? MultTranspose(hierarchy_.GetPs(level_-1), blk_x.GetBlock(2)) :
+//                                           blk_x.GetBlock(2);
+    const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
 
     auto& darcy_system_0 = hierarchy_.GetMatrix(0);
     mfem::Vector fine_flux = blk_x.GetBlock(0);
@@ -2137,7 +2152,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         fine_flux = MatVec(hierarchy_.GetPsigma(i), fine_flux);
     }
     mfem::Vector fine_S = blk_x.GetBlock(2);
-    for (int i = level_-2; i >= 0 ; --i)
+    for (int i = level_-1; i >= 0 ; --i)
     {
         fine_S = MatVec(hierarchy_.GetPs(i), fine_S);
     }
@@ -2216,7 +2231,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 //        auto D_upw_FS = MultTranspose(hierarchy_.GetPs(0), fine_D_upw_FS);
 
         auto D_upw_FS = MatVec(D_fine_, upw_FS);
-        for (int i = 0; i < level_-1 ; ++i)
+        for (int i = 0; i < level_; ++i)
         {
             D_upw_FS = MultTranspose(hierarchy_.GetPs(i), D_upw_FS);
         }
@@ -2361,10 +2376,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         LocalChopping(darcy_system_, blk_x.GetBlock(2));
     }
 
-    mfem::Vector x_blk_2_coarse = level_ ? MultTranspose(hierarchy_.GetPs(level_-1), blk_x.GetBlock(2)) :
-                                           blk_x.GetBlock(2);
-    const mfem::Vector S = PWConstProject(darcy_system_, x_blk_2_coarse);
-//    const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
+//    mfem::Vector x_blk_2_coarse = level_ ? MultTranspose(hierarchy_.GetPs(level_-1), blk_x.GetBlock(2)) :
+//                                           blk_x.GetBlock(2);
+//    const mfem::Vector S = PWConstProject(darcy_system_, x_blk_2_coarse);
+    const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
 
     mfem::Vector true_resid = AssembleTrueVector(Residual(x, rhs));
     true_resid *= -1.0;
@@ -2384,7 +2399,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         fine_flux = MatVec(hierarchy_.GetPsigma(i), fine_flux);
     }
     mfem::Vector fine_S = blk_x.GetBlock(2);
-    for (int i = level_-2; i >= 0 ; --i)
+    for (int i = level_-1; i >= 0 ; --i)
     {
         fine_S = MatVec(hierarchy_.GetPs(i), fine_S);
     }
@@ -2409,7 +2424,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         auto dMdS_fine = Assemble_dMdS(system_0, fine_flux, fine_S);
         auto PsigmaT = smoothg::Transpose(hierarchy_.GetPsigma(0));
         mat_help.reset( mfem::Mult(PsigmaT, dMdS_fine) );
-        for (int i = 1; i < level_-1; ++i)
+        for (int i = 1; i < level_; ++i)
         {
             mat_help.reset(mfem::RAP(hierarchy_.GetPsigma(i), *mat_help, hierarchy_.GetPs(i-1)));
         }
@@ -2480,18 +2495,18 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         auto U_FS_fine = MatVec(fine_upwind, FractionalFlow(fine_S));
 
 //        if (level_ > 1)
-//        {
-//            auto dTdsigma_fine = smoothg::Mult(D_fine_, SparseDiag(std::move(U_FS_fine)));
-//            dTdS_RAP.reset(mfem::RAP(hierarchy_.GetPs(0), dTdsigma_fine,
-//                                     hierarchy_.GetPsigma(0)));
-//        }
-//        else
         {
             auto dTdsigma_fine = smoothg::Mult(D_fine_, SparseDiag(std::move(U_FS_fine)));
-            dTdS_RAP.reset(mfem::Mult(dTdsigma_fine, hierarchy_.GetPsigma(0)));
+            dTdS_RAP.reset(mfem::RAP(hierarchy_.GetPs(0), dTdsigma_fine,
+                                     hierarchy_.GetPsigma(0)));
         }
+//        else
+//        {
+//            auto dTdsigma_fine = smoothg::Mult(D_fine_, SparseDiag(std::move(U_FS_fine)));
+//            dTdS_RAP.reset(mfem::Mult(dTdsigma_fine, hierarchy_.GetPsigma(0)));
+//        }
 
-        for (int i = 1; i < level_-1; ++i)
+        for (int i = 1; i < level_; ++i)
         {
             dTdS_RAP.reset(mfem::RAP(hierarchy_.GetPs(i-1), *dTdS_RAP, hierarchy_.GetPsigma(i)));
         }
@@ -2512,7 +2527,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             dTdS_RAP.reset( mfem::Mult(D_fine_, fine_upwind) );
         }
 
-        for (int i = 0; i < level_-1; ++i)
+        for (int i = 0; i < level_; ++i)
         {
             dTdS_RAP.reset(mfem::RAP(hierarchy_.GetPs(i), *dTdS_RAP, hierarchy_.GetPs(i)));
         }
@@ -2568,7 +2583,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             dTdsigma->GetDiag(diag);
             diag.EliminateRow(diag.NumRows()-1);
             dTdS->GetDiag(diag);
-            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
+            diag.EliminateRow(diag.NumRows()-1);
+            diag.EliminateCol(diag.NumCols()-1);
+            diag.Set(diag.NumRows()-1, diag.NumRows()-1, 1.0);
+//            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
 
             dMdS->GetDiag(diag);
             diag.EliminateCol(diag.NumCols()-1);
@@ -2594,7 +2612,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        auto pfix = ToParMatrix(comm_, std::move(fix));
 //        op.SetBlock(1, 1, pfix);
 
-        const bool use_direct_solver = !lowest_order;
+        const bool use_direct_solver = true;//!lowest_order;
         const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)
@@ -2640,8 +2658,8 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     blk_dx.GetBlock(1) = true_blk_dx.GetBlock(1);
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
 
-    const MixedMatrix& darcy_system_s = level_ ? hierarchy_.GetMatrix(level_-1) : darcy_system_;
-    const mfem::Vector dS = PWConstProject(darcy_system_s, blk_dx.GetBlock(2));
+//    const MixedMatrix& darcy_system_s = level_ ? hierarchy_.GetMatrix(level_-1) : darcy_system_;
+    const mfem::Vector dS = PWConstProject(darcy_system_, blk_dx.GetBlock(2));
     blk_dx *= std::min(1.0, param_.diff_tol / mfem::ParNormlp(dS, mfem::infinity(), comm_));
 
     x += blk_dx;
@@ -2788,7 +2806,7 @@ void CoupledSolver::PrimalSolve(const mfem::BlockOperator& op,
     op_array(2, 0)->Mult(-1.0, true_resid.GetBlock(0), 1.0, primal_resid.GetBlock(1));
     RescaleVector(op_00_diag, const_cast<mfem::Vector&>(true_resid.GetBlock(0)));
 
-    mfem::BlockVector primal_dx(true_dx.GetBlock(1), primal_offsets);
+    mfem::BlockVector primal_dx(true_dx.GetBlock(1).GetData(), primal_offsets);
     primal_dx = 0.0;
     gmres_.Mult(primal_resid, primal_dx);
 
@@ -2849,8 +2867,7 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
                                             upwind_flux_l, dt, *weight_l, density, S, param_l));
 //        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 1);
 
-        const int S_size = l ? hierarchy.GetMatrix(l-1).GetPWConstProj().NumCols()
-                             : system_l.GetPWConstProj().NumCols();
+        const int S_size = system_l.GetPWConstProj().NumCols();
         if (l > 0)
         {
             rhs_[l].SetSize(system_l.NumTotalDofs() + S_size);
@@ -2878,14 +2895,15 @@ void CoupledFAS::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coa
     mfem::BlockVector blk_coarse(coarse.GetData(), solver_c.BlockOffsets());
     hierarchy_.Restrict(level, blk_fine, blk_coarse);
 
-    if (level == 0)
-    {
-        blk_coarse.GetBlock(2) = blk_fine.GetBlock(2);
-    }
-    else
-    {
-        hierarchy_.GetPs(level - 1).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
-    }
+//    if (level == 0)
+//    {
+//        blk_coarse.GetBlock(2) = blk_fine.GetBlock(2);
+//    }
+//    else
+//    {
+//        hierarchy_.GetPs(level - 1).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
+//    }
+    hierarchy_.GetPs(level).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
 //    auto S = hierarchy_.PWConstProject(level + 1, blk_coarse.GetBlock(2));
 //    blk_coarse.GetBlock(2) = hierarchy_.PWConstInterpolate(level + 1, S);
 }
@@ -2900,14 +2918,15 @@ void CoupledFAS::Interpolate(int level, const mfem::Vector& coarse, mfem::Vector
 
 //    auto S = hierarchy_.PWConstProject(level, blk_coarse.GetBlock(2));
 //    blk_coarse.GetBlock(2) = hierarchy_.PWConstInterpolate(level, S);
-    if (level == 1)
-    {
-        blk_fine.GetBlock(2) = blk_coarse.GetBlock(2);
-    }
-    else
-    {
-        hierarchy_.GetPs(level - 2).Mult(blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
-    }
+//    if (level == 1)
+//    {
+//        blk_fine.GetBlock(2) = blk_coarse.GetBlock(2);
+//    }
+//    else
+//    {
+//        hierarchy_.GetPs(level - 2).Mult(blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
+//    }
+    hierarchy_.GetPs(level - 1).Mult(blk_coarse.GetBlock(2), blk_fine.GetBlock(2));
 }
 
 //mfem::Vector CoupledFAS::ProjectS(int level, const mfem::Vector& x) const
@@ -2942,14 +2961,16 @@ void CoupledFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coar
     hierarchy_.Project(level, blk_fine, blk_coarse);
 
 
-    if (level == 0)
-    {
-        blk_coarse.GetBlock(2) = blk_fine.GetBlock(2);
-    }
-    else
-    {
-        hierarchy_.GetPs(level - 1).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
-    }
+//    if (level == 0)
+//    {
+//        blk_coarse.GetBlock(2) = blk_fine.GetBlock(2);
+//    }
+//    else
+//    {
+//        hierarchy_.GetPs(level - 1).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
+//    }
+    hierarchy_.GetPs(level).MultTranspose(blk_fine.GetBlock(2), blk_coarse.GetBlock(2));
+
 
 //    auto S = hierarchy_.PWConstProject(level + 1, blk_coarse.GetBlock(2));
 //    blk_coarse.GetBlock(2) = hierarchy_.PWConstInterpolate(level + 1, S);

@@ -57,7 +57,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
 
     std::cout << "Number of layers around well cells to isolate: " << num_well_cell_isolation_layers << "\n";
 
-    const bool isolate_injection_well_cells = true;
+    const bool isolate_injection_well_cells = false;
     if (isolate_injection_well_cells)
     {
         for (int i = vert_edge.NumRows() - num_iso_verts; i < vert_edge.NumRows(); ++i)
@@ -77,7 +77,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
         }
     }
 
-    const bool isolate_production_well_cells = true;
+    const bool isolate_production_well_cells = false;
     if (isolate_production_well_cells && fine_graph.EdgeToBdrAtt().NumCols() > 1)
     {
         int num_prodution_well_edges = (fine_graph.EdgeToBdrAtt().NumCols()-1);
