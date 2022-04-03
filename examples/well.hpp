@@ -119,7 +119,7 @@ void WellManager::AddWell(const WellType type,
         double numerator = 0.28 * sqrt(k22 * h1 * h1 + k11 * h2 * h2);
         double equiv_radius = numerator / (sqrt(k11) + sqrt(k22));
 
-        double h3 = dim_ < 3 ? 1.0 : mesh_.GetElementSize(cell, dir_vec_);
+        double h3 = dim_ < 3 ? sqrt(h1 * h2) : mesh_.GetElementSize(cell, dir_vec_);
         return 2 * M_PI * h3 * sqrt(k11 * k22) / std::log(equiv_radius / r_w);
     };
 
@@ -207,6 +207,137 @@ unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
     return unique_ptr<mfem::HypreParMatrix>(out);
 }
 
+mfem::SparseMatrix ExtendVertexEdge(const mfem::SparseMatrix& vert_edge,
+                                    const WellManager& well_manager)
+{
+    const int num_well_cells = well_manager.NumWellCells();
+    const int num_injector_cells = well_manager.NumWellCells(Injector);
+
+    int num_verts = vert_edge.NumRows();         // number of reservoir cells
+    int num_edges = vert_edge.NumCols();         // number of reservoir faces
+
+    int* I = new int[num_verts + well_manager.NumWells(Injector) + 1]();
+    int* J = new int[NNZ(vert_edge) + num_well_cells + num_injector_cells];
+
+    for (const Well& well : well_manager.GetWells())
+    {
+        for (int cell : well.cells) { I[cell + 1] = 1; }
+    }
+
+    for (int i = 0; i < vert_edge.NumRows(); ++i)
+    {
+        I[i + 1] += I[i] + vert_edge.RowSize(i);
+        std::copy_n(vert_edge.GetRowColumns(i), vert_edge.RowSize(i), J + I[i]);
+    }
+
+    for (const Well& well : well_manager.GetWells())
+    {
+        if (well.type == Injector)
+        {
+            I[num_verts + 1] = I[num_verts] + well.cells.size();
+            std::iota(J + I[num_verts], J + I[num_verts + 1], num_edges);
+            num_verts++;
+        }
+        for (int cell : well.cells) { J[I[cell + 1] - 1] = num_edges++; }
+    }
+
+    double* Data = new double[I[num_verts]];
+    std::fill_n(Data, I[num_verts], 1.0);
+
+    return mfem::SparseMatrix(I, J, Data, num_verts, num_edges);
+}
+
+std::vector<mfem::Vector> AppendWellIndex(const std::vector<mfem::Vector>& loc_weight,
+                                          const WellManager& well_manager)
+{
+    std::vector<mfem::Vector> new_loc_weight;
+    new_loc_weight.reserve(loc_weight.size() + well_manager.NumWells(Injector));
+    for (const auto& loc_w : loc_weight) { new_loc_weight.push_back(loc_w); }
+
+    for (const Well& well : well_manager.GetWells())
+    {
+        for (unsigned int j = 0; j < well.cells.size(); j++)
+        {
+            const mfem::Vector& loc_w = loc_weight[well.cells[j]];
+            mfem::Vector& new_loc_w = new_loc_weight[well.cells[j]];
+            new_loc_w.SetSize(loc_w.Size() + 1);
+            std::copy_n(loc_w.GetData(), loc_w.Size(), new_loc_w.GetData());
+            new_loc_w[loc_w.Size()] = well.well_indices[j];
+        }
+
+        if (well.type == Injector)
+        {
+            mfem::Vector new_loc_w(well.cells.size());
+            new_loc_w = 1e10;//INFINITY; // Not sure if this is ok
+            new_loc_weight.push_back(new_loc_w);
+        }
+    }
+
+    return new_loc_weight;
+}
+
+mfem::Vector AppendWellData(const mfem::Vector& vec,
+                            const WellManager& well_manager,
+                            WellType type)
+{
+    const int append_size = type & Producer ? well_manager.NumWellCells()
+                            : well_manager.NumWells(Injector);
+
+    mfem::Vector combined_vec(vec.Size() + append_size);
+    std::copy_n(vec.GetData(), vec.Size(), combined_vec.GetData());
+
+    double* data = combined_vec.GetData() + vec.Size();
+    for (const Well& w : well_manager.GetWells())
+    {
+        const int size = w.cells.size();
+        switch (type)
+        {
+            case Any: std::copy_n(w.well_indices.data(), size, data); break;
+            case Injector: if (w.type == type) *(data++) = w.value; break;
+            case Producer: std::fill_n(data, size, w.type == type ? w.value : 0.0);
+        }
+        data += type & Producer ? size : 0;
+    }
+
+    return combined_vec;
+}
+
+mfem::SparseMatrix ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr,
+                                      const WellManager& well_manager)
+{
+    const int num_edges = edge_bdr.NumRows() + well_manager.NumWellCells();
+    const int nnz = NNZ(edge_bdr) + well_manager.NumWellCells(Producer);
+
+    int* I = new int[num_edges + 1];
+    int* J = new int[nnz];
+    double* Data = new double[nnz];
+
+    std::copy_n(edge_bdr.GetI(), edge_bdr.NumRows() + 1, I);
+    std::copy_n(edge_bdr.GetJ(), NNZ(edge_bdr), J);
+    std::fill_n(Data, nnz, 1.0);
+
+    int* I_ptr = I + edge_bdr.NumRows() + 1;
+    int* J_ptr = J + NNZ(edge_bdr);
+    int bdr = edge_bdr.NumCols();
+
+    for (const Well& well : well_manager.GetWells())
+    {
+        if (well.type == Producer)
+        {
+            std::iota(I_ptr, I_ptr + well.cells.size(), *(I_ptr - 1) + 1);
+            std::fill_n(J_ptr, well.cells.size(), bdr++);
+            J_ptr += well.cells.size();
+        }
+        else
+        {
+            std::fill_n(I_ptr, well.cells.size(), *(I_ptr - 1));
+        }
+        I_ptr += well.cells.size();
+    }
+
+    return mfem::SparseMatrix(I, J, Data, num_edges, bdr);
+}
+
 class TwoPhase : public SPE10Problem
 {
 public:
@@ -224,10 +355,6 @@ private:
     void CombineReservoirAndWellModel();
     void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
 
-    mfem::SparseMatrix ExtendVertexEdge(const mfem::SparseMatrix& vert_edge);
-    mfem::SparseMatrix ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr);
-    mfem::Vector AppendWellData(const mfem::Vector& vec, WellType type);
-    std::vector<mfem::Vector> AppendWellIndex(const std::vector<mfem::Vector>& loc_weight);
     mfem::Vector ComputeVertWeight();
 
     unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
@@ -395,141 +522,15 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
     //    }
 }
 
-mfem::SparseMatrix TwoPhase::ExtendVertexEdge(const mfem::SparseMatrix& vert_edge)
-{
-    const int num_well_cells = well_manager_.NumWellCells();
-    const int num_injector_cells = well_manager_.NumWellCells(Injector);
-
-    int num_verts = vert_edge.NumRows();         // number of reservoir cells
-    int num_edges = vert_edge.NumCols();         // number of reservoir faces
-
-    int* I = new int[num_verts + well_manager_.NumWells(Injector) + 1]();
-    int* J = new int[NNZ(vert_edge) + num_well_cells + num_injector_cells];
-
-    for (const Well& well : well_manager_.GetWells())
-    {
-        for (int cell : well.cells) { I[cell + 1] = 1; }
-    }
-
-    for (int i = 0; i < vert_edge.NumRows(); ++i)
-    {
-        I[i + 1] += I[i] + vert_edge.RowSize(i);
-        std::copy_n(vert_edge.GetRowColumns(i), vert_edge.RowSize(i), J + I[i]);
-    }
-
-    for (const Well& well : well_manager_.GetWells())
-    {
-        if (well.type == Injector)
-        {
-            I[num_verts + 1] = I[num_verts] + well.cells.size();
-            std::iota(J + I[num_verts], J + I[num_verts + 1], num_edges);
-            num_verts++;
-        }
-        for (int cell : well.cells) { J[I[cell + 1] - 1] = num_edges++; }
-    }
-
-    double* Data = new double[I[num_verts]];
-    std::fill_n(Data, I[num_verts], 1.0);
-
-    return mfem::SparseMatrix(I, J, Data, num_verts, num_edges);
-}
-
-std::vector<mfem::Vector> TwoPhase::AppendWellIndex(const std::vector<mfem::Vector>& loc_weight)
-{
-    std::vector<mfem::Vector> new_loc_weight;
-    new_loc_weight.reserve(loc_weight.size() + well_manager_.NumWells(Injector));
-    for (const auto& loc_w : loc_weight) { new_loc_weight.push_back(loc_w); }
-
-    for (const Well& well : well_manager_.GetWells())
-    {
-        for (unsigned int j = 0; j < well.cells.size(); j++)
-        {
-            const mfem::Vector& loc_w = loc_weight[well.cells[j]];
-            mfem::Vector& new_loc_w = new_loc_weight[well.cells[j]];
-            new_loc_w.SetSize(loc_w.Size() + 1);
-            std::copy_n(loc_w.GetData(), loc_w.Size(), new_loc_w.GetData());
-            new_loc_w[loc_w.Size()] = well.well_indices[j];
-        }
-
-        if (well.type == Injector)
-        {
-            mfem::Vector new_loc_w(well.cells.size());
-            new_loc_w = 1e10;//INFINITY; // Not sure if this is ok
-            new_loc_weight.push_back(new_loc_w);
-        }
-    }
-
-    return new_loc_weight;
-}
-
-mfem::Vector TwoPhase::AppendWellData(const mfem::Vector& vec, WellType type)
-{
-    const int append_size = type & Producer ? well_manager_.NumWellCells()
-                            : well_manager_.NumWells(Injector);
-
-    mfem::Vector combined_vec(vec.Size() + append_size);
-    std::copy_n(vec.GetData(), vec.Size(), combined_vec.GetData());
-
-    double* data = combined_vec.GetData() + vec.Size();
-    for (const Well& w : well_manager_.GetWells())
-    {
-        const int size = w.cells.size();
-        switch (type)
-        {
-            case Any: std::copy_n(w.well_indices.data(), size, data); break;
-            case Injector: if (w.type == type) *(data++) = w.value; break;
-            case Producer: std::fill_n(data, size, w.type == type ? w.value : 0.0);
-        }
-        data += type & Producer ? size : 0;
-    }
-
-    return combined_vec;
-}
-
-mfem::SparseMatrix TwoPhase::ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr)
-{
-    const int num_edges = edge_bdr.NumRows() + well_manager_.NumWellCells();
-    const int nnz = NNZ(edge_bdr) + well_manager_.NumWellCells(Producer);
-
-    int* I = new int[num_edges + 1];
-    int* J = new int[nnz];
-    double* Data = new double[nnz];
-
-    std::copy_n(edge_bdr.GetI(), edge_bdr.NumRows() + 1, I);
-    std::copy_n(edge_bdr.GetJ(), NNZ(edge_bdr), J);
-    std::fill_n(Data, nnz, 1.0);
-
-    int* I_ptr = I + edge_bdr.NumRows() + 1;
-    int* J_ptr = J + NNZ(edge_bdr);
-    int bdr = edge_bdr.NumCols();
-
-    for (const Well& well : well_manager_.GetWells())
-    {
-        if (well.type == Producer)
-        {
-            std::iota(I_ptr, I_ptr + well.cells.size(), *(I_ptr - 1) + 1);
-            std::fill_n(J_ptr, well.cells.size(), bdr++);
-            J_ptr += well.cells.size();
-        }
-        else
-        {
-            std::fill_n(I_ptr, well.cells.size(), *(I_ptr - 1));
-        }
-        I_ptr += well.cells.size();
-    }
-
-    return mfem::SparseMatrix(I, J, Data, num_edges, bdr);
-}
-
 void TwoPhase::CombineReservoirAndWellModel()
 {
-    vertex_edge_ = ExtendVertexEdge(vertex_edge_);
-    local_weight_ = AppendWellIndex(local_weight_);
-    weight_ = AppendWellData(weight_, Any);
-    edge_bdr_ = ExtendEdgeBoundary(edge_bdr_);
+    vertex_edge_ = ExtendVertexEdge(vertex_edge_, well_manager_);
+    local_weight_ = AppendWellIndex(local_weight_, well_manager_);
+    weight_ = AppendWellData(weight_, well_manager_, Any);
+    edge_bdr_ = ExtendEdgeBoundary(edge_bdr_, well_manager_);
 
-    rhs_sigma_ = AppendWellData(rhs_sigma_, Producer);
-    rhs_u_ = AppendWellData(rhs_u_, Injector);
+    rhs_sigma_ = AppendWellData(rhs_sigma_, well_manager_, Producer);
+    rhs_u_ = AppendWellData(rhs_u_, well_manager_, Injector);
 
     combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
                                                   well_manager_.NumWellCells());
@@ -582,7 +583,7 @@ void NorneModel::SetupMesh()
     std::ifstream imesh("/Users/lee1029/Downloads/norne/new_norne_HEX.vtk");
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
-};
+}
 
 class SaigupModel : public DarcyProblem
 {
@@ -598,4 +599,282 @@ void SaigupModel::SetupMesh(bool refined)
     std::ifstream imesh("/Users/lee1029/Downloads/"+file);
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
+}
+
+
+class TwoPhaseEGG : public EggModel
+{
+public:
+    TwoPhaseEGG(int well_height, double inject_rate, double bottom_hole_pressure);
+
+    const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
+private:
+    void SetWells(int well_height, double inject_rate, double bot_hole_pres);
+    void SetWells(const std::vector<std::vector<int>>& inj_well_cells,
+                  const std::vector<std::vector<int>>& prod_well_cells,
+                  double inject_rate, double bhp);
+    void CombineReservoirAndWellModel();
+    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
+
+    mfem::Vector ComputeVertWeight();
+
+    unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
+    WellManager well_manager_;
 };
+
+mfem::Vector TwoPhaseEGG::ComputeVertWeight()
+{
+    mfem::Vector vert_weight(vert_weight_);
+    vert_weight *= 0.2;
+    return vert_weight;
+}
+
+void TwoPhaseEGG::SetWells(const std::vector<std::vector<int>>& inj_well_cells,
+                        const std::vector<std::vector<int>>& prod_well_cells,
+                        double inject_rate, double bhp)
+{
+    for (unsigned int i = 0; i < inj_well_cells.size(); ++i)
+    {
+        well_manager_.AddWell(Injector, inject_rate, inj_well_cells[i]);
+    }
+    for (unsigned int i = 0; i < prod_well_cells.size(); ++i)
+    {
+        well_manager_.AddWell(Producer, bhp, prod_well_cells[i]);
+    }
+}
+
+void TwoPhaseEGG::SetWells(int well_height, double inject_rate, double bhp)
+{
+    const int num_wells = 5;
+    std::vector<std::vector<int>> cells(num_wells);
+
+    const double max_x = 365.76 - ft_;
+    const double max_y = 670.56 - ft_;
+
+    mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
+    point = ft_;
+    point(0, 2) = max_x;
+    point(1, 4) = max_y;
+    point(0, 3) = max_x;
+    point(1, 3) = max_y;
+    point(0, 0) = 182.5; // 185.5; // 182.5;
+    point(1, 0) = 335.0; // 336.5; // 335.0; // 258.0; //
+
+
+    for (int j = 0; j < well_height; ++j)
+    {
+        mfem::Array<int> ids;
+        mfem::Array<mfem::IntegrationPoint> ips;
+        mesh_->FindPoints(point, ids, ips, false);
+
+        for (int i = 0; i < num_wells; ++i)
+        {
+            if (ids[i] >= 0) { cells[i].push_back(ids[i]); }
+            if (mesh_->Dimension() == 3) { point(2, i) += 2.0 * ft_; }
+        }
+    }
+
+    for (int i = 0; i < num_wells; ++i)
+    {
+//        WellType type = (i == num_wells - 1) ? Injector : Producer;
+//        double value = (i == num_wells - 1) ? inject_rate : bhp;
+        WellType type = (i == 0) ? Injector : Producer;
+        double value = (i == 0) ? inject_rate : bhp;
+        if (cells[i].size())
+        {
+            well_manager_.AddWell(type, value, cells[i], WellDirection::Z, 0.127);
+        }
+    }
+}
+
+void TwoPhaseEGG::CombineReservoirAndWellModel()
+{
+    vertex_edge_ = ExtendVertexEdge(vertex_edge_, well_manager_);
+    local_weight_ = AppendWellIndex(local_weight_, well_manager_);
+    weight_ = AppendWellData(weight_, well_manager_, Any);
+    edge_bdr_ = ExtendEdgeBoundary(edge_bdr_, well_manager_);
+
+    rhs_sigma_ = AppendWellData(rhs_sigma_, well_manager_, Producer);
+    rhs_u_ = AppendWellData(rhs_u_, well_manager_, Injector);
+
+    combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
+                                                  well_manager_.NumWellCells());
+    edge_trueedge_ = combined_edge_trueedge_.get();
+
+    mfem::Array<int> producer_attr(well_manager_.NumWells(Producer));
+    producer_attr = 0;                // treat producer as "natural boundary"
+    ess_attr_.Append(producer_attr);
+}
+
+void TwoPhaseEGG::MetisPart(const mfem::Array<int>& coarsening_factor,
+                            mfem::Array<int>& partitioning) const
+{
+    const int dim = mesh_->Dimension();
+
+    mfem::SparseMatrix scaled_vert_edge(vertex_edge_);
+    if (dim == 3)
+    {
+        mfem::Vector weight_sqrt(weight_);
+        for (int i = 0; i < weight_.Size(); ++i)
+        {
+            weight_sqrt[i] = std::sqrt(weight_[i]);
+        }
+        scaled_vert_edge.ScaleColumns(weight_sqrt);
+    }
+
+    const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
+    const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
+
+    std::vector<std::vector<int>> iso_verts;
+    iso_vert_count_ = well_manager_.NumWells(Injector);
+    for (int i = 0; i < iso_vert_count_; ++i)
+    {
+        iso_verts.push_back(std::vector<int>(1, mesh_->GetNE() + i));
+    }
+
+    PartitionAAT(scaled_vert_edge, partitioning, metis_cf, dim > 2, iso_verts);
+}
+
+
+class LocalProblem : public DarcyProblem
+{
+public:
+    LocalProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr);
+
+    const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
+private:
+    void SetWells();
+    void SetWells(const std::vector<std::vector<int>>& inj_well_cells,
+                  const std::vector<std::vector<int>>& prod_well_cells,
+                  double inject_rate, double bhp);
+    void CombineReservoirAndWellModel();
+
+    unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
+    unique_ptr<WellManager> well_manager_ptr;
+    mfem::Vector coef_;
+};
+
+LocalProblem::LocalProblem(
+        MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
+    : DarcyProblem(comm, dim, ess_attr)
+{
+    mfem::Mesh mesh(29,29, mfem::Element::QUADRILATERAL, true, 1.0, 1.0);
+    mesh_.reset(new mfem::ParMesh(comm, mesh));
+
+    for (int i = 0; i < mesh_->GetNE(); ++i)
+    {
+        mesh_->SetAttribute(i, i+1);
+    }
+
+    InitGraph();
+
+    coef_.SetSize(mesh_->GetNE());
+    coef_ = 1;
+    double low_perm_value = 1e5;
+    int row_size = 29;
+    std::fill_n(coef_.GetData()+7*row_size, 3*row_size, low_perm_value);
+    std::fill_n(coef_.GetData()+13*row_size, 3*row_size, low_perm_value);
+    std::fill_n(coef_.GetData()+19*row_size, 3*row_size, low_perm_value);
+
+    kinv_vector_ = make_unique<mfem::VectorArrayCoefficient>(dim);
+    for (int d = 0; d < dim; ++d)
+    {
+        auto kinv = new mfem::PWConstCoefficient(coef_);
+        dynamic_cast<mfem::VectorArrayCoefficient&>(*kinv_vector_).Set(d, kinv);
+    }
+
+    ComputeGraphWeight();
+
+    rhs_sigma_ = 0.0;
+    rhs_u_ = 0.0;
+
+    well_manager_ptr.reset(new WellManager(*mesh_, *kinv_vector_));
+    SetWells();
+    CombineReservoirAndWellModel();
+
+    block_offsets_.SetSize(3);
+    block_offsets_[0] = 0;
+    block_offsets_[1] = vertex_edge_.NumCols();
+    block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
+
+    // print perm
+    {
+        mfem::Vector coef_print(coef_);
+        low_perm_value = 1e-5;
+        std::fill_n(coef_print.GetData()+7*row_size, 3*row_size, low_perm_value);
+        std::fill_n(coef_print.GetData()+13*row_size, 3*row_size, low_perm_value);
+        std::fill_n(coef_print.GetData()+19*row_size, 3*row_size, low_perm_value);
+        //    std::iota(coef.GetData(), coef.GetData()+coef.Size(), 0);
+
+        mfem::socketstream souts;
+        VisSetup(souts, coef_print, 0.0, 0.0, "Permeability", false, true);
+    }
+
+//    vert_weight_ = ComputeVertWeight();
+}
+
+void LocalProblem::SetWells()
+{
+    const int num_wells = 1;
+    std::vector<std::vector<int>> cells(num_wells);
+
+    int well_height = 19;
+    double h = 1.0/29;
+    mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
+    point(0, 0) = 0.5;
+    point(1, 0) = 5*h + h/2;
+
+    for (int j = 0; j < well_height; ++j)
+    {
+        mfem::Array<int> ids;
+        mfem::Array<mfem::IntegrationPoint> ips;
+        mesh_->FindPoints(point, ids, ips, false);
+
+        for (int i = 0; i < num_wells; ++i)
+        {
+            if (ids[i] >= 0)
+            {
+                cells[i].push_back(ids[i]);
+            }
+            { point(1, i) += h; }
+        }
+    }
+
+    double inject_rate = 1.0;
+    double bhp = 0.0;
+    for (int i = 0; i < num_wells; ++i)
+    {
+        WellType type = (i == 0) ? Injector : Producer;
+        double value = (i == 0) ? inject_rate : bhp;
+        if (cells[i].size())
+        {
+            well_manager_ptr->AddWell(type, value, cells[i], WellDirection::Z, 0.05/29);
+        }
+    }
+
+    mfem::Vector well_loc(mesh_->GetNE());
+    well_loc = 0.0;
+    for (int cell : cells[0]) { well_loc[cell] = 1; }
+    mfem::socketstream souts;
+    VisSetup(souts, well_loc, 0.0, 0.0, "Well cells", false, true);
+}
+
+void LocalProblem::CombineReservoirAndWellModel()
+{
+    WellManager& well_manager_ = *well_manager_ptr;
+    vertex_edge_ = ExtendVertexEdge(vertex_edge_, well_manager_);
+    local_weight_ = AppendWellIndex(local_weight_, well_manager_);
+    weight_ = AppendWellData(weight_, well_manager_, Any);
+    edge_bdr_ = ExtendEdgeBoundary(edge_bdr_, well_manager_);
+
+    rhs_sigma_ = AppendWellData(rhs_sigma_, well_manager_, Producer);
+    rhs_u_ = AppendWellData(rhs_u_, well_manager_, Injector);
+
+    combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
+                                                  well_manager_.NumWellCells());
+    edge_trueedge_ = combined_edge_trueedge_.get();
+
+    mfem::Array<int> producer_attr(well_manager_.NumWells(Producer));
+    producer_attr = 0;                // treat producer as "natural boundary"
+    ess_attr_.Append(producer_attr);
+}

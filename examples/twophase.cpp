@@ -36,7 +36,8 @@
 using namespace smoothg;
 
 double mu_o = 3e-3; //0.005; //0.0002; //
-double mu_w = 3e-4; // 0.3*centi*poise //1e-3;
+//double mu_w = 3e-4; // 0.3*centi*poise //1e-3;
+double mu_w = 1e-3; // 0.3*centi*poise //1e-3;
 int relperm_order = 2;
 //mfem::Array<int> well_cells;
 mfem::Array<int> well_perforations;
@@ -334,7 +335,7 @@ public:
                const mfem::Vector& S_prev,
                FASParameters param);
 
-    const NonlinearSolver& GetLevelSolver(int level) const { return *solvers_[level]; };
+    const NonlinearSolver& GetLevelSolver(int level) const { return *solvers_[level]; }
 };
 
 class TransportSolver : public NonlinearSolver
@@ -378,7 +379,10 @@ public:
                      double bottom_hole_pressure, const mfem::Array<int>& ess_attr)
         : DarcyProblem(MPI_COMM_WORLD, 2, ess_attr)
     {
-        std::string c2f_filename = path+"/cell_to_faces.txt";
+//        std::string c2f_filename = path+"/cell_to_faces.txt";
+//        std::string c2f_filename = path+"/cell_to_faces_homogeneous_with_all_perforations.txt";
+        std::string c2f_filename = path+"/cell_to_faces_with_all_perforations.txt";
+
 //        std::string c2f_filename = path+"/new_cell_to_faces_saigup_refined.txt";
         std::string vol_filename = path+"/cell_volume_porosity.txt";
         if (path == "/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive")
@@ -415,9 +419,11 @@ public:
         if (num_edges_res == 264305) { num_injectors = 5; num_producers = 5; }
         if (num_edges_res == 2000742) { num_injectors = 5; num_producers = 5; }
 
-
+        int well_height = 7;
         int num_vert_total = num_vert_res + num_injectors;
-        int num_edges_total = num_edges_res + num_injectors + num_producers;
+//        int num_edges_total = num_edges_res + num_injectors + num_producers;
+        int num_edges_total = num_edges_res + well_height*(num_injectors + num_producers);
+
 
         if (!file.is_open())
         {
@@ -521,28 +527,40 @@ public:
             std::getline(file, str);
             std::getline(file, str);
             std::getline(file, str);
-            std::getline(file, str);
+//            std::getline(file, str);
         }
 
         for (int i = 0; i < num_producers; ++i)
         {
-            save_one_line(num_injectors);
+            std::getline(file, str);
+            std::getline(file, str);
+            std::cout<<" new debug print: " << str << "\n";
+            for (int h = 0; h < well_height; ++h)
+            {
+                save_one_line(num_injectors*well_height);
+            }
+            std::cout<<" new debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
         }
-        std::cout<<" debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
 
         if (need_getline)
         {
             std::getline(file, str);
-            std::getline(file, str);
+//            std::getline(file, str);
         }
 
         for (int i = 0; i < num_injectors; ++i)
         {
-            save_one_line(-num_producers);
-            save_one_line(-num_producers);
-            vert_edge.Set(vert - 1, edge - 1 - num_producers, 1e10); // TODO: this is to match well.hpp, not sure if necessary
+            std::getline(file, str);
+            std::getline(file, str);
+            std::cout<<" new debug print: " << str << "\n";
+            for (int h = 0; h < well_height; ++h)
+            {
+                save_one_line(-num_producers*well_height);
+                save_one_line(-num_producers*well_height);
+                vert_edge.Set(vert - 1, edge - 1 - num_producers*well_height, 1e10); // TODO: this is to match well.hpp, not sure if necessary
+            }
+            std::cout<<" new debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
         }
-        std::cout<<" debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
 
 
         vert_edge.Finalize();
@@ -579,7 +597,10 @@ public:
         std::cout<<" num_producers = "<<num_producers<<"\n";
         for (int i = 0; i < num_producers; ++i)
         {
-            edge_bdr.Set(num_edges_res + num_injectors + i, 1 + i, 1.0);
+            for (int h = 0; h < well_height; ++ h)
+            {
+                edge_bdr.Set(num_edges_res + (num_injectors + i)*well_height + h, 1 + i, 1.0);
+            }
         }
         edge_bdr.Finalize();
 
@@ -603,7 +624,10 @@ public:
         rhs_sigma_ = 0.0;
         for (int i = 0; i < num_producers; ++i)
         {
-            rhs_sigma_[num_edges_res + num_injectors + i] = bottom_hole_pressure;
+            for (int h = 0; h < well_height; ++ h)
+            {
+                rhs_sigma_[num_edges_res + (num_injectors + i)*well_height + h] = bottom_hole_pressure;
+            }
         }
 
         rhs_u_.SetSize(num_vert_total);
@@ -868,7 +892,7 @@ int main(int argc, char* argv[])
     // program options from command line
     EvolveParamenters evolve_param;
     mfem::OptionsParser args(argc, argv);
-    std::string base_dir = "/Users/lee1029/Downloads/";
+    std::string base_dir = "/home/chak/Downloads/";
     const char* problem_dir = "";
     args.AddOption(&problem_dir, "-pd", "--problem-directory",
                    "Directory where data files are located");
@@ -932,7 +956,7 @@ int main(int argc, char* argv[])
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
 
     const int max_iter = upscale_param.max_levels > 1 ? 100 : 100;
-//    mu_o = smeared_front ? 0.005 : 0.0002;
+    mu_o = smeared_front ? 0.005 : 0.0002;
 
     FASParameters fas_param;
     fas_param.fine.max_num_iter = use_vcycle ? 1 : max_iter;
@@ -1030,6 +1054,16 @@ int main(int argc, char* argv[])
 //            num_vert_res = 148424;
 //            nnz_res = num_vert_res * 6;
 //            num_edges_res = 459456;
+
+            ess_attr.SetSize(3, 1);
+            problem_for_plot.reset(new EggModel(0, 0, ess_attr));
+        }
+        else if (path == "/home/chak/Downloads/egg_well_model")
+        {
+            num_vert_res = 18553;
+            nnz_res = num_vert_res * 6;
+            num_edges_res = 59205;
+            upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel(0, 0, ess_attr));
@@ -1754,14 +1788,25 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         {
             x.GetSubVector(well_perforations, well_flux);
             std::cout<< "flux at wells" << ":\n";
-            well_flux.Print(std::cout, 5);
+            well_flux.Print(std::cout, 7);
 
             std::cout<< "pressure at wells: "<< x.GetBlock(1)[x.BlockSize(1)-1] << "\n";
             std::cout<< "saturation at wells: "<< x[x.Size()-1] << "\n";
             mfem::Vector Ws(x.BlockSize(2));
             weight_.Mult(x.GetBlock(2), Ws);
+            Ws[Ws.Size()-1] = 0.0;
+            mfem::Vector W1(x.BlockSize(2));
+            mfem::Vector ones(x.BlockSize(2));
+            ones = 1.0;
+            weight_.Mult(ones, W1);
             std::cout<< "sum(Ws) / sum(W): "<<
-                        Ws.Sum() / 11781.6 / density_ / (400.0*std::pow(0.3048, 3)) << "\n";
+                        Ws.Sum() / W1.Sum() << "\n";
+//                        Ws.Sum() / 11781.6 / density_ / (400.0*std::pow(0.3048, 3)) << "\n";
+        }
+
+        if (level_ == 0)
+        {
+            step_CFL_const_.push_back(EvalCFL(dt_real, x));
         }
 
         if (myid == 0)
@@ -1797,12 +1842,6 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         all_file << "\nSCALARS saturation double 1\nLOOKUP_TABLE default\n";
         all_file << std::fixed;
         x_blk2.Print(all_file, 1);
-
-        if (level_ == 0)
-        {
-            step_CFL_const_.push_back(EvalCFL(dt_real, x));
-        }
-
     }
 
     if (myid == 0)

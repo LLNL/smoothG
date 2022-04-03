@@ -1413,6 +1413,9 @@ void EggModel::SetupCoeff()
     h = 8.0;
     h(2) = 4.0;
 
+    vert_weight_.SetSize(mesh_->GetNE());
+    vert_weight_ = 8.0 * 8.0 * 4.0;
+
     using IPC = InversePermeabilityCoefficient;
     kinv_vector_ = make_unique<IPC>(comm_, "egg_perm.dat", N, N, h);
 }

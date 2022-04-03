@@ -49,6 +49,9 @@ target_link_libraries(nldarcy smoothg ${TPL_LIBRARIES})
 add_executable(twophase twophase.cpp)
 target_link_libraries(twophase smoothg ${TPL_LIBRARIES})
 
+add_executable(well_basis well_basis.cpp)
+target_link_libraries(well_basis smoothg ${TPL_LIBRARIES})
+
 # add tests
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
     set(SMOOTHG_TEST_PROCS 2)
