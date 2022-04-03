@@ -739,14 +739,11 @@ void TwoPhaseEGG::MetisPart(const mfem::Array<int>& coarsening_factor,
 class LocalProblem : public DarcyProblem
 {
 public:
-    LocalProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr);
+    LocalProblem(MPI_Comm comm, int dim, std::vector<int> num_cells);
 
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
 private:
-    void SetWells();
-    void SetWells(const std::vector<std::vector<int>>& inj_well_cells,
-                  const std::vector<std::vector<int>>& prod_well_cells,
-                  double inject_rate, double bhp);
+    void SetWells(int num_cells_vertical);
     void CombineReservoirAndWellModel();
 
     unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
@@ -754,12 +751,21 @@ private:
     mfem::Vector coef_;
 };
 
-LocalProblem::LocalProblem(
-        MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
-    : DarcyProblem(comm, dim, ess_attr)
+LocalProblem::LocalProblem(MPI_Comm comm, int dim, std::vector<int> num_cells)
+    : DarcyProblem(comm, dim, mfem::Array<int>(dim == 2 ? 4 : 6))
 {
-    mfem::Mesh mesh(29,29, mfem::Element::QUADRILATERAL, true, 1.0, 1.0);
-    mesh_.reset(new mfem::ParMesh(comm, mesh));
+    ess_attr_ = 1;
+    auto type = dim < 3 ? mfem::Element::QUADRILATERAL : mfem::Element::HEXAHEDRON;
+    if (dim == 2)
+    {
+        mfem::Mesh mesh(num_cells[0], num_cells[1], type, true);
+        mesh_.reset(new mfem::ParMesh(comm, mesh));
+    }
+    else
+    {
+        mfem::Mesh mesh(num_cells[0], num_cells[1], num_cells[2], type, true);
+        mesh_.reset(new mfem::ParMesh(comm, mesh));
+    }
 
     for (int i = 0; i < mesh_->GetNE(); ++i)
     {
@@ -770,11 +776,14 @@ LocalProblem::LocalProblem(
 
     coef_.SetSize(mesh_->GetNE());
     coef_ = 1;
-    double low_perm_value = 1e5;
-    int row_size = 29;
-    std::fill_n(coef_.GetData()+7*row_size, 3*row_size, low_perm_value);
-    std::fill_n(coef_.GetData()+13*row_size, 3*row_size, low_perm_value);
-    std::fill_n(coef_.GetData()+19*row_size, 3*row_size, low_perm_value);
+    double low_perm_val = 1e5;
+    int layer_size = dim == 2 ? num_cells[0] : num_cells[0] * num_cells[1];
+
+    for (int channel = 0; channel < 3; channel++)
+    {
+        int offset = (num_cells[dim-1] - 1) / 2 - 7 + channel * 6;
+        std::fill_n(coef_.GetData()+offset*layer_size, 3*layer_size, low_perm_val);
+    }
 
     kinv_vector_ = make_unique<mfem::VectorArrayCoefficient>(dim);
     for (int d = 0; d < dim; ++d)
@@ -789,7 +798,7 @@ LocalProblem::LocalProblem(
     rhs_u_ = 0.0;
 
     well_manager_ptr.reset(new WellManager(*mesh_, *kinv_vector_));
-    SetWells();
+    SetWells(num_cells[dim-1]);
     CombineReservoirAndWellModel();
 
     block_offsets_.SetSize(3);
@@ -800,12 +809,12 @@ LocalProblem::LocalProblem(
     // print perm
     {
         mfem::Vector coef_print(coef_);
-        low_perm_value = 1e-5;
-        std::fill_n(coef_print.GetData()+7*row_size, 3*row_size, low_perm_value);
-        std::fill_n(coef_print.GetData()+13*row_size, 3*row_size, low_perm_value);
-        std::fill_n(coef_print.GetData()+19*row_size, 3*row_size, low_perm_value);
-        //    std::iota(coef.GetData(), coef.GetData()+coef.Size(), 0);
-
+        low_perm_val = 1e-5;
+        for (int channel = 0; channel < 3; channel++)
+        {
+            int offset = (num_cells[dim-1] - 1) / 2 - 7 + channel * 6;
+            std::fill_n(coef_print.GetData()+offset*layer_size, 3*layer_size, low_perm_val);
+        }
         mfem::socketstream souts;
         VisSetup(souts, coef_print, 0.0, 0.0, "Permeability", false, true);
     }
@@ -813,16 +822,16 @@ LocalProblem::LocalProblem(
 //    vert_weight_ = ComputeVertWeight();
 }
 
-void LocalProblem::SetWells()
+void LocalProblem::SetWells(int num_cells_vertical)
 {
     const int num_wells = 1;
     std::vector<std::vector<int>> cells(num_wells);
 
-    int well_height = 19;
-    double h = 1.0/29;
+    int well_height = num_cells_vertical - 10;
+    double h = 1.0 / num_cells_vertical;
     mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
-    point(0, 0) = 0.5;
-    point(1, 0) = 5*h + h/2;
+    point = 0.5;
+    point(mesh_->Dimension()-1, 0) = 5*h + h/2;
 
     for (int j = 0; j < well_height; ++j)
     {
@@ -836,7 +845,7 @@ void LocalProblem::SetWells()
             {
                 cells[i].push_back(ids[i]);
             }
-            { point(1, i) += h; }
+            { point(mesh_->Dimension()-1, i) += h; }
         }
     }
 
@@ -848,7 +857,7 @@ void LocalProblem::SetWells()
         double value = (i == 0) ? inject_rate : bhp;
         if (cells[i].size())
         {
-            well_manager_ptr->AddWell(type, value, cells[i], WellDirection::Z, 0.05/29);
+            well_manager_ptr->AddWell(type, value, cells[i], WellDirection::Z, 0.05*h);
         }
     }
 
