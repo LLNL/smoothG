@@ -356,7 +356,7 @@ void LevelSolver::AdjustChange(mfem::Vector& x, mfem::Vector& dx)
 
     mfem::BlockVector block_dx(dx.GetData(), mixed_system_.BlockOffsets());
     auto delta_p = mixed_system_.PWConstProject(block_dx.GetBlock(1));
-    auto max_dp = AbsMax(delta_p, comm_);
+    auto max_dp = ParAbsMax(delta_p, comm_);
     auto relative_change = max_dp * kappa_.alpha / std::log(param_.diff_tol);
 
     if (relative_change > 1.0)

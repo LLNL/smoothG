@@ -239,11 +239,11 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
                                     const mfem::HypreParMatrix& entity_trueentity_entity);
 
-/// Max of absolute values of entries of vec
-double AbsMax(const mfem::Vector& vec, MPI_Comm comm);
+/// Max of absolute values of entries of vec in all processors
+double ParAbsMax(const mfem::Vector& vec, MPI_Comm comm);
 
-/// Min of entries of vec
-double Min(const mfem::Vector& vec, MPI_Comm comm);
+/// Min of entries of vec in all processors
+double ParMin(const mfem::Vector& vec, MPI_Comm comm);
 
 /// Set entries in vec corresponding to nonzero entries of marker to be 0
 void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec);
