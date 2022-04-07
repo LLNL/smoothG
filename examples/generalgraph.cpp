@@ -218,9 +218,9 @@ void MetisGraphPart(const mfem::SparseMatrix& vertex_edge, mfem::Array<int>& par
     mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
     mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
 
-    mfem::Array<int> post_isolate_vertices;
+    std::vector<int> post_isolate_vertices;
     if (isolate >= 0)
-        post_isolate_vertices.Append(isolate);
+        post_isolate_vertices.push_back(isolate);
 
     partitioner.SetPostIsolateVertices(post_isolate_vertices);
 

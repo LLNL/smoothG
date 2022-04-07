@@ -132,17 +132,10 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
             partitioning[sub_to_global[i]] = sub_part[i];
         }
 
-        for (auto& partition : pre_isolated_vertices_)
-        {
-            for (auto vertex : partition)
-            {
-                partitioning[vertex] = num_partitions;
-            }
-            num_partitions++;
-        }
+        AddAggregates(pre_isolated_vertices_, num_partitions, partitioning);
     }
 
-    if (post_isolated_vertices_.Size() > 0)
+    if (post_isolated_vertices_.size() > 0)
     {
         IsolatePostProcess(wtable, num_partitions, partitioning);
     }
@@ -155,9 +148,12 @@ void MetisGraphPartitioner::SetPreIsolateVertices(int index)
     pre_isolated_vertices_.push_back(std::vector<int>(1, index));
 }
 
-void MetisGraphPartitioner::SetPreIsolateVertices(std::vector<int> indices)
+void MetisGraphPartitioner::SetPreIsolateVertices(const std::vector<int>& indices)
 {
-    pre_isolated_vertices_.push_back(std::move(indices));
+    for (auto& index : indices)
+    {
+        pre_isolated_vertices_.push_back(std::vector<int>(1, index));
+    }
 }
 
 void MetisGraphPartitioner::SetPreIsolateVertices(std::vector<std::vector<int>> sets)
@@ -170,12 +166,15 @@ void MetisGraphPartitioner::SetPreIsolateVertices(std::vector<std::vector<int>> 
 
 void MetisGraphPartitioner::SetPostIsolateVertices(int index)
 {
-    post_isolated_vertices_.Append(index);
+    post_isolated_vertices_.push_back(std::vector<int>(1, index));
 }
 
-void MetisGraphPartitioner::SetPostIsolateVertices(const mfem::Array<int>& indices)
+void MetisGraphPartitioner::SetPostIsolateVertices(const std::vector<int>& indices)
 {
-    post_isolated_vertices_.Append(indices);
+    for (auto& index : indices)
+    {
+        post_isolated_vertices_.push_back(std::vector<int>(1, index));
+    }
 }
 
 mfem::SparseMatrix MetisGraphPartitioner::getAdjacency(
@@ -266,21 +265,26 @@ void MetisGraphPartitioner::IsolatePostProcess(const mfem::SparseMatrix& wtable,
                                                mfem::Array<int>& partitioning)
 {
     // do a post-processing of partitioning to put critical vertices in their own partitions
-    {
-        int c_elem = num_partitions;
-        for (int i(0); i < post_isolated_vertices_.Size(); ++i)
-        {
-            int num = post_isolated_vertices_[i];
-            partitioning[num] = c_elem;
-            c_elem++;
-        }
-        num_partitions = c_elem;
-    }
+    AddAggregates(post_isolated_vertices_, num_partitions, partitioning);
 
     // removing cells may have made some partitions disconnected, so now
     // we fix that
     connectedComponents(partitioning, wtable);
     num_partitions = partitioning.Max() + 1;
+}
+
+void MetisGraphPartitioner::AddAggregates(const std::vector<std::vector<int>>& aggs,
+                                          int& current_num_aggs,
+                                          mfem::Array<int>& partitioning)
+{
+    for (auto& vertices : aggs)
+    {
+        for (auto vertex : vertices)
+        {
+            partitioning[vertex] = current_num_aggs;
+        }
+        current_num_aggs++;
+    }
 }
 
 int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
