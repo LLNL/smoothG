@@ -278,7 +278,7 @@ void BlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
     }
     dMdp.Finalize();
 
-    if (NNZ(dMdp) > 0)
+    if (dMdp.NumNonZeroElems() > 0)
     {
         mfem::SparseMatrix dMdp_copy(dMdp);
         for (int i = 0; i < ess_edofs_.Size(); ++i)

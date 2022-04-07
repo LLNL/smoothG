@@ -547,7 +547,7 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
             return NULL; /* error: A_offd and B_offd have different dimensions */
         }
         /* copy A_cmap -> C_cmap */
-        C_cmap = hypre_TAlloc(HYPRE_Int, A_cmap_size, HYPRE_MEMORY_HOST_ACT);
+        C_cmap = hypre_TAlloc(HYPRE_Int, A_cmap_size, HYPRE_MEMORY_HOST);
         for (im = 0; im < A_cmap_size; im++)
         {
             C_cmap[im] = A_cmap[im];
@@ -1285,12 +1285,7 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat)
     return offd;
 }
 
-int NNZ(const mfem::SparseMatrix& mat)
-{
-    return mat.NumNonZeroElems();
-}
-
-double FroNorm(const mfem::SparseMatrix& mat)
+double FrobeniusNorm(const mfem::SparseMatrix& mat)
 {
     double norm = 0.0;
     for (int i = 0; i < mat.NumNonZeroElems(); ++i)
