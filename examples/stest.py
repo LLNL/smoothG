@@ -770,9 +770,8 @@ def make_tests():
           "--max-levels", "3",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
-<<<<<<< HEAD
-         {"p-error-level-1": 0.15901786208069255,
-          "p-error-level-2": 0.28920183554358542}]
+         {"p-error-level-1": 0.15325177356696879,
+          "p-error-level-2": 0.28438100342155059}]
 
     tests["ml-sampler4-mac"] = \
         [["./sampler",
@@ -782,10 +781,6 @@ def make_tests():
           "--max-evects", "4"],
          {"p-error-level-1": 0.15902531435127545,
           "p-error-level-2": 0.29696652801349377}]
-=======
-         {"p-error-level-1": 0.1536666324079243,
-          "p-error-level-2": 0.37704136243107045}]
->>>>>>> f329ea704c1ef7d2d6681c5300aacb2792a6b9f3
 
     # this is supposed to mimic using --choose-samples, but the choice
     # depends on cpu time, so for reproducibility we fix everything
@@ -863,7 +858,7 @@ def make_tests():
           "--num-relax-fine", "1",
           "--use-picard",
           "--perm", spe10_perm_file],
-         {"nonlinear-iterations":49}]
+         {"nonlinear-iterations":59}]
 
     tests["fas-picard"] = \
         [["./nldarcy",
@@ -878,7 +873,7 @@ def make_tests():
           "--max-evects", "1",
           "--use-picard",
           "--perm", spe10_perm_file],
-         {"nonlinear-iterations":13}]
+         {"nonlinear-iterations":16}]
 
     tests["fas-newton-one-level"] = \
         [["./nldarcy",
@@ -888,7 +883,7 @@ def make_tests():
           "--num-relax-fine", "1",
           "--use-newton",
           "--perm", spe10_perm_file],
-         {"nonlinear-iterations":21}]
+         {"nonlinear-iterations":22}]
 
     tests["fas-newton"] = \
         [["./nldarcy",

@@ -68,9 +68,8 @@ void BlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 
     if (W_is_nonzero_)
     {
-        mfem::HypreParMatrix pW(comm_, D->M(), D->RowPart(), W);
-        nnz_ += pW.NNZ();
-        schur_block_.reset(ParAdd(pW, *schur_block_));
+        nnz_ += W->NumNonZeroElems();
+        GetDiag(*schur_block_).Add(1.0, *W);
     }
     else if (remove_one_dof_)
     {
