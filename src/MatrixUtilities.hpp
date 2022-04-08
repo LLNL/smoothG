@@ -482,6 +482,10 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 /// @return Frobenius Norm of a matrix
 double FrobeniusNorm(const mfem::SparseMatrix& mat);
 
+/// Drop the entries (whether on diagonal or not) that are smaller than tol
+/// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
+HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */
