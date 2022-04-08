@@ -649,8 +649,16 @@ void DarcyProblem::ComputeGraphWeight(bool unit_weight)
     }
 
     // Compute local edge weights
-    LocalTPFA local_TPFA(*pmesh_, *kinv_vector_);
-    local_weight_ = local_TPFA.ComputeLocalWeights();
+    unique_ptr<LocalTPFA> tpfa;
+    if (kinv_vector_)
+    {
+        tpfa = make_unique<LocalTPFA>(*pmesh_, *kinv_vector_);
+    }
+    else
+    {
+        tpfa = make_unique<LocalTPFA>(*pmesh_, *kinv_scalar_);
+    }
+    local_weight_ = tpfa->ComputeLocalWeights();
 
     // Assemble edge weights w_ij = (w_{ij,i}^{-1} + w_{ij,j}^{-1})^{-1}
     mfem::Array<int> edges;
@@ -1075,8 +1083,6 @@ public:
 private:
     void SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref);
     void SetupCoeff(int nDimensions, double correlation_length);
-
-    unique_ptr<mfem::ParMesh> pmesh_c_;
 };
 
 LognormalModel::LognormalModel(int nDimensions, int num_ser_ref,
@@ -1095,7 +1101,7 @@ LognormalModel::LognormalModel(int nDimensions, int num_ser_ref,
 
 void LognormalModel::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref)
 {
-    const int N = std::pow(2, num_ser_ref);
+    const int N = std::pow(2, 8 - nDimensions + num_ser_ref);
     unique_ptr<mfem::Mesh> mesh;
     if (nDimensions == 2)
     {
@@ -1105,13 +1111,8 @@ void LognormalModel::SetupMesh(int nDimensions, int num_ser_ref, int num_par_ref
     {
         mesh = make_unique<mfem::Mesh>(N, N, N, mfem::Element::HEXAHEDRON, true);
     }
-
     pmesh_ = make_unique<mfem::ParMesh>(comm_, *mesh);
-    for (int i = 0; i < 0; i++)
-    {
-        pmesh_->UniformRefinement();
-    }
-    pmesh_c_ = make_unique<mfem::ParMesh>(*pmesh_);
+
     for (int i = 0; i < num_par_ref ; i++)
     {
         pmesh_->UniformRefinement();
@@ -1150,10 +1151,15 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length)
     sol = 0.0;
     solver.Solve(rhs, sol);
 
+
     for (int i = 0; i < coeff_gf_->Size(); ++i)
     {
         coeff_gf_->Elem(i) = std::exp(sol[i]);
     }
+
+    mfem::socketstream soc;
+    VisSetup(soc, *coeff_gf_, 0., 0., "Lognormal permeability", 1);
+
     kinv_scalar_ = make_unique<mfem::GridFunctionCoefficient>(coeff_gf_.get());
 }
 
@@ -1251,8 +1257,6 @@ Richards::Richards(int num_ref, const mfem::Array<int>& ess_attr)
 {
     SetupMeshCoeff(num_ref);
     InitGraph();
-
-    kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
     ComputeGraphWeight();
 
     SetupRHS();
@@ -1260,13 +1264,14 @@ Richards::Richards(int num_ref, const mfem::Array<int>& ess_attr)
 
 void Richards::SetupMeshCoeff(int num_ref)
 {
-    mfem::Mesh mesh(40, 10, mfem::Element::QUADRILATERAL, 1, 4000.0, 1000.0);
+    mfem::Mesh mesh(160, 40, mfem::Element::QUADRILATERAL, 1, 4000.0, 1000.0);
     for (int i = 0; i < num_ref; i++)
     {
         mesh.UniformRefinement();
     }
-
     pmesh_ = make_unique<mfem::ParMesh>(comm_, mesh);
+
+    kinv_scalar_ = make_unique<mfem::ConstantCoefficient>(1.0);
 }
 
 void Velocity(const mfem::Vector& x, mfem::Vector& out)

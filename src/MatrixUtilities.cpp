@@ -1350,9 +1350,7 @@ HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol)
          {
             HYPRE_Int     col = A_offd_j[j];
             HYPRE_Complex val = A_offd_a[j];
-            /* in normal cases: diagonal entry should not
-             * appear in A_offd (but this can still be possible) */
-            if (i + first_row == col_map_offd_A[col] || fabs(val) >= tol)
+            if (fabs(val) >= tol)
             {
                if (0 == marker_offd[col])
                {
