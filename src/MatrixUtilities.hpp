@@ -489,7 +489,7 @@ double FrobeniusNorm(const mfem::SparseMatrix& mat);
 
 /// Drop the entries (whether on diagonal or not) that are smaller than tol
 /// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
-HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol);
+HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol);
 
 } // namespace smoothg
 
