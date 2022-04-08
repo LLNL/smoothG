@@ -33,7 +33,8 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
     : comm_(mixed_system.GetComm()),
       solvers_(param.max_levels),
       setup_time_(0.0),
-      ess_attr_(ess_attr)
+      ess_attr_(ess_attr),
+      param_(param)
 {
     mfem::StopWatch chrono;
     chrono.Start();
@@ -42,12 +43,16 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
+    if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
     MakeSolver(0, param);
+
+    agg_vert_.reserve(param.max_levels - 1);
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
         Coarsen(level, param, level ? nullptr : partitioning);
         MakeSolver(level + 1, param);
+        if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
     }
 
     chrono.Stop();
@@ -61,16 +66,17 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     mgL.BuildM();
 
     GraphTopology topology;
-    Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning)
-                         : topology.Coarsen(mgL.GetGraph(), param.coarse_factor);
+    Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
+                         topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
+
+    agg_vert_.push_back(topology.Agg_vertex_);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
-    std::vector<mfem::DenseMatrix> edge_traces;
-    std::vector<mfem::DenseMatrix> vertex_targets;
-
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-    localtargets.Compute(edge_traces, vertex_targets);
+    auto vertex_targets = localtargets.ComputeVertexTargets();
+
+    auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 
@@ -96,7 +102,7 @@ void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
     else // L2-H1 block diagonal preconditioner
     {
         GetMatrix(level).BuildM();
-        solvers_[level].reset(new MinresBlockSolverFalse(GetMatrix(level), ess_attr_));
+        solvers_[level].reset(new BlockSolverFalse(GetMatrix(level), ess_attr_));
     }
 }
 
@@ -208,18 +214,12 @@ mfem::BlockVector Hierarchy::Project(int level, const mfem::BlockVector& x) cons
 
 mfem::Vector Hierarchy::PWConstProject(int level, const mfem::Vector& x) const
 {
-    mfem::Vector out(GetMatrix(level).GetGraph().NumVertices());
-    GetMatrix(level).GetPWConstProj().Mult(x, out);
-    return out;
+    return GetMatrix(level).PWConstProject(x);
 }
 
 mfem::Vector Hierarchy::PWConstInterpolate(int level, const mfem::Vector& x) const
 {
-    mfem::Vector scaled_x(x);
-    RescaleVector(GetMatrix(level).GetVertexSizes(), scaled_x);
-    mfem::Vector out(GetMatrix(level).NumVDofs());
-    GetMatrix(level).GetPWConstProj().MultTranspose(scaled_x, out);
-    return out;
+    return GetMatrix(level).PWConstInterpolate(x);
 }
 
 MixedMatrix& Hierarchy::GetMatrix(int level)
@@ -344,12 +344,31 @@ void Hierarchy::SetAbsTol(double atol)
     }
 }
 
+void Hierarchy::SetPrintLevel(int level, int print_level)
+{
+    solvers_[level]->SetPrintLevel(print_level);
+}
+
+void Hierarchy::SetMaxIter(int level, int max_num_iter)
+{
+    solvers_[level]->SetMaxIter(max_num_iter);
+}
+
+void Hierarchy::SetRelTol(int level, double rtol)
+{
+    solvers_[level]->SetRelTol(rtol);
+}
+
+void Hierarchy::SetAbsTol(int level, double atol)
+{
+    solvers_[level]->SetAbsTol(atol);
+}
+
 void Hierarchy::ShowSetupTime(std::ostream& out) const
 {
     if (myid_ == 0)
     {
-        out << "\n";
-        out << "Hierarchy Setup Time:      " << setup_time_ << "\n";
+        out << "Hierarchy Setup Time:      " << setup_time_ << "\n\n";
     }
 }
 
@@ -427,6 +446,7 @@ void Hierarchy::Debug_tests(int level) const
 
     out -= random_vec;
     double diff = mfem::ParNormlp(out, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
+
     if (myid_ == 0 && diff >= error_tolerance)
     {
         std::cerr << "|| rand - Proj_sigma_ * Psigma_ * rand || / || rand || = " << diff
@@ -457,6 +477,7 @@ void Hierarchy::Debug_tests(int level) const
 
     pi_u_D_rand -= D_pi_sigma_rand;
     diff = mfem::ParNormlp(pi_u_D_rand, 2, comm_) / mfem::ParNormlp(random_vec, 2, comm_);
+
     if (myid_ == 0 && diff >= error_tolerance)
     {
         std::cerr << "|| pi_u * D * rand - D * pi_sigma * rand || / || rand || = "

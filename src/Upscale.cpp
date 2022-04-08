@@ -37,6 +37,7 @@ Upscale::Upscale(Hierarchy&& hierarchy)
     {
         rhs_.emplace_back(BlockOffsets(level));
         sol_.emplace_back(BlockOffsets(level));
+        sol_.back() = 0.0;
     }
 }
 

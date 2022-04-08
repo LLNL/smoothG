@@ -165,13 +165,13 @@ public:
     {
         for (int i = 1; i < hierarchy_.NumLevels(); ++i)
         {
-            hierarchy_.SetRelTolAtLevel(i, rel_tol);
+            hierarchy_.SetRelTol(i, rel_tol);
         }
         if (abs_tol >= 0.0)
         {
             for (int i = 1; i < hierarchy_.NumLevels(); ++i)
             {
-                hierarchy_.SetAbsTolAtLevel(i, abs_tol);
+                hierarchy_.SetAbsTol(i, abs_tol);
             }
         }
     }

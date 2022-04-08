@@ -14,14 +14,14 @@
  ***********************************************************************EHEADER*/
 
 /**
-   @file MinresBlockSolver.hpp
+   @file BlockSolver.hpp
 
    @brief Given a graph in mixed form, solve the resulting system with
-   preconditioned MINRES
+   preconditioned Krylov solver
 */
 
-#ifndef __MINRESBLOCKSOLVER_HPP
-#define __MINRESBLOCKSOLVER_HPP
+#ifndef __BLOCKSOLVER_HPP
+#define __BLOCKSOLVER_HPP
 
 #include <memory>
 #include <assert.h>
@@ -34,8 +34,7 @@ namespace smoothg
 {
 
 /**
-   @brief Block diagonal preconditioned MINRES solver for saddle point
-   problem.
+   @brief Block diagonal preconditioned Krylov solver for saddle point problem.
 
    Given matrix M and D, setup and solve the graph Laplacian problem
    \f[
@@ -51,11 +50,11 @@ namespace smoothg
        f \\ g
      \end{array} \right)
    \f]
-   using MinRes with a block-diagonal preconditioner.
+   using MinRes or GMRES with a block-diagonal preconditioner.
 
    This class and its implementation owes a lot to MFEM example ex5p
 */
-class MinresBlockSolver : public MixedLaplacianSolver
+class BlockSolver : public MixedLaplacianSolver
 {
 public:
     /**
@@ -67,36 +66,32 @@ public:
        @param block_true_offsets describes parallel partitioning (@todo can this be inferred from the matrices?)
        @param use_W use the W block
     */
-    MinresBlockSolver(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::SparseMatrix* W,
-                      const mfem::Array<int>& block_true_offsets);
+    BlockSolver(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D, mfem::SparseMatrix* W,
+                const mfem::Array<int>& block_true_offsets);
 
     /**
        @brief Constructor from a single MixedMatrix
     */
-    MinresBlockSolver(const MixedMatrix& mgL,
-                      const mfem::Array<int>* ess_attr = nullptr);
+    BlockSolver(const MixedMatrix& mgL,
+                const mfem::Array<int>* ess_attr = nullptr);
 
     /**
        @brief Use block-preconditioned MINRES to solve the problem.
     */
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
 
+    virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                const std::vector<mfem::DenseMatrix>& N_el)
+    {
+        mfem::mfem_error("not implemented!\n");
+    }
+
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse)
     {
         mfem::mfem_error("This is currently not supported!\n");
     }
 
-    ///@name Set solver parameters
-    ///@{
-    virtual void SetPrintLevel(int print_level) override;
-    virtual void SetMaxIter(int max_num_iter) override;
-    virtual void SetRelTol(double rtol) override;
-    virtual void SetAbsTol(double atol) override;
-    ///@}
-
 protected:
-    mfem::MINRESSolver minres_;
-
     void Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
               mfem::SparseMatrix* W);
 
@@ -116,21 +111,26 @@ protected:
 };
 
 /**
-   @brief MinresBlockSolver acts on "true" dofs, this one does not.
+   @brief BlockSolver acts on "true" dofs, this one does not.
 */
-class MinresBlockSolverFalse : public MinresBlockSolver
+class BlockSolverFalse : public BlockSolver
 {
 public:
-    MinresBlockSolverFalse(const MixedMatrix& mgL,
-                           const mfem::Array<int>* ess_attr = nullptr);
+    BlockSolverFalse(const MixedMatrix& mgL,
+                     const mfem::Array<int>* ess_attr = nullptr);
 
     virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
 
     virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
 
     virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
+
+    virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
+                                const std::vector<mfem::DenseMatrix>& N_el) override;
+
 private:
     const MixedMatrix& mixed_matrix_;
+    std::unique_ptr<mfem::HypreParMatrix> block_01_;
 };
 
 } // namespace smoothg

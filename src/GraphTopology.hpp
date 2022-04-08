@@ -48,9 +48,12 @@ public:
        @brief Coarsen a given graph
        @param fine_graph graph to be coarsened
        @param coarsening_factor intended number of vertices in an aggregate
+       @param num_iso_verts number of vertices to be isolated in the coarsening.
+              An isolated vertex forms an aggregate in all levels. The vertices
+              to be isolated are the ones in the end of the vertex enumeration.
        @return coarse graph
     */
-    Graph Coarsen(const Graph& fine_graph, int coarsening_factor);
+    Graph Coarsen(const Graph& fine_graph, int coarsening_factor, int num_iso_verts = 0);
 
     /**
        @brief Coarsen a given graph

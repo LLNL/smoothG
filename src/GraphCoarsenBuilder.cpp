@@ -62,26 +62,6 @@ void ElementMBuilder::Setup(const GraphSpace& coarse_space)
     ResetEdgeCdofMarkers(elem_edgedof_.NumCols());
 }
 
-void CoefficientMBuilder::Setup(const GraphSpace& coarse_space)
-{
-    const mfem::SparseMatrix& agg_coarse_vdof = coarse_space.VertexToVDof();
-
-    total_num_traces_ = coarse_space.EdgeToEDof().NumCols();
-    ncoarse_vertexdofs_ = agg_coarse_vdof.NumCols();
-    num_aggs_ = agg_coarse_vdof.NumRows();;
-
-    coarse_agg_dof_offsets_.SetSize(num_aggs_ + 1);
-    coarse_agg_dof_offsets_[0] = total_num_traces_;
-    for (unsigned int i = 0; i < num_aggs_; ++i)
-    {
-        coarse_agg_dof_offsets_[i + 1] = coarse_agg_dof_offsets_[i] + agg_coarse_vdof.RowSize(i) - 1;
-    }
-
-    Agg_face_ref_.MakeRef(coarse_space.GetGraph().VertexToEdge());
-    mfem::SparseMatrix tmp = smoothg::Transpose(Agg_face_ref_);
-    face_Agg_.Swap(tmp);
-}
-
 void ElementMBuilder::RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter)
 {
     agg_index_ = agg_index;
@@ -163,6 +143,34 @@ mfem::SparseMatrix ElementMBuilder::BuildAssembledM(
     return M;
 }
 
+mfem::Vector ElementMBuilder::Mult(
+    const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
+{
+    mfem::Vector y(x.Size());
+    y = 0.0;
+
+    mfem::Array<int> local_edofs;
+    mfem::Vector x_loc;
+    mfem::Vector y_loc;
+    for (int elem = 0; elem < elem_edgedof_.NumRows(); ++elem)
+    {
+        GetTableRow(elem_edgedof_, elem, local_edofs);
+
+        x.GetSubVector(local_edofs, x_loc);
+
+        y_loc.SetSize(x_loc.Size());
+        M_el_[elem].Mult(x_loc, y_loc);
+        y_loc /= elem_scaling_inv[elem];
+
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            y[local_edofs[j]] += y_loc[j];
+        }
+    }
+
+    return y;
+}
+
 /// this method may be unnecessary, could just use GetTableRow()
 void CoefficientMBuilder::GetCoarseFaceDofs(
     const mfem::SparseMatrix& face_cdof, int face, mfem::Array<int>& local_coarse_dofs) const
@@ -170,6 +178,26 @@ void CoefficientMBuilder::GetCoarseFaceDofs(
     mfem::Array<int> temp;
     GetTableRow(face_cdof, face, temp); // returns a writeable reference
     temp.Copy(local_coarse_dofs); // make sure we do not modify the matrix
+}
+
+void CoefficientMBuilder::Setup(const GraphSpace& coarse_space)
+{
+    const mfem::SparseMatrix& agg_coarse_vdof = coarse_space.VertexToVDof();
+
+    total_num_traces_ = coarse_space.EdgeToEDof().NumCols();
+    ncoarse_vertexdofs_ = agg_coarse_vdof.NumCols();
+    num_aggs_ = agg_coarse_vdof.NumRows();;
+
+    coarse_agg_dof_offsets_.SetSize(num_aggs_ + 1);
+    coarse_agg_dof_offsets_[0] = total_num_traces_;
+    for (unsigned int i = 0; i < num_aggs_; ++i)
+    {
+        coarse_agg_dof_offsets_[i + 1] = coarse_agg_dof_offsets_[i] + agg_coarse_vdof.RowSize(i) - 1;
+    }
+
+    Agg_face_ref_.MakeRef(coarse_space.GetGraph().VertexToEdge());
+    mfem::SparseMatrix tmp = smoothg::Transpose(Agg_face_ref_);
+    face_Agg_.Swap(tmp);
 }
 
 void CoefficientMBuilder::GetCoarseAggDofs(int agg, mfem::Array<int>& local_coarse_dofs) const
@@ -386,5 +414,13 @@ mfem::SparseMatrix CoefficientMBuilder::BuildAssembledM(
     CoarseM.Finalize(0);
     return CoarseM;
 }
+
+mfem::Vector CoefficientMBuilder::Mult(
+    const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
+{
+    mfem::mfem_error("CoefficientMBuilder::Mult is not implemented!\n");
+    return mfem::Vector();
+}
+
 
 }

@@ -209,8 +209,7 @@ void LocalEigenSolver::Compute(
         return;
     }
 
-    if (n_max_ < n)
-        AllocateWorkspace(n);
+    if (n_max_ < n) { AllocateWorkspace(n, false); }
 
     std::copy(A.Data(), A.Data() + n * n, begin(A_));
     Compute(n, A_.data(), evals, evects);
@@ -228,8 +227,7 @@ void LocalEigenSolver::Compute(
         return;
     }
 
-    if (n_max_ < n)
-        AllocateWorkspace(n, true);
+    if (n_max_ < n) { AllocateWorkspace(n, true); }
 
     // Compute Cholesky factorization of B = U^T * U
     std::copy(B.Data(), B.Data() + n * n, begin(B_));

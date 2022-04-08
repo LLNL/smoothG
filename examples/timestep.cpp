@@ -44,8 +44,8 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
+    const char* perm_file = "spe_perm.dat";
+    args.AddOption(&perm_file, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+    SPE10Problem spe10problem(perm_file, nDimensions, spe10_scale, slice,
                               metis_agglomeration, ess_attr);
     Graph graph = spe10problem.GetFVGraph();
 
@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
     mfem::Array<int> partitioning;
     spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
-    mfem::SparseMatrix W_block = SparseIdentity(graph.VertexToEdge().Height());
+    mfem::SparseMatrix W_block = SparseIdentity(graph.NumVertices());
     W_block *= spe10problem.CellVolume() / delta_t;     // Mass matrix / delta_t
 
     // Time Stepping
@@ -133,6 +133,7 @@ int main(int argc, char* argv[])
 
         // Set some pressure initial condition
         mfem::BlockVector fine_u(hierarchy.BlockOffsets(0));
+        fine_u.GetBlock(0) = 0.0;
         fine_u.GetBlock(1) = spe10problem.InitialCondition(initial_val);
 
         // Create Workspace
@@ -143,7 +144,6 @@ int main(int argc, char* argv[])
 
         assert(hierarchy.GetMatrix(k).CheckW());
         const mfem::SparseMatrix& W = hierarchy.GetMatrix(k).GetW();
-
 
         // Setup visualization
         mfem::socketstream vis_v;

@@ -20,6 +20,7 @@
 
 #include "MixedLaplacianSolver.hpp"
 #include "MixedMatrix.hpp"
+#include "utilities.hpp"
 
 namespace smoothg
 {
@@ -28,12 +29,23 @@ MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
                                            const mfem::Array<int>& block_offsets,
                                            bool W_is_nonzero)
     : comm_(comm), rhs_(block_offsets), sol_(block_offsets), nnz_(0),
-      num_iterations_(0), timing_(0), remove_one_dof_(true), W_is_nonzero_(W_is_nonzero)
-{ }
+      num_iterations_(0), timing_(0), remove_one_dof_(true),
+      W_is_nonzero_(W_is_nonzero), is_symmetric_(true)
+{
+    sol_ = 0.0;
+}
 
 void MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
 {
     Mult(rhs, sol);
+}
+
+mfem::BlockVector MixedLaplacianSolver::Solve(const mfem::BlockVector& rhs) const
+{
+    mfem::BlockVector sol(rhs);
+    sol = 0.0;
+    Mult(rhs, sol);
+    return sol;
 }
 
 void MixedLaplacianSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol) const
@@ -80,6 +92,29 @@ void MixedLaplacianSolver::Orthogonalize(mfem::Vector& vec) const
     MPI_Allreduce(&local_scale, &global_scale, 1, MPI_DOUBLE, MPI_SUM, comm_);
 
     vec.Add(-global_dot / global_scale, *const_rep_);
+}
+
+std::unique_ptr<mfem::IterativeSolver>
+MixedLaplacianSolver::InitKrylovSolver(KrylovMethod method)
+{
+    mfem::IterativeSolver* out;
+    if (method == KrylovMethod::CG)
+    {
+        out = new mfem::CGSolver(comm_);
+    }
+    else if (method == KrylovMethod::MINRES)
+    {
+        out = new mfem::MINRESSolver(comm_);
+    }
+    else
+    {
+        out = new mfem::GMRESSolver(comm_);
+    }
+    out->SetPrintLevel(print_level_);
+    out->SetMaxIter(max_num_iter_);
+    out->SetRelTol(rtol_);
+    out->SetAbsTol(atol_);
+    return std::unique_ptr<mfem::IterativeSolver>(out);
 }
 
 } // namespace smoothg

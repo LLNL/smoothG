@@ -55,8 +55,8 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
+    const char* perm_file = "spe_perm.dat";
+    args.AddOption(&perm_file, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
@@ -96,8 +96,16 @@ int main(int argc, char* argv[])
     }
 
     mfem::Array<int> coarsening_factors(nDimensions);
-    coarsening_factors = 10;
-    coarsening_factors.Last() = nDimensions == 3 ? 5 : 10;
+    if (metis_agglomeration)
+    {
+        coarsening_factors = 1;
+        coarsening_factors.Last() = upscale_param.coarse_factor;
+    }
+    else
+    {
+        coarsening_factors = 10;
+        coarsening_factors.Last() = nDimensions == 3 ? 2 : 10;
+    }
 
     mfem::Array<int> ess_attr(nDimensions == 3 ? 6 : 4);
     ess_attr = 1;
@@ -107,7 +115,7 @@ int main(int argc, char* argv[])
     }
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+    SPE10Problem spe10problem(perm_file, nDimensions, spe10_scale, slice,
                               metis_agglomeration, ess_attr);
     Graph graph = spe10problem.GetFVGraph();
 
@@ -117,7 +125,6 @@ int main(int argc, char* argv[])
 
     // Create Upscaler and Solve
     Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
-
     upscale.PrintInfo();
 
     mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));

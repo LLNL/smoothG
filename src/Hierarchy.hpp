@@ -21,9 +21,8 @@
 #ifndef __HIERARCHY_HPP__
 #define __HIERARCHY_HPP__
 
-#include "MinresBlockSolver.hpp"
+#include "BlockSolver.hpp"
 #include "HybridSolver.hpp"
-#include "MetisGraphPartitioner.hpp"
 #include "MixedMatrix.hpp"
 
 namespace smoothg
@@ -107,12 +106,15 @@ public:
     /// to a vector in vertex space of that level. Mostly used for visualization
     mfem::Vector PWConstInterpolate(int level, const mfem::Vector& x) const;
 
-    // Get Mixed System
+    /// Get Mixed System
     MixedMatrix& GetMatrix(int level);
     const MixedMatrix& GetMatrix(int level) const;
 
+    /// Get graph
+    const Graph& GetGraph(int level) const { return GetMatrix(level).GetGraph(); }
+
     /// Show Hierarchy Information
-    virtual void PrintInfo(std::ostream& out = std::cout) const;
+    void PrintInfo(std::ostream& out = std::cout) const;
 
     /// Compute total operator complexity up to a given level
     double OperatorComplexity(int level) const;
@@ -120,34 +122,17 @@ public:
     /// Compute operator complexity from level-1 to level
     double OperatorComplexityAtLevel(int level) const;
 
-    /// Set solver parameters
+    /// Set solver parameters at all levels
     virtual void SetPrintLevel(int print_level);
     virtual void SetMaxIter(int max_num_iter);
     virtual void SetRelTol(double rtol);
-    virtual void SetRelTolAtLevel(int level, double rtol)
-    { solvers_[level]->SetRelTol(rtol); }
     virtual void SetAbsTol(double atol);
-    virtual void SetAbsTolAtLevel(int level, double atol)
-    { solvers_[level]->SetAbsTol(atol); }
 
-    /// Show Total setup time
-    void ShowSetupTime(std::ostream& out = std::cout) const;
-
-    int GetSolveIters(int level) const { return solvers_[level]->GetNumIterations(); }
-
-    double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
-
-    MPI_Comm GetComm() const { return GetMatrix(0).GetComm(); }
-
-    /// Get block offsets for edge/vertex-based dofs in a given level
-    const mfem::Array<int>& BlockOffsets(int level) const
-    {
-        return GetMatrix(level).BlockOffsets();
-    }
-
-    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
-
-    const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
+    /// Set solver parameters at a given level
+    virtual void SetPrintLevel(int level, int print_level);
+    virtual void SetMaxIter(int level, int max_num_iter);
+    virtual void SetRelTol(int level, double rtol);
+    virtual void SetAbsTol(int level, double atol);
 
     /// Create solver on level
     void MakeSolver(int level, const UpscaleParameters& param);
@@ -155,7 +140,24 @@ public:
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
+    /// Show Total setup time
+    void ShowSetupTime(std::ostream& out = std::cout) const;
+
+    /// Getters
+    /// @{
+    int GetSolveIters(int level) const { return solvers_[level]->GetNumIterations(); }
+    double GetSolveTime(int level) const { return solvers_[level]->GetTiming(); }
+    MPI_Comm GetComm() const { return GetMatrix(0).GetComm(); }
+    const mfem::SparseMatrix& GetPsigma(int level) const { return Psigma_[level]; }
+    const mfem::SparseMatrix& GetPu(int level) const { return Pu_[level]; }
     int NumLevels() const { return mixed_systems_.size(); }
+    ///@}
+
+    /// Get block offsets for edge/vertex-based dofs in a given level
+    const mfem::Array<int>& BlockOffsets(int level) const
+    {
+        return GetMatrix(level).BlockOffsets();
+    }
 
     /// returns the number of vertices at a given level
     int NumVertices(int level) const;
@@ -164,6 +166,12 @@ public:
     std::vector<int> GetVertexSizes() const;
 
     void DumpDebug(const std::string& prefix) const;
+
+    const mfem::SparseMatrix& GetAggVert(int level) const { return agg_vert_[level]; }
+    const std::vector<mfem::DenseMatrix>& GetTraces(int level) const
+    {
+        return edge_traces_[level];
+    }
 
 private:
     void Coarsen(int level, const UpscaleParameters& param,
@@ -181,10 +189,14 @@ private:
     std::vector<mfem::SparseMatrix> Psigma_;
     std::vector<mfem::SparseMatrix> Pu_;
     std::vector<mfem::SparseMatrix> Proj_sigma_;
+    std::vector<std::vector<mfem::DenseMatrix>> edge_traces_;
 
     double setup_time_;
 
     const mfem::Array<int>* ess_attr_;
+
+    std::vector<mfem::SparseMatrix > agg_vert_;
+    UpscaleParameters param_;
 };
 
 } // namespace smoothg

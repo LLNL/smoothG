@@ -92,8 +92,7 @@ int MarkDofsOnBoundary(
    This is normally used with a mat that corresponds to some entity_dof or
    related table.
 */
-void GetTableRow(
-    const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
+void GetTableRow(const mfem::SparseMatrix& mat, int rownum, mfem::Array<int>& J);
 
 /// if you call GetTableRow repeatedly, bad things might happen
 void GetTableRowCopy(
@@ -217,10 +216,10 @@ void ShowErrors(const std::vector<double>& error_info, std::ostream& out = std::
 double PowerIterate(MPI_Comm comm, const mfem::Operator& A, mfem::Vector& result,
                     int max_iter = 1000, double tol = 1e-8, bool verbose = false);
 
-// Rescale vec by scaling: vec = diag(scaling) * vec
+/// Rescale vec by scaling: vec = diag(scaling) * vec
 void RescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 
-// Rescale vec by scaling: vec = diag(scaling)^{-1} * vec
+/// Rescale vec by scaling: vec = diag(scaling)^{-1} * vec
 void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 
 /**
@@ -233,11 +232,21 @@ void InvRescaleVector(const mfem::Vector& scaling, mfem::Vector& vec);
 */
 void GetElementColoring(mfem::Array<int>& colors, const mfem::SparseMatrix& el_el);
 
+/// @return columns of mat that contains nonzeros
 std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 
+/// @return A map such that order of reordered entity align with order of trueentity
 mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
                                     const mfem::HypreParMatrix& entity_trueentity_entity);
 
+/// Max of absolute values of entries of vec in all processors
+double ParAbsMax(const mfem::Vector& vec, MPI_Comm comm);
+
+/// Min of entries of vec in all processors
+double ParMin(const mfem::Vector& vec, MPI_Comm comm);
+
+/// Set entries in vec corresponding to nonzero entries of marker to be 0
+void SetZeroAtMarker(const mfem::Array<int>& marker, mfem::Vector& vec);
 
 } // namespace smoothg
 
