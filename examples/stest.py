@@ -659,7 +659,7 @@ def make_tests():
          {"relative-D-edge-error": 0.1438138616203242,
           "relative-vertex-error": 0.1874559440644907,
           "relative-edge-error": 0.25470044682041143,
-          "operator-complexity": (1.229388, 3.e-4)}]
+          "operator-complexity": (1.230, 1.e-3)}]
 
     tests["parsamplegraph4-mac"] = \
         [["mpirun", "-n", num_procs, "./generalgraph",
@@ -741,8 +741,8 @@ def make_tests():
         [["./sampler",
           "--kappa", "0.01",
           "--num-samples", "2"],
-         {"fine-mean-l1": 0.54961180496539375,
-          "p-error-level-1": 0.39869063097389679}]
+         {"fine-mean-l1": 0.54235348335037126,
+          "p-error-level-1": 0.42784788897003051}]
 
     tests["ml-sampler"] = \
         [["./sampler",
@@ -751,8 +751,8 @@ def make_tests():
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1"],
-         {"p-error-level-1": 0.20833920382939719,
-          "p-error-level-2": 0.40118441747952621}]
+         {"p-error-level-1": 0.197584266889065,
+          "p-error-level-2": 0.38747838996654665}]
 
     tests["ml-sampler-mac"] = \
         [["./sampler",
@@ -770,6 +770,7 @@ def make_tests():
           "--max-levels", "3",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
+<<<<<<< HEAD
          {"p-error-level-1": 0.15901786208069255,
           "p-error-level-2": 0.28920183554358542}]
 
@@ -781,6 +782,10 @@ def make_tests():
           "--max-evects", "4"],
          {"p-error-level-1": 0.15902531435127545,
           "p-error-level-2": 0.29696652801349377}]
+=======
+         {"p-error-level-1": 0.1536666324079243,
+          "p-error-level-2": 0.37704136243107045}]
+>>>>>>> f329ea704c1ef7d2d6681c5300aacb2792a6b9f3
 
     # this is supposed to mimic using --choose-samples, but the choice
     # depends on cpu time, so for reproducibility we fix everything

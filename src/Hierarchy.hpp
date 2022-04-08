@@ -123,16 +123,16 @@ public:
     double OperatorComplexityAtLevel(int level) const;
 
     /// Set solver parameters at all levels
-    void SetPrintLevel(int print_level);
-    void SetMaxIter(int max_num_iter);
-    void SetRelTol(double rtol);
-    void SetAbsTol(double atol);
+    virtual void SetPrintLevel(int print_level);
+    virtual void SetMaxIter(int max_num_iter);
+    virtual void SetRelTol(double rtol);
+    virtual void SetAbsTol(double atol);
 
     /// Set solver parameters at a given level
-    void SetPrintLevel(int level, int print_level);
-    void SetMaxIter(int level, int max_num_iter);
-    void SetRelTol(int level, double rtol);
-    void SetAbsTol(int level, double atol);
+    virtual void SetPrintLevel(int level, int print_level);
+    virtual void SetMaxIter(int level, int max_num_iter);
+    virtual void SetRelTol(int level, double rtol);
+    virtual void SetAbsTol(int level, double atol);
 
     /// Create solver on level
     void MakeSolver(int level, const UpscaleParameters& param);

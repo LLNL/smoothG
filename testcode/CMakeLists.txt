@@ -75,7 +75,7 @@ add_valgrind_test(vtest_IsolatePartitioner test_IsolatePartitioner)
 
 add_test(wattsstrogatz wattsstrogatz)
 add_test(parwattsstrogatz mpirun -np 2 ./wattsstrogatz)
-add_valgrind_test(vwattsstrogatz wattsstrogatz)
+# add_valgrind_test(vwattsstrogatz wattsstrogatz)
 
 add_test(rescaling rescaling)
 add_test(parrescaling mpirun -np 2 ./rescaling)

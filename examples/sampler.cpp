@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
     Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
     hierarchy.PrintInfo();
 
-    PDESampler pdesampler(nDimensions, cell_volume, kappa, seed + myid, std::move(hierarchy));
+    PDESampler pdesampler(nDimensions, kappa, seed + myid, std::move(hierarchy));
 
     double max_p_error = 0.0;
     for (int sample = 0; sample < num_samples; ++sample)

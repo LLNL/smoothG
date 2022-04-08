@@ -24,83 +24,71 @@ dependencies.
 * blas
 * lapack
 * [metis-5.1.0](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview)
-* [hypre-2.10.0b](https://computation.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods/software)
+* [hypre-2.15.1](https://computation.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods/software)
 * [SuiteSparse-4.5.4](http://faculty.cse.tamu.edu/davis/suitesparse.html)
-* [mfem-3.3](http://mfem.org/)
+* [mfem-3.4](http://mfem.org/)
+
 
 # Build Dependencies:
 
 These instructions will build dependencies in the your home folder: `${HOME}`
 
-If not installing in standard system locations (`/usr/`, `/usr/local/`, etc),
-you will need to export the appropriate `LIBRARY_PATH` and `LD_LIBRARY_PATH`
-so that the linker/loader can find them.
-
-For example the final `LIBRARY_PATH` will look like:
-
-    export LD_LIBRARY_PATH=${HOME}/local/lib:$LD_LIBRARY_PATH
-
-
 ## blas
 
-    check if exists or install from package manager
+Check if you already have this, and if not, install from a package manager
 
 ## lapack
 
-    check if exists or install from package manager
+Check if you already have this, and if not, install from a package manager
 
 ## metis-5.1.0
 
-    tar -xvzf metis-5.1.0.tar.gz
+Download with a browser from [here](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview) or type:
+
+    wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+    
+Then:
+    
+    tar xvzf metis-5.1.0.tar.gz
     cd metis-5.1.0
-
-    make config prefix=${HOME}/metis
+    make config prefix=${HOME}/metis-install
     make install
+    cd ..
 
-## hypre-2.10.0b
+## hypre-2.15.1
 
-    tar -xvfz hypre-2.10.0b.gz
-    cd hypre-2.10.0b/src
-
-    ./configure --disable-fortran --prefix=${HOME}/hypre
+    git clone https://github.com/hypre-space/hypre.git hypre
+    cd hypre
+    git checkout v2.15.1
+    cd src
+    ./configure --disable-fortran CC=mpicc CXX=mpicxx prefix=${HOME}/hypre-install
+    make
     make install
+    cd ../..
 
 ## SuiteSparse-4.5.4
 
-    tar -xvfz SuiteSparse-4.5.4.tar.gz
+Download with a browser from [here](http://faculty.cse.tamu.edu/davis/suitesparse.html) or type:
+
+    wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.4.tar.gz
+
+Then:
+
+    tar xvzf SuiteSparse-4.5.4.tar.gz
     cd SuiteSparse-4.5.4
+    make install INSTALL=${HOME}/suitesparse-install BLAS=-lblas MY_METIS_LIB=${HOME}/metis-install/lib/libmetis.a \
+        MY_METIS_INC=${HOME}/metis-install/include/
+    cd ..
 
-    make install BLAS=/usr/lib64/libblas.so.3 LAPACK=/usr/lib64/liblapack.so.3 \
-        INSTALL=${HOME}/SuiteSparse
+## mfem-3.4
 
-    #(Replace blas and lapack library locations appropriately)
-
-## mfem-3.3
-
-    tar -xvzf mfem-3.3.tar.gz
-    cd mfem-3.3
-
-    make config
-
-Choose one of the following:
-
-    edit config/config.mk with the correct parameters
-
-    make parallel
-    make install
-
---or--
-
-    make parallel \
-        PREFIX=${HOME}/mfem \
-        MFEM_USE_METIS_5=YES \
-        MFEM_USE_LAPACK=YES \
-        MFEM_USE_SUITESPARSE=YES \
-        HYPRE_DIR=${HOME}/hypre \
-        SUITESPARSE_DIR=${HOME}/SuiteSparse  \
-        METIS_DIR=${HOME}/metis \
-        LAPACKLIB="/usr/lib64/liblapack.so.3 /usr/lib64/libblas.so.3"
-    make install
+    git clone https://github.com/mfem/mfem.git mfem
+    cd mfem
+    git checkout v3.4
+    make config MFEM_USE_METIS_5=YES MFEM_USE_LAPACK=YES MFEM_USE_SUITESPARSE=YES MFEM_USE_MPI=YES \
+        HYPRE_DIR=${HOME}/hypre-install SUITESPARSE_DIR=${HOME}/suitesparse-install METIS_DIR=${HOME}/metis-install \
+        PREFIX=${HOME}/mfem-install
+    CC=mpicc CXX=mpicxx make install
 
 
 # Optional Dependencies:
@@ -110,20 +98,23 @@ Choose one of the following:
 
 ## spe10 dataset
 
+Available at [this page](https://www.spe.org/web/csp/datasets/set02.htm)
+
     unzip por_perm_case2a.zip -d ${HOME}/spe10
 
 ## Valgrind
 
-    tar -xvf valgrind-3.12.0
-    cd valgrind-3.12.0
+Some of our tests require valgrind, you can probably get it from your package manager or [here](https://valgrind.org/). Then:
 
-    ./configure --prefix=${HOME}/valgrind
+    tar xvf valgrind-3.12.0
+    cd valgrind-3.12.0
+    ./configure --prefix=${HOME}/valgrind-install
     make
     make install
 
 # Build smoothG
 
-Clone the smoothG repo and cd into smoothG directory.
+Clone the smoothG repo and `cd` into smoothG directory.
 
 To build smoothG, either copy, modify, and run a config file from config/
 or pass the parameters directly to cmake:
@@ -132,13 +123,11 @@ or pass the parameters directly to cmake:
     cd build
 
     cmake \
-        -DMFEM_DIR=${HOME}/mfem \
-        -DMETIS_DIR=${HOME}/metis \
-        -DHYPRE_DIR=${HOME}/hypre \
-        -DSuiteSparse_DIR=${HOME}/SuiteSparse \
+        -DMFEM_DIR=${HOME}/mfem-install \
+        -DMETIS_DIR=${HOME}/metis-install \
+        -DHYPRE_DIR=${HOME}/hypre-install \
+        -DSuiteSparse_DIR=${HOME}/suitesparse-install \
         -DCMAKE_BUILD_TYPE=DEBUG \
-        -DBLAS_LIBRARIES=/usr/lib64/libblas.so.3 \
-        -DLAPACK_LIBRARIES=/usr/lib64/liblapack.so.3 \
         -DSPE10_DIR=${HOME}/spe10 \
         ..
 
