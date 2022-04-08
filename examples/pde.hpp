@@ -1310,6 +1310,9 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length)
     kinv_scalar_ = make_unique<mfem::GridFunctionCoefficient>(coeff_gf_.get());
 }
 
+/*  The mesh and permeability data files in EggModel are postprocessed from
+    https://data.4tu.nl/articles/dataset/The_Egg_Model_-_data_files/12707642.
+    The relevant data files are not hosted in this repo. */
 class EggModel : public DarcyProblem
 {
 public:

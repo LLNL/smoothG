@@ -16,6 +16,17 @@
 /**
    @file nldarcy.cpp
    @brief nonlinear Darcy's problem.
+
+   This example builds a nonlinear multigrid (FAS) using spectral coarsening
+   to solve nonlinear elliptic problems of the form: -div (K(p) grad p) = f.
+   Reference: https://doi.org/10.1016/j.cma.2020.113432
+
+   Some example runs:
+       ./nldarcy --model-problem spe10
+       ./nldarcy --model-problem lognormal --use-picard
+       ./nldarcy --model-problem lognormal --dim 3 --max-levels 3
+       ./nldarcy --model-problem richard --max-levels 3
+       ./nldarcy --model-problem egg --max-levels 1 --alpha 1.6
 */
 
 #include <fstream>
