@@ -108,7 +108,7 @@ void HybridSolver::Init(
         std::cout << "  Timing: Hybridized system built in "
                   << chrono.RealTime() << "s. \n";
 
-    solver_ = InitKrylovSolver(CG);
+    solver_ = InitKrylovSolver(KrylovMethod::CG);
     BuildParallelSystemAndSolver(H_proc);
 
     Hrhs_.SetSize(num_multiplier_dofs_);
@@ -1070,7 +1070,7 @@ void HybridSolver::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
 
     is_symmetric_ = false;
 
-    solver_ = InitKrylovSolver(GMRES);
+    solver_ = InitKrylovSolver(KrylovMethod::GMRES);
     solver_->iterative_mode = false;
 
     auto H_proc = AssembleHybridSystem(elem_scaling_inverse, N_el);

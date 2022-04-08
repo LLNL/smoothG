@@ -28,7 +28,7 @@ namespace smoothg
 {
 
 /// Linearization method
-enum Linearization { Newton, Picard };
+enum class Linearization { Newton, Picard };
 
 /// Parameter list for abstract nonlinear solver
 struct NLSolverParameters
@@ -39,7 +39,7 @@ struct NLSolverParameters
     double atol = 1e-10;
 
     bool check_converge = true;
-    Linearization linearization = Newton;
+    Linearization linearization = Linearization::Newton;
     int num_backtrack = 0;
     double diff_tol = -1.0;
     double init_linear_tol = 1e-8;
@@ -110,12 +110,12 @@ protected:
     NLSolverParameters param_;
 };
 
-enum Cycle { V_CYCLE, FMG };
+enum class Cycle { V_CYCLE, FMG };
 
 struct FASParameters
 {
     int num_levels = 1;             // number of multigrid levels
-    Cycle cycle = V_CYCLE;          // multigrid cycle type
+    Cycle cycle = Cycle::V_CYCLE;   // multigrid cycle type
     double coarse_correct_tol;      // no coarse correction if rel resid < tol
     NLSolverParameters nl_solve;    // for FAS itself as a nonlinear solver
     NLSolverParameters fine;        // for finest level nonlinear solve

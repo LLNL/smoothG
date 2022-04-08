@@ -98,11 +98,11 @@ std::unique_ptr<mfem::IterativeSolver>
 MixedLaplacianSolver::InitKrylovSolver(KrylovMethod method)
 {
     mfem::IterativeSolver* out;
-    if (method == CG)
+    if (method == KrylovMethod::CG)
     {
         out = new mfem::CGSolver(comm_);
     }
-    else if (method == MINRES)
+    else if (method == KrylovMethod::MINRES)
     {
         out = new mfem::MINRESSolver(comm_);
     }

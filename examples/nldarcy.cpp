@@ -258,8 +258,8 @@ int main(int argc, char* argv[])
 void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
                 int num_backtrack, double diff_tol)
 {
-    param.cycle = use_vcycle ? V_CYCLE : FMG;
-    param.nl_solve.linearization = use_newton ? Newton : Picard;
+    param.cycle = use_vcycle ? Cycle::V_CYCLE : Cycle::FMG;
+    param.nl_solve.linearization = use_newton ? Linearization::Newton : Linearization::Picard;
     param.coarse_correct_tol = use_newton ? 1e-4 : 1e-8;
     param.fine.check_converge = false;
     param.fine.linearization = param.nl_solve.linearization;
@@ -278,7 +278,7 @@ LevelSolver::LevelSolver(const MixedMatrix& mixed_system, Kappa kappa,
     : NonlinearSolver(mixed_system.GetComm(), param),
       mixed_system_(mixed_system), kappa_(std::move(kappa))
 {
-    tag_ = param.linearization ? "Picard" : "Newton";
+    tag_ = param.linearization == Linearization::Picard ? "Picard" : "Newton";
 
     if (IsDiag(mixed_system.GetM())) // L2-H1 block diagonal preconditioner
     {
@@ -320,7 +320,7 @@ void LevelSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& d
     mfem::BlockVector blk_x(x.GetData(), mixed_system_.BlockOffsets());
     mfem::BlockVector blk_dx(dx.GetData(), mixed_system_.BlockOffsets());
 
-    if (param_.linearization == Picard) // fixed point iteration
+    if (param_.linearization == Linearization::Picard) // fixed point iteration
     {
         dx.Set(-1.0, x);
 
@@ -420,7 +420,7 @@ EllipticFAS::EllipticFAS(const Hierarchy& hierarchy, const Kappa& kappa,
         auto& matrix_l = hierarchy.GetMatrix(l);
         auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
         solvers_[l].reset(new LevelSolver(matrix_l, std::move(kappa_l), ess_attr, param_l));
-        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 0);
+        solvers_[l]->SetPrintLevel(param_.cycle == Cycle::V_CYCLE ? -1 : 0);
 
         if (l > 0)
         {

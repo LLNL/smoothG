@@ -85,7 +85,7 @@ void BlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     prec_.SetDiagonalBlock(0, Mprec_.get());
     prec_.SetDiagonalBlock(1, Sprec_.get());
 
-    solver_ = InitKrylovSolver(MINRES);
+    solver_ = InitKrylovSolver(KrylovMethod::MINRES);
     solver_->SetPreconditioner(prec_);
     solver_->SetOperator(operator_);
 }
@@ -316,7 +316,7 @@ void BlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
     Sprec_->SetPrintLevel(0);
     prec_.SetDiagonalBlock(1, Sprec_.get());
 
-    solver_ = InitKrylovSolver(GMRES);
+    solver_ = InitKrylovSolver(KrylovMethod::GMRES);
     solver_->SetOperator(operator_);
     solver_->SetPreconditioner(prec_);
     solver_->iterative_mode = false;
