@@ -72,7 +72,8 @@ public:
        @brief Build coarse mixed system
     */
     MixedMatrix BuildCoarseMatrix(const MixedMatrix& fine_mgL,
-                                  const mfem::SparseMatrix& Pvertices);
+                                  const mfem::SparseMatrix& Pvertices,
+                                  const mfem::SparseMatrix& Pvertices_min);
 
     /// take vertex-based target functions and assemble them in matrix
     mfem::SparseMatrix BuildPVertices();

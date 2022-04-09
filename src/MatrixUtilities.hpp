@@ -500,7 +500,7 @@ HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol);
 
 mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A);
 
-mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A);
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A);
 
 double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2);
 

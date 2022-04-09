@@ -471,9 +471,9 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
         double M_min = M_max;
         for (int mm = 0; mm < Mloc.NumNonZeroElems(); ++mm)
         {
-            M_min = std::min(M_min, Mloc.GetData()[mm]);
+            M_min = std::min(M_min, std::fabs(Mloc.GetData()[mm]));
         }
-        double rescale_const = std::exp((std::log(M_max) + std::log(M_min)) / 2.0);
+        double rescale_const = std::sqrt(M_max) * std::sqrt(M_min);
         Mloc *= 1.0 / rescale_const; // TODO: is this a good way?
 
         auto Dloc = ExtractRowAndColumns(D_ext, ext_loc_vdofs,
@@ -1043,6 +1043,8 @@ void LocalMixedGraphSpectralTargets::NormalizeTraces(std::vector<mfem::DenseMatr
         {
             std::cerr << "Warning: oneDpv is closed to zero, oneDpv = "
                       << oneDpv << ", this may be due to bad PV traces!\n";
+            PV_trace.Print();
+            local_constant.Print();
         }
 
         PV_trace /= oneDpv;

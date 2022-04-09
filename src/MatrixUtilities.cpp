@@ -1459,7 +1459,7 @@ mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A)
     return A_prec;
 }
 
-mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A)
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A)
 {
     mfem::Array<int> row_starts, col_starts;
     GenerateOffsets(comm, A.NumRows(), row_starts);
