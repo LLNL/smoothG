@@ -44,8 +44,8 @@ int main(int argc, char* argv[])
     // program options from command line
     UpscaleParameters upscale_param;
     mfem::OptionsParser args(argc, argv);
-    const char* permFile = "spe_perm.dat";
-    args.AddOption(&permFile, "-p", "--perm",
+    const char* perm_file = "spe_perm.dat";
+    args.AddOption(&perm_file, "-p", "--perm",
                    "SPE10 permeability file data.");
     int nDimensions = 2;
     args.AddOption(&nDimensions, "-d", "--dim",
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     ess_attr = 1;
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(permFile, nDimensions, spe10_scale, slice,
+    SPE10Problem spe10problem(perm_file, nDimensions, spe10_scale, slice,
                               metis_agglomeration, ess_attr);
     Graph graph = spe10problem.GetFVGraph();
 

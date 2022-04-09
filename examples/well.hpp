@@ -169,6 +169,8 @@ unique_ptr<mfem::HypreParMatrix> ConcatenateIdentity(
     mat.GetDiag(diag);
     mat.GetOffd(offd, old_colmap);
 
+    auto NNZ = [](const mfem::SparseMatrix& A) { return A.NumNonZeroElems(); };
+
     // Append identity matrix diagonally to the bottom left of diag
     int* d_i = Append(diag.GetI(), diag.NumRows() + 1, id_size, NNZ(diag) + 1, IOTA);
     int* d_j = Append(diag.GetJ(), NNZ(diag), id_size, diag.NumCols(), IOTA);
@@ -211,13 +213,13 @@ mfem::SparseMatrix ExtendVertexEdge(const mfem::SparseMatrix& vert_edge,
                                     const WellManager& well_manager)
 {
     const int num_well_cells = well_manager.NumWellCells();
-    const int num_injector_cells = well_manager.NumWellCells(Injector);
+    const int num_inj_cells = well_manager.NumWellCells(Injector);
 
     int num_verts = vert_edge.NumRows();         // number of reservoir cells
     int num_edges = vert_edge.NumCols();         // number of reservoir faces
 
     int* I = new int[num_verts + well_manager.NumWells(Injector) + 1]();
-    int* J = new int[NNZ(vert_edge) + num_well_cells + num_injector_cells];
+    int* J = new int[vert_edge.NumNonZeroElems() + num_well_cells + num_inj_cells];
 
     for (const Well& well : well_manager.GetWells())
     {
@@ -306,18 +308,18 @@ mfem::SparseMatrix ExtendEdgeBoundary(const mfem::SparseMatrix& edge_bdr,
                                       const WellManager& well_manager)
 {
     const int num_edges = edge_bdr.NumRows() + well_manager.NumWellCells();
-    const int nnz = NNZ(edge_bdr) + well_manager.NumWellCells(Producer);
+    const int nnz = edge_bdr.NumNonZeroElems() + well_manager.NumWellCells(Producer);
 
     int* I = new int[num_edges + 1];
     int* J = new int[nnz];
     double* Data = new double[nnz];
 
     std::copy_n(edge_bdr.GetI(), edge_bdr.NumRows() + 1, I);
-    std::copy_n(edge_bdr.GetJ(), NNZ(edge_bdr), J);
+    std::copy_n(edge_bdr.GetJ(), edge_bdr.NumNonZeroElems(), J);
     std::fill_n(Data, nnz, 1.0);
 
     int* I_ptr = I + edge_bdr.NumRows() + 1;
-    int* J_ptr = J + NNZ(edge_bdr);
+    int* J_ptr = J + edge_bdr.NumNonZeroElems();
     int bdr = edge_bdr.NumCols();
 
     for (const Well& well : well_manager.GetWells())

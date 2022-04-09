@@ -16,6 +16,17 @@
 /**
    @file nldarcy.cpp
    @brief nonlinear Darcy's problem.
+
+   This example builds a nonlinear multigrid (FAS) using spectral coarsening
+   to solve nonlinear elliptic problems of the form: -div (K(p) grad p) = f.
+   Reference: https://doi.org/10.1016/j.cma.2020.113432
+
+   Some example runs:
+       ./nldarcy --model-problem spe10
+       ./nldarcy --model-problem lognormal --use-picard
+       ./nldarcy --model-problem lognormal --dim 3 --max-levels 3
+       ./nldarcy --model-problem richard --max-levels 3
+       ./nldarcy --model-problem egg --max-levels 1 --alpha 1.6
 */
 
 #include <fstream>
@@ -30,7 +41,7 @@ using namespace smoothg;
 
 using std::unique_ptr;
 
-enum Soil { Loam, Sand };
+enum class Soil { Loam, Sand };
 
 /// storing some constants for evaluating nonlinear permeability multiplier
 struct Kappa
@@ -147,6 +158,9 @@ int main(int argc, char* argv[])
     args.AddOption(&diff_tol, "--diff-tol", "--diff-tol",
                    "Tolerance for coefficient change.");
     FASParameters mg_param;
+    mg_param.fine.max_num_iter = 1;
+    mg_param.mid.max_num_iter = 1;
+    mg_param.coarse.max_num_iter = 10;
     args.AddOption(&mg_param.fine.max_num_iter, "--num-relax-fine", "--num-relax-fine",
                    "Number of relaxation in fine level.");
     args.AddOption(&mg_param.mid.max_num_iter, "--num-relax-mid", "--num-relax-mid",
@@ -171,6 +185,13 @@ int main(int argc, char* argv[])
     }
     mg_param.num_levels = upscale_param.max_levels;
     SetOptions(mg_param, use_vcycle, use_newton, num_backtrack, diff_tol);
+    upscale_param.hybridization = false;
+    if (!myid)
+    {
+        std::cout << "\nWARNING: --hybridization flag is not used in this example."
+                  << "\n         Fine level is always solved by BlockSolver while"
+                  << "\n         coarse levels are always solved by HybridSolver.";
+    }
 
     // Setting up finite volume discretization problem
     double use_metis = true;
@@ -200,7 +221,7 @@ int main(int argc, char* argv[])
     {
         ess_attr[0] = 0;
         fv_problem.reset(new Richards(num_sr, ess_attr));
-        kappa = Kappa(Loam, fv_problem->ComputeZ());
+        kappa = Kappa(Soil::Loam, fv_problem->ComputeZ());
     }
     else
     {
@@ -227,24 +248,25 @@ int main(int argc, char* argv[])
     rhs.GetBlock(0) = fv_problem->GetEdgeRHS();
     rhs.GetBlock(1) = fv_problem->GetVertexRHS();
 
-    mfem::BlockVector sol_nlmg(rhs);
-    sol_nlmg = 0.0;
+    mfem::BlockVector sol(rhs);
+    sol = 0.0;
 
-    EllipticFAS nlmg(hierarchy, kappa, ess_attr, mg_param);
-    nlmg.SetPrintLevel(1);
-    nlmg.SetRelTol(1e-6);
-    nlmg.SetMaxIter(200);
-    nlmg.Solve(rhs, sol_nlmg);
+    EllipticFAS fas(hierarchy, kappa, ess_attr, mg_param);
+    fas.SetPrintLevel(1);
+    fas.SetRelTol(1e-8);
+    fas.SetMaxIter(200);
+    fas.Solve(rhs, sol);
 
-    serialize["nonlinear-iterations"] = picojson::value((double)nlmg.GetNumIterations());
+    serialize["nonlinear-iterations"] = picojson::value((double)fas.GetNumIterations());
 
     if (visualization)
     {
-        sol_nlmg.GetBlock(1).Add(problem == "richard" ? -1.0 : 0.0, kappa.Z);
-
+        if (problem == "richard")
+        {
+            sol.GetBlock(1).Add(-1.0, kappa.Z);
+        }
         mfem::socketstream sout;
-        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(0), 0.0, 0.0, "", false, false);
-        fv_problem->VisSetup(sout, sol_nlmg.GetBlock(1), 0.0, 0.0, "", false, true);
+        fv_problem->VisSetup(sout, sol.GetBlock(1));
     }
 
     if (myid == 0)
@@ -258,8 +280,8 @@ int main(int argc, char* argv[])
 void SetOptions(FASParameters& param, bool use_vcycle, bool use_newton,
                 int num_backtrack, double diff_tol)
 {
-    param.cycle = use_vcycle ? V_CYCLE : FMG;
-    param.nl_solve.linearization = use_newton ? Newton : Picard;
+    param.cycle = use_vcycle ? Cycle::V_CYCLE : Cycle::FMG;
+    param.nl_solve.linearization = use_newton ? Linearization::Newton : Linearization::Picard;
     param.coarse_correct_tol = use_newton ? 1e-4 : 1e-8;
     param.fine.check_converge = false;
     param.fine.linearization = param.nl_solve.linearization;
@@ -278,7 +300,7 @@ LevelSolver::LevelSolver(const MixedMatrix& mixed_system, Kappa kappa,
     : NonlinearSolver(mixed_system.GetComm(), param),
       mixed_system_(mixed_system), kappa_(std::move(kappa))
 {
-    tag_ = param.linearization ? "Picard" : "Newton";
+    tag_ = param.linearization == Linearization::Picard ? "Picard" : "Newton";
 
     if (IsDiag(mixed_system.GetM())) // L2-H1 block diagonal preconditioner
     {
@@ -320,7 +342,7 @@ void LevelSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& d
     mfem::BlockVector blk_x(x.GetData(), mixed_system_.BlockOffsets());
     mfem::BlockVector blk_dx(dx.GetData(), mixed_system_.BlockOffsets());
 
-    if (param_.linearization == Picard) // fixed point iteration
+    if (param_.linearization == Linearization::Picard) // fixed point iteration
     {
         dx.Set(-1.0, x);
 
@@ -356,7 +378,7 @@ void LevelSolver::AdjustChange(mfem::Vector& x, mfem::Vector& dx)
 
     mfem::BlockVector block_dx(dx.GetData(), mixed_system_.BlockOffsets());
     auto delta_p = mixed_system_.PWConstProject(block_dx.GetBlock(1));
-    auto max_dp = AbsMax(delta_p, comm_);
+    auto max_dp = ParAbsMax(delta_p, comm_);
     auto relative_change = max_dp * kappa_.alpha / std::log(param_.diff_tol);
 
     if (relative_change > 1.0)
@@ -420,7 +442,7 @@ EllipticFAS::EllipticFAS(const Hierarchy& hierarchy, const Kappa& kappa,
         auto& matrix_l = hierarchy.GetMatrix(l);
         auto& param_l = l ? (l < param.num_levels - 1 ? param.mid : param.coarse) : param.fine;
         solvers_[l].reset(new LevelSolver(matrix_l, std::move(kappa_l), ess_attr, param_l));
-        solvers_[l]->SetPrintLevel(param_.cycle == V_CYCLE ? -1 : 0);
+        solvers_[l]->SetPrintLevel(param_.cycle == Cycle::V_CYCLE ? -1 : 0);
 
         if (l > 0)
         {
@@ -470,8 +492,9 @@ void EllipticFAS::Project(int level, const mfem::Vector& fine, mfem::Vector& coa
 }
 
 Kappa::Kappa(Soil soil, const mfem::Vector& Z_in)
-    : alpha(soil == Loam ? 124.6 : 1.175e6), beta(soil == Loam ? 1.77 : 4.74),
-      K_s(soil == Loam ? 1.067 : 816.), Z(Z_in) { }
+    : alpha(soil == Soil::Loam ? 124.6 : 1.175e6),
+      beta(soil == Soil::Loam ? 1.77 : 4.74),
+      K_s(soil == Soil::Loam ? 1.067 : 816.), Z(Z_in) { }
 
 mfem::Vector Kappa::Eval(const mfem::Vector& p) const
 {
@@ -511,7 +534,7 @@ mfem::Vector Kappa::dKinv_dp(const mfem::Vector& p) const
         {
             double exp_ap = std::exp(alpha * p[i]);
             assert(exp_ap > 0.0);
-            out[i] = -(alpha * exp_ap) / (exp_ap * exp_ap);
+            out[i] = -alpha / exp_ap;
         }
     }
     else
@@ -519,12 +542,11 @@ mfem::Vector Kappa::dKinv_dp(const mfem::Vector& p) const
         const double b_over_a_K_s = beta / (K_s * alpha);
         const double beta_minus_1 = beta - 1.0;
 
-        mfem::Vector out(p.Size());
         assert(Z.Size() == p.Size());
         for (int i = 0; i < p.Size(); i++)
         {
             double p_head = p[i] - Z[i];
-            double sign = p_head < 0.0 ? -1.0 : 1.0;
+            double sign = p_head == 0.0 ? 0.0 : p_head / std::fabs(p_head);
             out[i] = sign * b_over_a_K_s * std::pow(std::fabs(p_head), beta_minus_1);
         }
     }

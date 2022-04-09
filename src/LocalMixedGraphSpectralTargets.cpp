@@ -99,8 +99,6 @@ void LocalMixedGraphSpectralTargets::BuildExtendedAggregates(const GraphSpace& s
     // Note that edofs on an extended aggregate boundary have value 1, while
     // interior edofs have value 2, and the goal is to keep only interior edofs
     // See also documentation in GraphSpace::BuildVertexToEDof
-    //    ExtAgg_edof_->Threshold(1.5);
-    //    hypre_ParCSRMatrixDropSmallEntries(*ExtAgg_edof_, 1.5, 0);
     DropSmallEntries(*ExtAgg_edof_, 1.5);
 }
 

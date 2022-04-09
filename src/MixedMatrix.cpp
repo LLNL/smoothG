@@ -100,7 +100,7 @@ void MixedMatrix::Init()
     {
         assert(W_.Height() == NumVDofs() && W_.Width() == NumVDofs());
 
-        const double zero_tol = 1e-6;
+        const double zero_tol = 0.0; // this was 1e-6
         unique_ptr<mfem::HypreParMatrix> pW(MakeParallelW(W_));
         W_is_nonzero_ = (MaxNorm(*pW) > zero_tol);
     }

@@ -491,19 +491,16 @@ mfem::SparseMatrix GetOffd(const mfem::HypreParMatrix& mat);
 /// @return column map for off diagonal block
 const HYPRE_Int* GetColMap(const mfem::HypreParMatrix& mat);
 
-/// @return Number of nonzeros of mat
-int NNZ(const mfem::SparseMatrix& mat);
+/// @return Frobenius Norm of a matrix
+double FrobeniusNorm(const mfem::SparseMatrix& mat);
 
-/// @return Frobenius norm of mat
-double FroNorm(const mfem::SparseMatrix& mat);
+/// Drop the entries (whether on diagonal or not) that are smaller than tol
+/// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
+HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol);
 
 mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A);
 
 mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A);
-
-/// Drop the entries (whether on diagonal or not) that are smaller than tol
-/// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
-HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol);
 
 double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2);
 

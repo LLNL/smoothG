@@ -68,9 +68,8 @@ void BlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
 
     if (W_is_nonzero_)
     {
-        mfem::HypreParMatrix pW(comm_, D->M(), D->RowPart(), W);
-        nnz_ += pW.NNZ();
-        schur_block_.reset(ParAdd(pW, *schur_block_));
+        nnz_ += W->NumNonZeroElems();
+        GetDiag(*schur_block_).Add(1.0, *W);
     }
     else if (remove_one_dof_)
     {
@@ -85,7 +84,7 @@ void BlockSolver::Init(mfem::HypreParMatrix* M, mfem::HypreParMatrix* D,
     prec_.SetDiagonalBlock(0, Mprec_.get());
     prec_.SetDiagonalBlock(1, Sprec_.get());
 
-    solver_ = InitKrylovSolver(MINRES);
+    solver_ = InitKrylovSolver(KrylovMethod::MINRES);
     solver_->SetPreconditioner(prec_);
     solver_->SetOperator(operator_);
 }
@@ -278,7 +277,7 @@ void BlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
     }
     dMdp.Finalize();
 
-    if (NNZ(dMdp) > 0)
+    if (dMdp.NumNonZeroElems() > 0)
     {
         mfem::SparseMatrix dMdp_copy(dMdp);
         for (int i = 0; i < ess_edofs_.Size(); ++i)
@@ -316,7 +315,7 @@ void BlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
     Sprec_->SetPrintLevel(0);
     prec_.SetDiagonalBlock(1, Sprec_.get());
 
-    solver_ = InitKrylovSolver(GMRES);
+    solver_ = InitKrylovSolver(KrylovMethod::GMRES);
     solver_->SetOperator(operator_);
     solver_->SetPreconditioner(prec_);
     solver_->iterative_mode = false;

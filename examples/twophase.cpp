@@ -1258,8 +1258,8 @@ int main(int argc, char* argv[])
 
 void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double diff_tol)
 {
-    param.cycle = use_vcycle ? V_CYCLE : FMG;
-    param.nl_solve.linearization = Newton;
+    param.cycle = use_vcycle ? Cycle::V_CYCLE : Cycle::FMG;
+    param.nl_solve.linearization = Linearization::Newton;
     param.coarse_correct_tol = 1e-2;
     param.fine.check_converge = use_vcycle ? false : true;
     param.fine.linearization = param.nl_solve.linearization;
@@ -2580,7 +2580,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             double dtds_diff = OperatorsRelDiff(dTdS_diag, *dTdS_RAP);
 
             unique_ptr<mfem::SparseMatrix> diff_diag(mfem::Add(1.0, dTdS_diag, -1.0, *dTdS_RAP));
-            *diff_diag *= (1.0 / FroNorm(*diff_diag));
+            *diff_diag *= (1.0 / FrobeniusNorm(*diff_diag));
 
             if (dtds_diff > 1e-13)
             {
@@ -3072,7 +3072,7 @@ void TwoPhaseHybrid::Init()
         B00_[agg] *= -1.0;
     }
 
-    solver_ = InitKrylovSolver(GMRES);
+    solver_ = InitKrylovSolver(KrylovMethod::GMRES);
     solver_->SetAbsTol(1e-10);
     solver_->SetRelTol(1e-8);
 }

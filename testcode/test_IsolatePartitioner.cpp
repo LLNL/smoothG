@@ -37,35 +37,30 @@ int main(int argc, char* argv[])
                    "Graph connection data.");
 
     // load the graph
-    mfem::SparseMatrix vertex_edge_global;
-    {
-        std::ifstream graphFile(graphFileName);
-        smoothg::ReadVertexEdge(graphFile, vertex_edge_global);
-    }
+    mfem::SparseMatrix vertex_edge = smoothg::ReadVertexEdge(graphFileName);
 
     // partition
     int num_partitions = 2;
     mfem::Array<int> global_partitioning;
-    mfem::Array<int> isolated_vertices;
+    std::vector<int> isolated_vertices;
     {
-        smoothg::MetisGraphPartitioner metis_partitioner;
+        auto type = smoothg::MetisGraphPartitioner::PartType::RECURSIVE;
+        smoothg::MetisGraphPartitioner metis_partitioner(type);
         metis_partitioner.setUnbalanceTol(1);
-        mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge_global);
-        mfem::SparseMatrix vertex_vertex = smoothg::Mult(vertex_edge_global,
-                                                         edge_vertex);
+        mfem::SparseMatrix edge_vertex = smoothg::Transpose(vertex_edge);
+        auto vertex_vertex = smoothg::Mult(vertex_edge, edge_vertex);
 
-        mfem::Array<int> pre_isolated_vertices(2);
+        std::vector<int> pre_isolated_vertices(2);
         pre_isolated_vertices[0] = 0;
-        pre_isolated_vertices[1] = 5;
-        isolated_vertices.Append(pre_isolated_vertices);
+        pre_isolated_vertices[1] = 1;
+        isolated_vertices.push_back(pre_isolated_vertices[0]);
+        isolated_vertices.push_back(pre_isolated_vertices[1]);
 
-        mfem::Array<int> post_isolated_vertices(1);
-        post_isolated_vertices[0] = 2;
-        isolated_vertices.Append(post_isolated_vertices);
+        int post_isolated_vertex = 2;
+        isolated_vertices.push_back(post_isolated_vertex);
 
-        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices[0]);
-        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices[1]);
-        metis_partitioner.SetPostIsolateVertices(post_isolated_vertices);
+        metis_partitioner.SetPreIsolateVertices(pre_isolated_vertices);
+        metis_partitioner.SetPostIsolateVertices(post_isolated_vertex);
 
         metis_partitioner.doPartition(vertex_vertex, num_partitions,
                                       global_partitioning);

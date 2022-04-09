@@ -103,8 +103,9 @@ void NonlinearSolver::Solve(const mfem::Vector& rhs, mfem::Vector& sol)
 
 void NonlinearSolver::UpdateLinearSolveTol()
 {
-    double exponent = param_.linearization == Newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
-    double ref_norm = param_.linearization == Newton ? prev_resid_norm_ : rhs_norm_;
+    bool is_newton = param_.linearization == Linearization::Newton;
+    double exponent = is_newton ? (1.0 + std::sqrt(5)) / 2 : 1.0;
+    double ref_norm = is_newton ? prev_resid_norm_ : rhs_norm_;
     double tol = std::pow(resid_norm_ / ref_norm, exponent);
     linear_tol_ = std::max(std::min(tol, linear_tol_), 1e-8);
 }
@@ -175,7 +176,7 @@ void FAS::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 
 void FAS::MG_Cycle(int l)
 {
-    if (param_.cycle == V_CYCLE || l == param_.num_levels - 1)
+    if (param_.cycle == Cycle::V_CYCLE || l == param_.num_levels - 1)
     {
         Smoothing(l, rhs_[l], sol_[l]); // Pre-smoothing
 
@@ -187,7 +188,7 @@ void FAS::MG_Cycle(int l)
 
     if (l == param_.num_levels - 1) { return; } // terminate if coarsest level
 
-    if (l == 0 && param_.cycle == V_CYCLE)
+    if (l == 0 && param_.cycle == Cycle::V_CYCLE)
     {
         resid_norm_ = solvers_[l]->ResidualNorm(sol_[l], rhs_[l]);
         if (resid_norm_ < adjusted_tol_)
@@ -213,7 +214,7 @@ void FAS::MG_Cycle(int l)
 
         // Store projected coarse solution pi x_l
         mfem::Vector coarse_sol = sol_[l + 1];
-        if (param_.cycle == FMG)
+        if (param_.cycle == Cycle::FMG)
         {
             coarse_sol = 0.0;
         }
@@ -225,7 +226,7 @@ void FAS::MG_Cycle(int l)
         sol_[l + 1] -= coarse_sol;
 
         Interpolate(l + 1, sol_[l + 1], help_[l]);
-        if (param_.cycle == V_CYCLE)
+        if (param_.cycle == Cycle::V_CYCLE)
         {
             sol_[l] += help_[l];
         }
@@ -234,7 +235,7 @@ void FAS::MG_Cycle(int l)
             sol_[l] = help_[l];
         }
 
-        if (param_.cycle == V_CYCLE)
+        if (param_.cycle == Cycle::V_CYCLE)
         {
             solvers_[l]->BackTracking(rhs_[l], resid_norm_l, sol_[l], help_[l]);
         }

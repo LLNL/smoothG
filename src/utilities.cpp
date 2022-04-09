@@ -544,14 +544,14 @@ mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentit
     return entity_reorder_map;
 }
 
-double AbsMax(const mfem::Vector& vec, MPI_Comm comm)
+double ParAbsMax(const mfem::Vector& vec, MPI_Comm comm)
 {
     double global_abs_max, loc_abs_max = vec.Normlinf();
     MPI_Allreduce(&loc_abs_max, &global_abs_max, 1, MPI_DOUBLE, MPI_MAX, comm);
     return global_abs_max;
 }
 
-double Min(const mfem::Vector& vec, MPI_Comm comm)
+double ParMin(const mfem::Vector& vec, MPI_Comm comm)
 {
     double global_min, local_min = vec.Min();
     MPI_Allreduce(&local_min, &global_min, 1, MPI_DOUBLE, MPI_MIN, comm);

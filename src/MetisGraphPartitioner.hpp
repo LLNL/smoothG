@@ -48,7 +48,7 @@ public:
     explicit MetisGraphPartitioner(PartType _part_time = PartType::KWAY);
 
     //! Destructor
-    virtual ~MetisGraphPartitioner() { };
+    virtual ~MetisGraphPartitioner() { }
 
     //! Set flags
     void setFlags(PartType type)
@@ -90,14 +90,18 @@ public:
        Isolate some critical vertices of the graph into their own partition, so
        that these vertices are not coarsened but remain on coarser levels.
 
-       (this does a deep copy of the indices)
+       If the input is of type std::vector<int>, each index in the container
+       forms one partition.
+
+       If the input is of type std::vector<std::vector<int>>, each inner
+       container forms one partition.
     */
     void SetPreIsolateVertices(int index);
-    void SetPreIsolateVertices(std::vector<int> indices);
-    void SetPreIsolateVertices(std::vector<std::vector<int>> sets);
+    void SetPreIsolateVertices(const std::vector<int>& indices);
+    void SetPreIsolateVertices(std::vector<std::vector<int>> sets_of_indices);
 
     void SetPostIsolateVertices(int index);
-    void SetPostIsolateVertices(const mfem::Array<int>& indices);
+    void SetPostIsolateVertices(const std::vector<int>& indices);
 
 private:
     int options_[METIS_NOPTIONS];
@@ -106,7 +110,7 @@ private:
     PartType part_type_;
     real_t unbalance_tol_;
     std::vector<std::vector<int>> pre_isolated_vertices_;
-    mfem::Array<int> post_isolated_vertices_;
+    std::vector<std::vector<int>> post_isolated_vertices_;
 
     void removeEmptyParts(mfem::Array<int>& partitioning,
                           int& num_partitions) const;
@@ -121,6 +125,10 @@ private:
     void IsolatePostProcess(const mfem::SparseMatrix& wtable,
                             int& num_partitions,
                             mfem::Array<int>& partitioning);
+
+    void AddAggregates(const std::vector<std::vector<int>>& aggs,
+                       int& current_num_aggs,
+                       mfem::Array<int>& partitioning);
 
     std::function<int(int*, int*, int*, int*, int*, int*,
                       int*, int*, float*, float*, int*, int*, int*)> CallMetis;

@@ -26,7 +26,7 @@
 namespace smoothg
 {
 
-enum KrylovMethod { CG, MINRES, GMRES };
+enum class KrylovMethod { CG, MINRES, GMRES };
 
 /**
    @brief Abstract base class for solvers of graph Laplacian problems

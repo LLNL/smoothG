@@ -239,11 +239,11 @@ std::set<unsigned> FindNonZeroColumns(const mfem::SparseMatrix& mat);
 mfem::SparseMatrix EntityReorderMap(const mfem::HypreParMatrix& entity_trueentity,
                                     const mfem::HypreParMatrix& entity_trueentity_entity);
 
-/// @return Global maximum of absolute value of entries of input vector
-double AbsMax(const mfem::Vector& vec, MPI_Comm comm);
+/// @return Global maximum of absolute values of entries of vec in all processes
+double ParAbsMax(const mfem::Vector& vec, MPI_Comm comm);
 
-/// @return Global minimum of entries of input vector
-double Min(const mfem::Vector& vec, MPI_Comm comm);
+/// @return Global minimum of entries of vec in all processes
+double ParMin(const mfem::Vector& vec, MPI_Comm comm);
 
 /// @return Global value of MPI_Allreduce of MPI operation op on local_value
 bool Allreduce(bool local_value, MPI_Op op, MPI_Comm comm);

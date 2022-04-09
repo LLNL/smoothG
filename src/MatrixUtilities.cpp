@@ -399,6 +399,11 @@ mfem::SparseMatrix SparseDiag(mfem::Vector diag)
     int* J = new int[size];
     std::iota(J, J + size, 0);
 
+    if (size == 0)
+    {
+        double* data = new double[size];
+        return mfem::SparseMatrix(I, J, data, size, size);
+    }
     return mfem::SparseMatrix(I, J, diag.StealData(), size, size);
 }
 
@@ -1333,12 +1338,7 @@ const HYPRE_Int* GetColMap(const mfem::HypreParMatrix& mat)
     return ((hypre_ParCSRMatrix*)mat)->col_map_offd;
 }
 
-int NNZ(const mfem::SparseMatrix& mat)
-{
-    return mat.NumNonZeroElems();
-}
-
-double FroNorm(const mfem::SparseMatrix& mat)
+double FrobeniusNorm(const mfem::SparseMatrix& mat)
 {
     double norm = 0.0;
     for (int i = 0; i < mat.NumNonZeroElems(); ++i)
@@ -1346,6 +1346,110 @@ double FroNorm(const mfem::SparseMatrix& mat)
         norm += std::pow(mat.GetData()[i], 2.0);
     }
     return std::sqrt(norm);
+}
+
+HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol)
+{
+    HYPRE_Int i, j, k, nnz_diag, nnz_offd, A_diag_i_i, A_offd_i_i;
+
+    MPI_Comm         comm     = hypre_ParCSRMatrixComm(A);
+    /* diag part of A */
+    hypre_CSRMatrix* A_diag   = hypre_ParCSRMatrixDiag(A);
+    HYPRE_Real*      A_diag_a = hypre_CSRMatrixData(A_diag);
+    HYPRE_Int*       A_diag_i = hypre_CSRMatrixI(A_diag);
+    HYPRE_Int*       A_diag_j = hypre_CSRMatrixJ(A_diag);
+    /* off-diag part of A */
+    hypre_CSRMatrix* A_offd   = hypre_ParCSRMatrixOffd(A);
+    HYPRE_Real*      A_offd_a = hypre_CSRMatrixData(A_offd);
+    HYPRE_Int*       A_offd_i = hypre_CSRMatrixI(A_offd);
+    HYPRE_Int*       A_offd_j = hypre_CSRMatrixJ(A_offd);
+
+    HYPRE_Int  num_cols_A_offd = hypre_CSRMatrixNumCols(A_offd);
+    HYPRE_BigInt* col_map_offd_A  = hypre_ParCSRMatrixColMapOffd(A);
+    HYPRE_Int* marker_offd = NULL;
+
+    HYPRE_BigInt first_row  = hypre_ParCSRMatrixFirstRowIndex(A);
+    HYPRE_Int nrow_local = hypre_CSRMatrixNumRows(A_diag);
+    HYPRE_Int my_id, num_procs;
+    /* MPI size and rank*/
+    hypre_MPI_Comm_size(comm, &num_procs);
+    hypre_MPI_Comm_rank(comm, &my_id);
+
+    if (tol <= 0.0)
+    {
+        return hypre_error_flag;
+    }
+
+    marker_offd = hypre_CTAlloc(HYPRE_Int, num_cols_A_offd, HYPRE_MEMORY_HOST);
+
+    nnz_diag = nnz_offd = A_diag_i_i = A_offd_i_i = 0;
+    for (i = 0; i < nrow_local; i++)
+    {
+        /* drop small entries based on tol */
+        for (j = A_diag_i_i; j < A_diag_i[i + 1]; j++)
+        {
+            HYPRE_Int     col = A_diag_j[j];
+            HYPRE_Complex val = A_diag_a[j];
+            if (fabs(val) >= tol)
+            {
+                A_diag_j[nnz_diag] = col;
+                A_diag_a[nnz_diag] = val;
+                nnz_diag ++;
+            }
+        }
+        if (num_procs > 1)
+        {
+            for (j = A_offd_i_i; j < A_offd_i[i + 1]; j++)
+            {
+                HYPRE_Int     col = A_offd_j[j];
+                HYPRE_Complex val = A_offd_a[j];
+                if (fabs(val) >= tol)
+                {
+                    if (0 == marker_offd[col])
+                    {
+                        marker_offd[col] = 1;
+                    }
+                    A_offd_j[nnz_offd] = col;
+                    A_offd_a[nnz_offd] = val;
+                    nnz_offd ++;
+                }
+            }
+        }
+        A_diag_i_i = A_diag_i[i + 1];
+        A_offd_i_i = A_offd_i[i + 1];
+        A_diag_i[i + 1] = nnz_diag;
+        A_offd_i[i + 1] = nnz_offd;
+    }
+
+    hypre_CSRMatrixNumNonzeros(A_diag) = nnz_diag;
+    hypre_CSRMatrixNumNonzeros(A_offd) = nnz_offd;
+    hypre_ParCSRMatrixSetNumNonzeros(A);
+    hypre_ParCSRMatrixDNumNonzeros(A) = (HYPRE_Real) hypre_ParCSRMatrixNumNonzeros(A);
+
+    for (i = 0, k = 0; i < num_cols_A_offd; i++)
+    {
+        if (marker_offd[i])
+        {
+            col_map_offd_A[k] = col_map_offd_A[i];
+            marker_offd[i] = k++;
+        }
+    }
+    /* num_cols_A_offd = k; */
+    hypre_CSRMatrixNumCols(A_offd) = k;
+    for (i = 0; i < nnz_offd; i++)
+    {
+        A_offd_j[i] = marker_offd[A_offd_j[i]];
+    }
+
+    if ( hypre_ParCSRMatrixCommPkg(A) )
+    {
+        hypre_MatvecCommPkgDestroy( hypre_ParCSRMatrixCommPkg(A) );
+    }
+    hypre_MatvecCommPkgCreate(A);
+
+    hypre_TFree(marker_offd, HYPRE_MEMORY_HOST);
+
+    return hypre_error_flag;
 }
 
 mfem::HypreBoomerAMG* BoomerAMG(mfem::HypreParMatrix& A)
@@ -1368,112 +1472,6 @@ mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix A)
     A.SetGraphOwner(false);
     A.SetDataOwner(false);
     return pA;
-};
-
-HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix *A, double tol)
-{
-   HYPRE_Int i, j, k, nnz_diag, nnz_offd, A_diag_i_i, A_offd_i_i;
-
-   MPI_Comm         comm     = hypre_ParCSRMatrixComm(A);
-   /* diag part of A */
-   hypre_CSRMatrix *A_diag   = hypre_ParCSRMatrixDiag(A);
-   HYPRE_Real      *A_diag_a = hypre_CSRMatrixData(A_diag);
-   HYPRE_Int       *A_diag_i = hypre_CSRMatrixI(A_diag);
-   HYPRE_Int       *A_diag_j = hypre_CSRMatrixJ(A_diag);
-   /* off-diag part of A */
-   hypre_CSRMatrix *A_offd   = hypre_ParCSRMatrixOffd(A);
-   HYPRE_Real      *A_offd_a = hypre_CSRMatrixData(A_offd);
-   HYPRE_Int       *A_offd_i = hypre_CSRMatrixI(A_offd);
-   HYPRE_Int       *A_offd_j = hypre_CSRMatrixJ(A_offd);
-
-   HYPRE_Int  num_cols_A_offd = hypre_CSRMatrixNumCols(A_offd);
-   HYPRE_BigInt *col_map_offd_A  = hypre_ParCSRMatrixColMapOffd(A);
-   HYPRE_Int *marker_offd = NULL;
-
-   HYPRE_BigInt first_row  = hypre_ParCSRMatrixFirstRowIndex(A);
-   HYPRE_Int nrow_local = hypre_CSRMatrixNumRows(A_diag);
-   HYPRE_Int my_id, num_procs;
-   /* MPI size and rank*/
-   hypre_MPI_Comm_size(comm, &num_procs);
-   hypre_MPI_Comm_rank(comm, &my_id);
-
-   if (tol <= 0.0)
-   {
-      return hypre_error_flag;
-   }
-
-   marker_offd = hypre_CTAlloc(HYPRE_Int, num_cols_A_offd, HYPRE_MEMORY_HOST);
-
-   nnz_diag = nnz_offd = A_diag_i_i = A_offd_i_i = 0;
-   for (i = 0; i < nrow_local; i++)
-   {
-      /* drop small entries based on tol */
-      for (j = A_diag_i_i; j < A_diag_i[i+1]; j++)
-      {
-         HYPRE_Int     col = A_diag_j[j];
-         HYPRE_Complex val = A_diag_a[j];
-         if (fabs(val) >= tol)
-         {
-            A_diag_j[nnz_diag] = col;
-            A_diag_a[nnz_diag] = val;
-            nnz_diag ++;
-         }
-      }
-      if (num_procs > 1)
-      {
-         for (j = A_offd_i_i; j < A_offd_i[i+1]; j++)
-         {
-            HYPRE_Int     col = A_offd_j[j];
-            HYPRE_Complex val = A_offd_a[j];
-            /* in normal cases: diagonal entry should not
-             * appear in A_offd (but this can still be possible) */
-            if (i + first_row == col_map_offd_A[col] || fabs(val) >= tol)
-            {
-               if (0 == marker_offd[col])
-               {
-                  marker_offd[col] = 1;
-               }
-               A_offd_j[nnz_offd] = col;
-               A_offd_a[nnz_offd] = val;
-               nnz_offd ++;
-            }
-         }
-      }
-      A_diag_i_i = A_diag_i[i+1];
-      A_offd_i_i = A_offd_i[i+1];
-      A_diag_i[i+1] = nnz_diag;
-      A_offd_i[i+1] = nnz_offd;
-   }
-
-   hypre_CSRMatrixNumNonzeros(A_diag) = nnz_diag;
-   hypre_CSRMatrixNumNonzeros(A_offd) = nnz_offd;
-   hypre_ParCSRMatrixSetNumNonzeros(A);
-   hypre_ParCSRMatrixDNumNonzeros(A) = (HYPRE_Real) hypre_ParCSRMatrixNumNonzeros(A);
-
-   for (i = 0, k = 0; i < num_cols_A_offd; i++)
-   {
-      if (marker_offd[i])
-      {
-         col_map_offd_A[k] = col_map_offd_A[i];
-         marker_offd[i] = k++;
-      }
-   }
-   /* num_cols_A_offd = k; */
-   hypre_CSRMatrixNumCols(A_offd) = k;
-   for (i = 0; i < nnz_offd; i++)
-   {
-      A_offd_j[i] = marker_offd[A_offd_j[i]];
-   }
-
-   if ( hypre_ParCSRMatrixCommPkg(A) )
-   {
-      hypre_MatvecCommPkgDestroy( hypre_ParCSRMatrixCommPkg(A) );
-   }
-   hypre_MatvecCommPkgCreate(A);
-
-   hypre_TFree(marker_offd, HYPRE_MEMORY_HOST);
-
-   return hypre_error_flag;
 }
 
 double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2)
