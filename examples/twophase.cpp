@@ -2895,21 +2895,21 @@ CoupledFAS::CoupledFAS(const Hierarchy& hierarchy,
         {
             S_prev_l = smoothg::MultTranspose(hierarchy.GetPs(l-1), S_prev_l);
             auto PsT = smoothg::Transpose(hierarchy.GetPs(l-1));
-//            Qs_.push_back(smoothg::Mult(PsT, *weight_l));
-//            weight_l.reset(mfem::RAP(hierarchy.GetPs(l-1), *weight_l, hierarchy.GetPs(l-1)));
+            Qs_.push_back(smoothg::Mult(PsT, *weight_l));
+            weight_l.reset(mfem::RAP(hierarchy.GetPs(l-1), *weight_l, hierarchy.GetPs(l-1)));
 
-//            mfem::Vector Wc_inv;
-//            weight_l->GetDiag(Wc_inv);
-//            for (int i = 0; i < Wc_inv.Size(); ++i)
-//            {
-//                Wc_inv[i] = 1.0 / Wc_inv[i];
-//            }
-//            Qs_[l-1].ScaleRows(Wc_inv);
-            if (l > 1)
+            mfem::Vector Wc_inv;
+            weight_l->GetDiag(Wc_inv);
+            for (int i = 0; i < Wc_inv.Size(); ++i)
             {
-                const auto& Ps = hierarchy.GetPs(l-2);
-                weight_l.reset(mfem::RAP(Ps, *weight_l, Ps));
+                Wc_inv[i] = 1.0 / Wc_inv[i];
             }
+            Qs_[l-1].ScaleRows(Wc_inv);
+//            if (l > 1)
+//            {
+//                const auto& Ps = hierarchy.GetPs(l-2);
+//                weight_l.reset(mfem::RAP(Ps, *weight_l, Ps));
+//            }
 
         }
 

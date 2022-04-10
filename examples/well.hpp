@@ -153,7 +153,6 @@ template<typename T>
 T* Append(const T* in, int in_size, int append_size, T value, AppendType type)
 {
     if ((in_size + append_size) == 0) { return nullptr; }
-//    T* out = new T[in_size + append_size];
     T* out = hypre_CTAlloc(T, in_size + append_size, HYPRE_MEMORY_HOST);
     std::copy_n(in, in_size, out);
     if (type == FILL) { std::fill_n(out + in_size, append_size, value); }

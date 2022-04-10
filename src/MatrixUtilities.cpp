@@ -1468,7 +1468,7 @@ mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A)
                                        row_starts, col_starts, &A);
     pA->CopyRowStarts();
     pA->CopyColStarts();
-    pA->SetOwnerFlags(3, 0, 0);
+    pA->SetOwnerFlags(3, -1, -1);
     A.SetGraphOwner(false);
     A.SetDataOwner(false);
     return pA;

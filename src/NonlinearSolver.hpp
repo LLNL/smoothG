@@ -57,6 +57,9 @@ public:
     /// Constructor
     NonlinearSolver(MPI_Comm comm, NLSolverParameters param);
 
+    /// Destructor
+    virtual ~NonlinearSolver() = default;
+
     /// Solve A(sol) = rhs
     void Solve(const mfem::Vector& rhs, mfem::Vector& sol);
 

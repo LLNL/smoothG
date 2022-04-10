@@ -537,6 +537,8 @@ public:
     */
     DarcyProblem(const mfem::ParMesh& mesh, const mfem::Array<int>& ess_attr);
 
+    virtual ~DarcyProblem() = default;
+
     /**
        @param use_local_weight whether to store "element" weight
        @return weighted graph associated with the finite volume problem
