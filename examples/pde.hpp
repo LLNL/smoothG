@@ -539,6 +539,9 @@ public:
 
     virtual ~DarcyProblem() = default;
 
+    /// Destructor
+    virtual ~DarcyProblem() = default;
+
     /**
        @param use_local_weight whether to store "element" weight
        @return weighted graph associated with the finite volume problem
