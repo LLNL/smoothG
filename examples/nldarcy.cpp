@@ -199,8 +199,8 @@ int main(int argc, char* argv[])
     mfem::Array<int> ess_attr(problem == "egg" ? 3 : (dim == 3 ? 6 : 4));
     ess_attr = 1;
 
-    unique_ptr<DarcyProblem> fv_problem;
     Kappa kappa(alpha);
+    unique_ptr<DarcyProblem> fv_problem;
     if (problem == "spe10")
     {
         ess_attr[dim - 2] = 0;
