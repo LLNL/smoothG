@@ -933,6 +933,9 @@ int main(int argc, char* argv[])
                    "--sharp-front", "Control density to produce smeared or sharp saturation front.");
     args.AddOption(&relperm_order, "-ro", "--relperm-order",
                    "Exponent of relperm function.");
+    bool isolate_well_cells = false;
+    args.AddOption(&isolate_well_cells, "-iso-wc", "--isolate-well-cells", "-no-iso-wc",
+                   "--no-isolate-well-cells", "Whether to isolate well cells in coarsening.");
     UpscaleParameters upscale_param;
     upscale_param.spect_tol = 1.0;
     upscale_param.max_evects = 1;
@@ -986,6 +989,9 @@ int main(int argc, char* argv[])
 
     int num_attr_from_file = 5;
     upscale_param.num_iso_verts = 1; // TODO: this should be read from file
+
+    int num_injectors = 1;
+    int num_producers = 4;
 
     // Setting up finite volume discretization problem
     std::string path(base_dir + problem_dir);
@@ -1064,6 +1070,8 @@ int main(int argc, char* argv[])
             nnz_res = num_vert_res * 6;
             num_edges_res = 59205;
             upscale_param.num_iso_verts = 8; // TODO: this should be read from file
+            num_injectors = 8;
+            well_height = 7;
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel(0, 0, ess_attr));
@@ -1124,36 +1132,105 @@ int main(int argc, char* argv[])
     Graph graph = problem->GetFVGraph(true);
     auto& ess_attr_final = problem->EssentialAttribute();
 
-    unique_ptr<mfem::Array<int>> partition(read_from_file ? nullptr : new mfem::Array<int>);
 
-    if (read_from_file == false)
+    bool special_part = (read_from_file == false || isolate_well_cells);
+    unique_ptr<mfem::Array<int>> partition(special_part ? new mfem::Array<int> : nullptr);
+
+    if (special_part)
     {
         mfem::Array<int> coarsening_factors(dim);
         coarsening_factors = 1;
         coarsening_factors[0] = upscale_param.coarse_factor;
 //        coarsening_factors[0] = 6;
 //        coarsening_factors[1] = 11;
-        problem->Partition(use_metis, coarsening_factors, *partition);
-        if (!use_metis) { partition->Append(partition->Max()+1); }
-        if (use_metis) { upscale_param.num_iso_verts = problem->NumIsoVerts(); }
-//        SetAttrForAggPrint(*problem_ptr, *partition);
+
+        if (isolate_well_cells)
+        {
+            std::vector<std::vector<int>> iso_verts;
+            for (int i = 0; i < upscale_param.num_iso_verts; ++i)
+            {
+                iso_verts.push_back(std::vector<int>(1, graph.NumVertices()-1-i));
+            }
+            PartitionAAT(graph.VertexToEdge(), *partition,
+                         upscale_param.coarse_factor, false, std::move(iso_verts));
+        }
+        else
+        {
+
+            problem->Partition(use_metis, coarsening_factors, *partition);
+            if (!use_metis) { partition->Append(partition->Max()+1); }
+            if (use_metis) { upscale_param.num_iso_verts = problem->NumIsoVerts(); }
+//            SetAttrForAggPrint(*problem_ptr, *partition);
+        }
     }
 
-    const int num_injectors = 1;
-    const int num_producers = 4;
-//    const int num_old_parts = partition->Max()+1;
-//    auto well_cells = FindWellCells(graph, num_injectors, num_producers, well_height);
-//    partition.reset(AddWellCellAgg(*partition, well_cells));
-//    std::cout << "Number of new aggs created because of well cell isolation: "
-//              << partition->Max()+1 - num_old_parts << "\n";
+    if (isolate_well_cells)
+    {
+
+        const int num_old_parts = partition->Max()+1;
+        auto well_cells = FindWellCells(graph, num_injectors, num_producers, well_height);
+        partition.reset(AddWellCellAgg(*partition, well_cells));
+        std::cout << "Number of new aggs created because of well cell isolation: "
+                  << partition->Max()+1 - num_old_parts << "\n";
+
+        mfem::Vector part_print(graph.NumVertices());
+        part_print = 0.0;
+        for (int i = 0; i < part_print.Size(); ++i)
+        {
+            if ((*partition)[i] >= num_old_parts)
+            {
+                part_print[i] = (*partition)[i] - num_old_parts + 1;
+            }
+        }
+
+        mfem::socketstream souts;
+        problem_ptr->VisSetup(souts, part_print, 0.0, 0.0, "Well cells", false, true);
+    }
 
     Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr_final);
     hierarchy.PrintInfo();
+
 
     // Fine scale transport based on fine flux
     std::vector<mfem::Vector> Ss(upscale_param.max_levels);
     std::vector<mfem::Vector> flux_s(upscale_param.max_levels);
     std::vector<mfem::Vector> pres_s(upscale_param.max_levels);
+
+//    auto D0 = hierarchy.GetMatrix(0).GetD();
+//    auto edge_map = problem_for_plot->ComputeEdgeMap(D0);
+//    flux_s[0].SetSize(D0.NumCols());
+//    flux_s[0] = 0.0;
+//    for (int l = 1; l < upscale_param.max_levels; ++l)
+//    {
+//        auto& D = hierarchy.GetMatrix(l).GetD();
+//        flux_s[l].SetSize(D.NumCols());
+//        flux_s[l] = 0.0;
+
+
+//        for (int i = 0; i < num_injectors; ++i)
+//        {
+//            int* D_i = D.GetI();
+//            int row = D.NumRows() - num_injectors - 2 + i;
+//            for (int j = D_i[row]; j < D_i[row+1]; ++j)
+//            {
+//                std::cout << "found basis near well "<< i<<"\n";
+//                int edof = D.GetJ()[j];
+//                flux_s[l][edof] = 1;
+//            }
+//        }
+
+//        for (int ll = l; ll > 0; --ll)
+//        {
+//            hierarchy.GetPsigma(ll-1).Mult(flux_s[ll], flux_s[ll-1]);
+//        }
+
+//        mfem::Vector flux_for_print = MatVec(edge_map, flux_s[0]);
+//        auto base_msg = "level "+std::to_string(l);
+//        mfem::socketstream souts;
+//        problem_for_plot->VisSetup2(souts, flux_for_print,  "basis "+base_msg);
+//    }
+
+
 
     int perf_offset = graph.NumEdges() - (num_injectors+num_producers)*well_height;
     for (int w = 0; w < num_injectors+num_producers; ++w)
@@ -2235,7 +2312,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     out.GetBlock(1) *= (dt_ * density_);
 
     auto& up_param = hierarchy_.GetUpscaleParameters();
-    if (level_ == 0)// || (up_param.max_traces == 1 && (up_param.max_evects == 1 || up_param.add_Pvertices_pwc)))
+    if (level_ == 0 || (up_param.max_traces == 1 && (up_param.max_evects == 1 || up_param.add_Pvertices_pwc)))
     {
         const GraphSpace& space = darcy_system_.GetGraphSpace();
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
@@ -2494,7 +2571,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     auto& up_param = hierarchy_.GetUpscaleParameters();
 //    bool pwc_sat = (up_param.max_evects == 1 || up_param.add_Pvertices_pwc);
     const bool lowest_coarse = (up_param.max_traces == 1 && up_param.max_evects == 1);
-    const bool lowest_order = (level_ == 0);// || lowest_coarse);
+    const bool lowest_order = ((level_ == 0) || lowest_coarse);
     if (lowest_order)
     {
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
@@ -2622,10 +2699,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             dTdsigma->GetDiag(diag);
             diag.EliminateRow(diag.NumRows()-1);
             dTdS->GetDiag(diag);
-            diag.EliminateRow(diag.NumRows()-1);
-            diag.EliminateCol(diag.NumCols()-1);
-            diag.Set(diag.NumRows()-1, diag.NumRows()-1, 1.0);
-//            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
+//            diag.EliminateRow(diag.NumRows()-1);
+//            diag.EliminateCol(diag.NumCols()-1);
+//            diag.Set(diag.NumRows()-1, diag.NumRows()-1, 1.0);
+            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
 
             dMdS->GetDiag(diag);
             diag.EliminateCol(diag.NumCols()-1);
@@ -2651,7 +2728,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        auto pfix = ToParMatrix(comm_, std::move(fix));
 //        op.SetBlock(1, 1, pfix);
 
-        const bool use_direct_solver = true;//!lowest_order;
+        const bool use_direct_solver = !lowest_order;
         const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)

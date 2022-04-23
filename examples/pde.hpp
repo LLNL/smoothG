@@ -598,6 +598,10 @@ public:
     /// @return a vector of size number of cells containing z-coordinates of cell centers
     mfem::Vector ComputeZ() const;
 
+    /// Construct a map from a different edge numbering to the edge in this class.
+    /// Vert numbering in vert_edge2 should be same as that in vertex_edge_.
+    mfem::SparseMatrix ComputeEdgeMap(const mfem::SparseMatrix& vert_edge) const;
+
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
 
     const mfem::SparseMatrix* VertReorderMap() const { return vertex_reorder_map_.get(); }
@@ -738,6 +742,47 @@ void DarcyProblem::InitGraph()
         const int vert = edge_vert.GetRowColumns(edge)[0];
         sigma_sign_change_[edge] = DivOp.SpMat()(vert, edge) < 0 ? -1.0 : 1.0;
     }
+}
+
+mfem::SparseMatrix DarcyProblem::ComputeEdgeMap(const mfem::SparseMatrix& vert_edge) const
+{
+    mfem::DiscreteLinearOperator DivOp(sigma_fes_.get(), u_fes_.get());
+    DivOp.AddDomainInterpolator(new mfem::DivergenceInterpolator);
+    DivOp.Assemble();
+    DivOp.Finalize();
+    auto& elem_face = DivOp.SpMat();
+    auto face_elem = smoothg::Transpose(elem_face);
+    auto edge_vert = smoothg::Transpose(vert_edge);
+
+    mfem::Array<int> elems, faces, edges;
+
+    mfem::SparseMatrix face_edge(elem_face.NumCols(), vert_edge.NumCols());
+    for (int i = 0; i < elem_face.NumRows(); ++i)
+    {
+        GetTableRow(elem_face, i, faces);
+        GetTableRow(vert_edge, i, edges);
+        for (auto face : faces)
+        {
+            GetTableRow(face_elem, face, elems);
+            if (elems.Size() == 1) { continue; }
+
+            int neighbor_elem = elems[0] == i ? elems[1] : elems[0];
+            for (auto edge : edges)
+            {
+                GetTableRow(edge_vert, edge, elems);
+                if (elems.Size() == 1) { continue; }
+
+                int neighbor_vert = elems[0] == i ? elems[1] : elems[0];
+
+                if (neighbor_elem == neighbor_vert)
+                {
+                    face_edge.Add(face, edge, 1.0);
+                    break;
+                }
+            }
+        }
+    }
+    return face_edge;
 }
 
 void DarcyProblem::ComputeGraphWeight()
