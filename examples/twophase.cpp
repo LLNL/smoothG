@@ -35,13 +35,36 @@
 
 using namespace smoothg;
 
-double mu_o = 3e-3; //0.005; //0.0002; //
-//double mu_w = 3e-4; // 0.3*centi*poise //1e-3;
-double mu_w = 1e-3; // 0.3*centi*poise //1e-3;
-int relperm_order = 2;
 //mfem::Array<int> well_cells;
 mfem::Array<int> well_perforations;
 mfem::Vector well_cell_gf;
+
+
+class Mobility
+{
+    /// CoreyRelPerm, relative permeability
+    static double RelPerm(double S, double mu);
+    static double RelPermDerivative(double S, double mu);
+    static double CellMobility(double S_w, double S_o);
+    static double CellMobilityDerivative(double S_w, double S_o);
+public:
+    static double mu_o_; // = 3e-3; //0.005; //0.0002; //
+    static double mu_w_; // = 1e-3; // 0.3*centi*poise //1e-3;
+    static int relperm_order_; // = 2;
+    static double S_max_; // = 0.8;
+    static double S_min_; // = 0.2;
+
+    static mfem::Vector TotalMobility(const mfem::Vector& S);
+    static mfem::Vector dTMinv_dS(const mfem::Vector& S);
+    static mfem::Vector FractionalFlow(const mfem::Vector& S);
+    static mfem::Vector dFdS(const mfem::Vector& S);
+};
+
+double Mobility::mu_o_ = 5e-3; //0.005; //0.0002; //
+double Mobility::mu_w_ = 1e-3; // 0.3*centi*poise //1e-3;
+int Mobility::relperm_order_ = 2;
+double Mobility::S_max_ = 1.0;
+double Mobility::S_min_ = 0.0;
 
 mfem::Vector PWConstProject(const MixedMatrix& darcy_system, const mfem::Vector& x)
 {
@@ -175,11 +198,6 @@ struct EvolveParamenters
 };
 
 void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double diff_tol);
-
-mfem::Vector TotalMobility(const mfem::Vector& S);
-mfem::Vector dTMinv_dS(const mfem::Vector& S);
-mfem::Vector FractionalFlow(const mfem::Vector& S);
-mfem::Vector dFdS(const mfem::Vector& S);
 
 DarcyProblem* problem_ptr;
 std::vector<mfem::socketstream> sout_resid_(50); // this should not be needed (only for debug)
@@ -931,8 +949,10 @@ int main(int argc, char* argv[])
     bool smeared_front = true;
     args.AddOption(&smeared_front, "-smeared-front", "--smeared-front", "-sharp-front",
                    "--sharp-front", "Control density to produce smeared or sharp saturation front.");
-    args.AddOption(&relperm_order, "-ro", "--relperm-order",
+    args.AddOption(&(Mobility::relperm_order_), "-ro", "--relperm-order",
                    "Exponent of relperm function.");
+    args.AddOption(&(Mobility::S_max_), "-smax", "--s-max", "Max of water saturation.");
+    args.AddOption(&(Mobility::S_min_), "-smin", "--s-min", "Min of water saturation.");
     bool isolate_well_cells = false;
     args.AddOption(&isolate_well_cells, "-iso-wc", "--isolate-well-cells", "-no-iso-wc",
                    "--no-isolate-well-cells", "Whether to isolate well cells in coarsening.");
@@ -959,7 +979,8 @@ int main(int argc, char* argv[])
     evolve_param.scheme = static_cast<SteppingScheme>(scheme);
 
     const int max_iter = upscale_param.max_levels > 1 ? 100 : 100;
-    mu_o = smeared_front ? 0.005 : 0.0002;
+    Mobility::mu_o_ = smeared_front ? 0.005 : 0.0002;
+
 
     FASParameters fas_param;
     fas_param.fine.max_num_iter = use_vcycle ? 1 : max_iter;
@@ -1979,7 +2000,7 @@ double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
         if (S[ii] < 0.0) { S[ii]  = 0.0; }
         if (S[ii] > 1.0) { S[ii] =  1.0; }
     }
-    mfem::Vector df_ds = dFdS(S);
+    mfem::Vector df_ds = Mobility::dFdS(S);
 
     mfem::Array<int> edofs;
     mfem::Vector local_flux(D.NumRows());
@@ -2102,7 +2123,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         mfem::mfem_error("usage of weight need to be fixed!\n");
 
         const mfem::Vector S = PWConstProject(system, x.GetBlock(2));
-        hierarchy_->RescaleCoefficient(level_, TotalMobility(S));
+        hierarchy_->RescaleCoefficient(level_, Mobility::TotalMobility(S));
         mfem::BlockVector flow_rhs(*source_, hierarchy_->BlockOffsets(level_));
         mfem::BlockVector flow_sol(x, hierarchy_->BlockOffsets(level_));
         hierarchy_->Solve(level_, flow_rhs, flow_sol);
@@ -2114,7 +2135,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
         {
             mfem::Vector dSdt(source_->GetBlock(2));
-            D_te_e_->Mult(-1.0, MatVec(upwind, FractionalFlow(S)), 1.0, dSdt);
+            D_te_e_->Mult(-1.0, MatVec(upwind, Mobility::FractionalFlow(S)), 1.0, dSdt);
 //            x.GetBlock(2).Add(dt * density_ / weight_, dSdt);
             step_converged_ = true;
         }
@@ -2287,7 +2308,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 
         mfem::BlockVector fine_darcy_Rx(darcy_system_0.BlockOffsets());
         fine_darcy_Rx = 0.0;
-        darcy_system_0.Mult(TotalMobility(fine_S), fine_darcy_x, fine_darcy_Rx);
+        darcy_system_0.Mult(Mobility::TotalMobility(fine_S), fine_darcy_x, fine_darcy_Rx);
 
         mfem::Vector Rflux = fine_darcy_Rx.GetBlock(0);
         mfem::Vector Rp = fine_darcy_Rx.GetBlock(1);
@@ -2304,7 +2325,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     {
         mfem::BlockVector darcy_x(x.GetData(), darcy_system_.BlockOffsets());
         mfem::BlockVector darcy_Rx(out.GetData(), darcy_system_.BlockOffsets());
-        darcy_system_.Mult(TotalMobility(S), darcy_x, darcy_Rx);
+        darcy_system_.Mult(Mobility::TotalMobility(S), darcy_x, darcy_Rx);
     }
 
 
@@ -2318,7 +2339,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
 //        auto upwind = BuildUpwindPattern(space, blk_x.GetBlock(0));
 
-        auto upw_FS = MatVec(upwind, FractionalFlow(S));
+        auto upw_FS = MatVec(upwind, Mobility::FractionalFlow(S));
         RescaleVector(blk_x.GetBlock(0), upw_FS);
         auto U_FS = MatVec(space.TrueEDofToEDof(), upw_FS);
 
@@ -2340,7 +2361,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 
         auto fine_upwind = BuildWeightedUpwindPattern(darcy_system_0.GetGraphSpace(), fine_flux);
 
-        auto upw_FS = MatVec(fine_upwind, FractionalFlow(fine_S));
+        auto upw_FS = MatVec(fine_upwind, Mobility::FractionalFlow(fine_S));
         RescaleVector(fine_flux, upw_FS);
 
 //        auto fine_D_upw_FS = MatVec(D_fine_, upw_FS);
@@ -2403,7 +2424,7 @@ void CoupledSolver::Build_dMdS(const MixedMatrix& darcy_system,
     mfem::Vector sigma_loc, Msigma_vec;
     mfem::DenseMatrix proj_pwc_loc;
 
-    const mfem::Vector dTMinv_dS_vec = dTMinv_dS(S);
+    const mfem::Vector dTMinv_dS_vec = Mobility::dTMinv_dS(S);
 
     local_dMdS_.resize(vert_edof.NumRows());
     const int S_size = darcy_system.GetPWConstProj().NumCols();
@@ -2523,13 +2544,14 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     // exact RAP
     if (level_ == 0 || !exact_flow_RAP_)
     {
-        M_proc = darcy_system_.GetMBuilder().BuildAssembledM(TotalMobility(S));
+        M_proc = darcy_system_.GetMBuilder().BuildAssembledM(Mobility::TotalMobility(S));
         dMdS_proc = Assemble_dMdS(darcy_system_, blk_x.GetBlock(0), S);
     }
     else
     {
         unique_ptr<mfem::SparseMatrix> mat_help;
-        auto M_fine = system_0.GetMBuilder().BuildAssembledM(TotalMobility(fine_S));
+        auto tot_mob = Mobility::TotalMobility(fine_S);
+        auto M_fine = system_0.GetMBuilder().BuildAssembledM(tot_mob);
         mat_help.reset(new mfem::SparseMatrix(M_fine));
         for (int i = 0; i < level_; ++i)
         {
@@ -2577,10 +2599,10 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
 //        auto upwind = BuildUpwindPattern(space, blk_x.GetBlock(0));
 
-        U_FS = MatVec(space.TrueEDofToEDof(), MatVec(upwind, FractionalFlow(S)));
+        U_FS = MatVec(space.TrueEDofToEDof(), MatVec(upwind, Mobility::FractionalFlow(S)));
 
         upwind.ScaleRows(blk_x.GetBlock(0));
-        upwind.ScaleColumns(dFdS(S));
+        upwind.ScaleColumns(Mobility::dFdS(S));
 
         auto U = ParMult(space.TrueEDofToEDof(), upwind, sdof_starts_);
         auto U_pwc = ParMult(*U, darcy_system_.GetPWConstProj(), sdof_starts_);
@@ -2608,7 +2630,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        auto fine_upwind = BuildWeightedUpwindPattern(hierarchy_.GetMatrix(0).GetGraphSpace(), fine_flux);
 
 //        auto& Psigma = hierarchy_.GetPsigma(0);
-        auto U_FS_fine = MatVec(fine_upwind, FractionalFlow(fine_S));
+        auto U_FS_fine = MatVec(fine_upwind, Mobility::FractionalFlow(fine_S));
 
 //        if (level_ > 1)
         {
@@ -2631,7 +2653,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
         dTdsigma.reset(ToParMatrix(comm_, *dTdS_RAP));
 
         fine_upwind.ScaleRows(fine_flux);
-        fine_upwind.ScaleColumns(dFdS(fine_S));
+        fine_upwind.ScaleColumns(Mobility::dFdS(fine_S));
 
 //        if (level_ > 1)
 //        {
@@ -2875,7 +2897,8 @@ void CoupledSolver::HybridSolve(const mfem::HypreParMatrix& dTdS, const mfem::Ve
     auto local_dTdsigma = Build_dTdsigma(space, D, U_FS);
 
     TwoPhaseHybrid solver(darcy_system_, &ess_attr_);
-    solver.AssembleSolver(TotalMobility(S), local_dMdS_, local_dTdsigma, dTdS);
+    auto tot_mob = Mobility::TotalMobility(S);
+    solver.AssembleSolver(tot_mob, local_dMdS_, local_dTdsigma, dTdS);
 
     solver.Mult(true_resid, true_dx);
     linear_iter_ += solver.GetNumIterations();
@@ -3118,7 +3141,7 @@ mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector
     mfem::Vector out(x);
     mfem::Vector S = PWConstProject(darcy_system_, x);
 
-    auto FS = FractionalFlow(S);
+    auto FS = Mobility::FractionalFlow(S);
     Adv_.Mult(1.0, FS, Ms_(0, 0), out);
     out -= y;
     return out;
@@ -3127,7 +3150,7 @@ mfem::Vector TransportSolver::Residual(const mfem::Vector& x, const mfem::Vector
 void TransportSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
 {
     mfem::SparseMatrix df_ds = darcy_system_.GetPWConstProj();
-    df_ds.ScaleRows(dFdS(PWConstProject(darcy_system_, x)));
+    df_ds.ScaleRows(Mobility::dFdS(PWConstProject(darcy_system_, x)));
 
     auto A = ParMult(Adv_, df_ds, starts_);
     GetDiag(*A) += Ms_;
@@ -3392,264 +3415,52 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
     resid_norm_ = solver_->GetFinalNorm();
 }
 
-
-//mfem::Vector TotalMobility(const mfem::Vector& S)
-//{
-//    mfem::Vector LamS(S.Size());
-//    LamS = 1000.;
-//    return LamS;
-//}
-
-//mfem::Vector dTMinv_dS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    out = 0.0;
-//    return out;
-//}
-
-//mfem::Vector FractionalFlow(const mfem::Vector& S)
-//{
-//    mfem::Vector FS(S);
-//    return FS;
-//}
-
-//mfem::Vector dFdS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    out = 1.0;
-//    return out;
-//}
-
-//mfem::Vector TotalMobility(const mfem::Vector& S)
-//{
-//    mfem::Vector LamS(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        LamS(i)  = S_w * S_w + S_o * S_o / 5.0;
-//    }
-//    return LamS;
-//}
-
-//mfem::Vector dTMinv_dS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        out(i)  = 2.0 * (S_w - S_o / 5.0);
-//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-//        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
-//    }
-//    return out;
-//}
-
-//mfem::Vector FractionalFlow(const mfem::Vector& S)
-//{
-//    mfem::Vector FS(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-//        FS(i) = S_w * S_w / Lam_S;
-//    }
-//    return FS;
-//}
-
-//mfem::Vector dFdS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        double Lam_S  = S_w * S_w + S_o * S_o / 5.0;
-//        out(i) = 0.4 * (S_w - S_w * S_w) / (Lam_S * Lam_S);
-//    }
-//    return out;
-//}
-
-// case 1
-//mfem::Vector TotalMobility(const mfem::Vector& S)
-//{
-//    mfem::Vector LamS(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        LamS(i)  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
-//    }
-//    return LamS;
-//}
-
-//mfem::Vector dTMinv_dS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        out(i)  = 2. * S_w / 1e-3 - 1.5 * std::pow(S_o, 0.5) / 1e-4;
-//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
-//        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
-//    }
-//    return out;
-//}
-
-//mfem::Vector FractionalFlow(const mfem::Vector& S)
-//{
-//    mfem::Vector FS(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
-//        FS(i) = S_w * S_w / 1e-3 / Lam_S;
-//    }
-//    return FS;
-//}
-
-//mfem::Vector dFdS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        double dLw_dS = 2. * S_w / 1e-3;
-//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 1.5) / 1e-4;
-//        double dLam_dS = 2. * S_w / 1e-3 - 1.5 * std::pow(S_o, 0.5) / 1e-4;
-//        out(i) = (dLw_dS * Lam_S - dLam_dS * S_w * S_w / 1e-3) / (Lam_S * Lam_S);
-//    }
-//    return out;
-//}
-
-// case 2
-//mfem::Vector TotalMobility(const mfem::Vector& S)
-//{
-//    mfem::Vector LamS(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        LamS(i)  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
-//    }
-//    return LamS;
-//}
-
-//mfem::Vector dTMinv_dS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        out(i)  = 2. * S_w / 1e-3 - 3.0 * std::pow(S_o, 2.0) / 1e-2;
-//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
-//        out(i) = -1.0 * out(i) / (Lam_S * Lam_S);
-//    }
-//    return out;
-//}
-
-//mfem::Vector FractionalFlow(const mfem::Vector& S)
-//{
-//    mfem::Vector FS(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
-//        FS(i) = S_w * S_w / 1e-3 / Lam_S;
-//    }
-//    return FS;
-//}
-
-//mfem::Vector dFdS(const mfem::Vector& S)
-//{
-//    mfem::Vector out(S.Size());
-//    for (int i = 0; i < S.Size(); i++)
-//    {
-//        double S_w = S(i);
-//        double S_o = 1.0 - S_w;
-//        double dLw_dS = 2. * S_w / 1e-3;
-//        double Lam_S  = S_w * S_w / 1e-3 + std::pow(S_o, 3.0) / 1e-2;
-//        double dLam_dS = 2. * S_w / 1e-3 - 3.0 * std::pow(S_o, 2.0) / 1e-2;
-//        out(i) = (dLw_dS * Lam_S - dLam_dS * S_w * S_w / 1e-3) / (Lam_S * Lam_S);
-//    }
-//    return out;
-//}
-
-
-double _max_S = 0.8;
-double _min_S = 0.2;
-
-//// case 5 any exponent
-double RelPerm(double S, double mu) // relative permeability
+double Mobility::RelPerm(double S, double mu)
 {
-//    return std::pow(S, relperm_order) / mu;
-
-    // CoreyRelPerm
-    double modified_S = (S-0.2) / (0.6);
+    double modified_S = (S - S_min_) / (S_max_ - S_min_);
     modified_S = modified_S < 0.0 ? 0.0 : (modified_S > 1.0 ? 1.0 : modified_S);
-    return std::pow(modified_S, relperm_order) / mu;
+    return std::pow(modified_S, relperm_order_) / mu;
 
 }
 
-double RelPermDerivative(double S, double mu)
+double Mobility::RelPermDerivative(double S, double mu)
 {
-//    return relperm_order * std::pow(S, relperm_order - 1) / mu;
-
-    // CoreyRelPerm
-    double modified_S = (S-0.2) / (0.6);
+    double S_range = (S_max_ - S_min_);
+    double modified_S = (S - S_min_) / S_range;
     modified_S = modified_S < 0.0 ? 0.0 : (modified_S > 1.0 ? 1.0 : modified_S);
-    return relperm_order * std::pow(modified_S, relperm_order - 1) / mu / (0.6);
+    return relperm_order_ * std::pow(modified_S, relperm_order_ - 1) / mu / S_range;
 }
 
-double CellMobility(double S_w, double S_o)
+double Mobility::CellMobility(double S_w, double S_o)
 {
-   return RelPerm(S_w, mu_w) + RelPerm(S_o, mu_o);
+   return RelPerm(S_w, mu_w_) + RelPerm(S_o, mu_o_);
 }
 
-double CellMobilityDerivative(double S_w, double S_o)
+double Mobility::CellMobilityDerivative(double S_w, double S_o)
 {
-   return RelPermDerivative(S_w, mu_w) - RelPermDerivative(S_o, mu_o);
+   return RelPermDerivative(S_w, mu_w_) - RelPermDerivative(S_o, mu_o_);
 }
 
-mfem::Vector TotalMobility(const mfem::Vector& S)
+mfem::Vector Mobility::TotalMobility(const mfem::Vector& S)
 {
     mfem::Vector LamS(S.Size());
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-
-        S_w = S_w < _min_S ? _min_S : (S_w > _max_S ? _max_S : S_w);
-
-//        double S_o = 1.0 - S_w;
-
-        // CoreyRelPerm
+        S_w = S_w < S_min_ ? S_min_ : (S_w > S_max_ ? S_max_ : S_w);
         double S_o = 1.0 - S_w;
-
         LamS(i)  = CellMobility(S_w, S_o);
     }
     return LamS;
 }
 
-mfem::Vector dTMinv_dS(const mfem::Vector& S)
+mfem::Vector Mobility::dTMinv_dS(const mfem::Vector& S)
 {
     mfem::Vector out(S.Size());
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-
-//        if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
-
-//        double S_o = 1.0 - S_w;
-
-        // CoreyRelPerm
-        if (S_w < 0.2 || S_w > 0.8) { out(i) = 0.0; continue; }
+        if (S_w < S_min_ || S_w > S_max_) { out(i) = 0.0; continue; }
         double S_o = 1.0 - S_w;
 
         double Lam_S  = CellMobility(S_w, S_o);
@@ -3658,41 +3469,32 @@ mfem::Vector dTMinv_dS(const mfem::Vector& S)
     return out;
 }
 
-mfem::Vector FractionalFlow(const mfem::Vector& S)
+mfem::Vector Mobility::FractionalFlow(const mfem::Vector& S)
 {
     mfem::Vector FS(S.Size());
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-        S_w = S_w < _min_S ? _min_S : (S_w > _max_S ? _max_S : S_w);
-
-        //        double S_o = 1.0 - S_w;
-
-        // CoreyRelPerm
+        S_w = S_w < S_min_ ? S_min_ : (S_w > S_max_ ? S_max_ : S_w);
         double S_o = 1.0 - S_w;
 
-        double Lam_S  = CellMobility(S_w, S_o);
-        FS(i) = RelPerm(S_w, mu_w) / Lam_S;
+        double Lam_S = CellMobility(S_w, S_o);
+        FS(i) = RelPerm(S_w, mu_w_) / Lam_S;
     }
     return FS;
 }
 
-mfem::Vector dFdS(const mfem::Vector& S)
+mfem::Vector Mobility::dFdS(const mfem::Vector& S)
 {
     mfem::Vector out(S.Size());
     for (int i = 0; i < S.Size(); i++)
     {
         double S_w = S(i);
-//        if (S_w < 0.0 || S_w > 1.0) { out(i) = 0.0; continue; }
-
-        //        double S_o = 1.0 - S_w;
-
-        // CoreyRelPerm
-        if (S_w < 0.2 || S_w > 0.8) { out(i) = 0.0; continue; }
+        if (S_w < S_min_ || S_w > S_max_) { out(i) = 0.0; continue; }
         double S_o = 1.0 - S_w;
 
-        double Lw = RelPerm(S_w, mu_w);
-        double dLw_dS = RelPermDerivative(S_w, mu_w);
+        double Lw = RelPerm(S_w, mu_w_);
+        double dLw_dS = RelPermDerivative(S_w, mu_w_);
         double Lam_S  = CellMobility(S_w, S_o);
         double dLam_dS = CellMobilityDerivative(S_w, S_o);
         out(i) = (dLw_dS * Lam_S - dLam_dS * Lw) / (Lam_S * Lam_S);
