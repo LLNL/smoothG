@@ -66,7 +66,9 @@ int main(int argc, char* argv[])
 
     // Setting up finite volume discretization problem
     LocalProblem problem(comm, dim, std::vector<int>(dim, 29));
-    Upscale upscale(problem.GetFVGraph(true));
+    UpscaleParameters upscale_param;
+    upscale_param.max_levels = 1;
+    Upscale upscale(problem.GetFVGraph(true), upscale_param);
     upscale.PrintInfo();
 
     mfem::BlockVector rhs(upscale.BlockOffsets(0));
