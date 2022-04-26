@@ -42,17 +42,16 @@ mfem::Vector well_cell_gf;
 
 class Mobility
 {
-    /// CoreyRelPerm, relative permeability
-    static double RelPerm(double S, double mu);
+    static double RelPerm(double S, double mu); // relative permeability
     static double RelPermDerivative(double S, double mu);
     static double CellMobility(double S_w, double S_o);
     static double CellMobilityDerivative(double S_w, double S_o);
 public:
-    static double mu_o_; // = 3e-3; //0.005; //0.0002; //
-    static double mu_w_; // = 1e-3; // 0.3*centi*poise //1e-3;
-    static int relperm_order_; // = 2;
-    static double S_max_; // = 0.8;
-    static double S_min_; // = 0.2;
+    static double mu_o_;
+    static double mu_w_;
+    static int relperm_order_;
+    static double S_max_;
+    static double S_min_;
 
     static mfem::Vector TotalMobility(const mfem::Vector& S);
     static mfem::Vector dTMinv_dS(const mfem::Vector& S);
@@ -187,14 +186,28 @@ public:
     double GetResidualNorm() const { return resid_norm_; }
 };
 
-enum SteppingScheme { IMPES = 1, SequentiallyImplicit, FullyImplcit };
+enum SteppingScheme
+{
+    IMPES = 1,            // implicit pressure, explicit saturation
+    SequentiallyImplicit, // solve pressure and saturation implicitly one by one
+    FullyImplcit          // solve pressure and saturation implicitly together
+};
 
-struct EvolveParamenters
+struct TimeSteppingParameters
 {
     double total_time = 10.0;    // Total time
-    double dt = 1.0;   // Time step size
+    double initial_dt = 1.0;     // Initial time step size
+    double dt_multiplier = 2.0;  // next dt = current dt * dt_multiplier
+    double dt_max = 0.0;         // Max of dt allowed, only enforced if positive
     int vis_step = 0;
     SteppingScheme scheme = IMPES;
+
+    double GetStepSize(double previous_dt, int step, double time) const
+    {
+        double dt = step > 1 ? previous_dt * dt_multiplier : previous_dt;
+        dt = std::min(dt, total_time - time);
+        return dt_max > 0.0 ? std::min(dt, dt_max) : dt;
+    }
 };
 
 void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double diff_tol);
@@ -210,7 +223,7 @@ std::vector<mfem::socketstream> sout_resid_(50); // this should not be needed (o
 class TwoPhaseSolver
 {
     const int level_;
-    const EvolveParamenters& evolve_param_;
+    const TimeSteppingParameters& time_stepping_param_;
     const FASParameters& solver_param_;
     const DarcyProblem& problem_;
     Hierarchy* hierarchy_;
@@ -246,7 +259,7 @@ class TwoPhaseSolver
     double EvalCFL(double dt, const mfem::BlockVector& x) const;
 public:
     TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy,
-                   const int level, const EvolveParamenters& evolve_param,
+                   const int level, const TimeSteppingParameters& time_stepping_param,
                    const FASParameters& solver_param);
 
     void TimeStepping(const double dt, mfem::BlockVector& x);
@@ -908,7 +921,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &myid);
 
     // program options from command line
-    EvolveParamenters evolve_param;
+    TimeSteppingParameters time_stepping_param;
     mfem::OptionsParser args(argc, argv);
     std::string base_dir = "/home/chak/Downloads/";
     const char* problem_dir = "";
@@ -926,10 +939,13 @@ int main(int argc, char* argv[])
     args.AddOption(&inject_rate, "-ir", "--inject-rate", "Injector rate.");
     double bhp = -2.7579e07;//-1.0e6;
     args.AddOption(&bhp, "-bhp", "--bottom-hole-pressure", "Bottom Hole Pressure.");
-    args.AddOption(&evolve_param.dt, "-dt", "--delta-t", "Time step.");
-    args.AddOption(&evolve_param.total_time, "-time", "--total-time",
+    args.AddOption(&time_stepping_param.total_time, "-time", "--total-time",
                    "Total time to step.");
-    args.AddOption(&evolve_param.vis_step, "-vs", "--vis-step",
+    args.AddOption(&time_stepping_param.initial_dt, "-dt", "--delta-t",
+                   "Initial time step size.");
+    args.AddOption(&time_stepping_param.dt_multiplier, "-dt-mult", "--dt-multiplier",
+                   "Multiplier for time step size.");
+    args.AddOption(&time_stepping_param.vis_step, "-vs", "--vis-step",
                    "Step size for visualization.");
     int scheme = 3;
     args.AddOption(&scheme, "-scheme", "--stepping-scheme",
@@ -976,7 +992,7 @@ int main(int argc, char* argv[])
         args.PrintOptions(std::cout);
     }
 
-    evolve_param.scheme = static_cast<SteppingScheme>(scheme);
+    time_stepping_param.scheme = static_cast<SteppingScheme>(scheme);
 
     const int max_iter = upscale_param.max_levels > 1 ? 100 : 100;
     Mobility::mu_o_ = smeared_front ? 0.005 : 0.0002;
@@ -1269,8 +1285,11 @@ int main(int argc, char* argv[])
     {
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
-        initial_value.GetBlock(2) = 0.2;
-        initial_value[initial_value.Size()-1] = 0.8;
+        initial_value.GetBlock(2) = Mobility::S_min_;
+        for (int i = 0; i < num_injectors; ++i)
+        {
+            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
+        }
 
         mfem::BlockVector sol(initial_value);
 //        if (l == 0)
@@ -1281,9 +1300,7 @@ int main(int argc, char* argv[])
 //        else
         {
             fas_param.num_levels = upscale_param.max_levels; //l + 1;
-            TwoPhaseSolver solver(*problem, hierarchy, l, evolve_param, fas_param);
-
-
+            TwoPhaseSolver solver(*problem, hierarchy, l, time_stepping_param, fas_param);
 
             mfem::StopWatch chrono;
             chrono.Start();
@@ -1745,9 +1762,9 @@ std::vector<mfem::DenseMatrix> Build_dTdsigma(const GraphSpace& graph_space,
 }
 
 TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy,
-                               const int level, const EvolveParamenters& evolve_param,
+                               const int level, const TimeSteppingParameters& time_stepping_param,
                                const FASParameters& solver_param)
-    : level_(level), evolve_param_(evolve_param), solver_param_(solver_param),
+    : level_(level), time_stepping_param_(time_stepping_param), solver_param_(solver_param),
       problem_(problem), hierarchy_(&hierarchy), blk_offsets_(4), nonlinear_iter_(0),
       step_converged_(true), weight_(SparseDiag(hierarchy.GetMatrix(0).GetGraph().VertexWeight()))
 {
@@ -1834,7 +1851,10 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
     mfem::socketstream sout;
     std::string msg = "Level "+std::to_string(level_);
-    if (evolve_param_.vis_step) { problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, msg); }
+    if (time_stepping_param_.vis_step)
+    {
+        problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, msg);
+    }
 
     for (int l = 0; l < level_; ++l)
     {
@@ -1846,10 +1866,8 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     x.GetBlock(1) = blk_helper_[level_].GetBlock(1);
     x.GetBlock(2) = x_blk2;
 
-    double dt_multiplier = 2.0;
     double time = 0.0;
-//    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time) / dt_multiplier;
-    double dt_real = std::min(evolve_param_.dt, evolve_param_.total_time - time);
+    double dt = time_stepping_param_.initial_dt;
 
     std::vector<double> cumulative_time;
     bool done = false;
@@ -1859,27 +1877,19 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         step_global = step;
 
         mfem::BlockVector previous_x(x);
-//        dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 345600.);
-        if (step > 2)
-            dt_real = std::min(std::min(dt_real * 2.0, evolve_param_.total_time - time), 2592000.0);
-//        dt_real = std::min(dt_real * dt_multiplier, evolve_param_.total_time - time);
-//        dt_real = std::min(dt_real, evolve_param_.total_time - time);
+        dt = time_stepping_param_.GetStepSize(dt, step, time);
 
         step_converged_ = false;
-
-        TimeStepping(dt_real, x);
+        TimeStepping(dt, x);
         while (!step_converged_)
         {
             x = previous_x;
-            dt_real /= 2.0;
-            TimeStepping(dt_real, x);
+            dt /= 2.0;
+            TimeStepping(dt, x);
         }
 
-//        auto S_tmp = hierarchy_->PWConstProject(level_, x.GetBlock(2));
-//        x.GetBlock(2) = hierarchy_->PWConstInterpolate(level_, S_tmp);
-
-        time += dt_real;
-        done = (time >= evolve_param_.total_time);
+        time += dt;
+        done = (time >= time_stepping_param_.total_time);
         cumulative_time.push_back(time / 86400.0);
 
         mfem::Vector well_flux;
@@ -1904,16 +1914,16 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
         if (level_ == 0)
         {
-            step_CFL_const_.push_back(EvalCFL(dt_real, x));
+            step_CFL_const_.push_back(EvalCFL(dt, x));
         }
 
         if (myid == 0)
         {
-            std::cout << "Time step " << step << ": step size = " << dt_real
+            std::cout << "Time step " << step << ": step size = " << dt
                       << ", time = " << time << ".\n\n";
         }
 
-        if (evolve_param_.vis_step && (done || step % evolve_param_.vis_step == 0))
+        if (time_stepping_param_.vis_step && (done || step % time_stepping_param_.vis_step == 0))
         {
             x_blk2 = x.GetBlock(2);
             for (int l = level_-1; l > 0; --l)
@@ -2061,7 +2071,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
     const MixedMatrix& system = hierarchy_->GetMatrix(level_);
     std::vector<mfem::DenseMatrix> traces;
 
-    if (evolve_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
+    if (time_stepping_param_.scheme == FullyImplcit) // coupled: solve all unknowns together
     {
 //        const MixedMatrix& system_s = level_ ? hierarchy_->GetMatrix(level_-1) : system;
 //        auto S = PWConstProject(system, x.GetBlock(2));
@@ -2132,7 +2142,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         mfem::SparseMatrix upwind = BuildUpwindPattern(system.GetGraphSpace(), x.GetBlock(0));
         upwind.ScaleRows(x.GetBlock(0));
 
-        if (evolve_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
+        if (time_stepping_param_.scheme == IMPES) // explcict: new_S = S + dt W^{-1} (b - Adv F(S))
         {
             mfem::Vector dSdt(source_->GetBlock(2));
             D_te_e_->Mult(-1.0, MatVec(upwind, Mobility::FractionalFlow(S)), 1.0, dSdt);
@@ -3420,7 +3430,6 @@ double Mobility::RelPerm(double S, double mu)
     double modified_S = (S - S_min_) / (S_max_ - S_min_);
     modified_S = modified_S < 0.0 ? 0.0 : (modified_S > 1.0 ? 1.0 : modified_S);
     return std::pow(modified_S, relperm_order_) / mu;
-
 }
 
 double Mobility::RelPermDerivative(double S, double mu)
