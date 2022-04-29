@@ -210,7 +210,7 @@ int main(int argc, char* argv[])
     else if (problem == "egg")
     {
         ess_attr[1] = 0;
-        fv_problem.reset(new EggModel(num_sr, num_pr, ess_attr));
+        fv_problem.reset(new EggModel("egg_model.mesh", num_sr, num_pr, ess_attr));
     }
     else if (problem == "lognormal")
     {

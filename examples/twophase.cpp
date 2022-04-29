@@ -407,7 +407,9 @@ class TwoPhaseFromFile : public DarcyProblem
 public:
     TwoPhaseFromFile(std::string& path, bool need_getline, int num_vert_res,
                      int nnz_res, int num_edges_res, double inject_rate,
-                     double bottom_hole_pressure, const mfem::Array<int>& ess_attr)
+                     double bottom_hole_pressure, int num_injectors,
+                     int num_producers, int well_height,
+                     const mfem::Array<int>& ess_attr)
         : DarcyProblem(MPI_COMM_WORLD, 2, ess_attr)
     {
 //        std::string c2f_filename = path+"/cell_to_faces.txt";
@@ -440,17 +442,17 @@ public:
         std::ifstream file(c2f_filename);
         std::ifstream vol_file(vol_filename);
 
-        int num_injectors = num_vert_res == 18553 ? 8 : 1; // egg 8 // other 1
-        num_injectors = num_vert_res == 500931 ? 8 : num_injectors;
-        num_injectors = num_vert_res == 148424 ? 8 : num_injectors;
-        int num_producers = num_vert_res < 50 ? 1 : 4; // small case 1 // other 4
+//        int num_injectors = num_vert_res == 18553 ? 8 : 1; // egg 8 // other 1
+//        num_injectors = num_vert_res == 500931 ? 8 : num_injectors;
+//        num_injectors = num_vert_res == 148424 ? 8 : num_injectors;
+//        int num_producers = num_vert_res < 50 ? 1 : 4; // small case 1 // other 4
 
-        if (num_edges_res == 155268) { num_injectors = 6; num_producers = 5; }
+//        if (num_edges_res == 155268) { num_injectors = 6; num_producers = 5; }
         if (num_edges_res == 155268) { c2f_filename = path+"/cell_to_faces_positive.txt"; }
-        if (num_edges_res == 264305) { num_injectors = 5; num_producers = 5; }
-        if (num_edges_res == 2000742) { num_injectors = 5; num_producers = 5; }
+//        if (num_edges_res == 264305) { num_injectors = 5; num_producers = 5; }
+//        if (num_edges_res == 2000742) { num_injectors = 5; num_producers = 5; }
 
-        int well_height = 7;
+//        int well_height = 1;
         int num_vert_total = num_vert_res + num_injectors;
 //        int num_edges_total = num_edges_res + num_injectors + num_producers;
         int num_edges_total = num_edges_res + well_height*(num_injectors + num_producers);
@@ -1079,11 +1081,12 @@ int main(int argc, char* argv[])
             inject_rate = 1e-7;
             num_attr_from_file = 2;
         }
-        else if (path == "/Users/lee1029/Downloads/egg")
+//        else if (path == "/Users/lee1029/Downloads/egg")
+        else if (path == "/home/chak/Downloads/egg_single_perforation")
         {
-            num_vert_res = 18553;
-            nnz_res = num_vert_res * 6;
-            num_edges_res = 59205;
+//            num_vert_res = 18553;
+//            nnz_res = num_vert_res * 6;
+//            num_edges_res = 59205;
 //            inject_rate = 5e-4;
 //            inject_rate = 2e-3;
             upscale_param.num_iso_verts = 8; // TODO: this should be read from file
@@ -1094,12 +1097,14 @@ int main(int argc, char* argv[])
 //            num_edges_res = 1534707;
 
             // refined 2x2x2
-//            num_vert_res = 148424;
-//            nnz_res = num_vert_res * 6;
-//            num_edges_res = 459456;
+            num_vert_res = 148424;
+            nnz_res = num_vert_res * 6;
+            num_edges_res = 459456;
+
+            num_injectors = 8;
 
             ess_attr.SetSize(3, 1);
-            problem_for_plot.reset(new EggModel(0, 0, ess_attr));
+            problem_for_plot.reset(new EggModel("refined_egg_2x2x2.vtk", 0, 0, ess_attr));
         }
         else if (path == "/home/chak/Downloads/egg_well_model")
         {
@@ -1107,11 +1112,12 @@ int main(int argc, char* argv[])
             nnz_res = num_vert_res * 6;
             num_edges_res = 59205;
             upscale_param.num_iso_verts = 8; // TODO: this should be read from file
+
             num_injectors = 8;
             well_height = 7;
 
             ess_attr.SetSize(3, 1);
-            problem_for_plot.reset(new EggModel(0, 0, ess_attr));
+            problem_for_plot.reset(new EggModel("egg_model.mesh", 0, 0, ess_attr));
         }
         else if (path == "/Users/lee1029/Downloads/norne")
         {
@@ -1121,6 +1127,9 @@ int main(int argc, char* argv[])
             inject_rate *= 1.0;
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 6; // TODO: this should be read from file
+
+            num_injectors = 6;
+            num_producers = 5;
 
             ess_attr.SetSize(1, 1);
             problem_for_plot.reset(new NorneModel(comm, ess_attr));
@@ -1134,6 +1143,9 @@ int main(int argc, char* argv[])
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 5; // TODO: this should be read from file
 
+            num_injectors = 5;
+            num_producers = 5;
+
             mfem::Array<int> ess_attr2(1); ess_attr2 = 1;
             problem_for_plot.reset(new SaigupModel(comm, false, ess_attr2));
         }
@@ -1145,6 +1157,9 @@ int main(int argc, char* argv[])
             inject_rate *= 1.0;
             num_attr_from_file = 6;
             upscale_param.num_iso_verts = 5; // TODO: this should be read from file
+
+            num_injectors = 5;
+            num_producers = 5;
 
             ess_attr.SetSize(1, 1);
             problem_for_plot.reset(new SaigupModel(comm, true, ess_attr));
@@ -1158,9 +1173,10 @@ int main(int argc, char* argv[])
         ess_attr[0] = 1;
 
         read_from_file = true;
-        std::cout << "Read data from " << path << "... \n";
+        std::cout << "Read data from " << path << " ... \n";
         problem.reset(new TwoPhaseFromFile(path, need_getline, num_vert_res, nnz_res,
-                                           num_edges_res, inject_rate, bhp, ess_attr));
+                                           num_edges_res, inject_rate, bhp, num_injectors,
+                                           num_producers, well_height, ess_attr));
     }
     std::cout << "Injection rate: " << inject_rate << "\n";
 
@@ -1286,10 +1302,10 @@ int main(int argc, char* argv[])
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
         initial_value.GetBlock(2) = Mobility::S_min_;
-        for (int i = 0; i < num_injectors; ++i)
-        {
-            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
-        }
+//        for (int i = 0; i < num_injectors; ++i)
+//        {
+//            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
+//        }
 
         mfem::BlockVector sol(initial_value);
 //        if (l == 0)
@@ -1349,7 +1365,8 @@ int main(int argc, char* argv[])
 //            mfem::socketstream soutp;
 //            problem_ptr->VisSetup(soutp, pres_s[l], 0.0, 0.0, "Pressure, "+base_msg, false, true, partition->GetData());
             mfem::socketstream souts;
-            problem_ptr->VisSetup(souts, Ss[l], 0.0, 0.0, "Saturation, "+base_msg, false, true, partition->GetData());
+            problem_ptr->VisSetup(souts, Ss[l], Mobility::S_min_, Mobility::S_max_,
+                                  "Saturation, "+base_msg, false, true, partition->GetData());
         }
 
 
@@ -1853,7 +1870,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     std::string msg = "Level "+std::to_string(level_);
     if (time_stepping_param_.vis_step)
     {
-        problem_ptr->VisSetup(sout, x_blk2, 0.0, 0.0, msg);
+        problem_ptr->VisSetup(sout, x_blk2, Mobility::S_min_, Mobility::S_max_, msg);
     }
 
     for (int l = 0; l < level_; ++l)
@@ -2007,8 +2024,8 @@ double TwoPhaseSolver::EvalCFL(double dt, const mfem::BlockVector& x) const
     mfem::Vector S = PWConstProject(darcy_system, x.GetBlock(2));
     for (int ii = 0; ii < S.Size(); ++ii)
     {
-        if (S[ii] < 0.0) { S[ii]  = 0.0; }
-        if (S[ii] > 1.0) { S[ii] =  1.0; }
+        if (S[ii] < 0.0) { S[ii] = 0.0; }
+        if (S[ii] > 1.0) { S[ii] = 1.0; }
     }
     mfem::Vector df_ds = Mobility::dFdS(S);
 
@@ -2176,8 +2193,8 @@ void LocalChopping(const MixedMatrix& darcy_system, mfem::Vector& x)
     const mfem::Vector S = PWConstProject(darcy_system, x);
     for (int i = 0; i < x.Size(); ++i)
     {
-        if (S[i] < 0.2) { x[i] = 0.2; }
-        if (S[i] > 0.8) { x[i] = 0.8; }
+        if (S[i] < Mobility::S_min_) { x[i] = Mobility::S_min_; }
+        if (S[i] > Mobility::S_max_) { x[i] = Mobility::S_max_; }
     }
 }
 
@@ -2243,19 +2260,19 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
 
     normalizer_.SetSize(Ds_->NumRows()); // TODO: need to have one for each block
 //    Ms_.GetDiag(normalizer_);
-    normalizer_ = 800.0 * (1.0 / density_);
+//    normalizer_ = 800.0 * (1.0 / density_);
 
 //    if (false) // TODO: define a way to normalize for higher order coarsening
-//    {
-//        mfem::Vector normalizer_help(normalizer_.Size());
-//        normalizer_help = S_prev;
-//        normalizer_help -= 1.0;
-//        normalizer_help *= -800.0;
-//        normalizer_help.Add(1000.0, S_prev);
-////        normalizer_ *= (weight(0, 0) / density_); // weight_ / density_ = vol * porosity
-//        Ms_.Mult(normalizer_help, normalizer_);
-//        normalizer_ /= density_;
-//    }
+    {
+        mfem::Vector normalizer_help(normalizer_.Size());
+        normalizer_help = S_prev;
+        normalizer_help -= 1.0;
+        normalizer_help *= -800.0;
+        normalizer_help.Add(1000.0, S_prev);
+//        normalizer_ *= (weight(0, 0) / density_); // weight_ / density_ = vol * porosity
+        Ms_.Mult(normalizer_help, normalizer_);
+        normalizer_ /= density_;
+    }
 
     scales_ = 1.0;
 
@@ -2411,10 +2428,10 @@ double CoupledSolver::Norm(const mfem::Vector& vec)
     auto true_resid = AssembleTrueVector(vec);
     mfem::BlockVector blk_resid(true_resid.GetData(), true_blk_offsets_);
 
-//    InvRescaleVector(normalizer_, blk_resid.GetBlock(1));
-//    InvRescaleVector(normalizer_, blk_resid.GetBlock(2));
-    blk_resid.GetBlock(1) /= (800.0 / density_);
-    blk_resid.GetBlock(2) /= (800.0 / density_);
+    InvRescaleVector(normalizer_, blk_resid.GetBlock(1));
+    InvRescaleVector(normalizer_, blk_resid.GetBlock(2));
+//    blk_resid.GetBlock(1) /= (800.0 / density_);
+//    blk_resid.GetBlock(2) /= (800.0 / density_);
 
     return ParNorm(blk_resid, comm_);
 }

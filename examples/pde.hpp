@@ -1534,9 +1534,10 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length)
 class EggModel : public DarcyProblem
 {
 public:
-    EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess_attr);
+    EggModel(const char* perm_file, int num_ser_ref,
+             int num_par_ref, const mfem::Array<int>& ess_attr);
 private:
-    void SetupMesh(int num_ser_ref, int num_par_ref);
+    void SetupMesh(const char* perm_file, int num_ser_ref, int num_par_ref);
     void SetupCoeff();
 };
 
@@ -1547,10 +1548,11 @@ void VelocityEgg(const mfem::Vector& x, mfem::Vector& out)
     out[0] = 1000.0;
 }
 
-EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess_attr)
+EggModel::EggModel(const char* perm_file, int num_ser_ref,
+                   int num_par_ref, const mfem::Array<int>& ess_attr)
     : DarcyProblem(MPI_COMM_WORLD, 3, ess_attr)
 {
-    SetupMesh(num_ser_ref, num_par_ref);
+    SetupMesh(perm_file, num_ser_ref, num_par_ref);
     InitGraph();
 
 //    SetupCoeff();
@@ -1578,10 +1580,10 @@ EggModel::EggModel(int num_ser_ref, int num_par_ref, const mfem::Array<int>& ess
     }
 }
 
-void EggModel::SetupMesh(int num_ser_ref, int num_par_ref)
+void EggModel::SetupMesh(const char* perm_file, int num_ser_ref, int num_par_ref)
 {
-    std::ifstream imesh("egg_model.mesh");
-//    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_2x2x2.vtk");
+    std::ifstream imesh(perm_file);
+//    std::ifstream imesh("refined_egg_2x2x2.vtk");
 //    std::ifstream imesh("/Users/lee1029/Downloads/egg/refined_egg_3x3x3.vtk");
     mfem::Mesh mesh(imesh, 1, 1);
 
