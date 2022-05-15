@@ -126,10 +126,10 @@ void WellManager::AddWell(const WellType type,
     std::vector<double> well_indices;
     well_indices.reserve(cells.size());
 
-    if (type == WellType::Injector)
-        std::cout<<"Injector:\n";
-    else
-        std::cout<<"Producer:\n";
+//    if (type == WellType::Injector)
+//        std::cout<<"Injector:\n";
+//    else
+//        std::cout<<"Producer:\n";
 
     for (const auto& cell : cells)
     {
@@ -396,55 +396,55 @@ mfem::Vector TwoPhase::ComputeVertWeight()
     max_N[1] = 220;
     max_N[2] = 85;//85;
 
-    double poro_min = 0.01;
+//    double poro_min = 0.01;
 
     mfem::Vector vert_weight(vertex_edge_.NumRows());
-    vert_weight_ = 1.0;
+    vert_weight = .3;
 
     // Read Porosity data file
-    std::ifstream poro_file("spe_phi.dat");
-    double* ip = vert_weight.GetData();
-    double unneeded;
+//    std::ifstream poro_file("spe_phi.dat");
+//    double* ip = vert_weight.GetData();
+//    double unneeded;
 
-//    // map from mfem cell id to mrst cell id
-//    mfem::SparseMatrix mfem_to_mrst_map(mesh_->GetNE(), mesh_->GetNE());
-//    mfem::Array<int> ids;
-//    mfem::Array<mfem::IntegrationPoint> ips;
-//    mfem::DenseMatrix point(mesh_->Dimension(), 1);
-//    int count = 0;
+////    // map from mfem cell id to mrst cell id
+////    mfem::SparseMatrix mfem_to_mrst_map(mesh_->GetNE(), mesh_->GetNE());
+////    mfem::Array<int> ids;
+////    mfem::Array<mfem::IntegrationPoint> ips;
+////    mfem::DenseMatrix point(mesh_->Dimension(), 1);
+////    int count = 0;
 
-    for (int k = 0; k < N_[2]; k++)
-    {
-//        point(2, 0) = k*2.0*ft_ + ft_;
-        for (int j = 0; j < N_[1]; j++)
-        {
-//            point(1, 0) = j*10.0*ft_ + 5.0*ft_;
-            for (int i = 0; i < N_[0]; i++)
-            {
-                poro_file >> *ip;
-                *ip = std::max(*ip, poro_min);
-                ip++;
+//    for (int k = 0; k < N_[2]; k++)
+//    {
+////        point(2, 0) = k*2.0*ft_ + ft_;
+//        for (int j = 0; j < N_[1]; j++)
+//        {
+////            point(1, 0) = j*10.0*ft_ + 5.0*ft_;
+//            for (int i = 0; i < N_[0]; i++)
+//            {
+//                poro_file >> *ip;
+//                *ip = std::max(*ip, poro_min);
+//                ip++;
 
-//                point(0, 0) = i*20.0*ft_ + 10*ft_;
-//                if (count % 1000 == 0) { std::cout<<"have found IDs for " << count << " cells\n"; }
-//                mesh_->FindPoints(point, ids, ips, false);
-//                if (count < 20) { std::cout << count << " " << ids[0] << "\n"; }
-//                mfem_to_mrst_map.Add(count, ids[0], 1.0);
-//                count++;
-            }
-            for (int i = 0; i < max_N[0] - N_[0]; i++)
-                poro_file >> unneeded; // skip unneeded part
-        }
-        for (int j = 0; j < max_N[1] - N_[1]; j++)
-            for (int i = 0; i < max_N[0]; i++)
-                poro_file >> unneeded;  // skip unneeded part
-    }
+////                point(0, 0) = i*20.0*ft_ + 10*ft_;
+////                if (count % 1000 == 0) { std::cout<<"have found IDs for " << count << " cells\n"; }
+////                mesh_->FindPoints(point, ids, ips, false);
+////                if (count < 20) { std::cout << count << " " << ids[0] << "\n"; }
+////                mfem_to_mrst_map.Add(count, ids[0], 1.0);
+////                count++;
+//            }
+//            for (int i = 0; i < max_N[0] - N_[0]; i++)
+//                poro_file >> unneeded; // skip unneeded part
+//        }
+//        for (int j = 0; j < max_N[1] - N_[1]; j++)
+//            for (int i = 0; i < max_N[0]; i++)
+//                poro_file >> unneeded;  // skip unneeded part
+//    }
 
 //    mfem_to_mrst_map.Finalize();
 //    std::ofstream mat_file("mfem_to_mrst_map.txt");
 //    mfem_to_mrst_map.PrintMatlab(mat_file);
 
-    std::cout << " sum(poro) = " << vert_weight.Sum() << "\n";
+//    std::cout << " sum(poro) = " << vert_weight.Sum() << "\n";
 
     vert_weight *= 20.0 * 10.0 * 2.0 * std::pow(ft_, 3); // cell volume
 
@@ -487,8 +487,8 @@ void TwoPhase::SetWells(int well_height, double inject_rate, double bhp)
     point(1, 4) = max_y;
     point(0, 3) = max_x;
     point(1, 3) = max_y;
-    point(0, 0) = 182.5; // 185.5; // 182.5;
-    point(1, 0) = 335.0; // 336.5; // 335.0; // 258.0; //
+    point(0, 0) = 182.5-40.0*ft_;// 182.5; // 185.5; // 182.5;
+    point(1, 0) = 335.0-20.0*ft_;// 335.0; // 336.5; // 335.0; // 258.0; //
 
 
     for (int j = 0; j < well_height; ++j)
@@ -606,6 +606,235 @@ void SaigupModel::SetupMesh(bool refined)
     std::ifstream imesh("/Users/lee1029/Downloads/"+file);
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
+}
+
+
+class MRSTLogNormal : public DarcyProblem
+{
+public:
+    MRSTLogNormal(const char* perm_file, int well_height,
+                  double inject_rate, double bottom_hole_pressure);
+
+    const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
+private:
+    void Set5Wells(int well_height, double inject_rate, double bot_hole_pres);
+    void Set64Wells(int well_height, double inject_rate, double bot_hole_pres);
+    void SetWells(const std::vector<std::vector<int>>& inj_well_cells,
+                  const std::vector<std::vector<int>>& prod_well_cells,
+                  double inject_rate, double bhp);
+    void CombineReservoirAndWellModel();
+    void MetisPart(const mfem::Array<int>& coarsening_factor, mfem::Array<int>& partitioning) const;
+
+    mfem::Vector ComputeVertWeight();
+
+    unique_ptr<mfem::HypreParMatrix> combined_edge_trueedge_;
+    unique_ptr<WellManager> well_manager_;
+};
+
+MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
+                             double inject_rate, double bottom_hole_pressure)
+    : DarcyProblem(MPI_COMM_WORLD, 3, mfem::Array<int>())
+{
+    ess_attr_.SetSize(6);
+    ess_attr_ = 1;
+
+//    std::ifstream imesh("logNormal.vtk");
+//    mfem::Mesh serial_mesh(imesh, 1, 1);
+    mfem::Mesh serial_mesh(101, 101, 30, mfem::Element::HEXAHEDRON, true,
+                           1010.0*ft_, 1010.0*ft_, 30.0*ft_);
+    mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
+    InitGraph();
+
+    std::ifstream perm_str(perm_file);
+    coeff_gf_.SetSpace(u_fes_.get());
+    coeff_gf_.Load(perm_str, coeff_gf_.Size());
+    for (int i = 0; i < coeff_gf_.Size(); ++i)
+    {
+        coeff_gf_[i] = 1.0 / coeff_gf_[i];
+    }
+
+    auto kinv = new mfem::VectorArrayCoefficient(mesh_->Dimension());
+    for (int i = 0; i < mesh_->Dimension(); ++i)
+    {
+        kinv->Set(i, new mfem::GridFunctionCoefficient(&coeff_gf_));
+    }
+    kinv_vector_.reset(kinv);
+    ComputeGraphWeight();
+
+    well_manager_.reset(new WellManager(*mesh_, *kinv_vector_));
+    Set64Wells(well_height, inject_rate, bottom_hole_pressure);
+    CombineReservoirAndWellModel();
+
+    vert_weight_ = ComputeVertWeight();
+
+    block_offsets_.SetSize(4);
+    block_offsets_[0] = 0;
+    block_offsets_[1] = vertex_edge_.NumCols();
+    block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
+    block_offsets_[3] = block_offsets_[2] + vertex_edge_.NumRows();
+
+    iso_vert_count_ = 1;
+
+    std::ofstream mesh_file("mrst_lognormal_mesh.vtk");
+    mesh_->PrintVTK(mesh_file, 1);
+    std::ofstream perm_out_file("mrst_lognormal_perm.vtk");
+    coeff_gf_.SaveVTK(perm_out_file, "perm", 1);
+}
+
+mfem::Vector MRSTLogNormal::ComputeVertWeight()
+{
+    mfem::Vector vert_weight(vertex_edge_.NumRows());
+    vert_weight = .3 * 10.0 * 10.0 * 1.0 * std::pow(ft_, 3);
+    return vert_weight;
+}
+
+void MRSTLogNormal::Set5Wells(int well_height, double inject_rate, double bhp)
+{
+    const int num_wells = 5;
+    std::vector<std::vector<int>> cells(num_wells);
+
+    const double max_x = 1010.0*ft_ - 5.0*ft_;
+    const double max_y = 1010.0*ft_ - 5.0*ft_;
+
+    mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
+    point = 0.5 * ft_;
+    point(0, 2) = max_x;
+    point(1, 4) = max_y;
+    point(0, 3) = max_x;
+    point(1, 3) = max_y;
+    point(0, 0) = 500.0*ft_ + 5.0*ft_;
+    point(1, 0) = 500.0*ft_ + 5.0*ft_;
+
+    well_height = 30;
+
+    for (int j = 0; j < well_height; ++j)
+    {
+        mfem::Array<int> ids;
+        mfem::Array<mfem::IntegrationPoint> ips;
+        mesh_->FindPoints(point, ids, ips, false);
+
+        for (int i = 0; i < num_wells; ++i)
+        {
+            if (ids[i] >= 0) { cells[i].push_back(ids[i]); }
+            if (mesh_->Dimension() == 3) { point(2, i) += 1.0*ft_; }
+        }
+    }
+
+    for (int i = 0; i < num_wells; ++i)
+    {
+        WellType type = (i == 0) ? Injector : Producer;
+        double value = (i == 0) ? inject_rate : bhp;
+        if (cells[i].size())
+        {
+            well_manager_->AddWell(type, value, cells[i], WellDirection::Z, 0.127);
+        }
+    }
+}
+
+void MRSTLogNormal::Set64Wells(int well_height, double inject_rate, double bhp)
+{
+    const int num_wells = 121; // 6*6 + 5 * 5 + 5*6 *2
+    std::vector<std::vector<int>> cells(num_wells);
+
+    int even_cnt = 0;
+    int odd_cnt = 61;
+
+    double space = 100.0*ft_;
+    mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
+    point = 0.5 * ft_;
+
+    for (int i = 0; i < 11; i++)
+    {
+        for (int j = 0; j < 11; j++)
+        {
+            int cnt = (i+j)%2 ? odd_cnt : even_cnt;
+
+            point(0, cnt) = i * space + 5.0*ft_;
+            point(1, cnt) = j * space + 5.0*ft_;
+
+            if ((i+j)%2)
+            {
+                odd_cnt++;
+            }
+            else
+            {
+                even_cnt++;
+            }
+        }
+    }
+
+    well_height = 30;
+
+    for (int j = 0; j < well_height; ++j)
+    {
+        mfem::Array<int> ids;
+        mfem::Array<mfem::IntegrationPoint> ips;
+        mesh_->FindPoints(point, ids, ips, false);
+
+        for (int i = 0; i < num_wells; ++i)
+        {
+            if (ids[i] >= 0) { cells[i].push_back(ids[i]); }
+            if (mesh_->Dimension() == 3) { point(2, i) += 1.0*ft_; }
+        }
+    }
+
+    for (int i = 0; i < num_wells; ++i)
+    {
+        WellType type = (i < 61) ? Injector : Producer;
+        double value = (i < 61) ? inject_rate : bhp;
+        if (cells[i].size())
+        {
+            well_manager_->AddWell(type, value, cells[i], WellDirection::Z, 0.127);
+        }
+    }
+}
+
+void MRSTLogNormal::CombineReservoirAndWellModel()
+{
+    vertex_edge_ = ExtendVertexEdge(vertex_edge_, *well_manager_);
+    local_weight_ = AppendWellIndex(local_weight_, *well_manager_);
+    weight_ = AppendWellData(weight_, *well_manager_, Any);
+    edge_bdr_ = ExtendEdgeBoundary(edge_bdr_, *well_manager_);
+
+    rhs_sigma_ = AppendWellData(rhs_sigma_, *well_manager_, Producer);
+    rhs_u_ = AppendWellData(rhs_u_, *well_manager_, Injector);
+
+    combined_edge_trueedge_ = ConcatenateIdentity(*sigma_fes_->Dof_TrueDof_Matrix(),
+                                                  well_manager_->NumWellCells());
+    edge_trueedge_ = combined_edge_trueedge_.get();
+
+    mfem::Array<int> producer_attr(well_manager_->NumWells(Producer));
+    producer_attr = 0;                // treat producer as "natural boundary"
+    ess_attr_.Append(producer_attr);
+}
+
+void MRSTLogNormal::MetisPart(const mfem::Array<int>& coarsening_factor,
+                            mfem::Array<int>& partitioning) const
+{
+    const int dim = mesh_->Dimension();
+
+    mfem::SparseMatrix scaled_vert_edge(vertex_edge_);
+    if (dim == 3)
+    {
+        mfem::Vector weight_sqrt(weight_);
+        for (int i = 0; i < weight_.Size(); ++i)
+        {
+            weight_sqrt[i] = std::sqrt(weight_[i]);
+        }
+        scaled_vert_edge.ScaleColumns(weight_sqrt);
+    }
+
+    const int xy_cf = coarsening_factor[0] * coarsening_factor[1];
+    const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
+
+    std::vector<std::vector<int>> iso_verts;
+    iso_vert_count_ = well_manager_->NumWells(Injector);
+    for (int i = 0; i < iso_vert_count_; ++i)
+    {
+        iso_verts.push_back(std::vector<int>(1, mesh_->GetNE() + i));
+    }
+
+    PartitionAAT(scaled_vert_edge, partitioning, metis_cf, dim > 2, iso_verts);
 }
 
 
@@ -741,6 +970,8 @@ void TwoPhaseEGG::MetisPart(const mfem::Array<int>& coarsening_factor,
 
     PartitionAAT(scaled_vert_edge, partitioning, metis_cf, dim > 2, iso_verts);
 }
+
+
 
 
 class LocalProblem : public DarcyProblem

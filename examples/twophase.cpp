@@ -854,6 +854,8 @@ FindWellCells(const Graph& graph, int num_injectors, int num_producers, int well
             int i_friend = vert_vert.GetRowColumns(i)[j];
             if (i_friend == i) { continue; }
             injector_cells.push_back(i_friend);
+
+            std::cout<<"injector_cell: "<<i_friend<<"\n";
         }
         out.push_back(injector_cells);
     }
@@ -925,7 +927,6 @@ int main(int argc, char* argv[])
     // program options from command line
     TimeSteppingParameters time_stepping_param;
     mfem::OptionsParser args(argc, argv);
-    std::string base_dir = "/home/chak/Downloads/";
     const char* problem_dir = "";
     args.AddOption(&problem_dir, "-pd", "--problem-directory",
                    "Directory where data files are located");
@@ -1005,8 +1006,8 @@ int main(int argc, char* argv[])
     fas_param.mid.max_num_iter = use_vcycle ? 1 : max_iter;
     fas_param.coarse.max_num_iter = use_vcycle ? 10 : max_iter;
     fas_param.coarse.print_level = use_vcycle ? print_level : print_level;
-    fas_param.fine.print_level = use_vcycle ? -1 : print_level;
-    fas_param.mid.print_level = use_vcycle ? -1 : print_level;
+    fas_param.fine.print_level = use_vcycle ? print_level : print_level;
+    fas_param.mid.print_level = use_vcycle ? print_level : print_level;
 //    fas_param.coarse.rtol = 1e-10;
 //    fas_param.coarse.atol = 1e-12;
     fas_param.nl_solve.print_level = use_vcycle ? 1 : -1;
@@ -1029,60 +1030,66 @@ int main(int argc, char* argv[])
     int num_attr_from_file = 5;
     upscale_param.num_iso_verts = 1; // TODO: this should be read from file
 
-    int num_injectors = 1;
-    int num_producers = 4;
+    int num_injectors = 61;
+    int num_producers = 60;
 
     // Setting up finite volume discretization problem
-    std::string path(base_dir + problem_dir);
+    std::string path(problem_dir);
     unique_ptr<DarcyProblem> problem, problem_for_plot;
-    if (path == "/Users/lee1029/Downloads/")
+    if (path == "")
     {
         problem.reset(new TwoPhase(perm_file, dim, 5, slice, use_metis, ess_attr,
                                    well_height, inject_rate, bhp));
     }
+    else if (path == "mrst_lognormal")
+    {
+        well_height = 30;
+        problem.reset(new MRSTLogNormal(perm_file, well_height, inject_rate, bhp));
+        upscale_param.num_iso_verts = num_injectors;
+    }
     else
     {
-        //    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_2d";
+        //    std::string path = "spe10_bottom_layer_2d";
         bool need_getline = true;
         int num_vert_res = 13200;
         int nnz_res = num_vert_res * 4;
         int num_edges_res = 26680;
 
-        if (path == "/Users/lee1029/Downloads/spe10_bottom_layer_3d_no_inactive")
+        if (path == "spe10_bottom_layer_3d_no_inactive")
         {
-            //    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^5/";
-            //    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d_constrast_10^3";
+            //    std::string path = "spe10_bottom_layer_3d_constrast_10^5/";
+            //    std::string path = "spe10_bottom_layer_3d_constrast_10^3";
             need_getline = false;
             num_vert_res = 12321;
             nnz_res = num_vert_res * 6;
             num_edges_res = 50438;
             inject_rate *= 0.6096;
         }
-        else if (path == "/Users/lee1029/Downloads/spe10_top_layer_3d" ||
-                 path == "/Users/lee1029/Downloads/spe10_bottom_layer_3d")
+        else if (path == "spe10_top_layer_3d" ||
+                 path == "spe10_bottom_layer_3d")
         {
-            //    std::string path = "/Users/lee1029/Downloads/spe10_bottom_layer_3d";
+            //    std::string path = "spe10_bottom_layer_3d";
             num_vert_res = 13200;
             nnz_res = num_vert_res * 6;
             num_edges_res = 53080;
             inject_rate *= 0.6096;
         }
-        else if (path == "/Users/lee1029/Downloads/test_2")
+        else if (path == "test_2")
         {
             num_vert_res = 16;
             num_edges_res = 40;
             inject_rate = 1e-7;
             num_attr_from_file = 2;
         }
-        else if (path == "/Users/lee1029/Downloads/test_5")
+        else if (path == "test_5")
         {
             num_vert_res = 25;
             num_edges_res = 60;
             inject_rate = 1e-7;
             num_attr_from_file = 2;
         }
-//        else if (path == "/Users/lee1029/Downloads/egg")
-        else if (path == "/home/chak/Downloads/egg_single_perforation")
+//        else if (path == "egg")
+        else if (path == "egg_single_perforation")
         {
 //            num_vert_res = 18553;
 //            nnz_res = num_vert_res * 6;
@@ -1102,11 +1109,12 @@ int main(int argc, char* argv[])
             num_edges_res = 459456;
 
             num_injectors = 8;
+            num_producers = 4;
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel("refined_egg_2x2x2.vtk", 0, 0, ess_attr));
         }
-        else if (path == "/home/chak/Downloads/egg_well_model")
+        else if (path == "egg_well_model")
         {
             num_vert_res = 18553;
             nnz_res = num_vert_res * 6;
@@ -1114,12 +1122,13 @@ int main(int argc, char* argv[])
             upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
             num_injectors = 8;
+            num_producers = 4;
             well_height = 7;
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel("egg_model.mesh", 0, 0, ess_attr));
         }
-        else if (path == "/Users/lee1029/Downloads/norne")
+        else if (path == "norne")
         {
             num_vert_res = 44915;
             nnz_res = 291244;
@@ -1134,7 +1143,7 @@ int main(int argc, char* argv[])
             ess_attr.SetSize(1, 1);
             problem_for_plot.reset(new NorneModel(comm, ess_attr));
         }
-        else if (path == "/Users/lee1029/Downloads/saigup")
+        else if (path == "saigup")
         {
             num_vert_res = 78720;
             nnz_res = 505918;
@@ -1149,7 +1158,7 @@ int main(int argc, char* argv[])
             mfem::Array<int> ess_attr2(1); ess_attr2 = 1;
             problem_for_plot.reset(new SaigupModel(comm, false, ess_attr2));
         }
-        else if (path == "/Users/lee1029/Downloads/refined_saigup")
+        else if (path == "refined_saigup")
         {
             num_vert_res = 629760;
             nnz_res = 3913208;
@@ -1164,7 +1173,7 @@ int main(int argc, char* argv[])
             ess_attr.SetSize(1, 1);
             problem_for_plot.reset(new SaigupModel(comm, true, ess_attr));
         }
-        else if (path != "/Users/lee1029/Downloads/spe10_bottom_layer_2d")
+        else if (path != "spe10_bottom_layer_2d")
         {
             mfem::mfem_error("Unknown model problem!");
         }
@@ -1180,20 +1189,21 @@ int main(int argc, char* argv[])
     }
     std::cout << "Injection rate: " << inject_rate << "\n";
 
+
     problem_ptr = problem_for_plot ? problem_for_plot.get() : problem.get();
 
     Graph graph = problem->GetFVGraph(true);
     auto& ess_attr_final = problem->EssentialAttribute();
 
-
-    bool special_part = (read_from_file == false || isolate_well_cells);
+    bool special_part = false;//(read_from_file == false || isolate_well_cells);
     unique_ptr<mfem::Array<int>> partition(special_part ? new mfem::Array<int> : nullptr);
 
-    if (special_part)
+    if (special_part && upscale_param.max_levels > 1)
     {
         mfem::Array<int> coarsening_factors(dim);
         coarsening_factors = 1;
         coarsening_factors[0] = upscale_param.coarse_factor;
+
 //        coarsening_factors[0] = 6;
 //        coarsening_factors[1] = 11;
 
@@ -1240,14 +1250,210 @@ int main(int argc, char* argv[])
         problem_ptr->VisSetup(souts, part_print, 0.0, 0.0, "Well cells", false, true);
     }
 
+
     Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr_final);
     hierarchy.PrintInfo();
+
+
+//=======
+
+////    mfem::SparseMatrix agg_vert = PartitionToMatrix(*partition, partition->Max()+1);
+////    const mfem::SparseMatrix& vert_edge = graph.VertexToEdge();
+////    mfem::SparseMatrix edge_vert = smoothg::Transpose(vert_edge);
+////    mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
+
+
+//    for (int level = 1; level < 3; level++)
+//    {
+
+
+//    auto agg_face = hierarchy.GetGraph(level).VertexToEdge();
+//    auto face_agg = hierarchy.GetGraph(level).EdgeToVertex();
+
+//    auto agg_agg = smoothg::Mult(agg_face, face_agg);
+////    std::cout << "agg connected to injector:\n";
+//    for (int i = 0; i < num_injectors; ++i)
+//    {
+//        int agg = agg_agg.NumRows() - num_injectors + i;
+//        std::cout << "aggs connected to injector #" << i << " (agg "<<agg<<"):\n";
+
+//        for (int j = 0; j < agg_agg.RowSize(agg); ++j)
+//        {
+//            if (agg_agg.GetRowColumns(agg)[j] != agg)
+//            {
+//                std::cout << agg_agg.GetRowColumns(agg)[j] << " ";
+//            }
+//        }
+//        std::cout << "\n";
+//    }
+
+////    const int num_old_parts = partition->Max()+1;
+////    auto well_cells = FindWellCells(graph, num_injectors, num_producers, well_height);
+////    partition.reset(AddWellCellAgg(*partition, well_cells));
+////    std::cout << "Number of new aggs created because of well cell isolation: "
+////              << partition->Max()+1 - num_old_parts << "\n";
+////>>>>>>> Stashed changes
+
+//    mfem::L2_FECollection u_fec(0, problem_for_plot->GetMesh().Dimension());
+//    mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_for_plot->GetMesh()), &u_fec);
+
+//    auto vert_agg = smoothg::Transpose(hierarchy.GetAggVert(level-1));
+
+//    if (level == 2)
+//    {
+//        auto vert_agg_fine = smoothg::Transpose(hierarchy.GetAggVert(level-2));
+//        auto vert_agg_tmp = smoothg::Mult(vert_agg_fine, vert_agg);
+//        vert_agg.Swap(vert_agg_tmp);
+//    }
+
+
+////    mfem::Vector part_vec(partition->Size()-num_injectors);
+//    mfem::GridFunction part_vec(&u_fes);
+//    for (int i = 0; i < part_vec.Size(); ++i)
+//    {
+//        assert(vert_agg.RowSize(i) == 1);
+//        part_vec[i] = vert_agg.GetRowColumns(i)[0];
+//    }
+
+////    std::string tag = "part"+std::to_string(upscale_param.coarse_factor)
+////            +"_lvl"+std::to_string(level);
+////    std::ofstream part_file("egg_"+tag+"_ref1.vtk");
+//////    part_vec.Print(part_file, 1);
+////    part_vec.SaveVTK(part_file, tag, 1);
+
+//    if (level == 1)
+//    {
+//        std::cout << "face connected to agg 483:\n";
+//        for (int j = 0; j < agg_face.RowSize(483); ++j)
+//        {
+//            std::cout << agg_face.GetRowColumns(483)[j] << " ";
+//        }
+//        std::cout << "\n";
+
+//        std::cout << "face connected to agg 522:\n";
+//        for (int j = 0; j < agg_face.RowSize(522); ++j)
+//        {
+//            std::cout << agg_face.GetRowColumns(522)[j] << " ";
+//        }
+//        std::cout << "\n";
+//    }
+//    if (level == 2)
+//    {
+//        std::cout << "face connected to agg 32:\n";
+//        for (int j = 0; j < agg_face.RowSize(32); ++j)
+//        {
+//            std::cout << agg_face.GetRowColumns(32)[j] << " ";
+//        }
+//        std::cout << "\n";
+
+//        std::cout << "face connected to agg 72:\n";
+//        for (int j = 0; j < agg_face.RowSize(72); ++j)
+//        {
+//            std::cout << agg_face.GetRowColumns(72)[j] << " ";
+//        }
+//        std::cout << "\n";
+//    }
+
+//    }
+
+
+
+
+//    auto vert_edge = hierarchy.GetGraph(0).VertexToEdge();
+//    auto edge_vert = hierarchy.GetGraph(0).EdgeToVertex();
+
+//    auto vert_vert = smoothg::Mult(vert_edge, edge_vert);
+//    std::ofstream inj_file("egg_injector_cells_ref1.vtk");
+
+//    part_vec = 0.0;
+//    for (int i = 0; i < num_injectors; ++i)
+//    {
+//        int vert = vert_vert.NumRows() - num_injectors + i;
+//        std::cout << "verts connected to injector #" << i << " (vert "<<vert<<"):\n";
+
+//        for (int j = 0; j < vert_vert.RowSize(vert); ++j)
+//        {
+//            if (vert_vert.GetRowColumns(vert)[j] != vert)
+//            {
+//                std::cout << vert_vert.GetRowColumns(vert)[j] << " ";
+//                part_vec[vert_vert.GetRowColumns(vert)[j]] = i+1.0;
+//            }
+//        }
+//        std::cout << "\n";
+//    }
+//    part_vec.SaveVTK(inj_file, "injector_cell", 1);
+
+
+    if (false)
+    {
+//        std::ifstream flux_file("spe10_1to5_flux_basis_357.vtk");
+        std::string b_id = std::to_string(100);
+        std::ifstream flux_file("egg_lvl2_flux_basis_"+b_id+".txt");
+        mfem::GridFunction flux_basis(problem_for_plot->GetSigmaSpace());
+
+        auto& Psigma = hierarchy.GetPsigma(0);
+        mfem::Vector flux_tmp(Psigma.NumCols()), flux_fine(Psigma.NumRows());
+        flux_tmp = 0.0;
+        flux_tmp.Load(flux_file, flux_tmp.Size());
+        flux_tmp.SetSize(Psigma.NumCols());
+        Psigma.Mult(flux_tmp, flux_fine);
+
+        auto edge_map = problem_for_plot->ComputeEdgeMap(hierarchy.GetMatrix(0).GetD());
+        edge_map.Mult(flux_fine, flux_basis);
+
+        RescaleVector(problem_for_plot->GetSigmaSignChange(), flux_basis);
+        std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
+        std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
+//        std::ofstream flux_outfile("spe10_1to5_flux_basis_357_ref1.vtk");
+        std::ofstream flux_outfile("egg_lvl2_flux_basis_"+b_id+"_ref1.vtk");
+        flux_basis.SaveVTK(flux_outfile, "lvl2_flux_basis_"+b_id+"", 1);
+
+        std::ifstream pot_file("egg_lvl2_potential_"+b_id+".txt");
+        mfem::GridFunction pot_basis(problem_for_plot->GetUSpace());
+        auto& Pu = hierarchy.GetPu(0);
+        mfem::Vector pot_tmp(Pu.NumCols()), pot_fine(Pu.NumRows());;
+        pot_tmp = 0.0;
+        pot_tmp.Load(pot_file, pot_tmp.Size()-8);
+        pot_tmp.SetSize(Pu.NumCols());
+        Pu.Mult(pot_tmp, pot_fine);
+        for (int ii = 0; ii <pot_basis.Size(); ++ii)
+        {
+            pot_basis[ii] = pot_fine[ii];
+        }
+
+        std::ofstream pot_outfile("egg_lvl2_potential_"+b_id+"_ref1.vtk");
+        pot_basis.SaveVTK(pot_outfile, "potential_"+b_id+"", 1);
+    }
+
+    if (false)
+    {
+        std::string b_id = std::to_string(2017);
+        std::ifstream flux_file("egg_lvl1_flux_basis_"+b_id+".txt");
+        mfem::GridFunction flux_basis(problem_for_plot->GetSigmaSpace());
+
+        auto& Psigma = hierarchy.GetPsigma(0);
+        mfem::Vector flux_fine(Psigma.NumRows());
+        flux_fine = 0.0;
+        flux_fine.Load(flux_file, flux_fine.Size());
+
+        auto edge_map = problem_for_plot->ComputeEdgeMap(hierarchy.GetMatrix(0).GetD());
+        edge_map.Mult(flux_fine, flux_basis);
+
+        RescaleVector(problem_for_plot->GetSigmaSignChange(), flux_basis);
+        std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
+        std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
+//        std::ofstream flux_outfile("spe10_1to5_flux_basis_357_ref1.vtk");
+        std::ofstream flux_outfile("egg_lvl1_flux_basis_"+b_id+"_ref1.vtk");
+        flux_basis.SaveVTK(flux_outfile, "lvl1_flux_basis_"+b_id+"", 1);
+
+    }
 
 
     // Fine scale transport based on fine flux
     std::vector<mfem::Vector> Ss(upscale_param.max_levels);
     std::vector<mfem::Vector> flux_s(upscale_param.max_levels);
     std::vector<mfem::Vector> pres_s(upscale_param.max_levels);
+
 
 //    auto D0 = hierarchy.GetMatrix(0).GetD();
 //    auto edge_map = problem_for_plot->ComputeEdgeMap(D0);
@@ -1302,10 +1508,10 @@ int main(int argc, char* argv[])
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
         initial_value.GetBlock(2) = Mobility::S_min_;
-//        for (int i = 0; i < num_injectors; ++i)
-//        {
-//            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
-//        }
+        for (int i = 0; i < num_injectors; ++i)
+        {
+            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
+        }
 
         mfem::BlockVector sol(initial_value);
 //        if (l == 0)
@@ -1362,11 +1568,20 @@ int main(int argc, char* argv[])
         {
 //            mfem::socketstream soutf;
 //            problem_ptr->VisSetup(soutf, flux_s[l], 0.0, 0.0, "Flux, "+base_msg, false, false, partition->GetData());
-//            mfem::socketstream soutp;
-//            problem_ptr->VisSetup(soutp, pres_s[l], 0.0, 0.0, "Pressure, "+base_msg, false, true, partition->GetData());
+            mfem::socketstream soutp;
             mfem::socketstream souts;
-            problem_ptr->VisSetup(souts, Ss[l], Mobility::S_min_, Mobility::S_max_,
-                                  "Saturation, "+base_msg, false, true, partition->GetData());
+            if (partition)
+            {
+                problem_ptr->VisSetup(soutp, pres_s[l], 0.0, 0.0, "Pressure, "+base_msg, false, true, partition->GetData());
+                problem_ptr->VisSetup(souts, Ss[l], Mobility::S_min_, Mobility::S_max_,
+                                      "Saturation, "+base_msg, false, true, partition->GetData());
+            }
+            else
+            {
+                problem_ptr->VisSetup(soutp, pres_s[l], 0.0, 0.0, "Pressure, "+base_msg, false, true);
+                problem_ptr->VisSetup(souts, Ss[l], Mobility::S_min_, Mobility::S_max_,
+                                      "Saturation, "+base_msg, false, true);
+            }
         }
 
 
@@ -1911,9 +2126,9 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
         mfem::Vector well_flux;
         {
-            x.GetSubVector(well_perforations, well_flux);
-            std::cout<< "flux at wells" << ":\n";
-            well_flux.Print(std::cout, 7);
+//            x.GetSubVector(well_perforations, well_flux);
+//            std::cout<< "flux at wells" << ":\n";
+//            well_flux.Print(std::cout, 7);
 
             std::cout<< "pressure at wells: "<< x.GetBlock(1)[x.BlockSize(1)-1] << "\n";
             std::cout<< "saturation at wells: "<< x[x.Size()-1] << "\n";
@@ -1952,21 +2167,28 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
 
         x_blk2 = x.GetBlock(1);
         x_blk2 *= -1.;
-        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
+//        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
 
-        std::ofstream all_file("saigup_CFL_"+std::to_string(step)+".vtk");
-        all_file.precision(8);
-        all_file <<  "\nSCALARS pressure double 1\nLOOKUP_TABLE default\n";
-        all_file << std::fixed;
-        x_blk2.Print(all_file, 1);
+        std::ofstream all_file("mrst_lognormal_"+std::to_string(step)+".vtk");
+//        all_file.precision(8);
+//        all_file <<  "\nSCALARS pressure double 1\nLOOKUP_TABLE default\n";
+//        all_file << std::fixed;
+//        x_blk2.Print(all_file, 1);
 
-        x_blk2 = x.GetBlock(2);
-        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
-//        std::ofstream s_file("egg_sat_"+std::to_string(step)+".vtk");
-//        s_file.precision(8);
-        all_file << "\nSCALARS saturation double 1\nLOOKUP_TABLE default\n";
-        all_file << std::fixed;
-        x_blk2.Print(all_file, 1);
+//        x_blk2 = x.GetBlock(2);
+//        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
+////        std::ofstream s_file("egg_sat_"+std::to_string(step)+".vtk");
+////        s_file.precision(8);
+//        all_file << "\nSCALARS saturation double 1\nLOOKUP_TABLE default\n";
+//        all_file << std::fixed;
+//        x_blk2.Print(all_file, 1);
+
+        mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
+        mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
+        mfem::GridFunction vec_vtk(&u_fes, x_blk2.GetData());
+        vec_vtk.SaveVTK(all_file, "pressure", 1);
+        vec_vtk.SetData(x.GetBlock(2).GetData());
+        vec_vtk.SaveVTK(all_file, "saturation", 1);
     }
 
     if (myid == 0)
@@ -2110,7 +2332,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         rhs.GetBlock(1) *= (dt * density_);
 //        add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
         rhs.GetBlock(2) *= (dt * density_);
-        rhs[rhs.Size()-1] = 0.8;
+        rhs[rhs.Size()-1] = Mobility::S_max_;
         weight_.AddMult(x.GetBlock(2), rhs.GetBlock(2));
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
@@ -2743,15 +2965,16 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
             dTdsigma = ParMult(*Ds_, SparseDiag(std::move(U_FS)), true_edof_starts_);
         }
 
+//        if (false)
         {
             mfem::SparseMatrix diag;
             dTdsigma->GetDiag(diag);
             diag.EliminateRow(diag.NumRows()-1);
             dTdS->GetDiag(diag);
-//            diag.EliminateRow(diag.NumRows()-1);
-//            diag.EliminateCol(diag.NumCols()-1);
-//            diag.Set(diag.NumRows()-1, diag.NumRows()-1, 1.0);
-            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
+            diag.EliminateRow(diag.NumRows()-1);
+            diag.EliminateCol(diag.NumCols()-1);
+            diag.Set(diag.NumRows()-1, diag.NumRows()-1, 1.0);
+//            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
 
             dMdS->GetDiag(diag);
             diag.EliminateCol(diag.NumCols()-1);

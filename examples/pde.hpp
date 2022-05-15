@@ -568,6 +568,11 @@ public:
 
     const mfem::ParMesh& GetMesh() const { return *mesh_; }
 
+    mfem::ParFiniteElementSpace* GetSigmaSpace() { return sigma_fes_.get(); }
+    mfem::ParFiniteElementSpace* GetUSpace() { return u_fes_.get(); }
+
+    const mfem::Vector& GetSigmaSignChange() const { return sigma_sign_change_; }
+
     /// Save mesh with partitioning information (GLVis can separate partitions)
     void PrintMeshWithPartitioning(mfem::Array<int>& partition);
 
@@ -1101,10 +1106,10 @@ void DarcyProblem::VisualizePermeability()
         coeff_gf_[i] = ((InversePermeabilityCoefficient&)(*kinv_vector_)).FroNorm(center);
     }
 
-    mfem::socketstream soc;
-    VisSetup(soc, coeff_gf_, 0., 0., "", 1);
-    std::ofstream coef_file("spe10_1to5.gf");
-    coeff_gf_.Save(coef_file);
+//    mfem::socketstream soc;
+//    VisSetup(soc, coeff_gf_, 0., 0., "", 1);
+//    std::ofstream coef_file("spe10_1to5.gf");
+//    coeff_gf_.Save(coef_file);
 
 
 //    mfem::Vector inv_perm(3), perm_x(mesh_->GetNE()),
@@ -1128,6 +1133,10 @@ void DarcyProblem::VisualizePermeability()
 //        perm_y[i] = 1./inv_perm[1];
 //        perm_z[i] = 1./inv_perm[2];
 //    }
+
+
+//    std::ofstream mesh_file("spe10_1to5.vtk");
+//    const_cast<mfem::ParMesh&>(GetMesh()).PrintVTK(mesh_file);
 
 //    coeff_gf_.MakeRef(u_fes_.get(), perm_x);
 //    std::ofstream coefx_file("spe10_1to5_perm_x.vtk");
@@ -1257,16 +1266,47 @@ SPE10Problem::SPE10Problem(const char* perm_file, int dim, int spe10_scale, int 
 {
     SetupMeshAndCoeff(perm_file, dim, spe10_scale, use_metis, slice, unit_weight, anisotropy);
 
-    if (myid_ == 0)
-    {
-        std::cout << mesh_->GetNEdges() << " fine edges, "
-                  << mesh_->GetNFaces() << " fine faces, "
-                  << mesh_->GetNE() << " fine elements\n";
-    }
-
     InitGraph();
     ComputeGraphWeight();
     MakeRHS();
+
+    std::ofstream mesh_file("egg_mesh_ref1.vtk");
+    mesh_->PrintVTK(mesh_file, 1);
+
+    if (false)
+    {
+//        std::ifstream flux_file("spe10_1to5_flux_basis_357.vtk");
+        std::string b_id = std::to_string(495);
+        std::ifstream flux_file("spe10_2d_flux_basis_"+b_id+".vtk");
+        mfem::GridFunction flux_basis(sigma_fes_.get());
+        flux_basis = 0.0;
+        flux_basis.Load(flux_file, flux_basis.Size());
+        RescaleVector(sigma_sign_change_, flux_basis);
+        std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
+        std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
+//        std::ofstream flux_outfile("spe10_1to5_flux_basis_357_ref1.vtk");
+        std::ofstream flux_outfile("spe10_2d_flux_basis_"+b_id+"_ref1.vtk");
+        flux_basis.SaveVTK(flux_outfile, "flux_basis_"+b_id+"", 1);
+
+        std::ifstream pot_file("spe10_2d_potential_"+b_id+".vtk");
+        mfem::GridFunction pot_basis(u_fes_.get());
+        pot_basis = 0.0;
+        pot_basis.Load(pot_file, pot_basis.Size());
+        std::ofstream pot_outfile("spe10_2d_potential_"+b_id+"_ref1.vtk");
+        pot_basis.SaveVTK(pot_outfile, "potential_"+b_id+"", 1);
+    }
+
+//    {
+//        std::ifstream flux_file("spe10_1to5_flux_basis_698.vtk");
+//        mfem::GridFunction flux_basis(sigma_fes_.get());
+//        flux_basis = 0.0;
+//        flux_basis.Load(flux_file, flux_basis.Size());
+//        RescaleVector(sigma_sign_change_, flux_basis);
+//        std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
+//        std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
+//        std::ofstream flux_outfile("spe10_1to5_flux_basis_698_ref1.vtk");
+//        flux_basis.SaveVTK(flux_outfile, "flux_basis_698", 1);
+//    }
 }
 
 void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
@@ -1280,7 +1320,7 @@ void SPE10Problem::SetupMeshAndCoeff(const char* perm_file, int dim,
 
     N_.SetSize(3, 12 * spe10_scale);        // 60
     N_[1] = 44 * spe10_scale;               // 220
-    N_[2] = max_N[2];  // 17 * spe10_scale; // 85
+    N_[2] = 17;//max_N[2];  // 17 * spe10_scale; // 85
 
     // SPE10 grid cell sizes
     mfem::Vector h(3);
@@ -1555,7 +1595,32 @@ EggModel::EggModel(const char* perm_file, int num_ser_ref,
     SetupMesh(perm_file, num_ser_ref, num_par_ref);
     InitGraph();
 
-//    SetupCoeff();
+    if (false)
+    {
+//        std::ifstream flux_file("spe10_1to5_flux_basis_357.vtk");
+        std::string b_id = std::to_string(2017);
+//        std::ifstream flux_file("egg_lvl1_flux_basis_"+b_id+".txt");
+//        mfem::GridFunction flux_basis(sigma_fes_.get());
+//        flux_basis = 0.0;
+//        flux_basis.Load(flux_file, flux_basis.Size());
+
+//        RescaleVector(sigma_sign_change_, flux_basis);
+//        std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
+//        std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
+////        std::ofstream flux_outfile("spe10_1to5_flux_basis_357_ref1.vtk");
+//        std::ofstream flux_outfile("egg_lvl1_flux_basis_"+b_id+"_ref1.vtk");
+//        flux_basis.SaveVTK(flux_outfile, "lvl1_flux_basis_"+b_id+"", 1);
+
+        std::ifstream pot_file("egg_lvl1_potential_"+b_id+".txt");
+        mfem::GridFunction pot_basis(u_fes_.get());
+        pot_basis = 0.0;
+        pot_basis.Load(pot_file, pot_basis.Size());
+        std::ofstream pot_outfile("egg_lvl1_potential_"+b_id+"_ref1.vtk");
+        pot_basis.SaveVTK(pot_outfile, "potential_"+b_id+"", 1);
+    }
+
+
+    SetupCoeff();
 //    ComputeGraphWeight();
 
     {
@@ -1597,6 +1662,11 @@ void EggModel::SetupMesh(const char* perm_file, int num_ser_ref, int num_par_ref
     {
         mesh_->UniformRefinement();
     }
+
+    std::ofstream mesh_file("egg_mesh_ref1.vtk");
+    mesh_->PrintVTK(mesh_file, 1);
+
+
 }
 
 void EggModel::SetupCoeff()
@@ -1614,6 +1684,46 @@ void EggModel::SetupCoeff()
 
     using IPC = InversePermeabilityCoefficient;
     kinv_vector_ = make_unique<IPC>(comm_, "egg_perm.dat", N, N, h);
+
+    mfem::Array<int> vertices;
+    mfem::Vector inv_perm(3), perm_x(mesh_->GetNE()),
+            perm_y(mesh_->GetNE()), perm_z(mesh_->GetNE());
+    for (int i = 0; i < mesh_->GetNE(); ++i)
+    {
+        mesh_->GetElement(i)->GetVertices(vertices);
+        mfem::Vector center(mesh_->Dimension());
+        center = 0.0;
+        for (int index = 0; index < mesh_->Dimension(); ++index)
+        {
+            for (auto& vertex : vertices)
+            {
+                center[index] += mesh_->GetVertex(vertex)[index];
+            }
+            center[index] /= vertices.Size();
+        }
+
+        ((InversePermeabilityCoefficient&)(*kinv_vector_)).InversePermeability(center, inv_perm);
+        perm_x[i] = 1./inv_perm[0];
+        perm_y[i] = 1./inv_perm[1];
+        perm_z[i] = 1./inv_perm[2];
+    }
+
+
+    coeff_gf_.MakeRef(u_fes_.get(), perm_x);
+    std::ofstream coefx_file("egg_perm_x.vtk");
+//    coeff_gf_.Save(coefx_file);
+    coeff_gf_.SaveVTK(coefx_file, "perm_x", 1);
+
+    coeff_gf_.MakeRef(u_fes_.get(), perm_y);
+    std::ofstream coefy_file("egg_perm_y.vtk");
+//    coeff_gf_.Save(coefy_file);
+    coeff_gf_.SaveVTK(coefy_file, "perm_y", 1);
+
+    coeff_gf_.MakeRef(u_fes_.get(), perm_z);
+    std::ofstream coefz_file("egg_perm_z.vtk");
+//    coeff_gf_.Save(coefz_file);
+    coeff_gf_.SaveVTK(coefz_file, "perm_z", 1);
+
 }
 
 // domain = (0, 4000) x (0, 1000) cm

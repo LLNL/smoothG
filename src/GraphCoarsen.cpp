@@ -343,6 +343,43 @@ mfem::SparseMatrix GraphCoarsen::BuildPEdges(bool build_coarse_components)
                     F_potentials.GetColumnReference(nlocal_traces, F_potential);
                     solver.Mult(local_rhs_trace0, local_rhs_trace1, local_sol, F_potential);
 
+////                    if (false && (i == 74 && faces[j] == 233))
+////                    if ((i == 214 && faces[j] == 698))
+//                    if ((i == 257 && faces[j] == 495))
+//                    {
+//                        std::cout<<"hi 257 495 " <<fine_space_.VertexToEDof().NumCols()-5<<"\n" ;
+//                        std::ofstream flux_file("spe10_2d_flux_basis_495.vtk");
+//                        mfem::Vector flux_basis(fine_space_.VertexToEDof().NumCols()-5);
+//                        flux_basis = 0.;
+//                        flux_basis.SetSubVector(local_edofs, local_sol);
+//                        flux_basis.Print(flux_file, 1);
+
+//                        std::ofstream pot_file("spe10_2d_potential_495.vtk");
+//                        mfem::Vector pot_basis(fine_space_.VertexToVDof().NumCols()-1);
+//                        pot_basis = 0.;
+//                        pot_basis.SetSubVector(local_vdofs, F_potential);
+//                        pot_basis *= -1.0;
+//                        pot_basis.Print(pot_file, 1);
+//                    }
+
+//                    if (i == 100 && faces[j] == 357)
+//                    {
+//                        std::cout<<"hi 100 357 " <<fine_space_.VertexToEDof().NumCols()-25<<"\n" ;
+//                        std::ofstream flux_file("spe10_1to5_flux_basis_357.vtk");
+//                        mfem::Vector flux_basis(fine_space_.VertexToEDof().NumCols()-25);
+//                        flux_basis = 0.;
+//                        flux_basis.SetSubVector(local_edofs, local_sol);
+////                        flux_basis.SetSubVector(facefdofs[j], trace);
+//                        flux_basis.Print(flux_file, 1);
+
+////                        std::ofstream pot_file("spe10_1to5_potential_357.vtk");
+////                        mfem::Vector pot_basis(fine_space_.VertexToVDof().NumCols()-1);
+////                        pot_basis = 0.;
+////                        pot_basis.SetSubVector(local_vdofs, F_potential);
+////                        pot_basis *= -1.0;
+////                        pot_basis.Print(pot_file, 1);
+//                    }
+
                     // compute and store diagonal block of coarse M
                     entry_value = DTTraceProduct(DtransferT, F_potentials, nlocal_traces, trace);
                     entry_value -= MtransferT.InnerProduct(local_sol, trace);
