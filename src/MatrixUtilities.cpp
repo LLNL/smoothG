@@ -1486,4 +1486,26 @@ double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2)
     return op2_rand.Norml2() / op1_rand.Norml2();
 }
 
+mfem::SparseMatrix GetEliminatedCols(const mfem::SparseMatrix& A,
+                                     const mfem::Array<int>& cols)
+{
+    mfem::SparseMatrix out(A.NumRows(), A.NumCols());
+    for (auto col : cols)
+    {
+        for (int row = 0; row < A.NumRows(); ++row)
+        {
+            for (int j = A.GetI()[row]; j < A.GetI()[row+1]; ++j)
+            {
+                if (A.GetJ()[j] == col)
+                {
+                    out.Add(row, col, A.GetData()[j]);
+                }
+            }
+        }
+    }
+    out.Finalize();
+    return out;
+}
+
+
 } // namespace smoothg

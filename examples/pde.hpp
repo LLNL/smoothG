@@ -666,6 +666,8 @@ protected:
     mfem::Array<int> block_offsets_;
 
     unique_ptr<mfem::SparseMatrix> vertex_reorder_map_; // for plotting purpose
+
+    mfem::GridFunction well_pos_;
 };
 
 DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)

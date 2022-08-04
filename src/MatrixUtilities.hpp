@@ -504,6 +504,9 @@ mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A);
 
 double OperatorsRelDiff(const mfem::Operator& op1, const mfem::Operator& op2);
 
+mfem::SparseMatrix GetEliminatedCols(const mfem::SparseMatrix& A,
+                                     const mfem::Array<int>& cols);
+
 } // namespace smoothg
 
 #endif /* __MATRIXUTILITIES_HPP__ */

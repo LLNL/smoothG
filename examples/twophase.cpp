@@ -161,8 +161,11 @@ class TwoPhaseHybrid : public HybridSolver
     unique_ptr<mfem::HypreParMatrix> schur22_;
     unique_ptr<mfem::HypreParMatrix> schur33_;
 
+    unique_ptr<mfem::SparseMatrix> A10_elim_;
+
     const std::vector<mfem::DenseMatrix>* dTdsigma_;
     const std::vector<mfem::DenseMatrix>* dMdS_;
+    const mfem::HypreParMatrix* dTdS_;
 
     mutable double resid_norm_;
 
@@ -183,6 +186,9 @@ public:
                         double dt_density_ = 1.0);
 
     void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const override;
+    void DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    void DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    void DebugMult3(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     double GetResidualNorm() const { return resid_norm_; }
 };
 
@@ -1030,8 +1036,8 @@ int main(int argc, char* argv[])
     int num_attr_from_file = 5;
     upscale_param.num_iso_verts = 1; // TODO: this should be read from file
 
-    int num_injectors = 61;
-    int num_producers = 60;
+    int num_injectors = 1; //1; //61
+    int num_producers = 4; //4; //60
 
     // Setting up finite volume discretization problem
     std::string path(problem_dir);
@@ -1043,7 +1049,7 @@ int main(int argc, char* argv[])
     }
     else if (path == "mrst_lognormal")
     {
-        well_height = 30;
+        well_height = 3;
         problem.reset(new MRSTLogNormal(perm_file, well_height, inject_rate, bhp));
         upscale_param.num_iso_verts = num_injectors;
     }
@@ -1110,6 +1116,7 @@ int main(int argc, char* argv[])
 
             num_injectors = 8;
             num_producers = 4;
+            num_attr_from_file = 5;
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel("refined_egg_2x2x2.vtk", 0, 0, ess_attr));
@@ -1124,6 +1131,7 @@ int main(int argc, char* argv[])
             num_injectors = 8;
             num_producers = 4;
             well_height = 7;
+            num_attr_from_file = 5;
 
             ess_attr.SetSize(3, 1);
             problem_for_plot.reset(new EggModel("egg_model.mesh", 0, 0, ess_attr));
@@ -1179,6 +1187,7 @@ int main(int argc, char* argv[])
         }
 
         ess_attr.SetSize(num_attr_from_file, 0);
+        ess_attr = 0;
         ess_attr[0] = 1;
 
         read_from_file = true;
@@ -1254,6 +1263,95 @@ int main(int argc, char* argv[])
     Hierarchy hierarchy(std::move(graph), upscale_param, partition.get(), &ess_attr_final);
     hierarchy.PrintInfo();
 
+    if (false)
+    {
+        auto PsigmaT = smoothg::Transpose(hierarchy.GetPsigma(0));
+        //    PsigmaT.Print();
+
+        mfem::Array<int> coarse_well_flux_dofs;
+        for (int i = 0; i < PsigmaT.NumRows(); ++i)
+        {
+            int* cols = PsigmaT.GetRowColumns(i);
+            for (int j = 0; j < PsigmaT.RowSize(i); ++j)
+            {
+                if (cols[j] >= 59205)
+                {
+                    assert(cols[j] < 59289);
+                    coarse_well_flux_dofs.Append(i);
+                    break;
+                }
+            }
+        }
+        //    coarse_well_flux_dofs.Print();
+
+        mfem::Array<int> dof_part_fine(59289+18561+18561);
+        problem->BlockOffsets().Print();
+        for(int b = 0; b < problem->BlockOffsets().Size()-1; ++b)
+        {
+            for (int i = problem->BlockOffsets()[b]; i < problem->BlockOffsets()[b+1]; ++i)
+            {
+                dof_part_fine[i] = 2*b;
+            }
+        }
+
+        for (int i = problem->BlockOffsets()[1]-7*12; i < problem->BlockOffsets()[1]; ++i)
+        {
+            dof_part_fine[i] = 1;
+        }
+
+        for (int i = problem->BlockOffsets()[2]-num_injectors; i < problem->BlockOffsets()[2]; ++i)
+        {
+            dof_part_fine[i] = 3;
+        }
+
+        std::cout<<"dof_part_fine size = "<<dof_part_fine.Size()<<"\n";
+        std::ofstream dof_part_fine_file("mixed_monolithic_dof_part_fine.txt");
+        dof_part_fine.Print(dof_part_fine_file, 1);
+
+
+        auto& agg_face = hierarchy.GetGraph(1).VertexToEdge();
+        mfem::Array<int> dof_part_coarse(agg_face.NumCols()+2*agg_face.NumRows());
+
+        for (int i = hierarchy.BlockOffsets(1)[0]; i < hierarchy.BlockOffsets(1)[1]; ++i)
+        {
+            dof_part_coarse[i] = 0;
+        }
+        for (int dof : coarse_well_flux_dofs)
+        {
+            dof_part_coarse[dof] = 1;
+        }
+
+        for (int i = hierarchy.BlockOffsets(1)[1]; i < hierarchy.BlockOffsets(1)[2]; ++i)
+        {
+            dof_part_coarse[i] = 2;
+        }
+
+        for (int i = hierarchy.BlockOffsets(1)[2]-num_injectors; i < hierarchy.BlockOffsets(1)[2]; ++i)
+        {
+            dof_part_coarse[i] = 3;
+        }
+
+        for (int i = hierarchy.BlockOffsets(1)[2]; i < hierarchy.BlockOffsets(1)[2]+agg_face.NumRows(); ++i)
+        {
+            dof_part_coarse[i] = 4;
+        }
+
+        std::cout<<"dof_part_coarse size = "<<dof_part_coarse.Size()<<"\n";
+        std::ofstream dof_part_coarse_file("mixed_monolithic_dof_part_coarse.txt");
+//        mfem::Array<int> dof_part_coarse2(4);
+//        dof_part_coarse2 = 8;
+        dof_part_coarse.Print(dof_part_coarse_file, 1);
+    }
+
+
+//    for (int i = agg_face.NumRows()-num_injectors; i < agg_face.NumRows(); ++i)
+//    {
+//        mfem::Array<int> faces;
+//        GetTableRow(agg_face, i, faces);
+//        std::cout<<"agg "<<i<<"\n";
+//        faces.Print(std::cout, faces.Size());
+//    }
+
 
 //=======
 
@@ -1263,14 +1361,16 @@ int main(int argc, char* argv[])
 ////    mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
 
 
-//    for (int level = 1; level < 3; level++)
-//    {
+    for (int level = 1; level < 0; level++)
+    {
 
 
-//    auto agg_face = hierarchy.GetGraph(level).VertexToEdge();
-//    auto face_agg = hierarchy.GetGraph(level).EdgeToVertex();
+    auto agg_face = hierarchy.GetGraph(level).VertexToEdge();
+    auto face_agg = hierarchy.GetGraph(level).EdgeToVertex();
 
-//    auto agg_agg = smoothg::Mult(agg_face, face_agg);
+    auto agg_agg = smoothg::Mult(agg_face, face_agg);
+    mfem::Array<int> colors;
+    GetElementColoring(colors, agg_agg);
 ////    std::cout << "agg connected to injector:\n";
 //    for (int i = 0; i < num_injectors; ++i)
 //    {
@@ -1294,69 +1394,33 @@ int main(int argc, char* argv[])
 ////              << partition->Max()+1 - num_old_parts << "\n";
 ////>>>>>>> Stashed changes
 
-//    mfem::L2_FECollection u_fec(0, problem_for_plot->GetMesh().Dimension());
-//    mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_for_plot->GetMesh()), &u_fec);
+    mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
+    mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
 
-//    auto vert_agg = smoothg::Transpose(hierarchy.GetAggVert(level-1));
+    auto vert_agg = smoothg::Transpose(hierarchy.GetAggVert(level-1));
 
-//    if (level == 2)
-//    {
-//        auto vert_agg_fine = smoothg::Transpose(hierarchy.GetAggVert(level-2));
-//        auto vert_agg_tmp = smoothg::Mult(vert_agg_fine, vert_agg);
-//        vert_agg.Swap(vert_agg_tmp);
-//    }
-
-
-////    mfem::Vector part_vec(partition->Size()-num_injectors);
-//    mfem::GridFunction part_vec(&u_fes);
-//    for (int i = 0; i < part_vec.Size(); ++i)
-//    {
-//        assert(vert_agg.RowSize(i) == 1);
-//        part_vec[i] = vert_agg.GetRowColumns(i)[0];
-//    }
-
-////    std::string tag = "part"+std::to_string(upscale_param.coarse_factor)
-////            +"_lvl"+std::to_string(level);
-////    std::ofstream part_file("egg_"+tag+"_ref1.vtk");
-//////    part_vec.Print(part_file, 1);
-////    part_vec.SaveVTK(part_file, tag, 1);
-
-//    if (level == 1)
-//    {
-//        std::cout << "face connected to agg 483:\n";
-//        for (int j = 0; j < agg_face.RowSize(483); ++j)
-//        {
-//            std::cout << agg_face.GetRowColumns(483)[j] << " ";
-//        }
-//        std::cout << "\n";
-
-//        std::cout << "face connected to agg 522:\n";
-//        for (int j = 0; j < agg_face.RowSize(522); ++j)
-//        {
-//            std::cout << agg_face.GetRowColumns(522)[j] << " ";
-//        }
-//        std::cout << "\n";
-//    }
-//    if (level == 2)
-//    {
-//        std::cout << "face connected to agg 32:\n";
-//        for (int j = 0; j < agg_face.RowSize(32); ++j)
-//        {
-//            std::cout << agg_face.GetRowColumns(32)[j] << " ";
-//        }
-//        std::cout << "\n";
-
-//        std::cout << "face connected to agg 72:\n";
-//        for (int j = 0; j < agg_face.RowSize(72); ++j)
-//        {
-//            std::cout << agg_face.GetRowColumns(72)[j] << " ";
-//        }
-//        std::cout << "\n";
-//    }
-
-//    }
+    if (level == 2)
+    {
+        auto vert_agg_fine = smoothg::Transpose(hierarchy.GetAggVert(level-2));
+        auto vert_agg_tmp = smoothg::Mult(vert_agg_fine, vert_agg);
+        vert_agg.Swap(vert_agg_tmp);
+    }
 
 
+//    mfem::Vector part_vec(partition->Size()-num_injectors);
+    mfem::GridFunction part_vec(&u_fes);
+    for (int i = 0; i < part_vec.Size(); ++i)
+    {
+        assert(vert_agg.RowSize(i) == 1);
+        part_vec[i] = colors[vert_agg.GetRowColumns(i)[0]];
+    }
+
+    std::string tag = "part"+std::to_string(upscale_param.coarse_factor)
+            +"_lvl"+std::to_string(level);
+    std::ofstream part_file("mrst_lognormal_"+tag+"_ref1.vtk");
+//    part_vec.Print(part_file, 1);
+    part_vec.SaveVTK(part_file, tag, 1);
+    }
 
 
 //    auto vert_edge = hierarchy.GetGraph(0).VertexToEdge();
@@ -1508,10 +1572,10 @@ int main(int argc, char* argv[])
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
         initial_value.GetBlock(2) = Mobility::S_min_;
-        for (int i = 0; i < num_injectors; ++i)
-        {
-            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
-        }
+//        for (int i = 0; i < num_injectors; ++i)
+//        {
+//            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
+//        }
 
         mfem::BlockVector sol(initial_value);
 //        if (l == 0)
@@ -2332,7 +2396,7 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         rhs.GetBlock(1) *= (dt * density_);
 //        add(dt * density_, rhs.GetBlock(2), weight_, x.GetBlock(2), rhs.GetBlock(2));
         rhs.GetBlock(2) *= (dt * density_);
-        rhs[rhs.Size()-1] = Mobility::S_max_;
+//        rhs[rhs.Size()-1] = Mobility::S_max_;
         weight_.AddMult(x.GetBlock(2), rhs.GetBlock(2));
 
 //        rhs.GetBlock(2) *= (1. / dt / density_);
@@ -2464,7 +2528,7 @@ CoupledSolver::CoupledSolver(const Hierarchy& hierarchy,
     true_blk_offsets_[2] = true_blk_offsets_[1] + darcy_system.NumVDofs();
     true_blk_offsets_[3] = true_blk_offsets_[2] + S_size;
 
-    gmres_.SetMaxIter(500);
+    gmres_.SetMaxIter(50000);
     gmres_.SetAbsTol(1e-15);
     gmres_.SetRelTol(1e-12);
     gmres_.SetPrintLevel(0);
@@ -2628,6 +2692,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 
     out -= y;
     SetZeroAtMarker(ess_dofs_, out.GetBlock(0));
+//    out[out.Size()-1] = 0.0;
 
     {
         out.GetBlock(0) *= scales_[0];
@@ -2635,7 +2700,18 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
         out.GetBlock(2) *= scales_[2];
     }
 
-    out[out.Size()-1] = 0.0;
+//    std::cout<<"flux constraint residual at injector: " << out.GetBlock(1)[out.BlockSize(1)-1] << "\n";
+
+
+//    out[out.Size()-1] = 0.0;
+
+
+//    {
+//        for (int i = 0; i < 3; ++i )
+//        {
+//            std::cout<<"resid block" << i << ": " << out.GetBlock(i).Norml2() << "\n";
+//        }
+//    }
 
     return out;
 }
@@ -2686,7 +2762,8 @@ void CoupledSolver::Build_dMdS(const MixedMatrix& darcy_system,
         }
         else
         {
-            local_vdofs.SetSize(1, i);
+            local_vdofs.SetSize(1);
+            local_vdofs = i;
         }
         vert[0] = i;
 
@@ -2725,7 +2802,8 @@ mfem::SparseMatrix CoupledSolver::Assemble_dMdS(
         }
         else
         {
-            local_vdofs.SetSize(1, i);
+            local_vdofs.SetSize(1);
+            local_vdofs = i;
         }
         out.AddSubMatrix(local_edofs, local_vdofs, local_dMdS_[i]);
     }
@@ -2957,15 +3035,59 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     dTdS.reset(ToParMatrix(comm_, *dTdS_RAP));
 
 
+    mfem::BlockVector dx2(true_blk_dx);
+    dx2 = 0.0;
+
     const bool use_hybrid_solver = (up_param.hybridization && lowest_order && level_);
-    if (!use_hybrid_solver)
+//    if (!use_hybrid_solver)
     {
         if (lowest_order)
         {
             dTdsigma = ParMult(*Ds_, SparseDiag(std::move(U_FS)), true_edof_starts_);
+
+
+            auto local_dTdsigma = Build_dTdsigma(space, darcy_system_.GetD(), U_FS);
+
+            auto& vert_edof = space.VertexToEDof();
+            mfem::Array<int> local_edofs, local_vdofs(1);
+
+            const int S_size = darcy_system_.GetPWConstProj().NumCols();
+            mfem::SparseMatrix dTdsigma2(S_size, darcy_system_.NumEDofs());
+            for (int i = 0; i < vert_edof.NumRows(); ++i)
+            {
+                GetTableRow(vert_edof, i, local_edofs);
+                local_vdofs = i;
+                dTdsigma2.AddSubMatrix(local_vdofs, local_edofs, local_dTdsigma[i]);
+            }
+            dTdsigma2.Finalize();
+
+
+            dTdsigma2 *= (dt_ * density_);
+            mfem::Vector rand_vec(dTdsigma2.NumCols());
+            rand_vec.Randomize(myid_);
+
+            mfem::Vector dTdsig_rand1(dTdsigma2.NumRows());
+            mfem::Vector dTdsig_rand2(dTdsigma2.NumRows());
+            dTdsig_rand1 = 0.0;
+            dTdsig_rand2 = 0.0;
+
+            dTdsigma->Mult(rand_vec, dTdsig_rand1);
+            dTdsigma2.Mult(rand_vec, dTdsig_rand2);
+
+            auto Check = [&](mfem::Vector & v, mfem::Vector & u, std::string op)
+            {
+                v -= u;
+                double diff = mfem::ParNormlp(v, 2, comm_) / mfem::ParNormlp(u, 2, comm_);
+                if (diff > 1e-10 && myid_ == 0)
+                {
+                    std::cerr << "\nWarning: || " << op << " || = " << diff << " !!!\n";
+                }
+            };
+            Check(dTdsig_rand1, dTdsig_rand2, "dTdsig1 - dTdsig2");
+
         }
 
-//        if (false)
+        if (false)
         {
             mfem::SparseMatrix diag;
             dTdsigma->GetDiag(diag);
@@ -3000,7 +3122,8 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        auto pfix = ToParMatrix(comm_, std::move(fix));
 //        op.SetBlock(1, 1, pfix);
 
-        const bool use_direct_solver = !lowest_order;
+
+        const bool use_direct_solver = true;//!lowest_order;
         const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)
@@ -3030,13 +3153,13 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
                       << " iterations, residual = " << gmres_.GetFinalNorm() << "\n";
         }
     }
-    else
+//    else
     {
         *dTdS *= (1. / dt_ / density_);
         true_blk_resid.GetBlock(0) *= (dt_ * density_);
         true_blk_resid.GetBlock(1) /= (dt_ * density_);
         true_blk_resid.GetBlock(2) /= (dt_ * density_);
-        HybridSolve(*dTdS, U_FS, blk_x.GetBlock(0), S, true_blk_resid, true_blk_dx);
+        HybridSolve(*dTdS, U_FS, blk_x.GetBlock(0), S, true_blk_resid, dx2);
     }
 
     mfem::BlockVector blk_dx(dx.GetData(), blk_offsets_);
@@ -3045,6 +3168,23 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     dof_truedof.Mult(true_blk_dx.GetBlock(0), blk_dx.GetBlock(0));
     blk_dx.GetBlock(1) = true_blk_dx.GetBlock(1);
     blk_dx.GetBlock(2) = true_blk_dx.GetBlock(2);
+
+
+    dx2 -= blk_dx;
+//    dx2.GetBlock(1)[dx2.BlockSize(1)-1] = 0.0;
+
+//    dx2.GetBlock(0).Print();
+    for (int i = 0; i < 3; ++i )
+    {
+        std::cout << "x diff block" << i << ": "
+                  << dx2.GetBlock(i).Norml2() / blk_dx.GetBlock(i).Norml2() << "\n";
+    }
+
+//    mfem::socketstream vis;
+//    problem_ptr->VisSetup(vis, dx2.GetBlock(1), 0.0, 0.0, "hybrid_sol");
+//    mfem::socketstream vis2;
+//    problem_ptr->VisSetup(vis2, blk_dx.GetBlock(1), 0.0, 0.0, "primal_sol");
+
 
 //    const MixedMatrix& darcy_system_s = level_ ? hierarchy_.GetMatrix(level_-1) : darcy_system_;
     const mfem::Vector dS = PWConstProject(darcy_system_, blk_dx.GetBlock(2));
@@ -3118,12 +3258,70 @@ void CoupledSolver::MixedSolve(const mfem::BlockOperator& op,
 
     unique_ptr<mfem::SparseMatrix> mono_op = BlockGetDiag(op);
     unique_ptr<mfem::HypreParMatrix> par_mono_op(ToParMatrix(comm_, *mono_op));
+
+
+//    mfem::Array<int> new_offsets(6);
+//    new_offsets[0] = 0;
+//    new_offsets[3] = true_resid.GetBlock(1).Size() - 8;
+//    new_offsets[4] = 8;
+//    new_offsets[5] = true_resid.GetBlock(2).Size();
+
+//    if (prec.NumRows() > 10000)
+//    {
+//        int err = hypre_ParCSRMatrixPrint(*par_mono_op, "mixed_monolithic_fine_A");
+//        hypre_ParCSRMatrix* test = hypre_ParCSRMatrixRead(comm_, "mixed_monolithic_fine_A");
+//        assert(err == 0);
+////        par_mono_op.reset(new mfem::HypreParMatrix(test));
+//        mfem::HypreParVector par_resid(comm_, par_mono_op->N(), true_resid.GetData(), par_mono_op->RowPart());
+//        err = hypre_ParVectorPrint(par_resid, "mixed_monolithic_fine_rhs");
+//        hypre_ParVector* test_rhs = hypre_ParVectorRead(comm_, "mixed_monolithic_fine_rhs");
+//        assert(err == 0);
+
+
+//        new_offsets[1] = true_blk_offsets_[1] - 7*12;
+//        new_offsets[2] = 7*12;
+//        new_offsets.PartialSum();
+
+//        std::ofstream offset_file("mixed_monolithic_fine_offsets");
+//        new_offsets.Print(offset_file, 1);
+//    }
+//    else
+//    {
+//        int err = hypre_ParCSRMatrixPrint(*par_mono_op, "mixed_monolithic_coarse_A");
+//        hypre_ParCSRMatrix* test = hypre_ParCSRMatrixRead(comm_, "mixed_monolithic_coarse_A");
+//        assert(err == 0);
+////        par_mono_op.reset(new mfem::HypreParMatrix(test));
+//        mfem::HypreParVector par_resid(comm_, par_mono_op->N(), true_resid.GetData(), par_mono_op->RowPart());
+//        err = hypre_ParVectorPrint(par_resid, "mixed_monolithic_coarse_rhs");
+//        hypre_ParVector* test_rhs = hypre_ParVectorRead(comm_, "mixed_monolithic_coarse_rhs");
+//        assert(err == 0);
+
+//        new_offsets[1] = true_blk_offsets_[1] - 7*12;
+//        new_offsets[2] = 7*12;
+//        new_offsets.PartialSum();
+//        std::ofstream offset_file("mixed_monolithic_coarse_offsets");
+//        new_offsets.Print(offset_file, 1);
+//    }
+
+
     HypreILU ILU_smoother(*par_mono_op, 0); // equiv to Euclid
     TwoStageSolver prec_prod(prec, ILU_smoother, op);
 
     gmres_.SetOperator(op);
     gmres_.SetPreconditioner(prec_prod);
     gmres_.Mult(true_resid, true_dx);
+
+
+
+    if (false)
+    {
+        mfem::Vector sol_debug(true_dx);
+        mfem::UMFPackSolver solver_debug(*mono_op);
+        solver_debug.Mult(true_resid, sol_debug);
+        sol_debug -= true_dx;
+        std::cout <<"mixed sol diff = "<<sol_debug.Norml2() / true_dx.Norml2() << "\n";
+    }
+
 
     for (int j = 1; j < schur.NumCols(); ++j)
     {
@@ -3142,14 +3340,15 @@ void CoupledSolver::HybridSolve(const mfem::HypreParMatrix& dTdS, const mfem::Ve
 
     auto& space = darcy_system_.GetGraphSpace();
     auto& D = darcy_system_.GetD();
-//    auto local_dTdsigma = Build_dTdsigma(space, D, flux, FractionalFlow(S));
-//    auto local_dTdsigma = Build_dTdsigma(space, micro_upwind_flux_, D, flux, FractionalFlow(S));
+//    auto local_dTdsigma = Build_dTdsigma(space, D, flux, Mobility::FractionalFlow(S));
+//    auto local_dTdsigma = Build_dTdsigma(space, micro_upwind_flux_, D, flux, Mobility::FractionalFlow(S));
     auto local_dTdsigma = Build_dTdsigma(space, D, U_FS);
 
     TwoPhaseHybrid solver(darcy_system_, &ess_attr_);
     auto tot_mob = Mobility::TotalMobility(S);
     solver.AssembleSolver(tot_mob, local_dMdS_, local_dTdsigma, dTdS);
 
+    true_dx.GetBlock(2) = tot_mob;
     solver.Mult(true_resid, true_dx);
     linear_iter_ += solver.GetNumIterations();
     if (!myid_ && param_.print_level > 1)
@@ -3440,8 +3639,8 @@ void TwoPhaseHybrid::Init()
     }
 
     solver_ = InitKrylovSolver(KrylovMethod::GMRES);
-    solver_->SetAbsTol(1e-10);
-    solver_->SetRelTol(1e-8);
+    solver_->SetAbsTol(1e-15);
+    solver_->SetRelTol(1e-12);
 }
 
 void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
@@ -3508,6 +3707,7 @@ void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
     auto Scale = VectorToMatrix(diagonal_scaling_);
     mfem::HypreParMatrix pScale(comm_, H_->N(), H_->GetColStarts(), &Scale);
 
+    A10_elim_.reset(new mfem::SparseMatrix(GetEliminatedCols(A10, ess_true_multipliers_)));
     for (auto mult : ess_true_multipliers_)
     {
         A01.EliminateRow(mult);
@@ -3544,6 +3744,7 @@ void TwoPhaseHybrid::AssembleSolver(mfem::Vector elem_scaling_inverse,
 
     dTdsigma_ = &dTdsigma;
     dMdS_ = &dMdS;
+    dTdS_ = &dTdS;
 }
 
 mfem::BlockVector TwoPhaseHybrid::MakeHybridRHS(const mfem::BlockVector& rhs) const
@@ -3658,11 +3859,764 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
 {
     mfem::BlockVector sol_hb(offsets_);
     sol_hb = 0.0;
-    const mfem::BlockVector rhs_hb = MakeHybridRHS(rhs);
+
+    mfem::BlockVector rhs_copy(rhs);
+    for (int m = 0; m < ess_true_multipliers_.Size(); ++m)
+    {
+        sol_hb(ess_true_multipliers_[m]) = -rhs(ess_true_mult_to_edof_[m]);
+        rhs_copy(ess_true_mult_to_edof_[m]) = 0.0;
+    }
+
+    mfem::BlockVector rhs_hb = MakeHybridRHS(rhs_copy);
+
+    H_elim_->Mult(-1.0, sol_hb.GetBlock(0), 1.0, rhs_hb.GetBlock(0));
+    A10_elim_->AddMult(sol_hb.GetBlock(0), rhs_hb.GetBlock(1), -1.0);
+
+    for (int ess_true_mult : const_cast<mfem::Array<int>&>(ess_true_multipliers_))
+    {
+        rhs_hb(ess_true_mult) = sol_hb(ess_true_mult);
+    }
+
     solver_->Mult(rhs_hb, sol_hb);
-    BackSubstitute(rhs, sol_hb, sol);
+    BackSubstitute(rhs_copy, sol_hb, sol);
     num_iterations_ = solver_->GetNumIterations();
     resid_norm_ = solver_->GetFinalNorm();
+}
+
+void TwoPhaseHybrid::DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
+{
+    int num_hatdofs = mgL_.GetGraphSpace().VertexToEDof().NumNonZeroElems();
+
+    mfem::Array<int> bos(5);
+    bos[0] = 0;
+    bos[1] = bos[0] + num_hatdofs;
+    bos[2] = bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+    bos[3] = bos[2] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+    bos[4] = bos[3] + multiplier_d_td_->NumCols();
+
+    auto& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
+    auto& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL_.GetMBuilder()));
+    auto M_el = mbuilder->GetElementMatrices();
+
+    mfem::Vector rhs_blk0(rhs.GetBlock(0));
+//    for (int m = 0; m < ess_true_multipliers_.Size(); ++m)
+//    {
+//        rhs_blk0(ess_true_mult_to_edof_[m]) = 0.0;
+//    }
+
+    mfem::BlockVector rhs_debug(bos), sol_debug(bos);
+    mfem::Vector helper;
+
+    mfem::Array<int> local_edofs, local_vdofs, local_mult, local_hat;
+    mfem::Array<int> ess_hat(num_hatdofs);
+    ess_hat = 0;
+
+    mfem::SparseMatrix M_hat(num_hatdofs, num_hatdofs);
+    mfem::SparseMatrix dTdsigma_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix dMdS_hat(num_hatdofs, mgL_.NumVDofs());
+    mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
+
+    mfem::DenseMatrix DenseDloc, DenseCloc;
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        GetTableRow(vert_vdof, i, local_vdofs);
+        GetTableRow(Agg_multiplier_, i, local_mult);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        auto Dloc = ExtractRowAndColumns(mgL_.GetD(), local_vdofs, local_edofs);
+        Full(Dloc, DenseDloc);
+        Full(C_[i], DenseCloc);
+
+        mfem::DenseMatrix M_el_i(M_el[i]);
+        M_el_i *= (1.0 / sol.GetBlock(2)[i]);
+        M_hat.AddSubMatrix(local_hat, local_hat, M_el_i);
+        dTdsigma_hat.AddSubMatrix(local_vdofs, local_hat, (*dTdsigma_)[i]);
+        dMdS_hat.AddSubMatrix(local_hat, local_vdofs, (*dMdS_)[i]);
+        D_hat.AddSubMatrix(local_vdofs, local_hat, DenseDloc);
+        C_hat.AddSubMatrix(local_mult, local_hat, DenseCloc);
+
+        rhs_blk0.GetSubVector(local_edofs, helper);
+
+        for (int j =0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+
+
+        rhs_debug.GetBlock(0).SetSubVector(local_hat, helper);
+
+        for (int j =0; j < local_edofs.Size(); ++j)
+        {
+            if (ess_edofs_[local_edofs[j]])
+            {
+                ess_hat[local_hat[j]] = 1;
+                assert(rhs_debug[local_hat[j]] == 0.0);
+            }
+        }
+    }
+    M_hat.Finalize();
+    dTdsigma_hat.Finalize();
+    dMdS_hat.Finalize();
+    D_hat.Finalize();
+    C_hat.Finalize();
+
+
+
+    rhs_debug.GetBlock(3) = 0.0;
+    mfem::SparseMatrix mult_I(mgL_.NumEDofs(), mgL_.NumEDofs());
+    for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
+    {
+        C_hat.EliminateRow(ess_true_multipliers_[j]);
+        mult_I.Add(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+        rhs_debug.GetBlock(3)[ess_true_multipliers_[j]] = -rhs(ess_true_mult_to_edof_[j]);
+    }
+
+    mfem::SparseMatrix CT_hat = smoothg::Transpose(C_hat);
+
+//    for (int j =0; j < ess_edofs_.Size(); ++j)
+//    {
+//        if (ess_edofs_[j]) { mult_I.Add(j, j, 1.0); }
+//    }
+    mult_I.Finalize();
+
+    mfem::SparseMatrix DT_hat = smoothg::Transpose(D_hat);
+    mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
+
+
+    double dt_den = 8.85773e7;
+
+//    M_hat *= 1./dt_den;
+//    DT_hat *= 1./dt_den;
+//    CT_hat *= 1./dt_den;
+//    dMdS_hat *= 1./dt_den;
+//    rhs_debug.GetBlock(0) *= 1./dt_den;
+
+//    D_hat *= dt_den;
+//    C_hat *= dt_den;
+//    dTdS *= dt_den;
+//    dTdsigma_hat *= dt_den;
+//    mult_I *= dt_den;
+
+    mfem::BlockMatrix op_debug(bos);
+    op_debug.SetBlock(0, 0, &M_hat);
+    op_debug.SetBlock(1, 0, &D_hat);
+    op_debug.SetBlock(0, 1, &DT_hat);
+    op_debug.SetBlock(2, 0, &dTdsigma_hat);
+    op_debug.SetBlock(0, 2, &dMdS_hat);
+    op_debug.SetBlock(3, 0, &C_hat);
+    op_debug.SetBlock(0, 3, &CT_hat);
+    op_debug.SetBlock(2, 2, &dTdS);
+    op_debug.SetBlock(3, 3, &mult_I);
+
+    unique_ptr<mfem::SparseMatrix> op_debug_sp(op_debug.CreateMonolithic());
+
+    rhs_debug.GetBlock(1) = rhs.GetBlock(1);
+    rhs_debug.GetBlock(2) = rhs.GetBlock(2);
+
+
+
+//    rhs_debug.GetBlock(1) *= dt_den;
+//    rhs_debug.GetBlock(2) *= dt_den;
+//    rhs_debug.GetBlock(3) *= dt_den;
+
+
+    sol_debug = 0.0;
+//    for (int j =0; j < ess_hat.Size(); ++j)
+//    {
+//        if (ess_hat[j])
+//        {
+//            op_debug_sp->EliminateRowCol(j, mfem::Matrix::DIAG_KEEP);
+//        }
+//    }
+
+//    op_debug_sp->EliminateRowCol(op_debug_sp->NumCols()-1, mfem::Matrix::DIAG_KEEP);
+
+//    mfem::UMFPackSolver solver_debug(*op_debug_sp);
+//    solver_debug.Mult(rhs_debug, sol_debug);
+
+//    std::cout <<"|| M_hat || = "<<FrobeniusNorm(M_hat) << "\n";
+//    std::cout <<"|| dTdS || = "<<FrobeniusNorm(dTdS) << "\n";
+
+//    std::ofstream  op_file("hb_block_mat_1_perf.txt");
+//    op_debug_sp->PrintMatlab(op_file);
+
+//    D_hat.Print();
+
+    mfem::GMRESSolver solver_debug(comm_);
+    solver_debug.SetOperator(*op_debug_sp);
+    solver_debug.SetMaxIter(50000);
+    solver_debug.SetRelTol(1e-15);
+//    solver_debug.SetAbsTol(1e-18);
+
+    std::unique_ptr<mfem::HypreParMatrix> op_par(ToParMatrix(comm_, *op_debug_sp));
+    HypreILU prec_debug(*op_par);
+    solver_debug.SetPreconditioner(prec_debug);
+
+    mfem::BlockVector sol_hb2(sol_debug);
+    sol_hb2 = 0.0;
+    solver_debug.Mult(rhs_debug,  sol_hb2 );
+//sol_hb2.GetBlock(1).Print();
+
+    std::cout <<"flux sol = "<<sol_hb2[2187]<<" "<<sol_hb2[2186]<<" "<<sol_hb2[2185] << "\n";
+
+
+    mfem::UMFPackSolver solver_debug2(*op_debug_sp);
+    solver_debug2.Mult(rhs_debug, sol_debug );
+//    sol_debug.GetBlock(1).Print();
+
+    std::cout <<"flux sol2 = "<<sol_debug[2187]<<" "<<sol_debug[2186]<<" "<<sol_debug[2185] << "\n";
+
+    mfem::BlockVector resid_debug(rhs_debug);
+    resid_debug = 0.0;
+    op_debug_sp->Mult(sol_hb2, resid_debug);
+    resid_debug -= rhs_debug;
+
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(0).Norml2() / rhs_debug.GetBlock(0).Norml2() << "\n";
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(1).Norml2() / rhs_debug.GetBlock(1).Norml2() << "\n";
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(2).Norml2() / rhs_debug.GetBlock(2).Norml2() << "\n";
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(3).Norml2() / rhs_debug.GetBlock(3).Norml2() << "\n";
+    std::cout <<"hb rhs = "<< rhs_debug.GetBlock(3).Norml2() << "\n";
+
+
+
+    sol_hb2 -= sol_debug;
+    std::cout <<"hb sol diff = "<<sol_hb2.GetBlock(0).Norml2() / sol_debug.GetBlock(0).Norml2() << "\n";
+    std::cout <<"hb sol diff = "<<sol_hb2.GetBlock(1).Norml2() / sol_debug.GetBlock(1).Norml2() << "\n";
+    std::cout <<"hb sol diff = "<<sol_hb2.GetBlock(2).Norml2() / sol_debug.GetBlock(2).Norml2() << "\n";
+    std::cout <<"hb sol diff = "<<sol_hb2.GetBlock(3).Norml2() / sol_debug.GetBlock(3).Norml2() << "\n";
+    std::cout <<"gmres iter = "<<solver_debug.GetNumIterations() << "\n";
+
+
+    resid_debug = 0.0;
+    op_debug_sp->Mult(sol_debug, resid_debug);
+    resid_debug -= rhs_debug;
+
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(0).Norml2() / rhs_debug.GetBlock(0).Norml2() << "\n";
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(1).Norml2() / rhs_debug.GetBlock(1).Norml2() << "\n";
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(2).Norml2() / rhs_debug.GetBlock(2).Norml2() << "\n";
+    std::cout <<"hb resid = "<<resid_debug.GetBlock(3).Norml2() / rhs_debug.GetBlock(3).Norml2() << "\n";
+
+
+
+    sol = 0.0;
+    sol.GetBlock(1) = sol_debug.GetBlock(1);
+    sol.GetBlock(2) = sol_debug.GetBlock(2);
+
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        sol_debug.GetSubVector(local_hat, helper);
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+        sol.AddElementVector(local_edofs, helper);
+    }
+}
+
+void TwoPhaseHybrid::DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
+{
+    int num_hatdofs = mgL_.GetGraphSpace().VertexToEDof().NumNonZeroElems();
+
+    mfem::Array<int> bos(3), darcy_bos(3);
+    bos[0] = 0;
+    bos[1] = bos[0] + multiplier_d_td_->NumCols();
+    bos[2] = bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+
+    darcy_bos[0] = 0;
+    darcy_bos[1] = darcy_bos[0] + num_hatdofs;
+    darcy_bos[2] = darcy_bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+
+    auto& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
+    auto& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL_.GetMBuilder()));
+    auto M_el = mbuilder->GetElementMatrices();
+
+
+    mfem::BlockVector sol_hb(offsets_);
+    sol_hb = 0.0;
+
+    mfem::BlockVector rhs_copy(rhs);
+    for (int m = 0; m < ess_true_multipliers_.Size(); ++m)
+    {
+        sol_hb(ess_true_multipliers_[m]) = -rhs(ess_true_mult_to_edof_[m]);
+        rhs_copy(ess_true_mult_to_edof_[m]) = 0.0;
+    }
+
+
+    mfem::BlockVector darcy_rhs(darcy_bos), rhs_debug(bos), sol_debug(bos);
+    mfem::Vector helper;
+
+    mfem::Array<int> local_edofs, local_vdofs, local_mult, local_hat, local_ddofs;
+    mfem::Array<int> ess_hat(num_hatdofs);
+    ess_hat = 0;
+
+    mfem::SparseMatrix M_hat(num_hatdofs, num_hatdofs);
+    mfem::SparseMatrix dTdsigma_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix dMdS_hat(num_hatdofs, mgL_.NumVDofs());
+    mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
+    mfem::SparseMatrix darcy_hat_inv(num_hatdofs+D_hat.NumRows());
+
+    mfem::DenseMatrix DenseDloc, DenseCloc;
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        GetTableRow(vert_vdof, i, local_vdofs);
+        GetTableRow(Agg_multiplier_, i, local_mult);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        auto Dloc = ExtractRowAndColumns(mgL_.GetD(), local_vdofs, local_edofs);
+        Full(Dloc, DenseDloc);
+        Full(C_[i], DenseCloc);
+
+        mfem::DenseMatrix M_el_i(M_el[i]);
+        M_el_i *= (1.0 / sol.GetBlock(2)[i]);
+//        M_hat.AddSubMatrix(local_hat, local_hat, M_el_i);
+        dTdsigma_hat.AddSubMatrix(local_vdofs, local_hat, (*dTdsigma_)[i]);
+        dMdS_hat.AddSubMatrix(local_hat, local_vdofs, (*dMdS_)[i]);
+//        D_hat.AddSubMatrix(local_vdofs, local_hat, DenseDloc);
+        C_hat.AddSubMatrix(local_mult, local_hat, DenseCloc);
+
+
+        local_hat.Copy(local_ddofs);
+        local_ddofs.Append(local_vdofs);
+        for (int j = local_edofs.Size(); j < local_ddofs.Size(); ++j)
+        {
+            local_ddofs[j] = local_ddofs[j] + num_hatdofs;
+        }
+
+        mfem::DenseMatrix darcy_el(DenseDloc.NumCols() + DenseDloc.NumRows());
+        darcy_el.CopyMN(M_el_i, 0, 0);
+        darcy_el.CopyMN(DenseDloc, DenseDloc.NumCols(), 0);
+        darcy_el.CopyMNt(DenseDloc, 0, DenseDloc.NumCols());
+
+        mfem::DenseMatrixInverse darcy_el_solver(darcy_el);
+        mfem::DenseMatrix darcy_el_inv;
+        darcy_el_solver.GetInverseMatrix(darcy_el_inv);
+
+        darcy_hat_inv.AddSubMatrix(local_ddofs, local_ddofs, darcy_el_inv);
+
+
+
+        rhs_copy.GetSubVector(local_edofs, helper);
+
+        for (int j =0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+        darcy_rhs.GetBlock(0).SetSubVector(local_hat, helper);
+
+//        for (int j =0; j < local_edofs.Size(); ++j)
+//        {
+//            if (ess_edofs_[local_edofs[j]])
+//            {
+//                ess_hat[local_hat[j]] = 1;
+////                assert(rhs_debug[local_hat[j]] == 0.0);
+//            }
+//        }
+    }
+//    M_hat.Finalize();
+    dTdsigma_hat.Finalize();
+    dMdS_hat.Finalize();
+//    D_hat.Finalize();
+    C_hat.Finalize();
+    darcy_hat_inv.Finalize();
+
+    mfem::SparseMatrix CT_hat = smoothg::Transpose(C_hat);
+//    mfem::SparseMatrix DT_hat = smoothg::Transpose(D_hat);
+
+//    mfem::BlockMatrix darcy_debug(darcy_bos);
+//    darcy_debug.SetBlock(0, 0, &M_hat);
+//    darcy_debug.SetBlock(1, 0, &D_hat);
+//    darcy_debug.SetBlock(0, 1, &DT_hat);
+
+    mfem::BlockMatrix left_op(bos, darcy_bos);
+    left_op.SetBlock(0, 0, &C_hat);
+    left_op.SetBlock(1, 0, &dTdsigma_hat);
+    unique_ptr<mfem::SparseMatrix> left_sp(left_op.CreateMonolithic());
+
+    mfem::BlockMatrix right_op(darcy_bos, bos);
+    right_op.SetBlock(0, 0, &CT_hat);
+    right_op.SetBlock(0, 1, &dMdS_hat);
+
+//    mfem::DenseMatrix op_tmp;
+//    {
+//        {
+//            mfem::DenseMatrix right_tmp, right_dense;
+            unique_ptr<mfem::SparseMatrix> right_sp(right_op.CreateMonolithic());
+//            Full(*right_sp, right_dense);
+
+//            unique_ptr<mfem::SparseMatrix> darcy_sp(darcy_debug.CreateMonolithic());
+//            mfem::UMFPackSolver darcy_inv(*darcy_sp);
+//            right_tmp = smoothg::Mult(darcy_inv, right_dense);
+//            op_tmp = smoothg::Mult(left_op, right_tmp);
+//        }
+//        {
+//            mfem::DenseMatrix dtds_dense;
+            mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
+            mfem::BlockMatrix dtds_op(bos, bos);
+            dtds_op.SetBlock(1, 1, &dTdS);
+            unique_ptr<mfem::SparseMatrix> dtds_sp(dtds_op.CreateMonolithic());
+//            Full(*dtds_sp, dtds_dense);
+//            op_tmp -= dtds_dense;
+//        }
+//    }
+
+//    mfem::DenseMatrix op_elim(op_tmp);
+//    op_elim = 0.0;
+//    for (int j =0; j < ess_true_multipliers_.Size(); ++j)
+//    {
+//        for (int i = 0; i < op_tmp.NumRows(); ++i)
+//        {
+//            if (i != ess_true_multipliers_[j])
+//            {
+//                op_elim(i, ess_true_multipliers_[j]) = op_tmp(i, ess_true_multipliers_[j]);
+//            }
+//            op_tmp(i, ess_true_multipliers_[j]) = 0.0;
+//        }
+//        for (int i = 0; i < op_tmp.NumCols(); ++i)
+//        {
+//            op_tmp(ess_true_multipliers_[j], i) = 0.0;
+//        }
+//        op_tmp(ess_true_multipliers_[j], ess_true_multipliers_[j]) = 1.0;
+//    }
+
+//    for (int i = 0; i < op_tmp.NumRows(); ++i)
+//    {
+//        op_tmp(i, op_tmp.NumRows()-1) = 0.0;
+//    }
+//    for (int i = 0; i < op_tmp.NumCols(); ++i)
+//    {
+//        op_tmp(op_tmp.NumRows()-1, i) = 0.0;
+//    }
+//    op_tmp(op_tmp.NumRows()-1, op_tmp.NumRows()-1) = 1.0;
+
+    auto left_tmp = smoothg::Mult(*left_sp, darcy_hat_inv);
+    auto op_tmp = smoothg::Mult(left_tmp, *right_sp);
+
+    unique_ptr<mfem::SparseMatrix> op_debug(mfem::Add(1.0, op_tmp, -1.0, *dtds_sp));
+
+//    mfem::DenseMatrix mono_mat_dense;
+//    Full(*mono_mat_, mono_mat_dense);
+//    mono_mat_dense -= op_tmp;
+
+//    for (int r = 0; r < mono_mat_->NumRows(); ++r)
+//    {
+//        for (int c_ptr = mono_mat_->GetI()[r]; c_ptr < mono_mat_->GetI()[r+1]; ++c_ptr)
+//        {
+//            mono_mat_->GetData()[c_ptr] -= op_tmp(r, mono_mat_->GetJ()[c_ptr]);
+//        }
+//    }
+
+//    auto mono_mat_fix_small = DropSmall(*mono_mat_);
+//    mono_mat_fix_small.Print();
+////    mono_mat_->Print();
+//    std::cout << "op_diff = " << FrobeniusNorm(*mono_mat_) / op_tmp.FNorm() << "\n";
+//    std::cout << "diff_nnz = " << mono_mat_fix_small.NumNonZeroElems()<<"\n";
+//return;
+//    std::cout<<"op_diff = " << mono_mat_dense.FNorm()<<"\n";
+
+
+    mfem::SparseMatrix op_elim = GetEliminatedCols(*op_debug, ess_true_multipliers_);
+
+    for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
+    {
+        assert((*op_debug)(ess_true_multipliers_[j], ess_true_multipliers_[j]) != 0.0);
+//        op_debug->EliminateRowCol(ess_true_multipliers_[j]);
+        op_debug->EliminateRow(ess_true_multipliers_[j]);
+        op_debug->EliminateCol(ess_true_multipliers_[j]);
+        op_debug->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+    }
+
+//    unique_ptr<mfem::SparseMatrix> op_diff(mfem::Add(1.0, *op_debug, -1.0, *mono_mat_));
+//    op_diff->Print();
+//    std::cout<<"op_diff = " << FrobeniusNorm(*op_diff) / FrobeniusNorm(*op_debug) <<"\n";
+
+//    auto op_diff_small = DropSmall(*op_diff);
+//    std::cout << "diff_nnz = " << op_diff_small.NumNonZeroElems()<<"\n";
+
+//    return;
+
+
+
+    darcy_rhs.GetBlock(1) = rhs_copy.GetBlock(1);
+
+//    mfem::BlockVector rhs_hb = MakeHybridRHS(rhs_copy);
+
+    rhs_debug.GetBlock(0) = 0.0;
+    rhs_debug.GetBlock(1).Set(-1.0, rhs_copy.GetBlock(2));
+
+    left_tmp.AddMult(darcy_rhs, rhs_debug);
+
+
+
+    op_elim.AddMult(sol_hb, rhs_debug, -1.0);
+
+    for (int ess_true_mult : const_cast<mfem::Array<int>&>(ess_true_multipliers_))
+    {
+        rhs_debug(ess_true_mult) = sol_hb(ess_true_mult);
+    }
+
+    mfem::UMFPackSolver solver_debug(*op_debug);
+//    mfem::DenseMatrixInverse solver_debug(op_tmp);
+//    mfem::DenseMatrix solver_debug;
+//    solver_debug_tmp.GetInverseMatrix(solver_debug);
+    solver_debug.Mult(rhs_debug, sol_hb);
+
+//    solver_->Mult(rhs_hb, sol_hb);
+    BackSubstitute(rhs_copy, sol_hb, sol);
+    num_iterations_ = solver_->GetNumIterations();
+    resid_norm_ = solver_->GetFinalNorm();
+}
+
+void TwoPhaseHybrid::DebugMult3(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
+{
+    int num_hatdofs = mgL_.GetGraphSpace().VertexToEDof().NumNonZeroElems();
+
+    mfem::Array<int> bos(3), darcy_bos(3);
+    bos[0] = 0;
+    bos[1] = bos[0] + multiplier_d_td_->NumCols();
+    bos[2] = bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+
+    darcy_bos[0] = 0;
+    darcy_bos[1] = darcy_bos[0] + num_hatdofs;
+    darcy_bos[2] = darcy_bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+
+    auto& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
+    auto& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL_.GetMBuilder()));
+    auto M_el = mbuilder->GetElementMatrices();
+
+
+    mfem::BlockVector sol_hb(offsets_);
+    sol_hb = 0.0;
+
+    mfem::BlockVector darcy_rhs(darcy_bos), rhs_debug(bos);
+    mfem::Vector helper;
+
+    mfem::Array<int> local_edofs, local_vdofs, local_mult, local_hat, local_ddofs;
+    mfem::Array<int> ess_hat(num_hatdofs);
+    ess_hat = 0;
+
+//    mfem::SparseMatrix M_hat(num_hatdofs, num_hatdofs);
+    mfem::SparseMatrix dTdsigma_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix dMdS_hat(num_hatdofs, mgL_.NumVDofs());
+//    mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
+    mfem::SparseMatrix darcy_hat_inv(num_hatdofs+mgL_.NumVDofs());
+
+    mfem::DenseMatrix DenseDloc, DenseCloc;
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        GetTableRow(vert_vdof, i, local_vdofs);
+        GetTableRow(Agg_multiplier_, i, local_mult);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        auto Dloc = ExtractRowAndColumns(mgL_.GetD(), local_vdofs, local_edofs);
+        Full(Dloc, DenseDloc);
+        Full(C_[i], DenseCloc);
+
+        mfem::DenseMatrix M_el_i(M_el[i]);
+        M_el_i *= (1.0 / sol.GetBlock(2)[i]);
+        dTdsigma_hat.AddSubMatrix(local_vdofs, local_hat, (*dTdsigma_)[i]);
+        dMdS_hat.AddSubMatrix(local_hat, local_vdofs, (*dMdS_)[i]);
+        C_hat.AddSubMatrix(local_mult, local_hat, DenseCloc);
+
+
+//        D_hat.AddSubMatrix(local_vdofs, local_hat, DenseDloc);
+//        M_hat.AddSubMatrix(local_hat, local_hat, M_el_i);
+
+
+        local_hat.Copy(local_ddofs);
+        local_ddofs.Append(local_vdofs);
+        for (int j = local_edofs.Size(); j < local_ddofs.Size(); ++j)
+        {
+            local_ddofs[j] = local_ddofs[j] + num_hatdofs;
+        }
+
+        mfem::DenseMatrix darcy_el(DenseDloc.NumCols() + DenseDloc.NumRows());
+        darcy_el.CopyMN(M_el_i, 0, 0);
+        darcy_el.CopyMN(DenseDloc, DenseDloc.NumCols(), 0);
+        darcy_el.CopyMNt(DenseDloc, 0, DenseDloc.NumCols());
+
+        mfem::DenseMatrixInverse darcy_el_solver(darcy_el);
+        mfem::DenseMatrix darcy_el_inv;
+        darcy_el_solver.GetInverseMatrix(darcy_el_inv);
+
+        darcy_hat_inv.AddSubMatrix(local_ddofs, local_ddofs, darcy_el_inv);
+
+
+
+        rhs.GetSubVector(local_edofs, helper);
+
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+        darcy_rhs.GetBlock(0).SetSubVector(local_hat, helper);
+
+    }
+    dTdsigma_hat.Finalize();
+    dMdS_hat.Finalize();
+    C_hat.Finalize();
+    darcy_hat_inv.Finalize();
+
+
+//    M_hat.Finalize();
+//    D_hat.Finalize();
+//    mfem::SparseMatrix DT_hat = smoothg::Transpose(D_hat);
+//    mfem::BlockMatrix darcy_debug(darcy_bos);
+//    darcy_debug.SetBlock(0, 0, &M_hat);
+//    darcy_debug.SetBlock(1, 0, &D_hat);
+//    darcy_debug.SetBlock(0, 1, &DT_hat);
+
+//    unique_ptr<mfem::SparseMatrix> darcy_sp(darcy_debug.CreateMonolithic());
+//    auto darcy_I = smoothg::Mult(*darcy_sp, darcy_hat_inv);
+//    darcy_I.Print();
+
+
+
+    rhs_debug.GetBlock(0) = 0.0;
+    mfem::SparseMatrix mult_I(mgL_.NumEDofs(), mgL_.NumEDofs());
+    for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
+    {
+        C_hat.EliminateRow(ess_true_multipliers_[j]);
+        mult_I.Add(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+        rhs_debug(ess_true_multipliers_[j]) = rhs(ess_true_mult_to_edof_[j]); // negative  of block version
+    }
+    mult_I.Finalize();
+
+    mfem::SparseMatrix CT_hat = smoothg::Transpose(C_hat);
+
+    mfem::BlockMatrix left_op(bos, darcy_bos);
+    left_op.SetBlock(0, 0, &C_hat);
+    left_op.SetBlock(1, 0, &dTdsigma_hat);
+    unique_ptr<mfem::SparseMatrix> left_sp(left_op.CreateMonolithic());
+
+    mfem::BlockMatrix right_op(darcy_bos, bos);
+    right_op.SetBlock(0, 0, &CT_hat);
+    right_op.SetBlock(0, 1, &dMdS_hat);
+    unique_ptr<mfem::SparseMatrix> right_sp(right_op.CreateMonolithic());
+
+    mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
+    mfem::BlockMatrix dtds_op(bos, bos);
+    dtds_op.SetBlock(0, 0, &mult_I);
+    dtds_op.SetBlock(1, 1, &dTdS);
+    unique_ptr<mfem::SparseMatrix> dtds_sp(dtds_op.CreateMonolithic());
+
+    auto left_tmp = smoothg::Mult(*left_sp, darcy_hat_inv);
+    auto op_tmp = smoothg::Mult(left_tmp, *right_sp);
+
+    unique_ptr<mfem::SparseMatrix> op_debug(mfem::Add(1.0, op_tmp, -1.0, *dtds_sp));
+
+
+//    mfem::SparseMatrix op_elim = GetEliminatedCols(*op_debug, ess_true_multipliers_);
+
+//    for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
+//    {
+//        assert((*op_debug)(ess_true_multipliers_[j], ess_true_multipliers_[j]) != 0.0);
+////        op_debug->EliminateRowCol(ess_true_multipliers_[j]);
+//        op_debug->EliminateRow(ess_true_multipliers_[j]);
+//        op_debug->EliminateCol(ess_true_multipliers_[j]);
+//        op_debug->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+//    }
+
+//    unique_ptr<mfem::SparseMatrix> op_diff(mfem::Add(1.0, *op_debug, -1.0, *mono_mat_));
+//    op_diff->Print();
+//    std::cout<<"op_diff = " << FrobeniusNorm(*op_diff) / FrobeniusNorm(*op_debug) <<"\n";
+
+//    auto op_diff_small = DropSmall(*op_diff);
+//    std::cout << "diff_nnz = " << op_diff_small.NumNonZeroElems()<<"\n";
+
+    darcy_rhs.GetBlock(1) = rhs.GetBlock(1);
+    rhs_debug.GetBlock(1).Set(-1.0, rhs.GetBlock(2));
+
+    left_tmp.AddMult(darcy_rhs, rhs_debug);
+
+
+
+//    op_elim.AddMult(sol_hb, rhs_debug, -1.0);
+
+    mfem::UMFPackSolver solver_debug2(*op_debug);
+
+    mfem::GMRESSolver solver_debug(comm_);
+    solver_debug.SetOperator(*op_debug);
+    solver_debug.SetMaxIter(10000);
+    solver_debug.SetRelTol(1e-12);
+    solver_debug.SetAbsTol(1e-15);
+
+    std::unique_ptr<mfem::HypreParMatrix> op_par(ToParMatrix(comm_, *op_debug));
+    HypreILU prec_debug(*op_par);
+    solver_debug.SetPreconditioner(prec_debug);
+
+
+
+//    mfem::DenseMatrix op_dense;
+//    Full(*op_debug, op_dense);
+
+//    op_debug->Print();
+//    mfem::DenseMatrixInverse solver_debug(op_dense);
+//    mfem::DenseMatrix solver_debug;
+//    solver_debug_tmp.GetInverseMatrix(solver_debug);
+    solver_debug.Mult(rhs_debug, sol_hb);
+
+    mfem::Vector sol_hb2(sol_hb);
+    sol_hb2 = 0.0;
+    solver_debug2.Mult(rhs_debug, sol_hb2);
+    sol_hb2 -= sol_hb;
+    std::cout <<"hb sol diff = "<<sol_hb2.Norml2() / sol_hb.Norml2() << "\n";
+    std::cout <<"gmres iter = "<<solver_debug.GetNumIterations() << "\n";
+
+
+    mfem::BlockVector darcy_sol_tmp(darcy_rhs), darcy_sol(darcy_bos);
+    right_sp->AddMult(sol_hb, darcy_sol_tmp, -1.0);
+    darcy_hat_inv.Mult(darcy_sol_tmp, darcy_sol);
+
+    sol.GetBlock(1) = darcy_sol.GetBlock(1);
+    sol.GetBlock(2) = sol_hb.GetBlock(1);
+
+    sol.GetBlock(0) = 0.0;
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        darcy_sol.GetSubVector(local_hat, helper);
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+        sol.AddElementVector(local_edofs, helper);
+    }
+
+//    BackSubstitute(rhs, sol_hb, sol);
 }
 
 double Mobility::RelPerm(double S, double mu)
