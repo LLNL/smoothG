@@ -31,12 +31,13 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
+MixedMatrix::MixedMatrix(Graph graph, int num_injectors, const mfem::SparseMatrix& W)
     : mbuilder_(new ElementMBuilder(graph.EdgeWeight(), graph.VertexToEdge())),
       M_(mbuilder_->BuildAssembledM()), D_(ConstructD(graph)), W_(W),
       graph_space_(std::move(graph)), constant_rep_(NumVDofs()),
       vertex_sizes_(constant_rep_.GetData(), NumVDofs()),
-      trace_fluxes_(NumEDofs()), P_pwc_(SparseIdentity(NumVDofs()))
+      trace_fluxes_(NumEDofs()), P_pwc_(SparseIdentity(NumVDofs())),
+      num_injectors_(num_injectors)
 {
     Init();
     constant_rep_ = 1.0;
@@ -47,11 +48,13 @@ MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuil
                          mfem::SparseMatrix D, mfem::SparseMatrix W,
                          mfem::Vector constant_rep,
                          mfem::Vector vertex_sizes,
-                         mfem::SparseMatrix P_pwc)
+                         mfem::SparseMatrix P_pwc,
+                         int num_injectors)
     : mbuilder_(std::move(mbuilder)), D_(std::move(D)), W_(std::move(W)),
       graph_space_(std::move(graph_space)), constant_rep_(std::move(constant_rep)),
       vertex_sizes_(std::move(vertex_sizes)),
-      trace_fluxes_(NumEDofs()), P_pwc_(std::move(P_pwc))
+      trace_fluxes_(NumEDofs()), P_pwc_(std::move(P_pwc)),
+      num_injectors_(num_injectors)
 {
     Init();
 //    mfem::Vector ones(P_pwc_.NumRows());
@@ -93,6 +96,8 @@ MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
     trace_fluxes_.Swap(other.trace_fluxes_);
     P_pwc_.Swap(other.P_pwc_);
     W_is_nonzero_ = other.W_is_nonzero_;
+    num_injectors_ = other.num_injectors_;
+    std::swap(inj_cells_, other.inj_cells_);
 }
 
 void MixedMatrix::Init()
@@ -114,6 +119,24 @@ void MixedMatrix::Init()
     block_true_offsets_.SetSize(3, 0);
     block_true_offsets_[1] = graph_space_.EDofToTrueEDof().NumCols();
     block_true_offsets_[2] = block_true_offsets_[1] + NumVDofs();
+
+    inj_cells_.reserve(num_injectors_);
+    mfem::Array<int> edges, verts;
+    int num_verts = GetGraph().NumVertices();
+//    std::cout<<"inj_cells[j]: \n";
+    for (int i = num_verts-num_injectors_; i < num_verts; ++i)
+    {
+        GetTableRow(GetGraph().VertexToEdge(), i, edges);
+        std::vector<int> inj_cells(edges.Size());
+        for (int j = 0; j < edges.Size(); ++j)
+        {
+            GetTableRow(GetGraph().EdgeToVertex(), edges[j], verts);
+            assert(verts.Size() == 2);
+            inj_cells[j] = verts[0] == i ? verts[1] : verts[0];
+//            std::cout<<inj_cells[j]<<" ";
+        }
+        inj_cells_.push_back(inj_cells);
+    }
 }
 
 mfem::HypreParMatrix* MixedMatrix::MakeParallelM(const mfem::SparseMatrix& M) const
@@ -156,8 +179,16 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
     {
         if (ess_edofs_[i]) { x_blk0_copy[i] = 0.0; }
     }
-    y.GetBlock(0) = mbuilder_->Mult(scale, x_blk0_copy);
 
+    if (num_injectors_ == 0)
+    {
+        y.GetBlock(0) = mbuilder_->Mult(scale, x_blk0_copy);
+    }
+    else
+    {
+        y.GetBlock(0) = mbuilder_->Mult(scale, x_blk0_copy,
+                                        num_injectors_, inj_cells_);
+    }
 
 //    y.GetBlock(0) = mbuilder_->Mult(scale, x.GetBlock(0));
     D_.AddMultTranspose(x.GetBlock(1), y.GetBlock(0));

@@ -576,7 +576,8 @@ MixedMatrix GraphCoarsen::BuildCoarseMatrix(const MixedMatrix& fine_mgL,
 
     return MixedMatrix(std::move(coarse_space_), std::move(coarse_m_builder_),
                        std::move(coarse_D_), BuildCoarseW(Pvertices),
-                       std::move(const_rep), std::move(agg_sizes), std::move(P_pwc));
+                       std::move(const_rep), std::move(agg_sizes),
+                       std::move(P_pwc), fine_mgL.NumInjectors());
 }
 
 mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()

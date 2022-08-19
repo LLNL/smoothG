@@ -60,9 +60,27 @@ public:
     virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const = 0;
 
+    virtual mfem::SparseMatrix BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse,
+        int num_injectors,
+        const std::vector<std::vector<int> >& inj_cells) const
+    {
+        std::cerr << "MBuilder::BuildAssembledM: not implemented!\n";
+        std::abort();
+    }
+
     /// @return scaled M times x
     virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
                               const mfem::Vector& x) const = 0;
+
+    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x,
+                              int num_injectors,
+                              const std::vector<std::vector<int> >& inj_cells) const
+    {
+        std::cerr << "MBuilder::Mult: not implemented!\n";
+        std::abort();
+    }
 protected:
     unsigned int num_aggs_;
 };
@@ -158,6 +176,11 @@ public:
     virtual mfem::SparseMatrix BuildAssembledM(
         const mfem::Vector& agg_weights_inverse) const;
 
+    virtual mfem::SparseMatrix BuildAssembledM(
+        const mfem::Vector& agg_weights_inverse,
+        int num_injectors,
+        const std::vector<std::vector<int> >& inj_cells) const;
+
     bool NeedsCoarseVertexDofs() { return true; }
 
     const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return M_el_; }
@@ -167,6 +190,11 @@ public:
     /// @return scaled M times x
     virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
                               const mfem::Vector& x) const;
+
+    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x,
+                              int num_injectors,
+                              const std::vector<std::vector<int> >& inj_cells) const;
 
 private:
     std::vector<mfem::DenseMatrix> M_el_;

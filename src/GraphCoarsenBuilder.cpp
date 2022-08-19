@@ -143,6 +143,40 @@ mfem::SparseMatrix ElementMBuilder::BuildAssembledM(
     return M;
 }
 
+mfem::SparseMatrix ElementMBuilder::BuildAssembledM(
+    const mfem::Vector& agg_weights_inverse,
+    int num_injectors,
+    const std::vector<std::vector<int> >& inj_cells) const
+{
+    int inj_offset = elem_edgedof_.NumRows() - num_injectors;
+    mfem::Array<int> edofs;
+    mfem::SparseMatrix M(elem_edgedof_.NumCols());
+    for (int Agg = 0; Agg < elem_edgedof_.NumRows(); Agg++)
+    {
+        GetTableRow(elem_edgedof_, Agg, edofs);
+        mfem::DenseMatrix agg_M(M_el_[Agg]);
+
+        if (Agg < inj_offset)
+        {
+            agg_M *= (1.0 / agg_weights_inverse[Agg]);
+        }
+        else
+        {
+            mfem::Vector scale(edofs.Size());
+            auto& cells = inj_cells[Agg-inj_offset];
+            for (int j = 0; j < scale.Size(); ++j)
+            {
+                scale[j] = 1.0 / agg_weights_inverse[cells[j]];
+            }
+            agg_M.LeftScaling(scale);
+        }
+
+        M.AddSubMatrix(edofs, edofs, agg_M);
+    }
+    M.Finalize();
+    return M;
+}
+
 mfem::Vector ElementMBuilder::Mult(
     const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
 {
@@ -161,6 +195,50 @@ mfem::Vector ElementMBuilder::Mult(
         y_loc.SetSize(x_loc.Size());
         M_el_[elem].Mult(x_loc, y_loc);
         y_loc /= elem_scaling_inv[elem];
+
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            y[local_edofs[j]] += y_loc[j];
+        }
+    }
+
+    return y;
+}
+
+mfem::Vector ElementMBuilder::Mult(const mfem::Vector& elem_scaling_inv,
+                              const mfem::Vector& x,
+                              int num_injectors,
+                              const std::vector<std::vector<int> >& inj_cells) const
+{
+    mfem::Vector y(x.Size());
+    y = 0.0;
+
+    int inj_offset = elem_edgedof_.NumRows() - num_injectors;
+    mfem::Array<int> local_edofs;
+    mfem::Vector x_loc;
+    mfem::Vector y_loc;
+    for (int elem = 0; elem < elem_edgedof_.NumRows(); ++elem)
+    {
+        GetTableRow(elem_edgedof_, elem, local_edofs);
+
+        x.GetSubVector(local_edofs, x_loc);
+
+        y_loc.SetSize(x_loc.Size());
+        M_el_[elem].Mult(x_loc, y_loc);
+        if (elem < inj_offset)
+        {
+            y_loc /= elem_scaling_inv[elem];
+        }
+        else
+        {
+            mfem::Vector scale(local_edofs.Size());
+            auto& cells = inj_cells[elem-inj_offset];
+            for (int j = 0; j < scale.Size(); ++j)
+            {
+                scale[j] = 1.0 / elem_scaling_inv[cells[j]];
+            }
+            RescaleVector(scale, y_loc);
+        }
 
         for (int j = 0; j < local_edofs.Size(); ++j)
         {

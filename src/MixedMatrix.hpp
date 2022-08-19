@@ -54,6 +54,7 @@ public:
        @param w_block the matrix W. If not provided, it is assumed to be zero
     */
     MixedMatrix(Graph graph,
+                int num_injectors,
                 const mfem::SparseMatrix& W = SparseIdentity(0));
 
     /**
@@ -74,7 +75,8 @@ public:
                 mfem::SparseMatrix W,
                 mfem::Vector constant_rep,
                 mfem::Vector vertex_sizes,
-                mfem::SparseMatrix P_pwc);
+                mfem::SparseMatrix P_pwc,
+                int num_injectors);
 
     MixedMatrix(MixedMatrix&& other) noexcept;
 
@@ -148,6 +150,9 @@ public:
 
     void SetEssDofs(const mfem::Array<int>& ess_attr);
     const mfem::Array<int>& GetEssDofs() const { return ess_edofs_; }
+
+    int NumInjectors() const { return num_injectors_; }
+    const std::vector<std::vector<int>>& GetInjectorCells() const { return inj_cells_; }
 private:
     void Init();
 
@@ -190,6 +195,9 @@ private:
     bool W_is_nonzero_;
 
     mfem::Array<int> ess_edofs_;
+
+    int num_injectors_;
+    std::vector<std::vector<int> > inj_cells_;
 }; // class MixedMatrix
 
 } // namespace smoothg

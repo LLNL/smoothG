@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
 
 mfem::SparseMatrix MakeWeightedAdjacency(const Graph& graph)
 {
-    MixedMatrix mixed_system(graph);
+    MixedMatrix mixed_system(graph, 0);
     mixed_system.BuildM();
     const double* M_diag = mixed_system.GetM().GetData();
     mfem::Vector w(mixed_system.NumEDofs());

@@ -186,6 +186,7 @@ public:
                         double dt_density_ = 1.0);
 
     void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const override;
+    void Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     void DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     void DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
     void DebugMult3(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
@@ -234,8 +235,6 @@ class TwoPhaseSolver
     const DarcyProblem& problem_;
     Hierarchy* hierarchy_;
     std::vector<mfem::BlockVector> blk_helper_;
-
-    unique_ptr<Hierarchy> new_hierarchy_;
 
     mfem::Array<int> blk_offsets_;
     unique_ptr<mfem::BlockVector> source_;
@@ -595,8 +594,10 @@ public:
             for (int h = 0; h < well_height; ++h)
             {
                 save_one_line(-num_producers*well_height);
+                vert_edge.Set(vert - 1, edge - 1 - num_producers*well_height, half_trans * 2.0); // TODO: this is to match well.hpp, not sure if necessary
                 save_one_line(-num_producers*well_height);
-                vert_edge.Set(vert - 1, edge - 1 - num_producers*well_height, 1e10); // TODO: this is to match well.hpp, not sure if necessary
+                vert_edge.Set(vert - 1, edge - 1 - num_producers*well_height, half_trans * 2.0); // TODO: this is to match well.hpp, not sure if necessary
+//                vert_edge.Set(vert - 1, edge - 1 - num_producers*well_height, 1e10); // TODO: this is to match well.hpp, not sure if necessary
             }
             std::cout<<" new debug print: " << vert<<" "<<edge<<" "<<half_trans<<"\n";
         }
@@ -1049,7 +1050,7 @@ int main(int argc, char* argv[])
     }
     else if (path == "mrst_lognormal")
     {
-        well_height = 3;
+        well_height = 30;
         problem.reset(new MRSTLogNormal(perm_file, well_height, inject_rate, bhp));
         upscale_param.num_iso_verts = num_injectors;
     }
@@ -1231,7 +1232,7 @@ int main(int argc, char* argv[])
 
             problem->Partition(use_metis, coarsening_factors, *partition);
             if (!use_metis) { partition->Append(partition->Max()+1); }
-            if (use_metis) { upscale_param.num_iso_verts = problem->NumIsoVerts(); }
+            if (use_metis) { upscale_param.num_iso_verts = problem->NumInjectors(); }
 //            SetAttrForAggPrint(*problem_ptr, *partition);
         }
     }
@@ -2596,15 +2597,20 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     const mfem::Vector S = PWConstProject(darcy_system_, blk_x.GetBlock(2));
 
     auto& darcy_system_0 = hierarchy_.GetMatrix(0);
-    mfem::Vector fine_flux = blk_x.GetBlock(0);
-    for (int i = level_-1; i >= 0 ; --i)
+    mfem::Vector fine_flux;
+    mfem::Vector fine_S;
+    if (exact_flow_RAP_)
     {
-        fine_flux = MatVec(hierarchy_.GetPsigma(i), fine_flux);
-    }
-    mfem::Vector fine_S = blk_x.GetBlock(2);
-    for (int i = level_-1; i >= 0 ; --i)
-    {
-        fine_S = MatVec(hierarchy_.GetPs(i), fine_S);
+        fine_flux = blk_x.GetBlock(0);
+        for (int i = level_-1; i >= 0 ; --i)
+        {
+            fine_flux = MatVec(hierarchy_.GetPsigma(i), fine_flux);
+        }
+        fine_S = blk_x.GetBlock(2);
+        for (int i = level_-1; i >= 0 ; --i)
+        {
+            fine_S = MatVec(hierarchy_.GetPs(i), fine_S);
+        }
     }
 
     if (exact_flow_RAP_)
@@ -2745,7 +2751,7 @@ void CoupledSolver::Build_dMdS(const MixedMatrix& darcy_system,
     auto& M_el = MB.GetElementMatrices();
     auto& proj_pwc = darcy_system.GetPWConstProj();
 
-    mfem::Array<int> local_edofs, local_vdofs, vert(1);
+    mfem::Array<int> local_edofs, local_vdofs, vert(1), local_vdofs_helper;
     mfem::Vector sigma_loc, Msigma_vec;
     mfem::DenseMatrix proj_pwc_loc;
 
@@ -2753,29 +2759,59 @@ void CoupledSolver::Build_dMdS(const MixedMatrix& darcy_system,
 
     local_dMdS_.resize(vert_edof.NumRows());
     const int S_size = darcy_system.GetPWConstProj().NumCols();
+
+    int num_injectors = darcy_system.NumInjectors();
+    int inj_offset = vert_edof.NumRows() - num_injectors;
+    auto inj_cells = darcy_system.GetInjectorCells();
+    mfem::DenseMatrix Msigma_loc;
+
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
         GetTableRow(vert_edof, i, local_edofs);
-        if (S_size == darcy_system.NumVDofs())
+        flux.GetSubVector(local_edofs, sigma_loc);
+
+        if (i < inj_offset)
         {
-            GetTableRow(vert_vdof, i, local_vdofs);
+            if (S_size == darcy_system.NumVDofs())
+            {
+                GetTableRow(vert_vdof, i, local_vdofs);
+            }
+            else
+            {
+                local_vdofs.SetSize(1);
+                local_vdofs = i;
+            }
+            vert.SetSize(1);
+            vert[0] = i;
+
+            sigma_loc *= dTMinv_dS_vec[i];
+            Msigma_vec.SetSize(local_edofs.Size());
+            M_el[i].Mult(sigma_loc, Msigma_vec);
+            mfem::DenseMatrix Msigma_loc_help(Msigma_vec.GetData(), M_el[i].Size(), 1);
+            Msigma_loc = Msigma_loc_help;
         }
         else
         {
-            local_vdofs.SetSize(1);
-            local_vdofs = i;
+            auto& cells = inj_cells[i-inj_offset];
+            vert.SetSize(cells.size());
+
+            local_vdofs_helper.SetSize(0);
+            for (int j = 0; j < cells.size(); ++j)
+            {
+                sigma_loc[j] *= dTMinv_dS_vec[cells[j]];
+                vert[j] = cells[j];
+                GetTableRow(vert_vdof, cells[j], local_vdofs);
+                local_vdofs_helper.Append(local_vdofs);
+            }
+            local_vdofs.MakeRef(local_vdofs_helper);
+
+            Msigma_loc = M_el[i];
+            Msigma_loc.RightScaling(sigma_loc);
         }
-        vert[0] = i;
 
-        flux.GetSubVector(local_edofs, sigma_loc);
-        Msigma_vec.SetSize(local_edofs.Size());
-        M_el[i].Mult(sigma_loc, Msigma_vec);
-        mfem::DenseMatrix Msigma_loc(Msigma_vec.GetData(), M_el[i].Size(), 1);
-
-        proj_pwc_loc.SetSize(1, local_vdofs.Size());
+        proj_pwc_loc.SetSize(vert.Size(), local_vdofs.Size());
         proj_pwc_loc = 0.0;
         proj_pwc.GetSubMatrix(vert, local_vdofs, proj_pwc_loc);
-        proj_pwc_loc *= dTMinv_dS_vec[i];
 
         local_dMdS_[i].SetSize(local_edofs.Size(), local_vdofs.Size());
         mfem::Mult(Msigma_loc, proj_pwc_loc, local_dMdS_[i]);
@@ -2789,21 +2825,41 @@ mfem::SparseMatrix CoupledSolver::Assemble_dMdS(
 
     auto& vert_edof = darcy_system.GetGraphSpace().VertexToEDof();
     auto& vert_vdof = darcy_system.GetGraphSpace().VertexToVDof();
-    mfem::Array<int> local_edofs, local_vdofs;
+    mfem::Array<int> local_edofs, local_vdofs, local_vdofs_helper;
 
     const int S_size = darcy_system.GetPWConstProj().NumCols();
     mfem::SparseMatrix out(darcy_system.NumEDofs(), S_size);
+
+    int num_injectors = darcy_system.NumInjectors();
+    int inj_offset = vert_edof.NumRows() - num_injectors;
+    auto inj_cells = darcy_system.GetInjectorCells();
+
     for (int i = 0; i < vert_edof.NumRows(); ++i)
     {
         GetTableRow(vert_edof, i, local_edofs);
-        if (S_size == darcy_system_.NumVDofs())
+
+        if (i < inj_offset)
         {
-            GetTableRow(vert_vdof, i, local_vdofs);
+            if (S_size == darcy_system_.NumVDofs())
+            {
+                GetTableRow(vert_vdof, i, local_vdofs);
+            }
+            else
+            {
+                local_vdofs.SetSize(1);
+                local_vdofs = i;
+            }
         }
         else
         {
-            local_vdofs.SetSize(1);
-            local_vdofs = i;
+            auto& cells = inj_cells[i-inj_offset];
+            local_vdofs_helper.SetSize(0);
+            for (int j = 0; j < cells.size(); ++j)
+            {
+                GetTableRow(vert_vdof, cells[j], local_vdofs);
+                local_vdofs_helper.Append(local_vdofs);
+            }
+            local_vdofs.MakeRef(local_vdofs_helper);
         }
         out.AddSubMatrix(local_edofs, local_vdofs, local_dMdS_[i]);
     }
@@ -2871,7 +2927,9 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     // exact RAP
     if (level_ == 0 || !exact_flow_RAP_)
     {
-        M_proc = darcy_system_.GetMBuilder().BuildAssembledM(Mobility::TotalMobility(S));
+        auto mob = Mobility::TotalMobility(S);
+        M_proc = darcy_system_.GetMBuilder().BuildAssembledM(
+                    mob, darcy_system_.NumInjectors(), darcy_system_.GetInjectorCells());
         dMdS_proc = Assemble_dMdS(darcy_system_, blk_x.GetBlock(0), S);
     }
     else
@@ -3123,7 +3181,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 //        op.SetBlock(1, 1, pfix);
 
 
-        const bool use_direct_solver = true;//!lowest_order;
+        const bool use_direct_solver = !lowest_order;
         const bool solve_on_primal_form = (level_ == 0);
 
         if (solve_on_primal_form == false)
@@ -3349,7 +3407,7 @@ void CoupledSolver::HybridSolve(const mfem::HypreParMatrix& dTdS, const mfem::Ve
     solver.AssembleSolver(tot_mob, local_dMdS_, local_dTdsigma, dTdS);
 
     true_dx.GetBlock(2) = tot_mob;
-    solver.Mult(true_resid, true_dx);
+    solver.Mult2(true_resid, true_dx);
     linear_iter_ += solver.GetNumIterations();
     if (!myid_ && param_.print_level > 1)
     {
@@ -3883,6 +3941,242 @@ void TwoPhaseHybrid::Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) 
     resid_norm_ = solver_->GetFinalNorm();
 }
 
+
+void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
+{
+    int num_hatdofs = mgL_.GetGraphSpace().VertexToEDof().NumNonZeroElems();
+
+    mfem::Array<int> bos(3), darcy_bos(3);
+    bos[0] = 0;
+    bos[1] = bos[0] + multiplier_d_td_->NumCols();
+    bos[2] = bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+
+    darcy_bos[0] = 0;
+    darcy_bos[1] = darcy_bos[0] + num_hatdofs;
+    darcy_bos[2] = darcy_bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
+
+    auto& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
+    auto& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
+    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL_.GetMBuilder()));
+    auto& M_el = mbuilder->GetElementMatrices();
+
+
+    mfem::BlockVector sol_hb(offsets_);
+    sol_hb = 0.0;
+
+    mfem::BlockVector rhs_copy(rhs);
+    for (int m = 0; m < ess_true_multipliers_.Size(); ++m)
+    {
+        sol_hb(ess_true_multipliers_[m]) = -rhs(ess_true_mult_to_edof_[m]);
+        rhs_copy(ess_true_mult_to_edof_[m]) = 0.0;
+    }
+
+    mfem::BlockVector darcy_rhs(darcy_bos), rhs_debug(bos);
+    mfem::Vector helper;
+
+    mfem::Array<int> local_edofs, local_vdofs, local_mult,
+            local_hat, local_ddofs, local_special_vdofs, local_dofs_helper;
+    mfem::Array<int> ess_hat(num_hatdofs);
+    ess_hat = 0;
+
+    mfem::SparseMatrix dTdsigma_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix dMdS_hat(num_hatdofs, mgL_.NumVDofs());
+    mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
+    mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
+    mfem::SparseMatrix darcy_hat_inv(num_hatdofs+D_hat.NumRows());
+
+    int num_injectors = mgL_.NumInjectors();
+    auto inj_cells = mgL_.GetInjectorCells();
+
+    mfem::DenseMatrix DenseDloc, DenseCloc;
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        GetTableRow(vert_vdof, i, local_vdofs);
+        GetTableRow(Agg_multiplier_, i, local_mult);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        auto Dloc = ExtractRowAndColumns(mgL_.GetD(), local_vdofs, local_edofs);
+        Full(Dloc, DenseDloc);
+        Full(C_[i], DenseCloc);
+
+        mfem::DenseMatrix M_el_i(M_el[i]);
+        if (i < vert_edof.NumRows() - num_injectors)
+        {
+            M_el_i *= (1.0 / sol.GetBlock(2)[i]);
+            dMdS_hat.AddSubMatrix(local_hat, local_vdofs, (*dMdS_)[i]);
+        }
+        else
+        {
+            mfem::Vector scale(local_edofs.Size());
+            auto& cells = inj_cells[i-vert_edof.NumRows()+num_injectors];
+            local_special_vdofs.SetSize(0);
+            for (int j = 0; j < scale.Size(); ++j)
+            {
+                scale[j] = 1.0 / sol.GetBlock(2)[cells[j]];
+                GetTableRow(vert_vdof, cells[j], local_dofs_helper);
+                local_special_vdofs.Append(local_dofs_helper);
+            }
+            M_el_i.LeftScaling(scale);
+            dMdS_hat.AddSubMatrix(local_hat, local_special_vdofs, (*dMdS_)[i]);
+        }
+
+//        M_hat.AddSubMatrix(local_hat, local_hat, M_el_i);
+        dTdsigma_hat.AddSubMatrix(local_vdofs, local_hat, (*dTdsigma_)[i]);
+//        D_hat.AddSubMatrix(local_vdofs, local_hat, DenseDloc);
+        C_hat.AddSubMatrix(local_mult, local_hat, DenseCloc);
+
+
+        local_hat.Copy(local_ddofs);
+        local_ddofs.Append(local_vdofs);
+        for (int j = local_edofs.Size(); j < local_ddofs.Size(); ++j)
+        {
+            local_ddofs[j] = local_ddofs[j] + num_hatdofs;
+        }
+
+        mfem::DenseMatrix darcy_el(DenseDloc.NumCols() + DenseDloc.NumRows());
+        darcy_el.CopyMN(M_el_i, 0, 0);
+        darcy_el.CopyMN(DenseDloc, DenseDloc.NumCols(), 0);
+        darcy_el.CopyMNt(DenseDloc, 0, DenseDloc.NumCols());
+
+        mfem::DenseMatrixInverse darcy_el_solver(darcy_el);
+        mfem::DenseMatrix darcy_el_inv;
+        darcy_el_solver.GetInverseMatrix(darcy_el_inv);
+
+        darcy_hat_inv.AddSubMatrix(local_ddofs, local_ddofs, darcy_el_inv);
+
+
+
+        rhs_copy.GetSubVector(local_edofs, helper);
+
+        for (int j =0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+        darcy_rhs.GetBlock(0).SetSubVector(local_hat, helper);
+
+    }
+//    M_hat.Finalize();
+    dTdsigma_hat.Finalize();
+    dMdS_hat.Finalize();
+//    D_hat.Finalize();
+    C_hat.Finalize();
+    darcy_hat_inv.Finalize();
+
+    mfem::SparseMatrix CT_hat = smoothg::Transpose(C_hat);
+//    mfem::SparseMatrix DT_hat = smoothg::Transpose(D_hat);
+
+//    mfem::BlockMatrix darcy_debug(darcy_bos);
+//    darcy_debug.SetBlock(0, 0, &M_hat);
+//    darcy_debug.SetBlock(1, 0, &D_hat);
+//    darcy_debug.SetBlock(0, 1, &DT_hat);
+
+    mfem::BlockMatrix left_op(bos, darcy_bos);
+    left_op.SetBlock(0, 0, &C_hat);
+    left_op.SetBlock(1, 0, &dTdsigma_hat);
+    unique_ptr<mfem::SparseMatrix> left_sp(left_op.CreateMonolithic());
+
+    mfem::BlockMatrix right_op(darcy_bos, bos);
+    right_op.SetBlock(0, 0, &CT_hat);
+    right_op.SetBlock(0, 1, &dMdS_hat);
+
+//    mfem::DenseMatrix op_tmp;
+//    {
+//        {
+//            mfem::DenseMatrix right_tmp, right_dense;
+            unique_ptr<mfem::SparseMatrix> right_sp(right_op.CreateMonolithic());
+//            Full(*right_sp, right_dense);
+
+//            unique_ptr<mfem::SparseMatrix> darcy_sp(darcy_debug.CreateMonolithic());
+//            mfem::UMFPackSolver darcy_inv(*darcy_sp);
+//            right_tmp = smoothg::Mult(darcy_inv, right_dense);
+//            op_tmp = smoothg::Mult(left_op, right_tmp);
+//        }
+//        {
+//            mfem::DenseMatrix dtds_dense;
+            mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
+            mfem::BlockMatrix dtds_op(bos, bos);
+            dtds_op.SetBlock(1, 1, &dTdS);
+            unique_ptr<mfem::SparseMatrix> dtds_sp(dtds_op.CreateMonolithic());
+//            Full(*dtds_sp, dtds_dense);
+//            op_tmp -= dtds_dense;
+//        }
+//    }
+
+    auto left_tmp = smoothg::Mult(*left_sp, darcy_hat_inv);
+    auto op_tmp = smoothg::Mult(left_tmp, *right_sp);
+
+    unique_ptr<mfem::SparseMatrix> op_debug(mfem::Add(1.0, op_tmp, -1.0, *dtds_sp));
+
+    mfem::SparseMatrix op_elim = GetEliminatedCols(*op_debug, ess_true_multipliers_);
+
+    for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
+    {
+        assert((*op_debug)(ess_true_multipliers_[j], ess_true_multipliers_[j]) != 0.0);
+//        op_debug->EliminateRowCol(ess_true_multipliers_[j]);
+        op_debug->EliminateRow(ess_true_multipliers_[j]);
+        op_debug->EliminateCol(ess_true_multipliers_[j]);
+        op_debug->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+    }
+
+
+    darcy_rhs.GetBlock(1) = rhs_copy.GetBlock(1);
+
+//    mfem::BlockVector rhs_hb = MakeHybridRHS(rhs_copy);
+
+    rhs_debug.GetBlock(0) = 0.0;
+    rhs_debug.GetBlock(1).Set(-1.0, rhs_copy.GetBlock(2));
+
+    left_tmp.AddMult(darcy_rhs, rhs_debug);
+
+
+
+    op_elim.AddMult(sol_hb, rhs_debug, -1.0);
+
+    for (int ess_true_mult : const_cast<mfem::Array<int>&>(ess_true_multipliers_))
+    {
+        rhs_debug(ess_true_mult) = sol_hb(ess_true_mult);
+    }
+
+    mfem::UMFPackSolver solver_debug(*op_debug);
+//    mfem::DenseMatrixInverse solver_debug(op_tmp);
+//    mfem::DenseMatrix solver_debug;
+//    solver_debug_tmp.GetInverseMatrix(solver_debug);
+    solver_debug.Mult(rhs_debug, sol_hb);
+
+//    solver_->Mult(rhs_hb, sol_hb);
+
+    mfem::BlockVector darcy_sol_tmp(darcy_rhs), darcy_sol(darcy_bos);
+    right_sp->AddMult(sol_hb, darcy_sol_tmp, -1.0);
+    darcy_hat_inv.Mult(darcy_sol_tmp, darcy_sol);
+
+    sol.GetBlock(1) = darcy_sol.GetBlock(1);
+    sol.GetBlock(2) = sol_hb.GetBlock(1);
+
+    sol.GetBlock(0) = 0.0;
+    for (int i = 0; i < vert_edof.NumRows(); ++i)
+    {
+        GetTableRow(vert_edof, i, local_edofs);
+        local_hat.SetSize(local_edofs.Size());
+        std::iota(local_hat.begin(), local_hat.end(), vert_edof.GetI()[i]);
+
+        darcy_sol.GetSubVector(local_hat, helper);
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            if (edof_needs_averaging_[local_edofs[j]])
+            {
+                helper[j] /= 2.0;
+            }
+        }
+        sol.AddElementVector(local_edofs, helper);
+    }
+
+}
+
 void TwoPhaseHybrid::DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
 {
     int num_hatdofs = mgL_.GetGraphSpace().VertexToEDof().NumNonZeroElems();
@@ -3893,6 +4187,9 @@ void TwoPhaseHybrid::DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& 
     bos[2] = bos[1] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
     bos[3] = bos[2] + mgL_.GetGraphSpace().VertexToVDof().NumCols();
     bos[4] = bos[3] + multiplier_d_td_->NumCols();
+
+
+    bos.Print();
 
     auto& vert_edof = mgL_.GetGraphSpace().VertexToEDof();
     auto& vert_vdof = mgL_.GetGraphSpace().VertexToVDof();
@@ -4044,11 +4341,11 @@ void TwoPhaseHybrid::DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& 
 //    std::cout <<"|| M_hat || = "<<FrobeniusNorm(M_hat) << "\n";
 //    std::cout <<"|| dTdS || = "<<FrobeniusNorm(dTdS) << "\n";
 
-//    std::ofstream  op_file("hb_block_mat_1_perf.txt");
-//    op_debug_sp->PrintMatlab(op_file);
+    std::ofstream  op_file("hb_block_mat_30_perf.txt");
+    op_debug_sp->PrintMatlab(op_file);
 
 //    D_hat.Print();
-
+return;
     mfem::GMRESSolver solver_debug(comm_);
     solver_debug.SetOperator(*op_debug_sp);
     solver_debug.SetMaxIter(50000);
@@ -4157,7 +4454,7 @@ void TwoPhaseHybrid::DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector&
     }
 
 
-    mfem::BlockVector darcy_rhs(darcy_bos), rhs_debug(bos), sol_debug(bos);
+    mfem::BlockVector darcy_rhs(darcy_bos), rhs_debug(bos);
     mfem::Vector helper;
 
     mfem::Array<int> local_edofs, local_vdofs, local_mult, local_hat, local_ddofs;
@@ -4170,6 +4467,9 @@ void TwoPhaseHybrid::DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector&
     mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
     mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
     mfem::SparseMatrix darcy_hat_inv(num_hatdofs+D_hat.NumRows());
+
+    int num_injectors = mgL_.NumInjectors();
+    auto inj_cells = mgL_.GetInjectorCells();
 
     mfem::DenseMatrix DenseDloc, DenseCloc;
     for (int i = 0; i < vert_edof.NumRows(); ++i)
@@ -4185,7 +4485,21 @@ void TwoPhaseHybrid::DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector&
         Full(C_[i], DenseCloc);
 
         mfem::DenseMatrix M_el_i(M_el[i]);
-        M_el_i *= (1.0 / sol.GetBlock(2)[i]);
+        if (i < vert_edof.NumRows() - num_injectors)
+        {
+            M_el_i *= (1.0 / sol.GetBlock(2)[i]);
+        }
+        else
+        {
+            mfem::Vector scale(local_edofs.Size());
+            auto& cells = inj_cells[i-vert_edof.NumRows()+num_injectors];
+            for (int j = 0; j < scale.Size(); ++j)
+            {
+                scale[j] = 1.0 / sol.GetBlock(2)[cells[j]];
+            }
+            M_el_i.LeftScaling(scale);
+        }
+
 //        M_hat.AddSubMatrix(local_hat, local_hat, M_el_i);
         dTdsigma_hat.AddSubMatrix(local_vdofs, local_hat, (*dTdsigma_)[i]);
         dMdS_hat.AddSubMatrix(local_hat, local_vdofs, (*dMdS_)[i]);
@@ -4375,6 +4689,9 @@ void TwoPhaseHybrid::DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector&
         rhs_debug(ess_true_mult) = sol_hb(ess_true_mult);
     }
 
+    std::ofstream  op_file("hb_schur_mat_30_perf.txt");
+    op_debug->PrintMatlab(op_file);
+return;
     mfem::UMFPackSolver solver_debug(*op_debug);
 //    mfem::DenseMatrixInverse solver_debug(op_tmp);
 //    mfem::DenseMatrix solver_debug;

@@ -55,7 +55,8 @@ public:
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr,
               const mfem::SparseMatrix& w_block = SparseIdentity(0))
-        : Hierarchy(MixedMatrix(std::move(graph), w_block), param, partitioning, ess_attr) {}
+        : Hierarchy(MixedMatrix(std::move(graph), param.num_iso_verts, w_block),
+                    param, partitioning, ess_attr) {}
 
     Hierarchy(MixedMatrix mixed_system,
               const UpscaleParameters& param = UpscaleParameters(),

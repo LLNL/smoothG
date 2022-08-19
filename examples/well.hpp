@@ -263,13 +263,15 @@ std::vector<mfem::Vector> AppendWellIndex(const std::vector<mfem::Vector>& loc_w
 
     for (const Well& well : well_manager.GetWells())
     {
+        double factor = well.type == Injector ? 2.0 : 1.0;
+
         for (unsigned int j = 0; j < well.cells.size(); j++)
         {
             const mfem::Vector& loc_w = loc_weight[well.cells[j]];
             mfem::Vector& new_loc_w = new_loc_weight[well.cells[j]];
             new_loc_w.SetSize(loc_w.Size() + 1);
             std::copy_n(loc_w.GetData(), loc_w.Size(), new_loc_w.GetData());
-            new_loc_w[loc_w.Size()] = well.well_indices[j] * 2.0;
+            new_loc_w[loc_w.Size()] = well.well_indices[j] * factor;
         }
 
         if (well.type == Injector)
@@ -574,8 +576,8 @@ void TwoPhase::MetisPart(const mfem::Array<int>& coarsening_factor,
     const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
 
     std::vector<std::vector<int>> iso_verts;
-    iso_vert_count_ = well_manager_.NumWells(Injector);
-    for (int i = 0; i < iso_vert_count_; ++i)
+    num_injectors_ = well_manager_.NumWells(Injector);
+    for (int i = 0; i < num_injectors_; ++i)
     {
         iso_verts.push_back(std::vector<int>(1, mesh_->GetNE() + i));
     }
@@ -646,19 +648,19 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
 
 //    std::ifstream imesh("logNormal.vtk");
 //    mfem::Mesh serial_mesh(imesh, 1, 1);
-    mfem::Mesh serial_mesh(11, 11, 3, mfem::Element::HEXAHEDRON, true,
-                           1010.0*ft_, 1010.0*ft_, 20.0*ft_);
+    mfem::Mesh serial_mesh(11, 11, 30, mfem::Element::HEXAHEDRON, true,
+                           1010.0*ft_, 1010.0*ft_, 30.0*ft_);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
     InitGraph();
 
     std::ifstream perm_str(perm_file);
     coeff_gf_.SetSpace(u_fes_.get());
-//    coeff_gf_.Load(perm_str, coeff_gf_.Size());
-//    for (int i = 0; i < coeff_gf_.Size(); ++i)
-//    {
-//        coeff_gf_[i] = 1.0 / coeff_gf_[i];
-//    }
-    coeff_gf_ = 1.0e16;
+    coeff_gf_.Load(perm_str, coeff_gf_.Size());
+    for (int i = 0; i < coeff_gf_.Size(); ++i)
+    {
+        coeff_gf_[i] = 1.0 / coeff_gf_[i];
+    }
+//    coeff_gf_ = 1.0e16;
 
     auto kinv = new mfem::VectorArrayCoefficient(mesh_->Dimension());
     for (int i = 0; i < mesh_->Dimension(); ++i)
@@ -680,7 +682,7 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
     block_offsets_[2] = block_offsets_[1] + vertex_edge_.NumRows();
     block_offsets_[3] = block_offsets_[2] + vertex_edge_.NumRows();
 
-    iso_vert_count_ = 1;
+    num_injectors_ = 1;
 
     if (false)
     {
@@ -720,7 +722,7 @@ void MRSTLogNormal::Set5Wells(int well_height, double inject_rate, double bhp)
     point(0, 0) = 500.0*ft_ + 5.0*ft_;
     point(1, 0) = 500.0*ft_ + 5.0*ft_;
 
-    well_height = 3;
+    well_height = 30;
 
     for (int j = 0; j < well_height; ++j)
     {
@@ -732,13 +734,13 @@ void MRSTLogNormal::Set5Wells(int well_height, double inject_rate, double bhp)
         {
             if (ids[i] >= 0)
             {
-                if (i == 0 || cells[i].size() == 0)
+//                if (i == 0 || cells[i].size() == 0)
                 {
-//                    std::cout<<"well "<<i<<" height "<<j<<"\n";
+//                    std::cout<<"well "<<i<<" height "<<j<<"cell "<<ids[i]<<"\n";
                     cells[i].push_back(ids[i]);
                 }
             }
-            if (mesh_->Dimension() == 3) { point(2, i) += 10.0*ft_; }
+            if (mesh_->Dimension() == 3) { point(2, i) += 1.0*ft_; }
         }
     }
 
@@ -748,7 +750,7 @@ void MRSTLogNormal::Set5Wells(int well_height, double inject_rate, double bhp)
         double value = (i == 0) ? inject_rate : bhp;
         if (cells[i].size())
         {
-            well_manager_->AddWell(type, value, cells[i], WellDirection::Z, 10.127);
+            well_manager_->AddWell(type, value, cells[i], WellDirection::Z, 0.127);
         }
     }
 }
@@ -862,8 +864,8 @@ void MRSTLogNormal::MetisPart(const mfem::Array<int>& coarsening_factor,
     const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
 
     std::vector<std::vector<int>> iso_verts;
-    iso_vert_count_ = well_manager_->NumWells(Injector);
-    for (int i = 0; i < iso_vert_count_; ++i)
+    num_injectors_ = well_manager_->NumWells(Injector);
+    for (int i = 0; i < num_injectors_; ++i)
     {
         iso_verts.push_back(std::vector<int>(1, mesh_->GetNE() + i));
     }
@@ -996,8 +998,8 @@ void TwoPhaseEGG::MetisPart(const mfem::Array<int>& coarsening_factor,
     const int metis_cf = xy_cf * (dim > 2 ? coarsening_factor[2] : 1);
 
     std::vector<std::vector<int>> iso_verts;
-    iso_vert_count_ = well_manager_.NumWells(Injector);
-    for (int i = 0; i < iso_vert_count_; ++i)
+    num_injectors_ = well_manager_.NumWells(Injector);
+    for (int i = 0; i < num_injectors_; ++i)
     {
         iso_verts.push_back(std::vector<int>(1, mesh_->GetNE() + i));
     }

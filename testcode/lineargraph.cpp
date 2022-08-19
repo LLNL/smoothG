@@ -165,7 +165,7 @@ int main(int argc, char* argv[])
     }
 
     LinearGraph graph(global_size);
-    MixedMatrix mgL(graph.GetGraph());
+    MixedMatrix mgL(graph.GetGraph(), 0);
 
     LinearPartition partition(graph, num_partitions);
 

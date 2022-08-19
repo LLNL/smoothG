@@ -237,7 +237,7 @@ int main(int argc, char* argv[])
         coarsening_factors = 1;
         coarsening_factors[0] = upscale_param.coarse_factor;
         fv_problem->Partition(use_metis, coarsening_factors, partitioning);
-        upscale_param.num_iso_verts = fv_problem->NumIsoVerts();
+        upscale_param.num_iso_verts = fv_problem->NumInjectors();
     }
 
     // Create hierarchy

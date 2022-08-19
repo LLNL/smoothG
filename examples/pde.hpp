@@ -563,8 +563,7 @@ public:
     /// Volume of a cell in the mesh (assuming all cells have the same volume)
     virtual double CellVolume() const { return mesh_->GetElementVolume(0); }
 
-    /// @return number of isolated (graph) vertices
-    int NumIsoVerts() const { return iso_vert_count_; }
+    int NumInjectors() const { return num_injectors_; }
 
     const mfem::ParMesh& GetMesh() const { return *mesh_; }
 
@@ -647,8 +646,6 @@ protected:
     mfem::Vector rhs_sigma_;
     mfem::Vector rhs_u_;
 
-    mutable int iso_vert_count_ = 0;
-
     const double ft_ = 0.3048;          // 1 ft = 0.3048 meter
 
     mfem::Array<int> ess_attr_;
@@ -668,6 +665,9 @@ protected:
     unique_ptr<mfem::SparseMatrix> vertex_reorder_map_; // for plotting purpose
 
     mfem::GridFunction well_pos_;
+
+    mutable int num_injectors_ = 0;
+    int num_producers_ = 0;
 };
 
 DarcyProblem::DarcyProblem(MPI_Comm comm, int dim, const mfem::Array<int>& ess_attr)
@@ -1543,7 +1543,7 @@ void LognormalModel::SetupCoeff(int nDimensions, double correlation_length)
     mfem::SparseMatrix W_block = SparseIdentity(mesh_->GetNE());
     double cell_vol = CellVolume();
     W_block = cell_vol * kappa * kappa;
-    MixedMatrix mgL(darcy_problem.GetFVGraph(), W_block);
+    MixedMatrix mgL(darcy_problem.GetFVGraph(), 0, W_block);
     mgL.BuildM();
 
     NormalDistribution normal_dist(0.0, 1.0, 22 + myid_);
