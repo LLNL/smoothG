@@ -142,11 +142,11 @@ class TwoPhaseHybrid : public HybridSolver
     mfem::Array<int> offsets_;
     unique_ptr<mfem::BlockOperator> op_;
     unique_ptr<mfem::SparseMatrix> mono_mat_;
-    unique_ptr<mfem::HypreParMatrix> monolithic_;
-    unique_ptr<mfem::Solver> A00_inv_;
-    unique_ptr<mfem::Solver> A11_inv_;
-    unique_ptr<mfem::BlockLowerTriangularPreconditioner> stage1_prec_;
-    unique_ptr<HypreILU> stage2_prec_;
+    mutable unique_ptr<mfem::HypreParMatrix> monolithic_;
+    mutable unique_ptr<mfem::Solver> A00_inv_;
+    mutable unique_ptr<mfem::Solver> A11_inv_;
+    mutable unique_ptr<mfem::BlockLowerTriangularPreconditioner> stage1_prec_;
+    mutable unique_ptr<HypreILU> stage2_prec_;
 
     // B00_ and B01_ are the (0,0) and (0,1)-block of [M D^T; D 0]^{-1}
     std::vector<mfem::DenseMatrix> B00_;  // M^{-1} - B01_ D M^{-1}
@@ -3960,7 +3960,6 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL_.GetMBuilder()));
     auto& M_el = mbuilder->GetElementMatrices();
 
-
     mfem::BlockVector sol_hb(offsets_);
     sol_hb = 0.0;
 
@@ -3983,7 +3982,6 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     mfem::SparseMatrix dMdS_hat(num_hatdofs, mgL_.NumVDofs());
     mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
     mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
-//    mfem::SparseMatrix darcy_hat_inv(num_hatdofs+D_hat.NumRows());
 
     mfem::SparseMatrix darcy_hat_inv_00(num_hatdofs);
     mfem::SparseMatrix darcy_hat_inv_01(num_hatdofs, D_hat.NumRows());
@@ -4027,18 +4025,8 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
             dMdS_hat.AddSubMatrix(local_hat, local_special_vdofs, (*dMdS_)[i]);
         }
 
-//        M_hat.AddSubMatrix(local_hat, local_hat, M_el_i);
         dTdsigma_hat.AddSubMatrix(local_vdofs, local_hat, (*dTdsigma_)[i]);
-//        D_hat.AddSubMatrix(local_vdofs, local_hat, DenseDloc);
         C_hat.AddSubMatrix(local_mult, local_hat, DenseCloc);
-
-
-//        local_hat.Copy(local_ddofs);
-//        local_ddofs.Append(local_vdofs);
-//        for (int j = local_edofs.Size(); j < local_ddofs.Size(); ++j)
-//        {
-//            local_ddofs[j] = local_ddofs[j] + num_hatdofs;
-//        }
 
         mfem::DenseMatrix darcy_el(DenseDloc.NumCols() + DenseDloc.NumRows());
         darcy_el.CopyMN(M_el_i, 0, 0);
@@ -4049,7 +4037,6 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         mfem::DenseMatrix darcy_el_inv, darcy_el_inv_blk;
         darcy_el_solver.GetInverseMatrix(darcy_el_inv);
 
-//        darcy_hat_inv.AddSubMatrix(local_ddofs, local_ddofs, darcy_el_inv);
 
         darcy_el_inv_blk.CopyMN(darcy_el_inv, local_hat.Size(), local_hat.Size(), 0, 0);
         darcy_hat_inv_00.AddSubMatrix(local_hat, local_hat, darcy_el_inv_blk);
@@ -4078,7 +4065,6 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     dTdsigma_hat.Finalize();
     dMdS_hat.Finalize();
     C_hat.Finalize();
-//    darcy_hat_inv.Finalize();
 
     mfem::BlockMatrix darcy_hat_inv(darcy_bos);
     darcy_hat_inv.SetBlock(0, 0, &darcy_hat_inv_00);
@@ -4088,37 +4074,20 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     darcy_hat_inv.Finalize();
 
     mfem::SparseMatrix CT_hat = smoothg::Transpose(C_hat);
-//    mfem::SparseMatrix DT_hat = smoothg::Transpose(D_hat);
-
-//    mfem::BlockMatrix darcy_debug(darcy_bos);
-//    darcy_debug.SetBlock(0, 0, &M_hat);
-//    darcy_debug.SetBlock(1, 0, &D_hat);
-//    darcy_debug.SetBlock(0, 1, &DT_hat);
 
     mfem::BlockMatrix left_op(bos, darcy_bos);
     left_op.SetBlock(0, 0, &C_hat);
     left_op.SetBlock(1, 0, &dTdsigma_hat);
-//    unique_ptr<mfem::SparseMatrix> left_sp(left_op.CreateMonolithic());
 
     mfem::BlockMatrix right_op(darcy_bos, bos);
     right_op.SetBlock(0, 0, &CT_hat);
     right_op.SetBlock(0, 1, &dMdS_hat);
 
-//    unique_ptr<mfem::SparseMatrix> right_sp(right_op.CreateMonolithic());
-
-    mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
-//    mfem::BlockMatrix dtds_op(bos, bos);
-//    dtds_op.SetBlock(1, 1, &dTdS);
-//    unique_ptr<mfem::SparseMatrix> dtds_sp(dtds_op.CreateMonolithic());
-
-//    auto left_tmp = smoothg::Mult(*left_sp, darcy_hat_inv);
-//    auto op_tmp = smoothg::Mult(left_tmp, *right_sp);
-//    unique_ptr<mfem::SparseMatrix> op_debug(mfem::Add(1.0, op_tmp, -1.0, *dtds_sp));
-
     unique_ptr<mfem::BlockMatrix> left_tmp(mfem::Mult(left_op, darcy_hat_inv));
     unique_ptr<mfem::BlockMatrix> op_debug(mfem::Mult(*left_tmp, right_op));
 
 
+    mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
     mfem::SparseMatrix* op_debug_11 = &(op_debug->GetBlock(1, 1));
     mfem::SparseMatrix* op_11 = mfem::Add(1., *op_debug_11, -1., dTdS);
     op_debug->SetBlock(1, 1, op_11);
@@ -4129,23 +4098,20 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
 
     for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
     {
-//        assert((*op_debug)(ess_true_multipliers_[j], ess_true_multipliers_[j]) != 0.0);
-        op_sp->EliminateRowCol(ess_true_multipliers_[j]);
-//        op_debug->EliminateRow(ess_true_multipliers_[j]);
-//        op_debug->EliminateCol(ess_true_multipliers_[j]);
-//        op_debug->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+        op_debug->EliminateRowCol(ess_true_multipliers_[j]);
+        op_sp->EliminateRow(ess_true_multipliers_[j]);
+        op_sp->EliminateCol(ess_true_multipliers_[j]);
+        op_sp->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
     }
 
 
     darcy_rhs.GetBlock(1) = rhs_copy.GetBlock(1);
 
-//    mfem::BlockVector rhs_hb = MakeHybridRHS(rhs_copy);
 
     rhs_debug.GetBlock(0) = 0.0;
     rhs_debug.GetBlock(1).Set(-1.0, rhs_copy.GetBlock(2));
 
     left_tmp->AddMult(darcy_rhs, rhs_debug);
-
 
 
     op_elim.AddMult(sol_hb, rhs_debug, -1.0);
@@ -4155,13 +4121,31 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         rhs_debug(ess_true_mult) = sol_hb(ess_true_mult);
     }
 
-    mfem::UMFPackSolver solver_debug(*op_sp);
-//    mfem::DenseMatrixInverse solver_debug(op_tmp);
-//    mfem::DenseMatrix solver_debug;
-//    solver_debug_tmp.GetInverseMatrix(solver_debug);
-    solver_debug.Mult(rhs_debug, sol_hb);
 
-//    solver_->Mult(rhs_hb, sol_hb);
+    unique_ptr<mfem::HypreParMatrix> pA00(ToParMatrix(comm_, op_debug->GetBlock(0, 0)));
+    auto prec_00 = new mfem::HypreBoomerAMG(*pA00);
+    prec_00->SetPrintLevel(0);
+    A00_inv_.reset(prec_00);
+
+    unique_ptr<mfem::HypreParMatrix> pA11(ToParMatrix(comm_, *op_11));
+    A11_inv_.reset(new mfem::HypreSmoother(*pA11, mfem::HypreSmoother::l1Jacobi));
+    stage1_prec_->SetDiagonalBlock(0, A00_inv_.get());
+    stage1_prec_->SetDiagonalBlock(1, A11_inv_.get());
+    stage1_prec_->SetBlock(1, 0, &(op_debug->GetBlock(1, 0)));
+
+    monolithic_.reset(ToParMatrix(comm_, *op_sp));
+    stage2_prec_.reset(new HypreILU(*monolithic_, 0));
+
+    auto prec = make_unique<TwoStageSolver>(*stage1_prec_, *stage2_prec_, *op_sp);
+
+    solver_->SetPreconditioner(*prec);
+    solver_->SetOperator(*op_sp);
+
+
+    solver_->Mult(rhs_debug, sol_hb);
+    num_iterations_ = solver_->GetNumIterations();
+    resid_norm_ = solver_->GetFinalNorm();
+
 
     mfem::BlockVector darcy_sol_tmp(darcy_rhs), darcy_sol(darcy_bos);
     right_op.AddMult(sol_hb, darcy_sol_tmp, -1.0);
@@ -4187,7 +4171,6 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         }
         sol.AddElementVector(local_edofs, helper);
     }
-
 }
 
 void TwoPhaseHybrid::DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const
