@@ -3983,7 +3983,12 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     mfem::SparseMatrix dMdS_hat(num_hatdofs, mgL_.NumVDofs());
     mfem::SparseMatrix D_hat(mgL_.NumVDofs(), num_hatdofs);
     mfem::SparseMatrix C_hat(mgL_.NumEDofs(), num_hatdofs);
-    mfem::SparseMatrix darcy_hat_inv(num_hatdofs+D_hat.NumRows());
+//    mfem::SparseMatrix darcy_hat_inv(num_hatdofs+D_hat.NumRows());
+
+    mfem::SparseMatrix darcy_hat_inv_00(num_hatdofs);
+    mfem::SparseMatrix darcy_hat_inv_01(num_hatdofs, D_hat.NumRows());
+    mfem::SparseMatrix darcy_hat_inv_10(D_hat.NumRows(), num_hatdofs);
+    mfem::SparseMatrix darcy_hat_inv_11(D_hat.NumRows());
 
     int num_injectors = mgL_.NumInjectors();
     auto inj_cells = mgL_.GetInjectorCells();
@@ -4028,12 +4033,12 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         C_hat.AddSubMatrix(local_mult, local_hat, DenseCloc);
 
 
-        local_hat.Copy(local_ddofs);
-        local_ddofs.Append(local_vdofs);
-        for (int j = local_edofs.Size(); j < local_ddofs.Size(); ++j)
-        {
-            local_ddofs[j] = local_ddofs[j] + num_hatdofs;
-        }
+//        local_hat.Copy(local_ddofs);
+//        local_ddofs.Append(local_vdofs);
+//        for (int j = local_edofs.Size(); j < local_ddofs.Size(); ++j)
+//        {
+//            local_ddofs[j] = local_ddofs[j] + num_hatdofs;
+//        }
 
         mfem::DenseMatrix darcy_el(DenseDloc.NumCols() + DenseDloc.NumRows());
         darcy_el.CopyMN(M_el_i, 0, 0);
@@ -4041,12 +4046,22 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         darcy_el.CopyMNt(DenseDloc, 0, DenseDloc.NumCols());
 
         mfem::DenseMatrixInverse darcy_el_solver(darcy_el);
-        mfem::DenseMatrix darcy_el_inv;
+        mfem::DenseMatrix darcy_el_inv, darcy_el_inv_blk;
         darcy_el_solver.GetInverseMatrix(darcy_el_inv);
 
-        darcy_hat_inv.AddSubMatrix(local_ddofs, local_ddofs, darcy_el_inv);
+//        darcy_hat_inv.AddSubMatrix(local_ddofs, local_ddofs, darcy_el_inv);
 
-
+        darcy_el_inv_blk.CopyMN(darcy_el_inv, local_hat.Size(), local_hat.Size(), 0, 0);
+        darcy_hat_inv_00.AddSubMatrix(local_hat, local_hat, darcy_el_inv_blk);
+        darcy_el_inv_blk.CopyMN(darcy_el_inv, local_hat.Size(),
+                                local_vdofs.Size(), 0, local_hat.Size());
+        darcy_hat_inv_01.AddSubMatrix(local_hat, local_vdofs, darcy_el_inv_blk);
+        darcy_el_inv_blk.CopyMN(darcy_el_inv, local_vdofs.Size(),
+                                local_hat.Size(), local_hat.Size(), 0);
+        darcy_hat_inv_10.AddSubMatrix(local_vdofs, local_hat, darcy_el_inv_blk);
+        darcy_el_inv_blk.CopyMN(darcy_el_inv, local_vdofs.Size(), local_vdofs.Size(),
+                                local_hat.Size(), local_hat.Size());
+        darcy_hat_inv_11.AddSubMatrix(local_vdofs, local_vdofs, darcy_el_inv_blk);
 
         rhs_copy.GetSubVector(local_edofs, helper);
 
@@ -4060,11 +4075,16 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         darcy_rhs.GetBlock(0).SetSubVector(local_hat, helper);
 
     }
-//    M_hat.Finalize();
     dTdsigma_hat.Finalize();
     dMdS_hat.Finalize();
-//    D_hat.Finalize();
     C_hat.Finalize();
+//    darcy_hat_inv.Finalize();
+
+    mfem::BlockMatrix darcy_hat_inv(darcy_bos);
+    darcy_hat_inv.SetBlock(0, 0, &darcy_hat_inv_00);
+    darcy_hat_inv.SetBlock(0, 1, &darcy_hat_inv_01);
+    darcy_hat_inv.SetBlock(1, 0, &darcy_hat_inv_10);
+    darcy_hat_inv.SetBlock(1, 1, &darcy_hat_inv_11);
     darcy_hat_inv.Finalize();
 
     mfem::SparseMatrix CT_hat = smoothg::Transpose(C_hat);
@@ -4078,49 +4098,42 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     mfem::BlockMatrix left_op(bos, darcy_bos);
     left_op.SetBlock(0, 0, &C_hat);
     left_op.SetBlock(1, 0, &dTdsigma_hat);
-    unique_ptr<mfem::SparseMatrix> left_sp(left_op.CreateMonolithic());
+//    unique_ptr<mfem::SparseMatrix> left_sp(left_op.CreateMonolithic());
 
     mfem::BlockMatrix right_op(darcy_bos, bos);
     right_op.SetBlock(0, 0, &CT_hat);
     right_op.SetBlock(0, 1, &dMdS_hat);
 
-//    mfem::DenseMatrix op_tmp;
-//    {
-//        {
-//            mfem::DenseMatrix right_tmp, right_dense;
-            unique_ptr<mfem::SparseMatrix> right_sp(right_op.CreateMonolithic());
-//            Full(*right_sp, right_dense);
+//    unique_ptr<mfem::SparseMatrix> right_sp(right_op.CreateMonolithic());
 
-//            unique_ptr<mfem::SparseMatrix> darcy_sp(darcy_debug.CreateMonolithic());
-//            mfem::UMFPackSolver darcy_inv(*darcy_sp);
-//            right_tmp = smoothg::Mult(darcy_inv, right_dense);
-//            op_tmp = smoothg::Mult(left_op, right_tmp);
-//        }
-//        {
-//            mfem::DenseMatrix dtds_dense;
-            mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
-            mfem::BlockMatrix dtds_op(bos, bos);
-            dtds_op.SetBlock(1, 1, &dTdS);
-            unique_ptr<mfem::SparseMatrix> dtds_sp(dtds_op.CreateMonolithic());
-//            Full(*dtds_sp, dtds_dense);
-//            op_tmp -= dtds_dense;
-//        }
-//    }
+    mfem::SparseMatrix dTdS = GetDiag(*dTdS_);
+//    mfem::BlockMatrix dtds_op(bos, bos);
+//    dtds_op.SetBlock(1, 1, &dTdS);
+//    unique_ptr<mfem::SparseMatrix> dtds_sp(dtds_op.CreateMonolithic());
 
-    auto left_tmp = smoothg::Mult(*left_sp, darcy_hat_inv);
-    auto op_tmp = smoothg::Mult(left_tmp, *right_sp);
+//    auto left_tmp = smoothg::Mult(*left_sp, darcy_hat_inv);
+//    auto op_tmp = smoothg::Mult(left_tmp, *right_sp);
+//    unique_ptr<mfem::SparseMatrix> op_debug(mfem::Add(1.0, op_tmp, -1.0, *dtds_sp));
 
-    unique_ptr<mfem::SparseMatrix> op_debug(mfem::Add(1.0, op_tmp, -1.0, *dtds_sp));
+    unique_ptr<mfem::BlockMatrix> left_tmp(mfem::Mult(left_op, darcy_hat_inv));
+    unique_ptr<mfem::BlockMatrix> op_debug(mfem::Mult(*left_tmp, right_op));
 
-    mfem::SparseMatrix op_elim = GetEliminatedCols(*op_debug, ess_true_multipliers_);
+
+    mfem::SparseMatrix* op_debug_11 = &(op_debug->GetBlock(1, 1));
+    mfem::SparseMatrix* op_11 = mfem::Add(1., *op_debug_11, -1., dTdS);
+    op_debug->SetBlock(1, 1, op_11);
+    delete op_debug_11;
+    unique_ptr<mfem::SparseMatrix> op_sp(op_debug->CreateMonolithic());
+
+    mfem::SparseMatrix op_elim = GetEliminatedCols(*op_sp, ess_true_multipliers_);
 
     for (int j = 0; j < ess_true_multipliers_.Size(); ++j)
     {
-        assert((*op_debug)(ess_true_multipliers_[j], ess_true_multipliers_[j]) != 0.0);
-//        op_debug->EliminateRowCol(ess_true_multipliers_[j]);
-        op_debug->EliminateRow(ess_true_multipliers_[j]);
-        op_debug->EliminateCol(ess_true_multipliers_[j]);
-        op_debug->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
+//        assert((*op_debug)(ess_true_multipliers_[j], ess_true_multipliers_[j]) != 0.0);
+        op_sp->EliminateRowCol(ess_true_multipliers_[j]);
+//        op_debug->EliminateRow(ess_true_multipliers_[j]);
+//        op_debug->EliminateCol(ess_true_multipliers_[j]);
+//        op_debug->Set(ess_true_multipliers_[j], ess_true_multipliers_[j], 1.0);
     }
 
 
@@ -4131,7 +4144,7 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
     rhs_debug.GetBlock(0) = 0.0;
     rhs_debug.GetBlock(1).Set(-1.0, rhs_copy.GetBlock(2));
 
-    left_tmp.AddMult(darcy_rhs, rhs_debug);
+    left_tmp->AddMult(darcy_rhs, rhs_debug);
 
 
 
@@ -4142,7 +4155,7 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
         rhs_debug(ess_true_mult) = sol_hb(ess_true_mult);
     }
 
-    mfem::UMFPackSolver solver_debug(*op_debug);
+    mfem::UMFPackSolver solver_debug(*op_sp);
 //    mfem::DenseMatrixInverse solver_debug(op_tmp);
 //    mfem::DenseMatrix solver_debug;
 //    solver_debug_tmp.GetInverseMatrix(solver_debug);
@@ -4151,7 +4164,7 @@ void TwoPhaseHybrid::Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol)
 //    solver_->Mult(rhs_hb, sol_hb);
 
     mfem::BlockVector darcy_sol_tmp(darcy_rhs), darcy_sol(darcy_bos);
-    right_sp->AddMult(sol_hb, darcy_sol_tmp, -1.0);
+    right_op.AddMult(sol_hb, darcy_sol_tmp, -1.0);
     darcy_hat_inv.Mult(darcy_sol_tmp, darcy_sol);
 
     sol.GetBlock(1) = darcy_sol.GetBlock(1);
