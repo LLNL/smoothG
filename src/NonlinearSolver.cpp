@@ -25,7 +25,8 @@ namespace smoothg
 
 NonlinearSolver::NonlinearSolver(MPI_Comm comm, NLSolverParameters param)
     : comm_(comm), tag_("Nonlinear"), iter_(0), converged_(false),
-      linear_iter_(0), linear_tol_(param.init_linear_tol), param_(param)
+      linear_iter_(0), num_linear_solves_(0),
+      linear_tol_(param.init_linear_tol), param_(param)
 {
     MPI_Comm_rank(comm_, &myid_);
 }
@@ -149,7 +150,8 @@ void NonlinearSolver::BackTracking(const mfem::Vector& rhs, double prev_resid_no
 
 FAS::FAS(MPI_Comm comm, FASParameters param)
     : NonlinearSolver(comm, param.nl_solve), rhs_(param.num_levels),
-      sol_(rhs_.size()), help_(rhs_.size()), solvers_(rhs_.size()), param_(param)
+      sol_(rhs_.size()), help_(rhs_.size()), solvers_(rhs_.size()),
+      level_time_(rhs_.size()), param_(param)
 {
     tag_ = "FAS";
 }
@@ -176,21 +178,28 @@ void FAS::Smoothing(int level, const mfem::Vector& in, mfem::Vector& out)
 
 void FAS::MG_Cycle(int l)
 {
+    mfem::StopWatch chrono;
     if (param_.cycle == Cycle::V_CYCLE || l == param_.num_levels - 1)
     {
+        chrono.Start();
         Smoothing(l, rhs_[l], sol_[l]); // Pre-smoothing
+        level_time_[l] += chrono.RealTime();
 
-       if (l == param_.num_levels - 1)
-       {
-           coarsest_nonlinear_iter_ += solvers_[l]->GetNumIterations();
-       }
+        if (l == param_.num_levels - 1)
+        {
+            coarsest_nonlinear_iter_ += solvers_[l]->GetNumIterations();
+        }
     }
 
     if (l == param_.num_levels - 1) { return; } // terminate if coarsest level
 
     if (l == 0 && param_.cycle == Cycle::V_CYCLE)
     {
+        chrono.Clear();
+        chrono.Start();
         resid_norm_ = solvers_[l]->ResidualNorm(sol_[l], rhs_[l]);
+        level_time_[l] += chrono.RealTime();
+
         if (resid_norm_ < adjusted_tol_)
         {
             if (myid_ == 0)
@@ -207,41 +216,65 @@ void FAS::MG_Cycle(int l)
     {
         // Compute FAS coarser level rhs
         // f_{l+1} = P^T( f_l - A_l(x_l) ) + A_{l+1}(pi x_l)
+
+        chrono.Clear();
+        chrono.Start();
+
         help_[l] = solvers_[l]->Residual(sol_[l], rhs_[l]);
+        double resid_norm_l = Norm(l, help_[l]);
+
+        level_time_[l] += chrono.RealTime();
+
         Restrict(l, help_[l], help_[l + 1]);
         Project(l, sol_[l], sol_[l + 1]);
+
+        chrono.Clear();
+        chrono.Start();
+
         rhs_[l + 1] = solvers_[l + 1]->Residual(sol_[l + 1], help_[l + 1]);
 
         // Store projected coarse solution pi x_l
         mfem::Vector coarse_sol = sol_[l + 1];
-        if (param_.cycle == Cycle::FMG)
-        {
-            coarse_sol = 0.0;
-        }
-        double resid_norm_l = Norm(l, help_[l]);
+//        if (param_.cycle == Cycle::FMG)
+//        {
+//            coarse_sol = 0.0;
+//        }        
+        level_time_[l+1] += chrono.RealTime();
 
         MG_Cycle(l + 1); // Go to coarser level (sol_[l+1] will be updated)
 
         // Compute correction x_l += P( x_{l+1} - pi x_l )
-        sol_[l + 1] -= coarse_sol;
+
+        chrono.Clear();
+        chrono.Start();
+        sol_[l + 1] -= coarse_sol;        
+        level_time_[l+1] += chrono.RealTime();
 
         Interpolate(l + 1, sol_[l + 1], help_[l]);
-        if (param_.cycle == Cycle::V_CYCLE)
+
+        chrono.Clear();
+        chrono.Start();
+
+//        if (param_.cycle == Cycle::V_CYCLE)
         {
             sol_[l] += help_[l];
         }
-        else
-        {
-            sol_[l] = help_[l];
-        }
+//        else
+//        {
+//            sol_[l] = help_[l];
+//        }
 
-        if (param_.cycle == Cycle::V_CYCLE)
+//        if (param_.cycle == Cycle::V_CYCLE)
         {
             solvers_[l]->BackTracking(rhs_[l], resid_norm_l, sol_[l], help_[l]);
         }
+        level_time_[l] += chrono.RealTime();
     }
 
+    chrono.Clear();
+    chrono.Start();
     Smoothing(l, rhs_[l], sol_[l]); // Post-smoothing
+    level_time_[l] += chrono.RealTime();
 }
 
 void FAS::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)

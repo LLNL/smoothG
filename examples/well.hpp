@@ -610,8 +610,9 @@ public:
 
 void SaigupModel::SetupMesh(bool refined)
 {
-    std::string file = refined ? "refined_saigup/refined_saigup_HEX.vtk" : "saigup/saigup_HEX.vtk";
-    std::ifstream imesh("/Users/lee1029/Downloads/"+file);
+//    std::string file = refined ? "refined_saigup/refined_saigup_HEX.vtk" : "saigup/saigup_HEX.vtk";
+//    std::ifstream imesh("/Users/lee1029/Downloads/"+file);
+    std::ifstream imesh(refined ? "refined_saigup_HEX.vtk" : "saigup_HEX.vtk");
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
 }
@@ -648,7 +649,7 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
 
 //    std::ifstream imesh("logNormal.vtk");
 //    mfem::Mesh serial_mesh(imesh, 1, 1);
-    mfem::Mesh serial_mesh(11, 11, 30, mfem::Element::HEXAHEDRON, true,
+    mfem::Mesh serial_mesh(101, 101, 30, mfem::Element::HEXAHEDRON, true,
                            1010.0*ft_, 1010.0*ft_, 30.0*ft_);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
     InitGraph();
@@ -671,7 +672,7 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
     ComputeGraphWeight();
 
     well_manager_.reset(new WellManager(*mesh_, *kinv_vector_));
-    Set5Wells(well_height, inject_rate, bottom_hole_pressure);
+    Set64Wells(well_height, inject_rate, bottom_hole_pressure);
     CombineReservoirAndWellModel();
 
     vert_weight_ = ComputeVertWeight();
@@ -820,8 +821,8 @@ void MRSTLogNormal::Set64Wells(int well_height, double inject_rate, double bhp)
         }
     }
 
-    std::ofstream well_file("mrst_lognormal_well.vtk");
-    well_pos_.SaveVTK(well_file, "well_position", 1);
+//    std::ofstream well_file("mrst_lognormal_well.vtk");
+//    well_pos_.SaveVTK(well_file, "well_position", 1);
 
 }
 

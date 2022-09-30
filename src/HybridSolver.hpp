@@ -180,6 +180,8 @@ protected:
     mfem::Vector MakeInitialGuess(const mfem::BlockVector& sol,
                                   const mfem::BlockVector& rhs) const;
 
+    void MakeDarcyInverses(const std::vector<mfem::DenseMatrix>& M_el);
+
     const MixedMatrix& mgL_;
 
     mfem::SparseMatrix Agg_multiplier_;
@@ -236,6 +238,12 @@ protected:
     saamge::agg_partitioning_relations_t* sa_apr_;
     saamge::ml_data_t* sa_ml_data_;
 #endif
+
+    std::vector<mfem::DenseMatrix> darcy_inv_00_;
+    std::vector<mfem::DenseMatrix> darcy_inv_01_;
+    std::vector<mfem::DenseMatrix> darcy_inv_10_;
+    std::vector<mfem::DenseMatrix> darcy_inv_11_;
+    std::unique_ptr<mfem::SparseMatrix> C_proc_;
 };
 
 
@@ -261,6 +269,65 @@ private:
     mfem::SparseMatrix aux_map_;
     std::unique_ptr<mfem::HypreParMatrix> aux_op_;
     std::unique_ptr<mfem::HypreBoomerAMG> aux_solver_;
+};
+
+
+
+class TwoPhaseHybrid : public HybridSolver
+{
+    mfem::Array<int> offsets_;
+    std::unique_ptr<mfem::BlockOperator> op_;
+    std::unique_ptr<mfem::SparseMatrix> mono_mat_;
+    mutable std::unique_ptr<mfem::HypreParMatrix> monolithic_;
+    mutable std::unique_ptr<mfem::Solver> A00_inv_;
+    mutable std::unique_ptr<mfem::Solver> A11_inv_;
+    mutable std::unique_ptr<mfem::BlockLowerTriangularPreconditioner> stage1_prec_;
+    mutable std::unique_ptr<HypreILU> stage2_prec_;
+
+    // B00_ and B01_ are the (0,0) and (0,1)-block of [M D^T; D 0]^{-1}
+    std::vector<mfem::DenseMatrix> B00_;  // M^{-1} - B01_ D M^{-1}
+    std::vector<mfem::DenseMatrix> B01_;  // M^{-1} D^T (DM^{-1}D^T)^{-1}
+
+    double dt_density_;
+
+    mfem::Array<int> ess_redofs_;
+    std::unique_ptr<mfem::SparseMatrix> op3_;
+    std::unique_ptr<mfem::UMFPackSolver> solver3_;
+    std::unique_ptr<mfem::HypreParMatrix> schur_;
+    std::unique_ptr<mfem::HypreParMatrix> schur22_;
+    std::unique_ptr<mfem::HypreParMatrix> schur33_;
+
+    std::unique_ptr<mfem::SparseMatrix> A10_elim_;
+
+    const std::vector<mfem::DenseMatrix>* dTdsigma_;
+    const std::vector<mfem::DenseMatrix>* dMdS_;
+    const mfem::HypreParMatrix* dTdS_;
+
+    mutable double resid_norm_;
+
+    void Init();
+    mfem::BlockVector MakeHybridRHS(const mfem::BlockVector& rhs) const;
+    void BackSubstitute(const mfem::BlockVector& rhs,
+                        const mfem::BlockVector& sol_hb,
+                        mfem::BlockVector& sol) const;
+public:
+    TwoPhaseHybrid(const MixedMatrix& mgL, const mfem::Array<int>* ess_attr)
+        : HybridSolver(mgL, ess_attr), offsets_(3), B00_(nAggs_), B01_(nAggs_)
+    { Init(); }
+
+    void AssembleSolver(mfem::Vector elem_scaling_inverse,
+                        const std::vector<mfem::DenseMatrix>& dMdS,
+                        const std::vector<mfem::DenseMatrix>& dTdsigma,
+                        const mfem::HypreParMatrix& dTdS,
+                        double dt_density_ = 1.0);
+
+    void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const override;
+    void Mult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol);
+    void Mult3(const mfem::BlockVector& rhs, mfem::BlockVector& sol);
+    void DebugMult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    void DebugMult2(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    void DebugMult3(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    double GetResidualNorm() const { return resid_norm_; }
 };
 
 } // namespace smoothg

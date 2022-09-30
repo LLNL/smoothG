@@ -89,6 +89,10 @@ public:
     double GetTiming() const { return timing_; }
     double GetResidualNorm() const { return resid_norm_; }
     int GetNumLinearIterations() const { return linear_iter_; }
+    double GetNumLinearIterationsMean() const
+    {
+        return num_linear_solves_ ? ((double) linear_iter_) / num_linear_solves_ : 0.0;
+    }
     ///@}
 protected:
     /// Nonlinear iteration step: x is updated, dx stores the change in x
@@ -106,6 +110,7 @@ protected:
     bool converged_;
 
     int linear_iter_;
+    int num_linear_solves_;
 
     double adjusted_tol_;  // max(atol_, rtol_ * || rhs ||)
     double rhs_norm_;
@@ -146,6 +151,8 @@ public:
     double ResidualNorm(const mfem::Vector& x, const mfem::Vector& y) override;
 
     int GetNumCoarsestIterations() const { return coarsest_nonlinear_iter_; }
+
+    double GetLevelTime(int level) const { return level_time_[level]; }
 protected:
     virtual double Norm(int level, const mfem::Vector& vec) const = 0;
 
@@ -168,6 +175,7 @@ protected:
     std::vector<mfem::Vector> sol_;
     std::vector<mfem::Vector> help_;
     std::vector<std::unique_ptr<NonlinearSolver>> solvers_;
+    std::vector<double> level_time_;
     FASParameters param_;
 };
 

@@ -109,6 +109,65 @@ protected:
     bool is_symmetric_;
 };
 
+
+
+/// Constructs a solver which is a combination of a given pair of solvers
+/// TwoStageSolver * x = solver2 * (I - A * solver1 ) * x + solver1 * x
+class TwoStageSolver : public mfem::Solver
+{
+protected:
+    const mfem::Operator& solver1_;
+    const mfem::Operator& solver2_;
+    const mfem::Operator& op_;
+    // additional memory for storing intermediate results
+    mutable mfem::Vector tmp1;
+    mutable mfem::Vector tmp2;
+
+public:
+    virtual void SetOperator(const Operator &op) override { }
+    TwoStageSolver(const mfem::Operator& solver1, const mfem::Operator& solver2, const mfem::Operator& op) :
+        solver1_(solver1), solver2_(solver2), op_(op),  tmp1(op.NumRows()), tmp2(op.NumRows()) { }
+
+    void Mult(const mfem::Vector & x, mfem::Vector & y) const override
+    {
+        solver1_.Mult(x, y);
+        op_.Mult(y, tmp1);
+        tmp1 -= x;
+        solver2_.Mult(tmp1, tmp2);
+        y -= tmp2;
+    }
+};
+
+/// Hypre ILU Preconditioner
+class HypreILU : public mfem::HypreSolver
+{
+   HYPRE_Solver ilu_precond;
+public:
+   HypreILU(mfem::HypreParMatrix &A, int type = 0, int fill_level = 1)
+       : HypreSolver(&A)
+   {
+      HYPRE_ILUCreate(&ilu_precond);
+      HYPRE_ILUSetMaxIter( ilu_precond, 1 );
+      HYPRE_ILUSetTol( ilu_precond, 0.0 );
+      HYPRE_ILUSetType( ilu_precond, type );
+      HYPRE_ILUSetLevelOfFill( ilu_precond, fill_level );
+      HYPRE_ILUSetDropThreshold( ilu_precond, 1e-2 );
+      HYPRE_ILUSetMaxNnzPerRow( ilu_precond, 100 );
+      HYPRE_ILUSetLocalReordering(ilu_precond, type == 0 ? false : true);
+   }
+
+   virtual void SetOperator(const mfem::Operator &op) { }
+
+   virtual operator HYPRE_Solver() const { return ilu_precond; }
+
+   virtual HYPRE_PtrToParSolverFcn SetupFcn() const
+   { return (HYPRE_PtrToParSolverFcn) HYPRE_ILUSetup; }
+   virtual HYPRE_PtrToParSolverFcn SolveFcn() const
+   { return (HYPRE_PtrToParSolverFcn) HYPRE_ILUSolve; }
+
+   virtual ~HypreILU() { HYPRE_ILUDestroy(ilu_precond); }
+};
+
 } // namespace smoothg
 
 #endif /* __MIXEDLAPLACIANSOLVER_HPP__ */

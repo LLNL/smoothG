@@ -141,6 +141,12 @@ public:
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);
 
+    void MakeTwoPhaseHybridSolver(int level);
+    TwoPhaseHybrid& GetTwoPhaseHybridSolver(int level) const
+    {
+        return *two_phase_solvers_[level];
+    }
+
     /// Show Total setup time
     void ShowSetupTime(std::ostream& out = std::cout) const;
 
@@ -203,6 +209,7 @@ private:
 
     std::vector<MixedMatrix> mixed_systems_;
     std::vector<std::unique_ptr<MixedLaplacianSolver> > solvers_;
+    std::vector<std::unique_ptr<TwoPhaseHybrid> > two_phase_solvers_;
 
     std::vector<mfem::SparseMatrix> Psigma_;
     std::vector<mfem::SparseMatrix> Pu_;

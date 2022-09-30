@@ -153,6 +153,7 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
                      const mfem::Array<int>* ess_attr)
     : comm_(mixed_system.GetComm()),
       solvers_(param.max_levels),
+      two_phase_solvers_(param.max_levels),
       setup_time_(0.0),
       ess_attr_(ess_attr),
       param_(param)
@@ -273,11 +274,13 @@ mfem::SparseMatrix Hierarchy::MakeMinimalPvertices(
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
-    if (param.hybridization) // Hybridization solver
+    if (level && param.hybridization) // Hybridization solver
     {
         SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
                                                param.rescale_iter, sa_param));
+
+        MakeTwoPhaseHybridSolver(level);
     }
     else // L2-H1 block diagonal preconditioner
     {
@@ -731,5 +734,12 @@ Hierarchy::ComputeMicroUpwindFlux2(int level)
 //    out.Print();
     return out;
 }
+
+void Hierarchy::MakeTwoPhaseHybridSolver(int level)
+{
+    auto solver = make_unique<TwoPhaseHybrid>(GetMatrix(level), ess_attr_);
+    two_phase_solvers_[level] = std::move(solver);
+}
+
 
 } // namespace smoothg
