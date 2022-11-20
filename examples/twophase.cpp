@@ -810,6 +810,36 @@ AddWellCellAgg(const mfem::Array<int>& partition,
     return out;
 }
 
+void PrintFluxBasis(std::string& path, int level, int basis_id,
+                    const Hierarchy& hierarchy, DarcyProblem* problem_for_plot,
+                    const mfem::SparseMatrix& edge_map)
+{
+    std::string b_id = std::to_string(basis_id);
+    std::string lvl = "lvl"+std::to_string(level);
+    std::string tag = lvl+"_flux_basis_iso_"+b_id;
+
+//    std::ifstream flux_file("egg_lvl1_flux_basis_"+b_id+".txt");
+    mfem::GridFunction flux_basis(problem_for_plot->GetSigmaSpace());
+
+    auto& Psigma = hierarchy.GetPsigma(0);
+    mfem::Vector flux_coarse(Psigma.NumCols());
+
+    flux_coarse = 0.0;
+//    flux_fine.Load(flux_file, flux_fine.Size());
+    flux_coarse[basis_id] = 1.0;
+
+    mfem::Vector flux_fine = smoothg::MatVec(Psigma, flux_coarse);
+    edge_map.Mult(flux_fine, flux_basis);
+
+    RescaleVector(problem_for_plot->GetSigmaSignChange(), flux_basis);
+    std::cout<<"saving level " <<level << " flux basis "<<basis_id<<"\n";
+//    std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
+//    std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
+//        std::ofstream flux_outfile("spe10_1to5_flux_basis_357_ref1.vtk");
+    std::ofstream flux_outfile(path+"_"+tag+"_ref1.vtk");
+    flux_basis.SaveVTK(flux_outfile, tag, 1);
+}
+
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -1270,7 +1300,6 @@ int main(int argc, char* argv[])
         dof_part_coarse.Print(dof_part_coarse_file, 1);
     }
 
-
 //    for (int i = agg_face.NumRows()-num_injectors; i < agg_face.NumRows(); ++i)
 //    {
 //        mfem::Array<int> faces;
@@ -1279,25 +1308,18 @@ int main(int argc, char* argv[])
 //        faces.Print(std::cout, faces.Size());
 //    }
 
+    mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
+    mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
 
-//=======
-
-////    mfem::SparseMatrix agg_vert = PartitionToMatrix(*partition, partition->Max()+1);
-////    const mfem::SparseMatrix& vert_edge = graph.VertexToEdge();
-////    mfem::SparseMatrix edge_vert = smoothg::Transpose(vert_edge);
-////    mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
-
-
-    for (int level = 1; level < 0; level++)
+    for (int level = 1; level < upscale_param.max_levels; level++)
+//    for (int level = 1; level < 0; level++)
     {
+        auto agg_face = hierarchy.GetGraph(level).VertexToEdge();
+        auto face_agg = hierarchy.GetGraph(level).EdgeToVertex();
 
-
-    auto agg_face = hierarchy.GetGraph(level).VertexToEdge();
-    auto face_agg = hierarchy.GetGraph(level).EdgeToVertex();
-
-    auto agg_agg = smoothg::Mult(agg_face, face_agg);
-    mfem::Array<int> colors;
-    GetElementColoring(colors, agg_agg);
+        auto agg_agg = smoothg::Mult(agg_face, face_agg);
+        mfem::Array<int> colors;
+        GetElementColoring(colors, agg_agg);
 ////    std::cout << "agg connected to injector:\n";
 //    for (int i = 0; i < num_injectors; ++i)
 //    {
@@ -1319,61 +1341,180 @@ int main(int argc, char* argv[])
 ////    partition.reset(AddWellCellAgg(*partition, well_cells));
 ////    std::cout << "Number of new aggs created because of well cell isolation: "
 ////              << partition->Max()+1 - num_old_parts << "\n";
-////>>>>>>> Stashed changes
 
-    mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
-    mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
+        auto vert_agg = smoothg::Transpose(hierarchy.GetAggVert(level-1));
 
-    auto vert_agg = smoothg::Transpose(hierarchy.GetAggVert(level-1));
+        if (level == 2)
+        {
+            auto vert_agg_fine = smoothg::Transpose(hierarchy.GetAggVert(level-2));
+            auto vert_agg_tmp = smoothg::Mult(vert_agg_fine, vert_agg);
+            vert_agg.Swap(vert_agg_tmp);
+        }
 
-    if (level == 2)
+
+    //    mfem::Vector part_vec(partition->Size()-num_injectors);
+        mfem::GridFunction part_vec(&u_fes);
+        mfem::GridFunction part_color_vec(&u_fes);
+        for (int i = 0; i < part_vec.Size(); ++i)
+        {
+            assert(vert_agg.RowSize(i) == 1);
+            part_color_vec[i] = colors[vert_agg.GetRowColumns(i)[0]];
+            part_vec[i] = vert_agg.GetRowColumns(i)[0];
+        }
+
+        std::string tag = "agg"+std::to_string(upscale_param.coarse_factor)
+                +"_lvl"+std::to_string(level);
+        std::ofstream part_file(path+"_"+tag+"_ref1.vtk");
+        //    part_vec.Print(part_file, 1);
+        part_vec.SaveVTK(part_file, tag, 1);
+
+        std::string color_tag = "agg_color"+std::to_string(upscale_param.coarse_factor)
+                +"_lvl"+std::to_string(level);
+        part_color_vec.SaveVTK(part_file, color_tag, 1);
+    }
+//return EXIT_SUCCESS;
+    if (false)
     {
-        auto vert_agg_fine = smoothg::Transpose(hierarchy.GetAggVert(level-2));
-        auto vert_agg_tmp = smoothg::Mult(vert_agg_fine, vert_agg);
-        vert_agg.Swap(vert_agg_tmp);
+        auto& vert_edge = hierarchy.GetGraph(0).VertexToEdge();
+        auto& edge_vert = hierarchy.GetGraph(0).EdgeToVertex();
+
+        auto vert_vert = smoothg::Mult(vert_edge, edge_vert);
+        std::ofstream inj_file(path+"_injector_cells_ref1.vtk");
+
+        mfem::GridFunction inj_vec(&u_fes);
+        inj_vec = 0.0;
+        for (int i = 0; i < num_injectors; ++i)
+        {
+            int vert = vert_vert.NumRows() - num_injectors + i;
+            std::cout << "verts connected to injector #" << i << " (vert "<<vert<<"):\n";
+
+            for (int j = 0; j < vert_vert.RowSize(vert); ++j)
+            {
+                if (vert_vert.GetRowColumns(vert)[j] != vert)
+                {
+                    std::cout << vert_vert.GetRowColumns(vert)[j] << " ";
+                    inj_vec[vert_vert.GetRowColumns(vert)[j]] = i+1.0;
+                }
+            }
+            std::cout << "\n";
+        }
+
+        int edge_offset = edge_vert.NumRows() - num_producers*well_height;
+        for (int i = 0; i < num_producers; ++i)
+        {
+            std::cout << "verts connected to producer #" << i << ":\n";
+
+            for (int j = 0; j < well_height; ++j)
+            {
+                int edge = edge_offset + i * well_height + j;
+                std::cout << edge_vert.GetRowColumns(edge)[0] << " ";
+                assert(edge_vert.RowSize(edge) == 1);
+                inj_vec[edge_vert.GetRowColumns(edge)[0]] = -1.0-i;
+            }
+            std::cout << "\n";
+        }
+        inj_vec.SaveVTK(inj_file, "injector_cell", 1);
+//        inj_vec.Save(inj_file);
+
+        // fix incorrect inj cells
+        if (false)
+        {
+            //        int top_cell = 1501;
+            //        std::vector<int> inj_cells{ 128943, 128939, 107431, 107427, 85711, 85707, 63991, 63987,
+            //                                   42271, 42267, 21255, 21251}; //1501, 1497, inj 8
+
+            //        int top_cell = 93;
+            //        std::vector<int> inj_cells{127655, 127651, 105991, 105987, 84271, 84267, 62551, 62547, 40831,
+            //                                   40827, 19967, 19963 }; //93, 89, inj 7
+
+            int top_cell = 2301;
+            std::vector<int> inj_cells{129743, 129739, 108295, 108291, 86575, 86571, 64855, 64851, 43135,
+                                       43131, 22055, 22051}; //2301, 2297, inj 6
+
+
+            mfem::Array<int> top_cell_neighbor, vert_neighbor;
+            int old_vert = -1;
+            for (int i = 0; i < inj_cells.size(); ++i)
+            {
+                int vert = inj_cells[inj_cells.size()-1-i];
+                int find_counter = 0;
+
+                GetTableRow(vert_vert, top_cell-1, top_cell_neighbor);
+                GetTableRow(vert_vert, vert-1, vert_neighbor);
+                //            top_cell_neighbor.Print(std::cout, 8);
+                //            vert_neighbor.Print(std::cout, 8);
+
+                for (int neighbor : top_cell_neighbor)
+                {
+                    if (neighbor == old_vert) { continue; }
+                    if (neighbor == 148429) { continue; }
+
+                    int neighbor_idx = vert_neighbor.Find(neighbor);
+                    if (neighbor_idx == -1) { continue; }
+
+                    std::cout << "common neighbor of " << top_cell << " and ";
+                    top_cell = neighbor+1;
+                    std::cout << vert << " is " << top_cell << "\n";
+                    find_counter++;
+                    //                break;
+                }
+                old_vert = vert-1;
+                assert(find_counter == 1);
+            }
+        }
     }
 
-
-//    mfem::Vector part_vec(partition->Size()-num_injectors);
-    mfem::GridFunction part_vec(&u_fes);
-    for (int i = 0; i < part_vec.Size(); ++i)
+    if (false)
     {
-        assert(vert_agg.RowSize(i) == 1);
-        part_vec[i] = colors[vert_agg.GetRowColumns(i)[0]];
+        mfem::SparseMatrix vert_edge(hierarchy.GetGraph(0).VertexToEdge(), false);
+        vert_edge = 1.0;
+
+        std::vector<std::vector<int>> iso_verts;
+        iso_verts.reserve(num_injectors * 20);
+
+        auto AddIsoNeighbors = [&](const mfem::SparseMatrix& neighbors, int vert)
+        {
+            std::vector<int> current_iso_vert;
+            current_iso_vert.reserve(neighbors.RowSize(vert)-1);
+            for (int j = 0; j < neighbors.RowSize(vert); ++j)
+            {
+                const int i_friend = neighbors.GetRowColumns(vert)[j];
+                if (i_friend != vert) { current_iso_vert.push_back(i_friend); }
+            }
+            iso_verts.push_back(current_iso_vert);
+        };
+
+        const mfem::SparseMatrix& edge_vert = hierarchy.GetGraph(0).EdgeToVertex();
+        mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
+        mfem::SparseMatrix vert_vert2 = smoothg::Mult(vert_vert, vert_vert);
+        mfem::SparseMatrix vert_vert3 = smoothg::Mult(vert_vert, vert_vert2);
+        mfem::SparseMatrix vert_vert4 = smoothg::Mult(vert_vert, vert_vert3);
+        mfem::SparseMatrix vert_vert5 = smoothg::Mult(vert_vert, vert_vert4);
+        mfem::SparseMatrix vert_vert6 = smoothg::Mult(vert_vert, vert_vert5);
+        mfem::SparseMatrix vert_vert7 = smoothg::Mult(vert_vert, vert_vert6);
+        mfem::SparseMatrix vert_vert8 = smoothg::Mult(vert_vert, vert_vert7);
+
+        for (int i = vert_edge.NumRows() - num_injectors; i < vert_edge.NumRows(); ++i)
+        {
+            AddIsoNeighbors(vert_vert8, i);
+        }
+
+        mfem::GridFunction layer_vec(&u_fes);
+        layer_vec = 0.0;
+        double layer_cnt = 1.0;
+        for (auto& verts : iso_verts)
+        {
+            for (auto& vert : verts)
+            {
+                layer_vec[vert] = layer_cnt;
+            }
+            layer_cnt += 1.0;
+        }
+        std::ofstream layer_file(path+"_injector_cells_layers_ref1.vtk");
+        layer_vec.SaveVTK(layer_file, "injector_cell_layers7", 1);
+
+        return EXIT_SUCCESS;
     }
-
-    std::string tag = "part"+std::to_string(upscale_param.coarse_factor)
-            +"_lvl"+std::to_string(level);
-    std::ofstream part_file("mrst_lognormal_"+tag+"_ref1.vtk");
-//    part_vec.Print(part_file, 1);
-    part_vec.SaveVTK(part_file, tag, 1);
-    }
-
-
-//    auto vert_edge = hierarchy.GetGraph(0).VertexToEdge();
-//    auto edge_vert = hierarchy.GetGraph(0).EdgeToVertex();
-
-//    auto vert_vert = smoothg::Mult(vert_edge, edge_vert);
-//    std::ofstream inj_file("egg_injector_cells_ref1.vtk");
-
-//    part_vec = 0.0;
-//    for (int i = 0; i < num_injectors; ++i)
-//    {
-//        int vert = vert_vert.NumRows() - num_injectors + i;
-//        std::cout << "verts connected to injector #" << i << " (vert "<<vert<<"):\n";
-
-//        for (int j = 0; j < vert_vert.RowSize(vert); ++j)
-//        {
-//            if (vert_vert.GetRowColumns(vert)[j] != vert)
-//            {
-//                std::cout << vert_vert.GetRowColumns(vert)[j] << " ";
-//                part_vec[vert_vert.GetRowColumns(vert)[j]] = i+1.0;
-//            }
-//        }
-//        std::cout << "\n";
-//    }
-//    part_vec.SaveVTK(inj_file, "injector_cell", 1);
-
 
     if (false)
     {
@@ -1416,27 +1557,29 @@ int main(int argc, char* argv[])
         pot_basis.SaveVTK(pot_outfile, "potential_"+b_id+"", 1);
     }
 
-    if (false)
+//    if (false)
     {
-        std::string b_id = std::to_string(2017);
-        std::ifstream flux_file("egg_lvl1_flux_basis_"+b_id+".txt");
-        mfem::GridFunction flux_basis(problem_for_plot->GetSigmaSpace());
-
-        auto& Psigma = hierarchy.GetPsigma(0);
-        mfem::Vector flux_fine(Psigma.NumRows());
-        flux_fine = 0.0;
-        flux_fine.Load(flux_file, flux_fine.Size());
-
         auto edge_map = problem_for_plot->ComputeEdgeMap(hierarchy.GetMatrix(0).GetD());
-        edge_map.Mult(flux_fine, flux_basis);
 
-        RescaleVector(problem_for_plot->GetSigmaSignChange(), flux_basis);
-        std::cout<<"flux max = "<<flux_basis.Max()<<"\n";
-        std::cout<<"flux_basis size = "<<flux_basis.Size()<<"\n";
-//        std::ofstream flux_outfile("spe10_1to5_flux_basis_357_ref1.vtk");
-        std::ofstream flux_outfile("egg_lvl1_flux_basis_"+b_id+"_ref1.vtk");
-        flux_basis.SaveVTK(flux_outfile, "lvl1_flux_basis_"+b_id+"", 1);
+        auto& vert_edge = hierarchy.GetGraph(1).VertexToEdge();
+        auto& edge_vert = hierarchy.GetGraph(1).EdgeToVertex();
 
+        for (int ii = 0; ii < num_injectors; ii++)
+        {
+            std::cout<<"Looking for basis associated with injector "<<num_injectors-ii-1<<"\n";
+            int vert = vert_edge.NumRows()-ii-1;
+            for (int j = 0; j < vert_edge.RowSize(vert); ++j)
+            {
+                int b_id = vert_edge.GetRowColumns(vert)[j];
+                int agg = edge_vert.GetRowColumns(b_id)[0];
+                if (agg == vert)
+                {
+                    agg = edge_vert.GetRowColumns(b_id)[1];
+                }
+                std::cout<<"found one basis supported in agg "<<agg<<"\n";
+//                PrintFluxBasis(path, 1, b_id, hierarchy, problem_for_plot.get(), edge_map);
+            }
+        }
     }
 
 
@@ -1722,12 +1865,14 @@ mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
     return upwind_pattern;
 }
 
-mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
+mfem::SparseMatrix BuildUpwindPattern(const MixedMatrix& darcy_system,
                                       const mfem::SparseMatrix& micro_upwind_fluxes,
                                       const mfem::Vector& flux)
 {
+    const GraphSpace& graph_space = darcy_system.GetGraphSpace();
     const Graph& graph = graph_space.GetGraph();
     const mfem::SparseMatrix& edge_vert = graph.EdgeToVertex();
+    const mfem::SparseMatrix& vert_edge = graph.VertexToEdge();
     const mfem::SparseMatrix e_te_diag = GetDiag(graph.EdgeToTrueEdge());
 
     const int num_edofs = graph_space.VertexToEDof().NumCols();
@@ -1805,6 +1950,32 @@ mfem::SparseMatrix BuildUpwindPattern(const GraphSpace& graph_space,
             }
         }
     }
+
+    // for injector faces, take select well cells as the "upwind direction"
+//    const int num_injectors = darcy_system.NumInjectors();
+//    auto& inj_cells = darcy_system.GetInjectorCells();
+//    mfem::Array<int> local_edofs;
+
+//    for (int i = graph.NumVertices() - num_injectors; i < graph.NumVertices(); ++i)
+//    {
+//        GetTableRow(vert_edge, i, local_edofs);
+//        auto& cells = inj_cells[i-graph.NumVertices()+num_injectors];
+//        for (int j = 0; j < local_edofs.Size(); j++)
+//        {
+//            double weight;
+//            if (i == micro_upwind_fluxes.GetRowColumns(i)[0])
+//            {
+//                weight = micro_upwind_fluxes.GetRowEntries(i)[1];
+//            }
+//            else
+//            {
+//                weight = micro_upwind_fluxes.GetRowEntries(i)[0];
+//            }
+//            upwind_pattern.Set(local_edofs[j], i, 0.0);
+//            upwind_pattern.Set(local_edofs[j], cells[j], weight);
+//        }
+//    }
+
     upwind_pattern.Finalize(); // TODO: use sparsity pattern of DT and update the values
 
     return upwind_pattern;
@@ -1993,6 +2164,11 @@ TwoPhaseSolver::TwoPhaseSolver(const DarcyProblem& problem, Hierarchy& hierarchy
       level_time_(hierarchy.NumLevels()), weight_(SparseDiag(hierarchy.GetMatrix(0).GetGraph().VertexWeight()))
 {
     weight_ *= density_;
+//    for (int inj = 0; inj < hierarchy.GetMatrix(0).NumInjectors(); ++inj)
+//    {
+//        weight_(weight_.NumRows()-1-inj, weight_.NumRows()-1-inj) = 0.0;
+//    }
+
     for (int l = 0; l < level-1; ++l)
     {
         unique_ptr<mfem::SparseMatrix> coarse_weight(mfem::RAP(hierarchy.GetPs(l), weight_, hierarchy.GetPs(l)));
@@ -2090,6 +2266,19 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
     x.GetBlock(1) = blk_helper_[level_].GetBlock(1);
     x.GetBlock(2) = x_blk2;
 
+    double sum_W = 0.0;
+    {
+        mfem::Vector W1(x.BlockSize(2));
+        mfem::Vector ones(x.BlockSize(2));
+        ones = 1.0;
+        for (int inj = 0; inj < hierarchy_->GetUpscaleParameters().num_iso_verts; ++inj)
+        {
+            ones[ones.Size()-1-inj] = 0.0;
+        }
+        weight_.Mult(ones, W1);
+        sum_W = W1.Sum();
+    }
+
     double time = 0.0;
     double dt = time_stepping_param_.initial_dt;
 
@@ -2116,7 +2305,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         done = (time >= time_stepping_param_.total_time);
         cumulative_time.push_back(time / 86400.0);
 
-        mfem::Vector well_flux;
+//        mfem::Vector well_flux;
         {
 //            x.GetSubVector(well_perforations, well_flux);
 //            std::cout<< "flux at wells" << ":\n";
@@ -2126,14 +2315,11 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
             std::cout<< "saturation at wells: "<< x[x.Size()-1] << "\n";
             mfem::Vector Ws(x.BlockSize(2));
             weight_.Mult(x.GetBlock(2), Ws);
-            Ws[Ws.Size()-1] = 0.0;
-            mfem::Vector W1(x.BlockSize(2));
-            mfem::Vector ones(x.BlockSize(2));
-            ones = 1.0;
-            weight_.Mult(ones, W1);
-            std::cout<< "sum(Ws) / sum(W): "<<
-                        Ws.Sum() / W1.Sum() << "\n";
-//                        Ws.Sum() / 11781.6 / density_ / (400.0*std::pow(0.3048, 3)) << "\n";
+            for (int inj = 0; inj < hierarchy_->GetUpscaleParameters().num_iso_verts; ++inj)
+            {
+                Ws[Ws.Size()-1-inj] = 0.0;
+            }
+            std::cout<< "PVI = sum(Ws) / sum(W): " << Ws.Sum() / sum_W << "\n";
         }
 
         if (level_ == 0)
@@ -2343,12 +2529,12 @@ void TwoPhaseSolver::TimeStepping(const double dt, mfem::BlockVector& x)
         CoupledFAS solver(*hierarchy_, problem_.EssentialAttribute(), dt, weight_,
                           density_, x.GetBlock(2), solver_param_);
 
-        mfem::Vector res(x.GetBlock(2));
-        res = 0.0;
-        if (0 && step_global >= 6)
-        {
-            problem_ptr->VisSetup(sout_resid_[step_global], res, 0.0, 0.0, "Resid "+std::to_string(step_global));
-        }
+//        mfem::Vector res(x.GetBlock(2));
+//        res = 0.0;
+//        if (0 && step_global >= 6)
+//        {
+//            problem_ptr->VisSetup(sout_resid_[step_global], res, 0.0, 0.0, "Resid "+std::to_string(step_global));
+//        }
 
         mfem::BlockVector rhs(*source_);
         rhs.GetBlock(0) *= (1. / dt / density_);
@@ -2615,7 +2801,7 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     if (level_ == 0 || (up_param.max_traces == 1 && (up_param.max_evects == 1 || up_param.add_Pvertices_pwc)))
     {
         const GraphSpace& space = darcy_system_.GetGraphSpace();
-        auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
+        auto upwind = BuildUpwindPattern(darcy_system_, micro_upwind_flux_, blk_x.GetBlock(0));
 //        auto upwind = BuildUpwindPattern(space, blk_x.GetBlock(0));
 
         auto upw_FS = MatVec(upwind, Mobility::FractionalFlow(S));
@@ -2627,6 +2813,8 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
     }
     else
     {
+
+        mfem::mfem_error("RAP way of building coarse operator is not being maintained!\n");
 //        mfem::Vector fine_flux = blk_x.GetBlock(0);
 //        for (int i = level_-1; i >= 0 ; --i)
 //        {
@@ -2668,8 +2856,13 @@ mfem::Vector CoupledSolver::Residual(const mfem::Vector& x, const mfem::Vector& 
 
 //    std::cout<<"flux constraint residual at injector: " << out.GetBlock(1)[out.BlockSize(1)-1] << "\n";
 
-
-//    out[out.Size()-1] = 0.0;
+    if (false)
+    {
+        for (int inj = 0; inj < darcy_system_.NumInjectors(); ++inj)
+        {
+            out[out.Size()-1-inj] = 0.0;
+        }
+    }
 
 
 //    {
@@ -2941,7 +3134,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     const bool lowest_order = ((level_ == 0) || lowest_coarse);
     if (lowest_order)
     {
-        auto upwind = BuildUpwindPattern(space, micro_upwind_flux_, blk_x.GetBlock(0));
+        auto upwind = BuildUpwindPattern(darcy_system_, micro_upwind_flux_, blk_x.GetBlock(0));
 //        auto upwind = BuildUpwindPattern(space, blk_x.GetBlock(0));
 
         U_FS = MatVec(space.TrueEDofToEDof(), MatVec(upwind, Mobility::FractionalFlow(S)));
@@ -2955,6 +3148,7 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
     }
     else
     {
+        mfem::mfem_error("RAP way of building coarse operator is not being maintained!\n");
 //        mfem::Vector fine_flux = blk_x.GetBlock(0);
 //        for (int i = level_-1; i >= 0 ; --i)
 //        {
@@ -3107,17 +3301,20 @@ void CoupledSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector&
 
         if (false)
         {
-            mfem::SparseMatrix diag;
-            dTdsigma->GetDiag(diag);
-            diag.EliminateRow(diag.NumRows()-1);
-            dTdS->GetDiag(diag);
-            diag.EliminateRow(diag.NumRows()-1);
-            diag.EliminateCol(diag.NumCols()-1);
-            diag.Set(diag.NumRows()-1, diag.NumRows()-1, 1.0);
-//            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
+            mfem::SparseMatrix dTdsigma_diag, dTdS_diag, dMdS_diag;
 
-            dMdS->GetDiag(diag);
-            diag.EliminateCol(diag.NumCols()-1);
+            dTdsigma->GetDiag(dTdsigma_diag);
+            dTdS->GetDiag(dTdS_diag);
+            dMdS->GetDiag(dMdS_diag);
+            for (int inj = 0; inj < darcy_system_.NumInjectors(); ++inj)
+            {
+                dTdsigma_diag.EliminateRow(dTdsigma_diag.NumRows()-1-inj);
+                dTdS_diag.EliminateRow(dTdS_diag.NumRows()-1-inj);
+                dTdS_diag.EliminateCol(dTdS_diag.NumCols()-1-inj);
+                dTdS_diag.Set(dTdS_diag.NumRows()-1-inj, dTdS_diag.NumRows()-1-inj, 1.0);
+    //            diag.EliminateRowCol(diag.NumRows()-1, mfem::Matrix::DIAG_KEEP);
+                dMdS_diag.EliminateCol(dMdS_diag.NumCols()-1-inj);
+            }
         }
 
 

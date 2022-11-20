@@ -1613,12 +1613,12 @@ EggModel::EggModel(const char* perm_file, int num_ser_ref,
 //        std::ofstream flux_outfile("egg_lvl1_flux_basis_"+b_id+"_ref1.vtk");
 //        flux_basis.SaveVTK(flux_outfile, "lvl1_flux_basis_"+b_id+"", 1);
 
-        std::ifstream pot_file("egg_lvl1_potential_"+b_id+".txt");
-        mfem::GridFunction pot_basis(u_fes_.get());
-        pot_basis = 0.0;
-        pot_basis.Load(pot_file, pot_basis.Size());
-        std::ofstream pot_outfile("egg_lvl1_potential_"+b_id+"_ref1.vtk");
-        pot_basis.SaveVTK(pot_outfile, "potential_"+b_id+"", 1);
+//        std::ifstream pot_file("egg_lvl1_potential_"+b_id+".txt");
+//        mfem::GridFunction pot_basis(u_fes_.get());
+//        pot_basis = 0.0;
+//        pot_basis.Load(pot_file, pot_basis.Size());
+//        std::ofstream pot_outfile("egg_lvl1_potential_"+b_id+"_ref1.vtk");
+//        pot_basis.SaveVTK(pot_outfile, "potential_"+b_id+"", 1);
     }
 
 

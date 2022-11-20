@@ -76,7 +76,9 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
 
         double adj_wt_min = adj_weight.Min();
         for (int i = 0; i < adj_weight.Size(); i++)
+        {
             adj_weight_int[i] = floor(log2(adj_weight[i] / adj_wt_min)) + 1;
+        }
         edge_weight_ptr = adj_weight_int.GetData();
     }
 

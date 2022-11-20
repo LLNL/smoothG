@@ -36,32 +36,43 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
     mfem::SparseMatrix vert_edge(fine_graph.VertexToEdge(), false);
     vert_edge = 1.0;
 
-    std::vector<std::vector<int>> iso_verts;
+    std::vector<std::vector<int>> iso_verts, iso_verts_well_only;
     iso_verts.reserve(num_iso_verts * 20);
 
     auto AddIsoNeighbors = [&](const mfem::SparseMatrix& neighbors, int vert)
     {
+        std::vector<int> current_iso_vert;
+        current_iso_vert.reserve(neighbors.RowSize(vert)-1);
         for (int j = 0; j < neighbors.RowSize(vert); ++j)
         {
             const int i_friend = neighbors.GetRowColumns(vert)[j];
-            if (i_friend != vert) { iso_verts.push_back(std::vector<int>(1, i_friend)); }
+            if (i_friend != vert) { current_iso_vert.push_back(i_friend); }
+//            if (i_friend != vert) { iso_verts.push_back(std::vector<int>(1, i_friend)); }
         }
+        iso_verts.push_back(current_iso_vert);
     };
 
     const mfem::SparseMatrix& edge_vert = fine_graph.EdgeToVertex();
     mfem::SparseMatrix vert_vert = smoothg::Mult(vert_edge, edge_vert);
     mfem::SparseMatrix vert_vert2 = smoothg::Mult(vert_vert, vert_vert);
     mfem::SparseMatrix vert_vert3 = smoothg::Mult(vert_vert, vert_vert2);
+    mfem::SparseMatrix vert_vert4 = smoothg::Mult(vert_vert, vert_vert3);
+    mfem::SparseMatrix vert_vert5 = smoothg::Mult(vert_vert, vert_vert4);
+    mfem::SparseMatrix vert_vert6 = smoothg::Mult(vert_vert, vert_vert5);
+    mfem::SparseMatrix vert_vert7 = smoothg::Mult(vert_vert, vert_vert6);
+    mfem::SparseMatrix vert_vert8 = smoothg::Mult(vert_vert, vert_vert7);
 
-    const int num_well_cell_isolation_layers = 0;
+    const int num_well_cell_isolation_layers = fine_graph.NumVertices() > 10000 ? 3 : -1;
 
     std::cout << "Number of layers around well cells to isolate: " << num_well_cell_isolation_layers << "\n";
 
-    const bool isolate_injection_well_cells = false;
+    const bool isolate_injection_well_cells = fine_graph.NumVertices() > 10000;
     if (isolate_injection_well_cells)
     {
         for (int i = vert_edge.NumRows() - num_iso_verts; i < vert_edge.NumRows(); ++i)
         {
+//            if (i == vert_edge.NumRows() - num_iso_verts + 4) { continue; }
+
             if (num_well_cell_isolation_layers == 0)
             {
                 AddIsoNeighbors(vert_vert, i);
@@ -74,37 +85,122 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
             {
                 AddIsoNeighbors(vert_vert3, i);
             }
+            else if (num_well_cell_isolation_layers == 3)
+            {
+                AddIsoNeighbors(vert_vert4, i);
+            }
+            else if (num_well_cell_isolation_layers == 4)
+            {
+                AddIsoNeighbors(vert_vert5, i);
+            }
+            else if (num_well_cell_isolation_layers == 6)
+            {
+                AddIsoNeighbors(vert_vert7, i);
+            }
+            else if (num_well_cell_isolation_layers == 7)
+            {
+                AddIsoNeighbors(vert_vert8, i);
+            }
         }
     }
 
-    const bool isolate_production_well_cells = false;
+    const bool isolate_production_well_cells = fine_graph.NumVertices() > 10000;
     if (isolate_production_well_cells && fine_graph.EdgeToBdrAtt().NumCols() > 1)
     {
-        int num_prodution_well_edges = (fine_graph.EdgeToBdrAtt().NumCols()-1);
-        for (int i = edge_vert.NumRows() - num_prodution_well_edges; i < edge_vert.NumRows(); ++i)
+        auto bdr_edge = smoothg::Transpose(fine_graph.EdgeToBdrAtt());
+
+        for (int bdr = 1; bdr < bdr_edge.NumRows(); ++bdr)
         {
-            assert(edge_vert.RowSize(i) == 1);
-            int production_well_cell = edge_vert.GetRowColumns(i)[0];
-            iso_verts.push_back(std::vector<int>(1, production_well_cell));
+            std::vector<int> current_iso_production_vert;
+            for (int i = 0; i < bdr_edge.RowSize(bdr); ++i)
+            {
+                int edge = bdr_edge.GetRowColumns(bdr)[i];
+                assert(edge_vert.RowSize(edge) == 1);
+                int production_well_cell = edge_vert.GetRowColumns(edge)[0];
 
-            if (num_well_cell_isolation_layers == 1)
-            {
-                AddIsoNeighbors(vert_vert, production_well_cell);
+                current_iso_production_vert.push_back(production_well_cell);
+                for (int j = 0; j < vert_vert7.RowSize(production_well_cell); ++j)
+                {
+                    const int i_friend = vert_vert7.GetRowColumns(production_well_cell)[j];
+                    if (i_friend != production_well_cell) { current_iso_production_vert.push_back(i_friend); }
+                }
             }
-            else if (num_well_cell_isolation_layers == 2)
-            {
-                AddIsoNeighbors(vert_vert2, production_well_cell);
-            }
+            iso_verts.push_back(current_iso_production_vert);
         }
-    }
 
+//        int num_prodution_well_edges = (fine_graph.EdgeToBdrAtt().NumCols()-1);
+//        for (int i = edge_vert.NumRows() - num_prodution_well_edges; i < edge_vert.NumRows(); ++i)
+//        {
+//            assert(edge_vert.RowSize(i) == 1);
+//            int production_well_cell = edge_vert.GetRowColumns(i)[0];
+//            iso_verts.push_back(std::vector<int>(1, production_well_cell));
+
+//            if (num_well_cell_isolation_layers == 1)
+//            {
+//                AddIsoNeighbors(vert_vert, production_well_cell);
+//            }
+//            else if (num_well_cell_isolation_layers == 2)
+//            {
+//                AddIsoNeighbors(vert_vert2, production_well_cell);
+//            }
+//            else if (num_well_cell_isolation_layers == 3)
+//            {
+//                AddIsoNeighbors(vert_vert3, production_well_cell);
+//            }
+//        }
+    }
 
     for (int i = vert_edge.NumRows() - num_iso_verts; i < vert_edge.NumRows(); ++i)
     {
         iso_verts.push_back(std::vector<int>(1, i));
+        iso_verts_well_only.push_back(std::vector<int>(1, i));
     }
 
-    PartitionAAT(vert_edge, partitioning, coarsening_factor, false, std::move(iso_verts));
+
+
+    if( fine_graph.NumVertices() > 10000)
+    {
+        std::vector<bool> iso_verts_marker(vert_edge.NumRows(), false);
+        for (auto& verts : iso_verts)
+        {
+            for (auto& vert : verts)
+            {
+                iso_verts_marker[vert] = true;
+            }
+        }
+
+        mfem::SparseMatrix vert_edge_scaled(fine_graph.VertexToEdge());
+        auto edge_weights = fine_graph.EdgeWeight();
+
+        std::cout<<"topo, edge weight: "<< edge_weights[0][0]<<"\n";
+        for (int i = 0; i < vert_edge_scaled.NumRows(); ++i)
+        {
+            assert(vert_edge_scaled.RowSize(i) == edge_weights[i].Size());
+            for (int j = 0; j < vert_edge_scaled.RowSize(i); ++j)
+            {
+                int edge = vert_edge_scaled.GetRowColumns(i)[j];
+                double edge_weight = 2.0e-15 / edge_weights[i][j];
+
+                if (edge_vert.RowSize(i) == 2)
+                {
+                    if (iso_verts_marker[edge_vert.GetRowColumns(edge)[0]]
+                            && iso_verts_marker[edge_vert.GetRowColumns(edge)[1]])
+                    {
+                        edge_weight *= 1000000.0;
+                    }
+                }
+                edge_weight = std::sqrt(edge_weight);
+                vert_edge_scaled.GetRowEntries(i)[j] = edge_weight;
+            }
+        }
+
+        PartitionAAT(vert_edge_scaled, partitioning, coarsening_factor, true, std::move(iso_verts_well_only));
+    }
+    else
+    {
+        PartitionAAT(vert_edge, partitioning, coarsening_factor, false, std::move(iso_verts));
+    }
+//    PartitionAAT(vert_edge, partitioning, coarsening_factor, false, std::move(iso_verts));
     return Coarsen(fine_graph, partitioning);
 }
 
