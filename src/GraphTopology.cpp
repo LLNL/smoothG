@@ -62,13 +62,15 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
     mfem::SparseMatrix vert_vert7 = smoothg::Mult(vert_vert, vert_vert6);
     mfem::SparseMatrix vert_vert8 = smoothg::Mult(vert_vert, vert_vert7);
 
-    const int num_well_cell_isolation_layers = fine_graph.NumVertices() > 10000 ? 3 : -1;
+    const int num_well_cell_isolation_layers = fine_graph.NumVertices() > 100000 ? 4 : 1;
 
-    std::cout << "Number of layers around well cells to isolate: " << num_well_cell_isolation_layers << "\n";
+    const bool do_isolate = true;//fine_graph.NumVertices() > 100000;
 
-    const bool isolate_injection_well_cells = fine_graph.NumVertices() > 10000;
+    const bool isolate_injection_well_cells = do_isolate;//fine_graph.NumVertices() > 100000;
     if (isolate_injection_well_cells)
     {
+        std::cout << "Number of layers around injector cells to isolate: " << num_well_cell_isolation_layers << "\n";
+
         for (int i = vert_edge.NumRows() - num_iso_verts; i < vert_edge.NumRows(); ++i)
         {
 //            if (i == vert_edge.NumRows() - num_iso_verts + 4) { continue; }
@@ -104,9 +106,11 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
         }
     }
 
-    const bool isolate_production_well_cells = fine_graph.NumVertices() > 10000;
+    const bool isolate_production_well_cells = do_isolate;//fine_graph.NumVertices() > 100000;
     if (isolate_production_well_cells && fine_graph.EdgeToBdrAtt().NumCols() > 1)
     {
+        std::cout << "Number of layers around producer cells to isolate: " << num_well_cell_isolation_layers << "\n";
+
         auto bdr_edge = smoothg::Transpose(fine_graph.EdgeToBdrAtt());
 
         for (int bdr = 1; bdr < bdr_edge.NumRows(); ++bdr)
@@ -119,9 +123,9 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
                 int production_well_cell = edge_vert.GetRowColumns(edge)[0];
 
                 current_iso_production_vert.push_back(production_well_cell);
-                for (int j = 0; j < vert_vert7.RowSize(production_well_cell); ++j)
+                for (int j = 0; j < vert_vert3.RowSize(production_well_cell); ++j)
                 {
-                    const int i_friend = vert_vert7.GetRowColumns(production_well_cell)[j];
+                    const int i_friend = vert_vert3.GetRowColumns(production_well_cell)[j];
                     if (i_friend != production_well_cell) { current_iso_production_vert.push_back(i_friend); }
                 }
             }
@@ -158,8 +162,21 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
 
 
 
-    if( fine_graph.NumVertices() > 10000)
+    if (do_isolate)//fine_graph.NumVertices() > 100000)
     {
+        double edge_weight_scaling = 1e9;
+        std::cout<<"edge weight scaling around wells: " << edge_weight_scaling << "\n";
+
+        bool use_trans_as_weight = false;
+        if (use_trans_as_weight)
+        {
+            std::cout<<"use transmissibility as edge\n";
+        }
+        else
+        {
+            std::cout<<" do not use transmissibility as edge\n";
+        }
+
         std::vector<bool> iso_verts_marker(vert_edge.NumRows(), false);
         for (auto& verts : iso_verts)
         {
@@ -170,23 +187,26 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
         }
 
         mfem::SparseMatrix vert_edge_scaled(fine_graph.VertexToEdge());
-        auto edge_weights = fine_graph.EdgeWeight();
+        auto& edge_weights = fine_graph.EdgeWeight();
 
-        std::cout<<"topo, edge weight: "<< edge_weights[0][0]<<"\n";
         for (int i = 0; i < vert_edge_scaled.NumRows(); ++i)
         {
-            assert(vert_edge_scaled.RowSize(i) == edge_weights[i].Size());
+            if (use_trans_as_weight)
+            {
+                assert(vert_edge_scaled.RowSize(i) == edge_weights[i].Size());
+            }
             for (int j = 0; j < vert_edge_scaled.RowSize(i); ++j)
             {
                 int edge = vert_edge_scaled.GetRowColumns(i)[j];
-                double edge_weight = 2.0e-15 / edge_weights[i][j];
+                double edge_weight = use_trans_as_weight ? 1.0e-15 / edge_weights[i][j] : 1.0;
 
                 if (edge_vert.RowSize(i) == 2)
                 {
+                    edge_weight *= 2.0;
                     if (iso_verts_marker[edge_vert.GetRowColumns(edge)[0]]
                             && iso_verts_marker[edge_vert.GetRowColumns(edge)[1]])
                     {
-                        edge_weight *= 1000000.0;
+                        edge_weight *= edge_weight_scaling;
                     }
                 }
                 edge_weight = std::sqrt(edge_weight);

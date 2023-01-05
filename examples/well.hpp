@@ -615,6 +615,9 @@ void SaigupModel::SetupMesh(bool refined)
     std::ifstream imesh(refined ? "refined_saigup_HEX.vtk" : "saigup_HEX.vtk");
     mfem::Mesh serial_mesh(imesh, 1, 1);
     mesh_.reset(new mfem::ParMesh(comm_, serial_mesh));
+
+    std::ofstream mesh_file(refined ? "saigup2x2x2_mesh_ref1.vtk" : "saigup_mesh_ref1.vtk");
+    mesh_->PrintVTK(mesh_file, 1);
 }
 
 
@@ -702,7 +705,7 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
 mfem::Vector MRSTLogNormal::ComputeVertWeight()
 {
     mfem::Vector vert_weight(vertex_edge_.NumRows());
-    vert_weight = .3 * 10.0 * 10.0 * 10.0 * std::pow(ft_, 3);
+    vert_weight = 0.3 * 10.0 * 10.0 * 1.0 * std::pow(ft_, 3); // porosity = 0.3
     return vert_weight;
 }
 

@@ -30,7 +30,6 @@
 #include "mfem.hpp"
 #include "well.hpp"
 
-#include "../src/picojson.h"
 #include "../src/smoothG.hpp"
 
 using namespace smoothg;
@@ -147,7 +146,7 @@ class TwoPhaseSolver
 
     // TODO: these should be defined in / extracted from the problem, not here
     const double density_ = 1.0252e3;  // 64*pound/(ft^3)
-    const double porosity_ = problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
+//    const double porosity_ = problem_ptr->CellVolume() == 256.0 ? 0.2 : 0.05; // egg 0.2, spe10 0.05
     mfem::SparseMatrix weight_;
 
     double EvalCFL(double dt, const mfem::BlockVector& x) const;
@@ -1311,8 +1310,8 @@ int main(int argc, char* argv[])
     mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
     mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
 
-    for (int level = 1; level < upscale_param.max_levels; level++)
-//    for (int level = 1; level < 0; level++)
+//    for (int level = 1; level < upscale_param.max_levels; level++)
+    for (int level = 1; level < 0; level++)
     {
         auto agg_face = hierarchy.GetGraph(level).VertexToEdge();
         auto face_agg = hierarchy.GetGraph(level).EdgeToVertex();
@@ -1558,8 +1557,9 @@ int main(int argc, char* argv[])
     }
 
 //    if (false)
+    if (upscale_param.max_levels > 1)
     {
-        auto edge_map = problem_for_plot->ComputeEdgeMap(hierarchy.GetMatrix(0).GetD());
+        auto edge_map = problem_ptr->ComputeEdgeMap(hierarchy.GetMatrix(0).GetD());
 
         auto& vert_edge = hierarchy.GetGraph(1).VertexToEdge();
         auto& edge_vert = hierarchy.GetGraph(1).EdgeToVertex();
@@ -1642,10 +1642,10 @@ int main(int argc, char* argv[])
         mfem::BlockVector initial_value(problem->BlockOffsets());
         initial_value = 0.0;
         initial_value.GetBlock(2) = Mobility::S_min_;
-//        for (int i = 0; i < num_injectors; ++i)
-//        {
-//            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
-//        }
+        for (int i = 0; i < num_injectors; ++i)
+        {
+            initial_value[initial_value.Size()-1-i] = Mobility::S_max_;
+        }
 
         mfem::BlockVector sol(initial_value);
 //        if (l == 0)
