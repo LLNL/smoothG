@@ -164,7 +164,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
 
     if (do_isolate)//fine_graph.NumVertices() > 100000)
     {
-        double edge_weight_scaling = 1e9;
+        double edge_weight_scaling = 1e6;
         std::cout<<"edge weight scaling around wells: " << edge_weight_scaling << "\n";
 
         bool use_trans_as_weight = false;

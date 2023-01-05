@@ -106,7 +106,7 @@ struct TimeSteppingParameters
 void SetOptions(FASParameters& param, bool use_vcycle, int num_backtrack, double diff_tol);
 
 DarcyProblem* problem_ptr;
-std::vector<mfem::socketstream> sout_resid_(50); // this should not be needed (only for debug)
+//std::vector<mfem::socketstream> sout_resid_(50); // this should not be needed (only for debug)
 
 /**
    This computes dS/dt that solves W dS/dt + Adv F(S) = b, which is the
@@ -839,6 +839,8 @@ void PrintFluxBasis(std::string& path, int level, int basis_id,
     flux_basis.SaveVTK(flux_outfile, tag, 1);
 }
 
+std::string result_file_name;
+
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -1154,8 +1156,12 @@ int main(int argc, char* argv[])
     }
     std::cout << "Injection rate: " << inject_rate << "\n";
 
-
     problem_ptr = problem_for_plot ? problem_for_plot.get() : problem.get();
+    std::stringstream ir_stream;
+    ir_stream<<inject_rate;
+    result_file_name = "all_step_"+path+"_ir"+ir_stream.str()+"_ro"
+            +std::to_string(Mobility::relperm_order_)+"_"+std::to_string(upscale_param.max_levels)
+            +"lvl_cf"+std::to_string(upscale_param.coarse_factor)+"_4layers_scale1e6";
 
     Graph graph = problem->GetFVGraph(true);
     auto& ess_attr_final = problem->EssentialAttribute();
@@ -2396,7 +2402,7 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         PrintTable(level_time_, "total level time");
 //        PrintForLatexTable(step_num_backtrack_, "# backtrack");
 
-        std::ofstream step_all_file("step_all.csv");
+        std::ofstream step_all_file(result_file_name+".csv");
         step_all_file<<"Time,Dt,CFL,step_time,nonlinear_iter,linear_iter_fine,linear_iter_coarse";
         for (int ii = 0; ii < step_level_time_.size(); ++ii)
         {
