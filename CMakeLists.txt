@@ -1,4 +1,3 @@
-#!/bin/sh
 # BHEADER ####################################################################
 #
 # Copyright (c) 2018, Lawrence Livermore National Security, LLC.
@@ -33,9 +32,7 @@ set(${PROJECT_NAME}_GRAPHDATA ${PROJECT_SOURCE_DIR}/graphdata)
 
 #####
 # set up external dependencies
-# (this is a mess, seems to work, but I don't know what
-#  I'm doing and I'm sure it can be greatly simplified)
-# (also should take some directory hints from config.sh)
+# (we outsource a lot of this to MFEM)
 #####
 
 # This is a list of TPLs that are used by all targets
@@ -44,7 +41,7 @@ set(TPL_LIBRARIES "")
 # This is a list of linker flags to be used with TPLs for all targets
 set(TPL_LINKER_FLAGS "")
 
-# SAAMGE_PARALLEL
+# SAAMGE
 option(USE_SAAMGE "Should SAAMGE be enabled?" OFF)
 if(USE_SAAMGE)
   find_path(SAAMGE_INCLUDE_PATH saamge.hpp
@@ -64,6 +61,14 @@ else()
   set(${PROJECT_NAME}_USE_SAAMGE 0)
 endif()
 
+# MPI
+find_package(MPI REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
+list(APPEND TPL_LIBRARIES ${MPI_LIBRARIES})
+if(MPI_CXX_COMPILE_FLAGS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
+endif()
+
 # MFEM
 find_path(MFEM_INCLUDE_PATH mfem.hpp
           HINTS ${MFEM_DIR}/include)
@@ -75,41 +80,24 @@ add_library(MFEM_LIB STATIC IMPORTED)
 set_property(TARGET MFEM_LIB PROPERTY IMPORTED_LOCATION ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
 list(APPEND TPL_LIBRARIES ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
 
-# Hypre
-find_path(HYPRE_INCLUDE_PATH HYPRE.h
-          HINTS ${HYPRE_DIR}/include)
-include_directories(${HYPRE_INCLUDE_PATH})
-set(HYPRE_LIB_NAME libHYPRE.a)
-find_library(HYPRE_LIB HYPRE
-  ${HYPRE_DIR}/lib)
-list(APPEND TPL_LIBRARIES ${HYPRE_LIB})
-
-# MPI
-find_package(MPI REQUIRED)
-include_directories(${MPI_INCLUDE_PATH})
-list(APPEND TPL_LIBRARIES ${MPI_LIBRARIES})
-if(MPI_CXX_COMPILE_FLAGS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
+option(ADOPT_MFEM_DEPENDENCIES "Take include and link paths from MFEM installation?" ON)
+if(ADOPT_MFEM_DEPENDENCIES)
+  # steal all of MFEM's dependencies
+  find_path(MFEM_CONFIG_PATH config.mk
+      PATHS ${MFEM_DIR}/share/mfem ${MFEM_DIR})
+  execute_process(COMMAND python parsemk.py ${MFEM_CONFIG_PATH}/config.mk
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+  include("out.cmake")
+  include_directories(${MK_INCLUDES})
+  list(APPEND TPL_LIBRARIES ${MK_LIBRARIES})
+else()
+  include("explicitdependencies.cmake")
+  include_directories(${EI_INCLUDES})
+  list(APPEND TPL_LIBRARIES ${EI_LIBRARIES})
 endif()
 
-# Metis
-find_path(METIS_INCLUDE_PATH metis.h
-  HINTS ${METIS_DIR}/include)
-set(METIS_LIB_NAME libmetis.a)
-find_path(METIS_LIBRARY_PATH ${METIS_LIB_NAME}
-  ${METIS_DIR}/lib)
-include_directories(${METIS_INCLUDE_PATH})
-add_library(METIS_LIB STATIC IMPORTED)
-set_property(TARGET METIS_LIB PROPERTY IMPORTED_LOCATION ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
-list(APPEND TPL_LIBRARIES ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
-
-# SuiteSparse
-find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)
-include_directories(${SuiteSparse_INCLUDE_DIRS})
-list(APPEND TPL_LIBRARIES ${SuiteSparse_LIBRARIES})
-
 # ARPACK
-# there are several sources for ARPACK, I recommend
+# there are several sources for ARPACK, we recommend
 #    https://github.com/opencollab/arpack-ng.git
 # and
 #    https://github.com/m-reuter/arpackpp.git
@@ -134,13 +122,6 @@ if(USE_ARPACK)
 else()
   set(${PROJECT_NAME}_USE_ARPACK 0)
 endif()
-
-# BLAS/LAPACK
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
-list(APPEND TPL_LIBRARIES ${LAPACK_LIBRARIES})
-list(APPEND TPL_LIBRARIES ${BLAS_LIBRARIES})
-list(APPEND TPL_LIBRARIES "gfortran")
 
 list(REMOVE_DUPLICATES TPL_LIBRARIES)
 

@@ -32,10 +32,9 @@ rm CMakeCache.txt
 rm -rf CMakeFiles
 
 cmake \
+    -DADOPT_MFEM_DEPENDENCIES=ON \
+    \
     -DMFEM_DIR=/path/to/the/directory/where/mfem/is/installed \
-    -DMETIS_DIR=/path/to/the/directory/where/metis/is/installed \
-    -DHYPRE_DIR=/path/to/the/directory/where/hypre/is/installed \
-    -DSuiteSparse_DIR=/path/to/the/directory/where/SuiteSparse/is/installed \
     -DSPE10_DIR=/path/to/the/directory/where/spe_perm.dat/is/located \
     \
     -DMEMORYCHECK_COMMAND=/path/to/valgrind/binary \
@@ -44,8 +43,6 @@ cmake \
     -DUSE_ARPACK=OFF \
     \
     -DCMAKE_BUILD_TYPE=Debug \
-    -DBLAS_LIBRARIES=/path/to/the/blas/library/file \
-    -DLAPACK_LIBRARIES=/path/to/the/lapack/library/file \
     \
     ${EXTRA_ARGS} \
     ${BASE_DIR}

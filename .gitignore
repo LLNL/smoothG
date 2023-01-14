@@ -13,6 +13,7 @@ generated-docs/
 *.swp
 *.DS_Store
 
+out.cmake
 GPATH
 GRTAGS
 GTAGS
