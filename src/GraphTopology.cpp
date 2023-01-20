@@ -32,7 +32,7 @@ namespace smoothg
 
 Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int num_iso_verts)
 {
-    mfem::Array<int> partitioning;
+    mfem::Array<int> partitioning, well_cells(fine_graph.NumVertices());
     mfem::SparseMatrix vert_edge(fine_graph.VertexToEdge(), false);
     vert_edge = 1.0;
 
@@ -160,11 +160,9 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
         iso_verts_well_only.push_back(std::vector<int>(1, i));
     }
 
-
-
     if (do_isolate)//fine_graph.NumVertices() > 100000)
     {
-        double edge_weight_scaling = 1e6;
+        double edge_weight_scaling = 1e9;
         std::cout<<"edge weight scaling around wells: " << edge_weight_scaling << "\n";
 
         bool use_trans_as_weight = false;
@@ -200,7 +198,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
                 int edge = vert_edge_scaled.GetRowColumns(i)[j];
                 double edge_weight = use_trans_as_weight ? 1.0e-15 / edge_weights[i][j] : 1.0;
 
-                if (edge_vert.RowSize(i) == 2)
+                if (edge_vert.RowSize(edge) == 2)
                 {
                     edge_weight *= 2.0;
                     if (iso_verts_marker[edge_vert.GetRowColumns(edge)[0]]
@@ -215,6 +213,54 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, int coarsening_factor, int
         }
 
         PartitionAAT(vert_edge_scaled, partitioning, coarsening_factor, true, std::move(iso_verts_well_only));
+
+        // Post processing: merge all aggs that connect to a well into one agg
+        {
+            int num_aggs = partitioning.Max() + 1;
+
+            mfem::SparseMatrix agg_vert = PartitionToMatrix(partitioning, num_aggs);
+
+            mfem::SparseMatrix agg_well_cells(num_aggs, vert_vert.NumRows());
+            for (int vert = vert_vert.NumRows() - num_iso_verts; vert < vert_vert.NumRows(); ++vert)
+            {
+                for (int j = 0; j < vert_vert.RowSize(vert); ++j)
+                {
+                    int well_agg = vert - vert_vert.NumRows() + num_aggs;
+                    const int i_friend = vert_vert.GetRowColumns(vert)[j];
+                    if (i_friend != vert) { agg_well_cells.Add(well_agg, i_friend, 1.0); }
+                }
+            }
+            agg_well_cells.Finalize();
+
+            mfem::SparseMatrix well_cells_tmp = smoothg::Mult(agg_well_cells, vert_vert);
+            mfem::SparseMatrix vert_agg = smoothg::Transpose(agg_vert);
+            mfem::SparseMatrix agg_well_cells_agg = smoothg::Mult(well_cells_tmp, vert_agg);
+
+            std::cout << "num_aggs before merging: " << num_aggs << "\n";
+            mfem::Array<int> well_neighbors, cells_in_agg;
+            for (int agg = agg_vert.NumRows() - num_iso_verts; agg < agg_vert.NumRows(); ++agg)
+            {
+                GetTableRow(agg_well_cells_agg, agg, well_neighbors);
+
+                std::cout << "injector " << agg - (agg_vert.NumRows() - num_iso_verts) << " has " << well_neighbors.Size() -1 << " neighbors\n";
+
+                int agg_min = well_neighbors.Min(); // assuming wells have large id
+
+                for (int neighbor_agg : well_neighbors)
+                {
+                    if ((neighbor_agg != agg) && (neighbor_agg != agg_min))
+                    {
+                        GetTableRow(agg_vert, neighbor_agg, cells_in_agg);
+                        for (int cell : cells_in_agg)
+                        {
+                            partitioning[cell] = agg_min;
+                        }
+                    }
+                }
+            }
+            RemoveEmptyParts(partitioning);
+            std::cout << "num_aggs after merging: " << partitioning.Max()+1 << "\n";
+        }
     }
     else
     {

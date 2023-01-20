@@ -142,7 +142,8 @@ void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
         IsolatePostProcess(wtable, num_partitions, partitioning);
     }
 
-    removeEmptyParts(partitioning, num_partitions);
+    RemoveEmptyParts(partitioning);
+    num_partitions = partitioning.Max() + 1;
 }
 
 void MetisGraphPartitioner::SetPreIsolateVertices(int index)
@@ -213,29 +214,6 @@ mfem::SparseMatrix MetisGraphPartitioner::getAdjacency(
 
     return mfem::SparseMatrix(adj_i, adj_j, adj_weight,
                               nvertices, nvertices);
-}
-
-void MetisGraphPartitioner::removeEmptyParts(mfem::Array<int>& partitioning,
-                                             int& num_partitions) const
-{
-    int shift = 0;
-    std::vector<int> count(num_partitions, 0);
-    std::vector<int> shifter(num_partitions, 0);
-
-    for (const int& part : partitioning)
-        ++count[part];
-
-    for (int i = 0; i < num_partitions; ++i)
-    {
-        if (!count[i])
-            ++shift;
-        shifter[i] = shift;
-    }
-
-    for (int& part : partitioning)
-        part -= shifter[part];
-
-    num_partitions -= shift;
 }
 
 void MetisGraphPartitioner::IsolatePreProcess(const mfem::SparseMatrix& wtable,
@@ -366,6 +344,28 @@ int MetisGraphPartitioner::connectedComponents(mfem::Array<int>& partitioning,
 //      }
 //   }
 //}
+
+void RemoveEmptyParts(mfem::Array<int>& partitioning)
+{
+    int num_partitions = partitioning.Max() + 1;
+
+    int shift = 0;
+    std::vector<int> count(num_partitions, 0);
+    std::vector<int> shifter(num_partitions, 0);
+
+    for (const int& part : partitioning)
+        ++count[part];
+
+    for (int i = 0; i < num_partitions; ++i)
+    {
+        if (!count[i])
+            ++shift;
+        shifter[i] = shift;
+    }
+
+    for (int& part : partitioning)
+        part -= shifter[part];
+}
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
                int num_parts, bool use_edge_weight,

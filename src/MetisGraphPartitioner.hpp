@@ -112,9 +112,6 @@ private:
     std::vector<std::vector<int>> pre_isolated_vertices_;
     std::vector<std::vector<int>> post_isolated_vertices_;
 
-    void removeEmptyParts(mfem::Array<int>& partitioning,
-                          int& num_partitions) const;
-
     int connectedComponents(mfem::Array<int>& partitioning,
                             const mfem::SparseMatrix& conn);
 
@@ -133,6 +130,8 @@ private:
     std::function<int(int*, int*, int*, int*, int*, int*,
                       int*, int*, float*, float*, int*, int*, int*)> CallMetis;
 };
+
+void RemoveEmptyParts(mfem::Array<int>& partitioning);
 
 void Partition(const mfem::SparseMatrix& w_table, mfem::Array<int>& partitioning,
                int num_parts, bool use_edge_weight = false,
