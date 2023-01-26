@@ -961,9 +961,10 @@ int main(int argc, char* argv[])
 
     int num_attr_from_file = 5;
     upscale_param.num_iso_verts = 1; // TODO: this should be read from file
+    upscale_param.num_iso_bdrs = 1; // TODO: this should be read from file
 
-    int num_injectors = 61; //1; //61
-    int num_producers = 60; //4; //60
+    int num_injectors = 13; //1; //61
+    int num_producers = 12; //4; //60
 
     // Setting up finite volume discretization problem
     std::string path(problem_dir);
@@ -978,6 +979,7 @@ int main(int argc, char* argv[])
         well_height = 30;
         problem.reset(new MRSTLogNormal(perm_file, well_height, inject_rate, bhp));
         upscale_param.num_iso_verts = num_injectors;
+        upscale_param.num_iso_bdrs = num_producers;
     }
     else
     {
@@ -1028,7 +1030,7 @@ int main(int argc, char* argv[])
 //            num_edges_res = 59205;
 //            inject_rate = 5e-4;
 //            inject_rate = 2e-3;
-            upscale_param.num_iso_verts = 8; // TODO: this should be read from file
+//            upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
 //            // refined 3x3x3
 //            num_vert_res = 500931;
@@ -1052,9 +1054,8 @@ int main(int argc, char* argv[])
             num_vert_res = 18553;
             nnz_res = num_vert_res * 6;
             num_edges_res = 59205;
-            upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
-            num_injectors = 8;
+            num_injectors = 8; // TODO: this should be read from file
             num_producers = 4;
             well_height = 7;
             num_attr_from_file = 5;
@@ -1067,7 +1068,6 @@ int main(int argc, char* argv[])
             num_vert_res = 148424;
             nnz_res = num_vert_res * 6;
             num_edges_res = 459456;
-            upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
             num_injectors = 8;
             num_producers = 4;
@@ -1082,7 +1082,6 @@ int main(int argc, char* argv[])
             num_vert_res = 500931;
             nnz_res = num_vert_res * 6;
             num_edges_res = 1534707;  // total = 1534707 + 12 * 21
-            upscale_param.num_iso_verts = 8; // TODO: this should be read from file
 
             num_injectors = 8;
             num_producers = 4;
@@ -1099,7 +1098,6 @@ int main(int argc, char* argv[])
             num_edges_res = 155268;
             inject_rate *= 1.0;
             num_attr_from_file = 6;
-            upscale_param.num_iso_verts = 6; // TODO: this should be read from file
 
             num_injectors = 6;
             num_producers = 5;
@@ -1115,7 +1113,6 @@ int main(int argc, char* argv[])
             inject_rate *= 1.0;
             num_attr_from_file = 6;
             well_height = path == "saigup_well_model" ? 20 : 1;
-            upscale_param.num_iso_verts = 5; // TODO: this should be read from file
 
             num_injectors = 5;
             num_producers = 5;
@@ -1131,7 +1128,6 @@ int main(int argc, char* argv[])
             inject_rate *= 1.0;
             num_attr_from_file = 6;
             well_height = path == "saigup_well_model_2x2x2" ? 40 : 1;
-            upscale_param.num_iso_verts = 5; // TODO: this should be read from file
 
             num_injectors = 5;
             num_producers = 5;
@@ -1143,6 +1139,9 @@ int main(int argc, char* argv[])
         {
             mfem::mfem_error("Unknown model problem!");
         }
+
+        upscale_param.num_iso_verts = num_injectors;
+        upscale_param.num_iso_bdrs = num_producers;
 
         ess_attr.SetSize(num_attr_from_file, 0);
         ess_attr = 0;
@@ -1569,6 +1568,7 @@ int main(int argc, char* argv[])
 
         auto& vert_edge = hierarchy.GetGraph(1).VertexToEdge();
         auto& edge_vert = hierarchy.GetGraph(1).EdgeToVertex();
+        auto bdr_edge = smoothg::Transpose(hierarchy.GetGraph(1).EdgeToBdrAtt());
 
         for (int ii = 0; ii < num_injectors; ii++)
         {
@@ -1582,6 +1582,21 @@ int main(int argc, char* argv[])
                 {
                     agg = edge_vert.GetRowColumns(b_id)[1];
                 }
+                std::cout<<"found one basis supported in agg "<<agg<<"\n";
+//                PrintFluxBasis(path, 1, b_id, hierarchy, problem_for_plot.get(), edge_map);
+            }
+        }
+
+        for (int ii = 0; ii < num_producers; ii++)
+        {
+
+            std::cout<<"Looking for basis associated with producer "<<num_producers-ii-1<<"\n";
+            int bdr = bdr_edge.NumRows()-ii-1;
+            for (int j = 0; j < bdr_edge.RowSize(bdr); ++j)
+            {
+                int edge = bdr_edge.GetRowColumns(bdr)[j];
+                assert(edge_vert.RowSize(edge) == 1);
+                int agg = edge_vert.GetRowColumns(edge)[0];
                 std::cout<<"found one basis supported in agg "<<agg<<"\n";
 //                PrintFluxBasis(path, 1, b_id, hierarchy, problem_for_plot.get(), edge_map);
             }
@@ -2353,26 +2368,26 @@ mfem::BlockVector TwoPhaseSolver::Solve(const mfem::BlockVector& init_val)
         x_blk2 *= -1.;
 //        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
 
-        std::ofstream all_file("mrst_lognormal_"+std::to_string(step)+".vtk");
+//        std::ofstream all_file("mrst_lognormal_"+std::to_string(step)+".vtk");
 //        all_file.precision(8);
 //        all_file <<  "\nSCALARS pressure double 1\nLOOKUP_TABLE default\n";
 //        all_file << std::fixed;
 //        x_blk2.Print(all_file, 1);
 
-//        x_blk2 = x.GetBlock(2);
-//        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
-////        std::ofstream s_file("egg_sat_"+std::to_string(step)+".vtk");
-////        s_file.precision(8);
+        x_blk2 = x.GetBlock(2);
+        x_blk2.SetSize(x_blk2.Size() - hierarchy_->GetUpscaleParameters().num_iso_verts);
+        std::ofstream all_file("twophase_sat_"+std::to_string(step)+".vtk");
+        all_file.precision(8);
 //        all_file << "\nSCALARS saturation double 1\nLOOKUP_TABLE default\n";
 //        all_file << std::fixed;
 //        x_blk2.Print(all_file, 1);
 
-//        mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
-//        mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
-//        mfem::GridFunction vec_vtk(&u_fes, x_blk2.GetData());
+        mfem::L2_FECollection u_fec(0, problem_ptr->GetMesh().Dimension());
+        mfem::ParFiniteElementSpace u_fes(const_cast<mfem::ParMesh*>(&problem_ptr->GetMesh()), &u_fec);
+        mfem::GridFunction vec_vtk(&u_fes, x_blk2.GetData());
 //        vec_vtk.SaveVTK(all_file, "pressure", 1);
-//        vec_vtk.SetData(x.GetBlock(2).GetData());
-//        vec_vtk.SaveVTK(all_file, "saturation", 1);
+        vec_vtk.SetData(x.GetBlock(2).GetData());
+        vec_vtk.SaveVTK(all_file, "saturation", 1);
     }
 
     if (myid == 0)

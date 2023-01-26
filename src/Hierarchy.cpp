@@ -209,7 +209,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     int coarse_factor = level ? 8 : param.coarse_factor;
     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
                          topology.Coarsen(mgL.GetGraph(), coarse_factor,
-                                          param.num_iso_verts);
+                                          param.num_iso_verts, param.num_iso_bdrs);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 

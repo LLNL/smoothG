@@ -631,6 +631,7 @@ public:
 private:
     void Set5Wells(int well_height, double inject_rate, double bot_hole_pres);
     void Set64Wells(int well_height, double inject_rate, double bot_hole_pres);
+    void Set25Wells(int well_height, double inject_rate, double bot_hole_pres);
     void SetWells(const std::vector<std::vector<int>>& inj_well_cells,
                   const std::vector<std::vector<int>>& prod_well_cells,
                   double inject_rate, double bhp);
@@ -660,11 +661,17 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
     std::ifstream perm_str(perm_file);
     coeff_gf_.SetSpace(u_fes_.get());
     coeff_gf_.Load(perm_str, coeff_gf_.Size());
+    double coeff_max = coeff_gf_.Max();
+    double coeff_min = coeff_gf_.Min();
+    double coeff_range = coeff_max / coeff_min;
+    std::cout << "Original coeff_range: " << coeff_range << "\n";
+
     for (int i = 0; i < coeff_gf_.Size(); ++i)
     {
-        coeff_gf_[i] = 1.0 / coeff_gf_[i];
+        coeff_gf_[i] = 1.0 / (coeff_min * std::pow(10.0, 3.0*std::log(coeff_gf_[i] / coeff_min) / std::log(coeff_range)));
     }
 //    coeff_gf_ = 1.0e16;
+    std::cout << "Adjusted coeff_range: " << coeff_gf_.Max() / coeff_gf_.Min() << "\n";
 
     auto kinv = new mfem::VectorArrayCoefficient(mesh_->Dimension());
     for (int i = 0; i < mesh_->Dimension(); ++i)
@@ -675,7 +682,7 @@ MRSTLogNormal::MRSTLogNormal(const char* perm_file, int well_height,
     ComputeGraphWeight();
 
     well_manager_.reset(new WellManager(*mesh_, *kinv_vector_));
-    Set64Wells(well_height, inject_rate, bottom_hole_pressure);
+    Set25Wells(well_height, inject_rate, bottom_hole_pressure);
     CombineReservoirAndWellModel();
 
     vert_weight_ = ComputeVertWeight();
@@ -757,6 +764,76 @@ void MRSTLogNormal::Set5Wells(int well_height, double inject_rate, double bhp)
             well_manager_->AddWell(type, value, cells[i], WellDirection::Z, 0.127);
         }
     }
+}
+
+void MRSTLogNormal::Set25Wells(int well_height, double inject_rate, double bhp)
+{
+    const int num_wells = 25; // 3*3 + 2*2 + 2*3 *2
+    std::vector<std::vector<int>> cells(num_wells);
+
+    int even_cnt = 0;
+    int odd_cnt = 13;
+
+    double space = 250.0*ft_;
+    mfem::DenseMatrix point(mesh_->Dimension(), num_wells);
+    point = 0.5 * ft_;
+
+    for (int i = 0; i < 5; i++)
+    {
+        for (int j = 0; j < 5; j++)
+        {
+            int cnt = (i+j)%2 ? odd_cnt : even_cnt;
+
+            point(0, cnt) = i * space + 5.0*ft_;
+            point(1, cnt) = j * space + 5.0*ft_;
+
+            if ((i+j)%2)
+            {
+                odd_cnt++;
+            }
+            else
+            {
+                even_cnt++;
+            }
+        }
+    }
+
+    well_height = 30;
+
+    for (int j = 0; j < well_height; ++j)
+    {
+        mfem::Array<int> ids;
+        mfem::Array<mfem::IntegrationPoint> ips;
+        mesh_->FindPoints(point, ids, ips, false);
+
+        for (int i = 0; i < num_wells; ++i)
+        {
+            if (ids[i] >= 0) { cells[i].push_back(ids[i]); }
+            if (mesh_->Dimension() == 3) { point(2, i) += 1.0*ft_; }
+        }
+    }
+
+    well_pos_.SetSpace(u_fes_.get());
+    well_pos_ = 0.0;
+    for (int i = 0; i < num_wells; ++i)
+    {
+        WellType type = (i < 13) ? Injector : Producer;
+        double value = (i < 13) ? inject_rate : bhp;
+        if (cells[i].size())
+        {
+            well_manager_->AddWell(type, value, cells[i], WellDirection::Z, 0.127);
+        }
+
+        double pos_val = (i < 13) ? 1.0 : -1.0;
+        for (int cell : cells[i])
+        {
+            well_pos_[cell] = pos_val;
+        }
+    }
+
+    std::ofstream well_file("mrst_lognormal_well.vtk");
+    well_pos_.SaveVTK(well_file, "well_position", 1);
+
 }
 
 void MRSTLogNormal::Set64Wells(int well_height, double inject_rate, double bhp)

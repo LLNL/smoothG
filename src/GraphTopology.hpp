@@ -53,7 +53,7 @@ public:
               to be isolated are the ones in the end of the vertex enumeration.
        @return coarse graph
     */
-    Graph Coarsen(const Graph& fine_graph, int coarsening_factor, int num_iso_verts = 0);
+    Graph Coarsen(const Graph& fine_graph, int coarsening_factor, int num_iso_verts = 0, int num_iso_bdrs = 0);
 
     /**
        @brief Coarsen a given graph

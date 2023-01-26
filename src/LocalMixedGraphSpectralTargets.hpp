@@ -90,6 +90,7 @@ public:
     bool add_Pvertices_pwc;
     int coarse_factor;
     int num_iso_verts;
+    int num_iso_bdrs;
     int rescale_iter;
     SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
@@ -106,6 +107,7 @@ public:
         add_Pvertices_pwc(false),
         coarse_factor(64),
         num_iso_verts(0),
+        num_iso_bdrs(0),
         rescale_iter(-1),
         saamge_param(NULL)
     {}
@@ -136,6 +138,8 @@ public:
                        "Coarsening factor for metis agglomeration.");
         args.AddOption(&num_iso_verts, "--num-iso-verts", "--num-iso-verts",
                        "Number of isolated vertices.");
+        args.AddOption(&num_iso_verts, "--num-iso-bdrs", "--num-iso-bdrs",
+                       "Number of isolated boundary (attributes).");
         args.AddOption(&rescale_iter, "--rescale-iter", "--rescale-iter",
                        "Number of iteration to compute rescale vector in hybridization.");
     }
