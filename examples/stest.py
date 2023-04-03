@@ -262,75 +262,6 @@ def make_tests():
           "relative-edge-error": 0.38079825403520218,
           "operator-complexity": 1.016509834901651}]
 
-    tests["samplegraph1-coeff"] = \
-        [["./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "1",
-          "--max-traces", "1",
-          "--coarse-components"],
-         {"relative-D-edge-error": 0.37918423747873353,
-          "relative-vertex-error": 0.38013398274257243,
-          "relative-edge-error": 0.38079825403520218,
-          "operator-complexity": 1.016509834901651}]
-
-    tests["samplegraph1-coeff-hb"] = \
-        [["./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "1",
-          "--max-traces", "1",
-          "--coarse-components",
-          "--hybridization"],
-         {"relative-D-edge-error": 0.37918423747873353,
-          "relative-vertex-error": 0.38013398274257243,
-          "relative-edge-error": 0.38079825403520218,
-          "operator-complexity": 1.000874038778061}]
-
-    tests["parsamplegraph1-coeff"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "1",
-          "--max-traces", "1",
-          "--coarse-components"],
-         {"relative-D-edge-error": 0.79929158208615803,
-          "relative-vertex-error": 0.80196594708999625,
-          "relative-edge-error": 0.78297677149740286,
-          "operator-complexity": 1.016509834901651}]
-
-    tests["parsamplegraph1-coeff-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "1",
-          "--max-traces", "1",
-          "--coarse-components"],
-         {"relative-D-edge-error": 0.63689693723000362,
-          "relative-vertex-error": 0.64187135487003488,
-          "relative-edge-error": 0.59087512350996252,
-          "operator-complexity": 1.008739912600874}]
-
-    tests["parsamplegraph1-coeff-hb"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "1",
-          "--max-traces", "1",
-          "--coarse-components",
-          "--hybridization"],
-         {"relative-D-edge-error": 0.79929158208615803,
-          "relative-vertex-error": 0.80196594708999625,
-          "relative-edge-error": 0.78297677149740286,
-          "operator-complexity": 1.000874038778061}]
-
-    tests["parsamplegraph1-coeff-hb-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "1",
-          "--max-traces", "1",
-          "--coarse-components",
-          "--hybridization"],
-         {"relative-D-edge-error": 0.63689693723000362,
-          "relative-vertex-error": 0.64187135487003488,
-          "relative-edge-error": 0.59087512350996252,
-          "operator-complexity": 1.0004420643459024}]
-
     tests["graph-metis"] = \
         [["./generalgraph",
           "--spect-tol", "1.0",
@@ -361,27 +292,6 @@ def make_tests():
           "relative-vertex-error": 0.13514675917148347,
           "relative-edge-error": 0.19926779054787247,
           "operator-complexity": 1.2578874211257887}]
-
-    tests["samplegraph4-coeff"] = \
-        [["./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "4",
-          "--coarse-components"],
-         {"relative-D-edge-error": 0.12043046187567592,
-          "relative-vertex-error": 0.13514675917148347,
-          "relative-edge-error": 0.19926779054787247,
-          "operator-complexity": 1.2578874211257887}]
-
-    tests["samplegraph4-coeff-hb"] = \
-        [["./generalgraph",
-          "--spect-tol", "1.0",
-          "--max-evects", "4",
-          "--coarse-components",
-          "--hybridization"],
-         {"relative-D-edge-error": 0.12043046187567592,
-          "relative-vertex-error": 0.13514675917148347,
-          "relative-edge-error": 0.19926779054787247,
-          "operator-complexity": 1.013984620448976}]
 
     tests["graph-hybridization"] = \
         [["./generalgraph",
@@ -454,8 +364,7 @@ def make_tests():
         [["./mlmc",
           "--sampler-type", "pde",
           "--kappa", "0.01",
-          "--hybridization",
-          "--no-coarse-components"],
+          "--hybridization"],
          {"relative-vertex-error": 0.14875751525009742}]
 
     tests["par-mlmc"] = \

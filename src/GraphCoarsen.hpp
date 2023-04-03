@@ -96,12 +96,9 @@ public:
        interiors and contains the "bubbles". (The columns are in fact ordered as
        written above, but the rows are not.)
 
-       @param edge_trace lives on faces, not aggregates
-       @param vertex_target usually eigenvectors, lives on aggregate
-       @param coarse_space the coarse graph space
        @return the interpolation matrix Pedges for edge space
     */
-    mfem::SparseMatrix BuildPEdges(bool build_coarse_components);
+    mfem::SparseMatrix BuildPEdges();
 
     /**
        @brief Build the projection operator from fine to coarse edge space
@@ -161,7 +158,7 @@ private:
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix& W_proc_;
     const mfem::Vector& constant_rep_;
-    const ElementMBuilder* fine_mbuilder_;
+    const MBuilder& fine_mbuilder_;
     const GraphTopology& topology_;
     const DofAggregate& dof_agg_;
     const GraphSpace& fine_space_;
@@ -175,7 +172,7 @@ private:
     mfem::SparseMatrix coarse_D_;
 
     /// Builder for coarse M operator
-    std::unique_ptr<CoarseMBuilder> coarse_m_builder_;
+    std::unique_ptr<MBuilder> coarse_mbuilder_;
 };
 
 } // namespace smoothg

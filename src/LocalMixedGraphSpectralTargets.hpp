@@ -83,7 +83,6 @@ public:
     bool scaled_dual;
     bool energy_dual;
     bool hybridization;
-    bool coarse_components;
     int coarse_factor;
     int num_iso_verts;
     int rescale_iter;
@@ -98,7 +97,6 @@ public:
         scaled_dual(false),
         energy_dual(false),
         hybridization(false),
-        coarse_components(false),
         coarse_factor(64),
         num_iso_verts(0),
         rescale_iter(-1),
@@ -123,8 +121,6 @@ public:
                        "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
         args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
                        "--no-energy-dual", "Use energy matrix in trace generation.");
-        args.AddOption(&coarse_components, "-coarse-comp", "--coarse-components", "-no-coarse-comp",
-                       "--no-coarse-components", "Store trace, bubble components of coarse M.");
         args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
                        "Coarsening factor for metis agglomeration.");
         args.AddOption(&num_iso_verts, "--num-iso-verts", "--num-iso-verts",

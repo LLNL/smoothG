@@ -392,8 +392,7 @@ void LevelSolver::Build_dMdp(const mfem::Vector& flux, const mfem::Vector& p)
 {
     auto& vert_edof = mixed_system_.GetGraphSpace().VertexToEDof();
     auto& vert_vdof = mixed_system_.GetGraphSpace().VertexToVDof();
-    auto& MB = dynamic_cast<const ElementMBuilder&>(mixed_system_.GetMBuilder());
-    auto& M_el = MB.GetElementMatrices();
+    auto& M_el = mixed_system_.GetMBuilder().GetElementMatrices();
     auto& proj_pwc = const_cast<mfem::SparseMatrix&>(mixed_system_.GetPWConstProj());
 
     dMdp_.resize(M_el.size());

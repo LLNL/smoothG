@@ -81,7 +81,7 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 
     Pu_.push_back(graph_coarsen.BuildPVertices());
-    Psigma_.push_back(graph_coarsen.BuildPEdges(param.coarse_components));
+    Psigma_.push_back(graph_coarsen.BuildPEdges());
     Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
 
     mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_[level]));

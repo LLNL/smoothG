@@ -112,8 +112,6 @@ int main(int argc, char* argv[])
     }
 
     assert(num_partitions >= num_procs);
-    upscale_param.coarse_components = (upscale_param.coarse_components &&
-                                       !upscale_param.hybridization);
 
     /// [Load graph from file or generate one]
     mfem::SparseMatrix global_vertex_edge;

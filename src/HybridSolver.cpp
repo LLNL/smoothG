@@ -42,16 +42,10 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
 {
     MixedLaplacianSolver::Init(mgL, ess_attr);
 
-    auto mbuilder = dynamic_cast<const ElementMBuilder*>(&(mgL.GetMBuilder()));
-    if (!mbuilder)
-    {
-        std::cout << "HybridSolver requires fine level M builder to be FineMBuilder!\n";
-        std::abort();
-    }
-
+    const MBuilder& mbuilder = mgL.GetMBuilder();
     const GraphSpace& graph_space = mgL.GetGraphSpace();
 
-    Init(graph_space.EdgeToEDof(), mbuilder->GetElementMatrices(),
+    Init(graph_space.EdgeToEDof(), mbuilder.GetElementMatrices(),
          graph_space.EDofToTrueEDof(), graph_space.EDofToBdrAtt());
 }
 

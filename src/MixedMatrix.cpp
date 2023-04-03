@@ -32,7 +32,7 @@ namespace smoothg
 {
 
 MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
-    : mbuilder_(new ElementMBuilder(graph.EdgeWeight(), graph.VertexToEdge())),
+    : mbuilder_(new MBuilder(graph.EdgeWeight(), graph.VertexToEdge())),
       M_(mbuilder_->BuildAssembledM()), D_(ConstructD(graph)), W_(W),
       graph_space_(std::move(graph)), constant_rep_(NumVDofs()),
       vertex_sizes_(&constant_rep_[0], NumVDofs()), P_pwc_(SparseIdentity(NumVDofs()))

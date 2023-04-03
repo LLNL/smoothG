@@ -85,7 +85,6 @@ int main(int argc, char* argv[])
                    "Number of samples to draw and simulate.");
     int argseed = 1;
     args.AddOption(&argseed, "--seed", "--seed", "Seed for random number generator.");
-    upscale_param.coarse_components = true;
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();

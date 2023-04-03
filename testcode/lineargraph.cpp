@@ -208,9 +208,8 @@ int main(int argc, char* argv[])
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, local_edge_traces,
                                local_spectral_vertex_targets, coarse_graph);
-    bool build_coarse_components = false;
     auto Pp = graph_coarsen.BuildPVertices();
-    auto Pu = graph_coarsen.BuildPEdges(build_coarse_components);
+    auto Pu = graph_coarsen.BuildPEdges();
 
     std::cout << "Checking to see if divergence of coarse velocity is in range "
               << "of coarse pressure..." << std::endl;
