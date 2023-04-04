@@ -190,7 +190,7 @@ void BlockSolverFalse::UpdateElemScaling(const mfem::Vector& elem_scaling_invers
     mfem::StopWatch chrono;
     chrono.Start();
 
-    auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
+    auto M_proc = mixed_matrix_.BuildM(elem_scaling_inverse);
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])
@@ -252,7 +252,7 @@ void BlockSolverFalse::UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
     chrono.Start();
 
     // Update M and Mprec
-    auto M_proc = mixed_matrix_.GetMBuilder().BuildAssembledM(elem_scaling_inverse);
+    auto M_proc = mixed_matrix_.BuildM(elem_scaling_inverse);
     for (int mm = 0; mm < ess_edofs_.Size(); ++mm)
     {
         if (ess_edofs_[mm])

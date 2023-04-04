@@ -158,10 +158,10 @@ private:
     const mfem::SparseMatrix& D_proc_;
     const mfem::SparseMatrix& W_proc_;
     const mfem::Vector& constant_rep_;
-    const MBuilder& fine_mbuilder_;
     const GraphTopology& topology_;
     const DofAggregate& dof_agg_;
     const GraphSpace& fine_space_;
+    const MixedMatrix& fine_mgL_;
 
     GraphSpace coarse_space_;
 
@@ -172,7 +172,7 @@ private:
     mfem::SparseMatrix coarse_D_;
 
     /// Builder for coarse M operator
-    std::unique_ptr<MBuilder> coarse_mbuilder_;
+    MBuilder coarse_mbuilder_;
 };
 
 } // namespace smoothg

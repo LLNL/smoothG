@@ -60,7 +60,7 @@ public:
        @brief Construct a mixed system directly from building blocks.
 
        @param graph_space the associated graph space (entity-to-dof relations)
-       @param mbuilder builder for M
+       @param M_vert local M on vertices
        @param D the matrix D
        @param W the matrix W. If it is nullptr, it is assumed to be zero
        @param constant_rep constant representation (null vector of D^T)
@@ -69,7 +69,7 @@ public:
               vertices, see documentation on P_pwc_ below for more details.
     */
     MixedMatrix(GraphSpace graph_space,
-                std::unique_ptr<MBuilder> mbuilder,
+                std::vector<mfem::DenseMatrix> M_vert,
                 mfem::SparseMatrix D,
                 mfem::SparseMatrix W,
                 mfem::Vector constant_rep,
@@ -79,11 +79,36 @@ public:
     MixedMatrix(MixedMatrix&& other) noexcept;
 
     /// Assemble the mass matrix M
-    void BuildM()
-    {
-        auto M_tmp = mbuilder_->BuildAssembledM();
-        M_.Swap(M_tmp);
-    }
+    void BuildM();
+    // {
+        // auto M_tmp = mbuilder_->BuildAssembledM();
+        // M_.Swap(M_tmp);
+    // }
+
+    // /**
+    //    @brief Build the assembled M for the local processor
+    //  */
+    // mfem::SparseMatrix BuildAssembledM() const;
+
+    /**
+       @brief Assemble the rescaled M for the local processor
+
+       The point of this class is to be able to build the mass matrix M
+       with different weights, without recoarsening the whole thing.
+
+       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+       that is, agg_weights_inverse in the input is like the coefficient in
+       a finite volume problem, agg_weights is the weights on the mass matrix
+       in the mixed form, which is the reciprocal of that.
+
+       @note In the fine level, an agg is just a vertex.
+    */
+    mfem::SparseMatrix BuildM(
+        const mfem::Vector& agg_weights_inverse) const;
+
+    /// @return scaled M times x
+    mfem::Vector M_Mult(const mfem::Vector& elem_scaling_inv,
+                        const mfem::Vector& x) const;
 
     /// assemble the parallel edge mass matrix
     mfem::HypreParMatrix* MakeParallelM(const mfem::SparseMatrix& M) const;
@@ -115,7 +140,8 @@ public:
     const Graph& GetGraph() const { return graph_space_.GetGraph(); }
     const mfem::Vector& GetConstantRep() const { return constant_rep_; }
     const mfem::SparseMatrix& GetM() const { return M_; }
-    const MBuilder& GetMBuilder() const { return *mbuilder_; }
+    // const MBuilder& GetMBuilder() const { return *mbuilder_; }
+    const std::vector<mfem::DenseMatrix>& GetLocalMs() const { return M_vert_; }
     const mfem::SparseMatrix& GetD() const { return D_; }
     const mfem::SparseMatrix& GetW() const { return W_; }
     const mfem::Array<int>& BlockOffsets() const { return block_offsets_; }
@@ -150,9 +176,10 @@ private:
        vertex_edge is assumed undirected (all ones) when it comes in, and we
        modify it to have -1, 1 in the resulting D_ matrix.
     */
-    mfem::SparseMatrix ConstructD(const Graph& graph) const;
+    mfem::SparseMatrix BuildD(const Graph& graph) const;
 
-    std::unique_ptr<MBuilder> mbuilder_;
+    // std::unique_ptr<MBuilder> mbuilder_;
+    std::vector<mfem::DenseMatrix> M_vert_;
 
     mfem::SparseMatrix M_;
     mfem::SparseMatrix D_;

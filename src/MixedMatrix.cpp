@@ -32,21 +32,33 @@ namespace smoothg
 {
 
 MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
-    : mbuilder_(new MBuilder(graph.EdgeWeight(), graph.VertexToEdge())),
-      M_(mbuilder_->BuildAssembledM()), D_(ConstructD(graph)), W_(W),
+    : D_(BuildD(graph)), W_(W),
       graph_space_(std::move(graph)), constant_rep_(NumVDofs()),
       vertex_sizes_(&constant_rep_[0], NumVDofs()), P_pwc_(SparseIdentity(NumVDofs()))
 {
+    M_vert_.resize(D_.NumRows());
+    for (unsigned int vert = 0; vert < D_.NumRows(); vert++)
+    {
+        auto& local_edge_weight = graph_space_.GetGraph().EdgeWeight()[vert];
+        M_vert_[vert].SetSize(local_edge_weight.Size());
+        M_vert_[vert] = 0.0;
+        for (int i = 0; i < local_edge_weight.Size(); i++)
+        {
+            M_vert_[vert](i, i) = 1.0 / local_edge_weight[i];
+        }
+    }
+
+    BuildM();
     constant_rep_ = 1.0;
 
     Init();
 }
 
-MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuilder,
+MixedMatrix::MixedMatrix(GraphSpace graph_space, std::vector<mfem::DenseMatrix> M_vert,
                          mfem::SparseMatrix D, mfem::SparseMatrix W,
                          mfem::Vector constant_rep, mfem::Vector vertex_sizes,
                          mfem::SparseMatrix P_pwc)
-    : mbuilder_(std::move(mbuilder)), D_(std::move(D)), W_(std::move(W)),
+    : M_vert_(std::move(M_vert)), D_(std::move(D)), W_(std::move(W)),
       graph_space_(std::move(graph_space)), constant_rep_(std::move(constant_rep)),
       vertex_sizes_(std::move(vertex_sizes)), P_pwc_(std::move(P_pwc))
 {
@@ -55,7 +67,7 @@ MixedMatrix::MixedMatrix(GraphSpace graph_space, std::unique_ptr<MBuilder> mbuil
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
 {
-    std::swap(mbuilder_, other.mbuilder_);
+    std::swap(M_vert_, other.M_vert_);
     M_.Swap(other.M_);
     D_.Swap(other.D_);
     W_.Swap(other.W_);
@@ -87,6 +99,62 @@ void MixedMatrix::Init()
     block_true_offsets_.SetSize(3, 0);
     block_true_offsets_[1] = graph_space_.EDofToTrueEDof().NumCols();
     block_true_offsets_[2] = block_true_offsets_[1] + NumVDofs();
+}
+
+void MixedMatrix::BuildM()
+{
+    mfem::Vector vert_weights_inverse(M_vert_.size());
+    vert_weights_inverse = 1.0;
+    auto M_tmp = BuildM(vert_weights_inverse);
+    M_.Swap(M_tmp);
+}
+
+
+mfem::SparseMatrix MixedMatrix::BuildM(
+    const mfem::Vector& vert_weights_inverse) const
+{
+    mfem::Array<int> edofs;
+    auto& vert_edof = graph_space_.VertexToEDof();
+    mfem::SparseMatrix M(vert_edof.NumCols());
+    for (unsigned int vert = 0; vert < M_vert_.size(); vert++)
+    {
+        GetTableRow(vert_edof, vert, edofs);
+        const double vert_weight = 1. / vert_weights_inverse(vert);
+        mfem::DenseMatrix vert_M = M_vert_[vert];
+        vert_M *= vert_weight;
+        M.AddSubMatrix(edofs, edofs, vert_M);
+    }
+    M.Finalize();
+    return M;
+}
+
+mfem::Vector MixedMatrix::M_Mult(
+    const mfem::Vector& vert_scaling_inv, const mfem::Vector& x) const
+{
+    mfem::Vector y(x.Size());
+    y = 0.0;
+
+    auto& vert_edof = graph_space_.VertexToEDof();
+    mfem::Array<int> local_edofs;
+    mfem::Vector x_loc;
+    mfem::Vector y_loc;
+    for (unsigned int vert = 0; vert < M_vert_.size(); ++vert)
+    {
+        GetTableRow(vert_edof, vert, local_edofs);
+
+        x.GetSubVector(local_edofs, x_loc);
+
+        y_loc.SetSize(x_loc.Size());
+        M_vert_[vert].Mult(x_loc, y_loc);
+        y_loc /= vert_scaling_inv[vert];
+
+        for (int j = 0; j < local_edofs.Size(); ++j)
+        {
+            y[local_edofs[j]] += y_loc[j];
+        }
+    }
+
+    return y;
 }
 
 mfem::HypreParMatrix* MixedMatrix::MakeParallelM(const mfem::SparseMatrix& M) const
@@ -124,7 +192,7 @@ void MixedMatrix::Mult(const mfem::Vector& scale,
                        const mfem::BlockVector& x,
                        mfem::BlockVector& y) const
 {
-    y.GetBlock(0) = mbuilder_->Mult(scale, x.GetBlock(0));
+    y.GetBlock(0) = M_Mult(scale, x.GetBlock(0));
     D_.AddMultTranspose(x.GetBlock(1), y.GetBlock(0));
     for (int i = 0; i < ess_edofs_.Size(); ++i)
     {
@@ -151,7 +219,7 @@ mfem::Vector MixedMatrix::PWConstInterpolate(const mfem::Vector& x) const
     return out;
 }
 
-mfem::SparseMatrix MixedMatrix::ConstructD(const Graph& graph) const
+mfem::SparseMatrix MixedMatrix::BuildD(const Graph& graph) const
 {
     const mfem::SparseMatrix& vertex_edge = graph.VertexToEdge();
     const mfem::HypreParMatrix& edge_trueedge = graph.EdgeToTrueEdge();

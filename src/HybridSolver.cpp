@@ -42,10 +42,8 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
 {
     MixedLaplacianSolver::Init(mgL, ess_attr);
 
-    const MBuilder& mbuilder = mgL.GetMBuilder();
     const GraphSpace& graph_space = mgL.GetGraphSpace();
-
-    Init(graph_space.EdgeToEDof(), mbuilder.GetElementMatrices(),
+    Init(graph_space.EdgeToEDof(), mgL.GetLocalMs(),
          graph_space.EDofToTrueEDof(), graph_space.EDofToBdrAtt());
 }
 

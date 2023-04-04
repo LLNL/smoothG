@@ -162,7 +162,7 @@ void Graph::Init(const mfem::HypreParMatrix& edge_trueedge,
         ReorderEdges(edge_trueedge);
     }
 
-    GenerateOffsets(GetComm(), vertex_edge_local_.Height(), vertex_starts_);
+    GenerateOffsets(GetComm(), vertex_edge_local_.NumRows(), vertex_starts_);
 
     vertex_trueedge_ = ParMult(vertex_edge_local_, *edge_trueedge_, vertex_starts_);
 }
@@ -297,7 +297,7 @@ void Graph::MakeEdgeTrueEdge(MPI_Comm comm, int myid, const mfem::SparseMatrix& 
 
 mfem::Vector Graph::DistributeEdgeWeight(const mfem::Vector& edge_weight_global)
 {
-    mfem::Vector edge_weight_local(vertex_edge_local_.Width());
+    mfem::Vector edge_weight_local(vertex_edge_local_.NumCols());
     if (edge_weight_global.Size())
     {
         edge_weight_global.GetSubVector(edge_loc_to_glo_, edge_weight_local);
@@ -333,10 +333,10 @@ void Graph::FixSharedEdgeWeight(const mfem::HypreParMatrix& edge_trueedge,
 void Graph::SplitEdgeWeight(const mfem::Vector& edge_weight_local)
 {
     const mfem::SparseMatrix edge_vert = smoothg::Transpose(vertex_edge_local_);
-    split_edge_weight_.resize(edge_vert.Width());
+    split_edge_weight_.resize(edge_vert.NumCols());
 
     mfem::Array<int> edges;
-    for (int vert = 0; vert < edge_vert.Width(); vert++)
+    for (int vert = 0; vert < edge_vert.NumCols(); vert++)
     {
         GetTableRow(vertex_edge_local_, vert, edges);
         split_edge_weight_[vert].SetSize(edges.Size());
@@ -351,7 +351,7 @@ void Graph::SplitEdgeWeight(const mfem::Vector& edge_weight_local)
 
 mfem::Vector Graph::ReadVertexVector(const std::string& filename) const
 {
-    assert(vert_loc_to_glo_.Size() == vertex_edge_local_.Height());
+    assert(vert_loc_to_glo_.Size() == vertex_edge_local_.NumRows());
     return ReadVector(filename, vertex_starts_.Last(), vert_loc_to_glo_);
 }
 
@@ -411,7 +411,7 @@ mfem::Vector Graph::ReadVector(const std::string& filename, int global_size,
 
 void Graph::WriteVertexVector(const mfem::Vector& vec_loc, const std::string& filename) const
 {
-    assert(vert_loc_to_glo_.Size() == vertex_edge_local_.Height());
+    assert(vert_loc_to_glo_.Size() == vertex_edge_local_.NumRows());
     WriteVector(vec_loc, filename, vertex_starts_.Last(), vert_loc_to_glo_);
 }
 

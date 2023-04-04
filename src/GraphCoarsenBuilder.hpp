@@ -46,18 +46,11 @@ namespace smoothg
 class MBuilder
 {
 public:
-    MBuilder() {}
+    MBuilder(const GraphSpace& coarse_space);
 
-    /// Fine level element M builder using local edge weight
-    MBuilder(const std::vector<mfem::Vector>& local_edge_weight,
-             const mfem::SparseMatrix& elem_edgedof);
+    ~MBuilder() {}
 
-    virtual ~MBuilder() {}
-
-    /// Setting up coarse level element M builder
-    void Setup(const GraphSpace& coarse_space);
-
-    void RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter);
+    void RegisterRow(int agg_index, int row, int dof_loc);
 
     void SetTraceBubbleBlock(int l, double value);
 
@@ -70,41 +63,39 @@ public:
 
     void SetBubbleBubbleBlock(int agg_index, int l, int j, double value);
 
-    void ResetEdgeCdofMarkers(int size);
-
     void FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                              const mfem::SparseMatrix& Agg_cdof_edge);
 
-    /**
-       @brief Build the assembled M for the local processor
-     */
-    mfem::SparseMatrix BuildAssembledM() const;
+    std::vector<mfem::DenseMatrix>&& PopElementMatrices() { return std::move(M_el_); }
 
-    /**
-       @brief Assemble the rescaled M for the local processor
+    // /**
+    //    @brief Build the assembled M for the local processor
+    //  */
+    // mfem::SparseMatrix BuildAssembledM() const;
 
-       The point of this class is to be able to build the mass matrix M
-       with different weights, without recoarsening the whole thing.
+    // /**
+    //    @brief Assemble the rescaled M for the local processor
 
-       Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
-       that is, agg_weights_inverse in the input is like the coefficient in
-       a finite volume problem, agg_weights is the weights on the mass matrix
-       in the mixed form, which is the reciprocal of that.
+    //    The point of this class is to be able to build the mass matrix M
+    //    with different weights, without recoarsening the whole thing.
 
-       @note In the fine level, an agg is just a vertex.
-    */
-    virtual mfem::SparseMatrix BuildAssembledM(
-        const mfem::Vector& agg_weights_inverse) const;
+    //    Reciprocal here follows convention in MixedMatrix::SetMFromWeightVector(),
+    //    that is, agg_weights_inverse in the input is like the coefficient in
+    //    a finite volume problem, agg_weights is the weights on the mass matrix
+    //    in the mixed form, which is the reciprocal of that.
 
-    bool NeedsCoarseVertexDofs() { return true; }
+    //    @note In the fine level, an agg is just a vertex.
+    // */
+    // virtual mfem::SparseMatrix BuildAssembledM(
+    //     const mfem::Vector& agg_weights_inverse) const;
 
-    const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return M_el_; }
+    // const std::vector<mfem::DenseMatrix>& GetElementMatrices() const { return M_el_; }
 
-    const mfem::SparseMatrix& GetElemEdgeDofTable() const { return elem_edgedof_; }
+    // const mfem::SparseMatrix& GetElemEdgeDofTable() const { return elem_edgedof_; }
 
-    /// @return scaled M times x
-    virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
-                              const mfem::Vector& x) const;
+    // /// @return scaled M times x
+    // virtual mfem::Vector Mult(const mfem::Vector& elem_scaling_inv,
+    //                           const mfem::Vector& x) const;
 
 private:
     std::vector<mfem::DenseMatrix> M_el_;

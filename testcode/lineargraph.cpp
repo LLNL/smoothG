@@ -187,10 +187,10 @@ int main(int argc, char* argv[])
     int thisresult = 0;
     for (unsigned int i = 0; i < local_spectral_vertex_targets.size(); ++i)
     {
-        for (int j = 0; j < local_spectral_vertex_targets[i].Width(); ++j)
+        for (int j = 0; j < local_spectral_vertex_targets[i].NumCols(); ++j)
         {
             double val = local_spectral_vertex_targets[i].Elem(0, j);
-            for (int k = 0; k < local_spectral_vertex_targets[i].Height(); ++k)
+            for (int k = 0; k < local_spectral_vertex_targets[i].NumRows(); ++k)
             {
                 if (fabs(local_spectral_vertex_targets[i].Elem(k, j) - val) > test_tol)
                 {

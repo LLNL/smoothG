@@ -20,34 +20,14 @@
 namespace smoothg
 {
 
-mfem::SparseMatrix MBuilder::BuildAssembledM() const
-{
-    mfem::Vector agg_weights_inverse(num_aggs_);
-    agg_weights_inverse = 1.0;
-    return BuildAssembledM(agg_weights_inverse);
-}
+// mfem::SparseMatrix MBuilder::BuildAssembledM() const
+// {
+//     mfem::Vector agg_weights_inverse(num_aggs_);
+//     agg_weights_inverse = 1.0;
+//     return BuildAssembledM(agg_weights_inverse);
+// }
 
-MBuilder::MBuilder(const std::vector<mfem::Vector>& local_edge_weight,
-                   const mfem::SparseMatrix& elem_edgedof)
-{
-    elem_edgedof_.MakeRef(elem_edgedof);
-    num_aggs_ = elem_edgedof_.Height();
-    M_el_.resize(num_aggs_);
-
-    for (unsigned int agg = 0; agg < num_aggs_; agg++)
-    {
-        const mfem::Vector& Agg_edge_weight = local_edge_weight[agg];
-        mfem::DenseMatrix& agg_M = M_el_[agg];
-        agg_M.SetSize(Agg_edge_weight.Size());
-        agg_M = 0.0;
-        for (int i = 0; i < agg_M.Size(); i++)
-        {
-            agg_M(i, i) = 1.0 / Agg_edge_weight[i];
-        }
-    }
-}
-
-void MBuilder::Setup(const GraphSpace& coarse_space)
+MBuilder::MBuilder(const GraphSpace& coarse_space)
 {
     elem_edgedof_.MakeRef(coarse_space.VertexToEDof());
     num_aggs_ = elem_edgedof_.NumRows();
@@ -59,10 +39,11 @@ void MBuilder::Setup(const GraphSpace& coarse_space)
     }
 
     edge_dof_markers_.resize(2);
-    ResetEdgeCdofMarkers(elem_edgedof_.NumCols());
+    edge_dof_markers_[0].resize(elem_edgedof_.NumCols(), -1);
+    edge_dof_markers_[1].resize(elem_edgedof_.NumCols(), -1);
 }
 
-void MBuilder::RegisterRow(int agg_index, int row, int dof_loc, int bubble_counter)
+void MBuilder::RegisterRow(int agg_index, int row, int dof_loc)
 {
     agg_index_ = agg_index;
     dof_loc_ = dof_loc;
@@ -96,12 +77,6 @@ void MBuilder::SetBubbleBubbleBlock(int agg_index, int l,
     M_el_loc(j, l) = value;
 }
 
-void MBuilder::ResetEdgeCdofMarkers(int size)
-{
-    edge_dof_markers_[0].resize(size, -1);
-    edge_dof_markers_[1].resize(size, -1);
-}
-
 void MBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
                                    const mfem::SparseMatrix& Agg_cdof_edge)
 {
@@ -126,49 +101,49 @@ void MBuilder::AddTraceAcross(int row, int col, int agg, double value)
     M_el_loc(id0_in_agg, id1_in_agg) += value;
 }
 
-mfem::SparseMatrix MBuilder::BuildAssembledM(
-    const mfem::Vector& agg_weights_inverse) const
-{
-    mfem::Array<int> edofs;
-    mfem::SparseMatrix M(elem_edgedof_.Width());
-    for (int Agg = 0; Agg < elem_edgedof_.Height(); Agg++)
-    {
-        GetTableRow(elem_edgedof_, Agg, edofs);
-        const double agg_weight = 1. / agg_weights_inverse(Agg);
-        mfem::DenseMatrix agg_M = M_el_[Agg];
-        agg_M *= agg_weight;
-        M.AddSubMatrix(edofs, edofs, agg_M);
-    }
-    M.Finalize();
-    return M;
-}
+// mfem::SparseMatrix MBuilder::BuildAssembledM(
+//     const mfem::Vector& agg_weights_inverse) const
+// {
+//     mfem::Array<int> edofs;
+//     mfem::SparseMatrix M(elem_edgedof_.Width());
+//     for (int Agg = 0; Agg < elem_edgedof_.Height(); Agg++)
+//     {
+//         GetTableRow(elem_edgedof_, Agg, edofs);
+//         const double agg_weight = 1. / agg_weights_inverse(Agg);
+//         mfem::DenseMatrix agg_M = M_el_[Agg];
+//         agg_M *= agg_weight;
+//         M.AddSubMatrix(edofs, edofs, agg_M);
+//     }
+//     M.Finalize();
+//     return M;
+// }
 
-mfem::Vector MBuilder::Mult(
-    const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
-{
-    mfem::Vector y(x.Size());
-    y = 0.0;
+// mfem::Vector MBuilder::Mult(
+//     const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
+// {
+//     mfem::Vector y(x.Size());
+//     y = 0.0;
 
-    mfem::Array<int> local_edofs;
-    mfem::Vector x_loc;
-    mfem::Vector y_loc;
-    for (int elem = 0; elem < elem_edgedof_.NumRows(); ++elem)
-    {
-        GetTableRow(elem_edgedof_, elem, local_edofs);
+//     mfem::Array<int> local_edofs;
+//     mfem::Vector x_loc;
+//     mfem::Vector y_loc;
+//     for (int elem = 0; elem < elem_edgedof_.NumRows(); ++elem)
+//     {
+//         GetTableRow(elem_edgedof_, elem, local_edofs);
 
-        x.GetSubVector(local_edofs, x_loc);
+//         x.GetSubVector(local_edofs, x_loc);
 
-        y_loc.SetSize(x_loc.Size());
-        M_el_[elem].Mult(x_loc, y_loc);
-        y_loc /= elem_scaling_inv[elem];
+//         y_loc.SetSize(x_loc.Size());
+//         M_el_[elem].Mult(x_loc, y_loc);
+//         y_loc /= elem_scaling_inv[elem];
 
-        for (int j = 0; j < local_edofs.Size(); ++j)
-        {
-            y[local_edofs[j]] += y_loc[j];
-        }
-    }
+//         for (int j = 0; j < local_edofs.Size(); ++j)
+//         {
+//             y[local_edofs[j]] += y_loc[j];
+//         }
+//     }
 
-    return y;
-}
+//     return y;
+// }
 
 }
