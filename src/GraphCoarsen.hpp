@@ -43,7 +43,7 @@
 #include "LocalMixedGraphSpectralTargets.hpp"
 #include "utilities.hpp"
 #include "MixedMatrix.hpp"
-#include "LocalCoarseMBuilder.hpp"
+#include "CoarseLocalMBuilder.hpp"
 
 /// The overall namespace for the smoothG project
 namespace smoothg
