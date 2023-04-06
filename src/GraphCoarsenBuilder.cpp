@@ -20,130 +20,77 @@
 namespace smoothg
 {
 
-// mfem::SparseMatrix MBuilder::BuildAssembledM() const
-// {
-//     mfem::Vector agg_weights_inverse(num_aggs_);
-//     agg_weights_inverse = 1.0;
-//     return BuildAssembledM(agg_weights_inverse);
-// }
-
-MBuilder::MBuilder(const GraphSpace& coarse_space)
+LocalCoarseMBuilder::LocalCoarseMBuilder(const GraphSpace& coarse_space)
 {
-    elem_edgedof_.MakeRef(coarse_space.VertexToEDof());
-    num_aggs_ = elem_edgedof_.NumRows();
+    auto& agg_cedof = coarse_space.VertexToEDof();
+    int num_aggs = agg_cedof.NumRows();
 
-    M_el_.resize(num_aggs_);
-    for (unsigned int i = 0; i < num_aggs_; i++)
+    M_agg_.resize(num_aggs);
+    for (int agg = 0; agg < num_aggs; agg++)
     {
-        M_el_[i].SetSize(elem_edgedof_.RowSize(i));
+        M_agg_[agg].SetSize(agg_cedof.RowSize(agg));
     }
 
-    edge_dof_markers_.resize(2);
-    edge_dof_markers_[0].resize(elem_edgedof_.NumCols(), -1);
-    edge_dof_markers_[1].resize(elem_edgedof_.NumCols(), -1);
+    global_to_local_.resize(2);
+    global_to_local_[0].resize(agg_cedof.NumCols(), -1);
+    global_to_local_[1].resize(agg_cedof.NumCols(), -1);
 }
 
-void MBuilder::RegisterRow(int agg_index, int row, int dof_loc)
+void LocalCoarseMBuilder::RegisterTraceIndex(int agg_index, int dof_global, int dof_local)
 {
     agg_index_ = agg_index;
-    dof_loc_ = dof_loc;
-    edge_dof_markers_[0][row] = dof_loc;
+    dof_loc_ = dof_local;
+    global_to_local_[0][dof_global] = dof_local;
 }
 
-void MBuilder::SetTraceBubbleBlock(int l, double value)
+void LocalCoarseMBuilder::SetTraceBubbleBlock(int bubble_local, double value)
 {
-    mfem::DenseMatrix& M_el_loc(M_el_[agg_index_]);
-    M_el_loc(l, dof_loc_) = value;
-    M_el_loc(dof_loc_, l) = value;
+    mfem::DenseMatrix& M_agg_loc(M_agg_[agg_index_]);
+    M_agg_loc(bubble_local, dof_loc_) = value;
+    M_agg_loc(dof_loc_, bubble_local) = value;
 }
 
-void MBuilder::AddTraceTraceBlockDiag(double value)
+void LocalCoarseMBuilder::AddTraceTraceBlockDiag(double value)
 {
-    M_el_[agg_index_](dof_loc_, dof_loc_) += value;
+    M_agg_[agg_index_](dof_loc_, dof_loc_) += value;
 }
 
-void MBuilder::AddTraceTraceBlock(int l, double value)
+void LocalCoarseMBuilder::AddTraceTraceBlock(int dof_global, double value)
 {
-    mfem::DenseMatrix& M_el_loc(M_el_[agg_index_]);
-    M_el_loc(edge_dof_markers_[0][l], dof_loc_) += value;
-    M_el_loc(dof_loc_, edge_dof_markers_[0][l]) += value;
+    mfem::DenseMatrix& M_agg_loc(M_agg_[agg_index_]);
+    M_agg_loc(global_to_local_[0][dof_global], dof_loc_) += value;
+    M_agg_loc(dof_loc_, global_to_local_[0][dof_global]) += value;
 }
 
-void MBuilder::SetBubbleBubbleBlock(int agg_index, int l,
-                                    int j, double value)
+void LocalCoarseMBuilder::SetBubbleBubbleBlock(int agg_index, int bubble_local1,
+                                               int bubble_local2, double value)
 {
-    mfem::DenseMatrix& M_el_loc(M_el_[agg_index]);
-    M_el_loc(l, j) = value;
-    M_el_loc(j, l) = value;
+    mfem::DenseMatrix& M_agg_loc(M_agg_[agg_index]);
+    M_agg_loc(bubble_local1, bubble_local2) = value;
+    M_agg_loc(bubble_local2, bubble_local1) = value;
 }
 
-void MBuilder::FillEdgeCdofMarkers(int face_num, const mfem::SparseMatrix& face_Agg,
-                                   const mfem::SparseMatrix& Agg_cdof_edge)
+void LocalCoarseMBuilder::SetDofGlobalToLocalMaps(int face, const mfem::SparseMatrix& face_agg,
+                                                  const mfem::SparseMatrix& agg_cedof)
 {
-    mfem::Array<int> local_Agg_edge_cdof;
-    GetTableRow(face_Agg, face_num, Aggs_);
-    for (int a = 0; a < Aggs_.Size(); a++)
+    mfem::Array<int> local_cedof;
+    GetTableRow(face_agg, face, aggs_);
+    for (int a = 0; a < aggs_.Size(); a++)
     {
-        GetTableRow(Agg_cdof_edge, Aggs_[a], local_Agg_edge_cdof);
-        for (int k = 0; k < local_Agg_edge_cdof.Size(); k++)
+        GetTableRow(agg_cedof, aggs_[a], local_cedof);
+        for (int k = 0; k < local_cedof.Size(); k++)
         {
-            edge_dof_markers_[a][local_Agg_edge_cdof[k]] = k;
+            global_to_local_[a][local_cedof[k]] = k;
         }
     }
 }
 
-void MBuilder::AddTraceAcross(int row, int col, int agg, double value)
+void LocalCoarseMBuilder::AddTraceAcross(int dof_global1, int dof_global2, int agg, double value)
 {
-    mfem::DenseMatrix& M_el_loc(M_el_[Aggs_[agg]]);
-
-    int id0_in_agg = edge_dof_markers_[agg][row];
-    int id1_in_agg = edge_dof_markers_[agg][col];
-    M_el_loc(id0_in_agg, id1_in_agg) += value;
+    mfem::DenseMatrix& M_agg_loc(M_agg_[aggs_[agg]]);
+    int dof_local1 = global_to_local_[agg][dof_global1];
+    int dof_local2 = global_to_local_[agg][dof_global2];
+    M_agg_loc(dof_local1, dof_local2) += value;
 }
-
-// mfem::SparseMatrix MBuilder::BuildAssembledM(
-//     const mfem::Vector& agg_weights_inverse) const
-// {
-//     mfem::Array<int> edofs;
-//     mfem::SparseMatrix M(elem_edgedof_.Width());
-//     for (int Agg = 0; Agg < elem_edgedof_.Height(); Agg++)
-//     {
-//         GetTableRow(elem_edgedof_, Agg, edofs);
-//         const double agg_weight = 1. / agg_weights_inverse(Agg);
-//         mfem::DenseMatrix agg_M = M_el_[Agg];
-//         agg_M *= agg_weight;
-//         M.AddSubMatrix(edofs, edofs, agg_M);
-//     }
-//     M.Finalize();
-//     return M;
-// }
-
-// mfem::Vector MBuilder::Mult(
-//     const mfem::Vector& elem_scaling_inv, const mfem::Vector& x) const
-// {
-//     mfem::Vector y(x.Size());
-//     y = 0.0;
-
-//     mfem::Array<int> local_edofs;
-//     mfem::Vector x_loc;
-//     mfem::Vector y_loc;
-//     for (int elem = 0; elem < elem_edgedof_.NumRows(); ++elem)
-//     {
-//         GetTableRow(elem_edgedof_, elem, local_edofs);
-
-//         x.GetSubVector(local_edofs, x_loc);
-
-//         y_loc.SetSize(x_loc.Size());
-//         M_el_[elem].Mult(x_loc, y_loc);
-//         y_loc /= elem_scaling_inv[elem];
-
-//         for (int j = 0; j < local_edofs.Size(); ++j)
-//         {
-//             y[local_edofs[j]] += y_loc[j];
-//         }
-//     }
-
-//     return y;
-// }
 
 }

@@ -171,8 +171,8 @@ private:
     /// Coarse D operator
     mfem::SparseMatrix coarse_D_;
 
-    /// Builder for coarse M operator
-    MBuilder coarse_mbuilder_;
+    /// Builder for local coarse M operator
+    LocalCoarseMBuilder coarse_loc_M_builder_;
 };
 
 } // namespace smoothg

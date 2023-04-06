@@ -37,7 +37,7 @@ MixedMatrix::MixedMatrix(Graph graph, const mfem::SparseMatrix& W)
       vertex_sizes_(&constant_rep_[0], NumVDofs()), P_pwc_(SparseIdentity(NumVDofs()))
 {
     M_vert_.resize(D_.NumRows());
-    for (unsigned int vert = 0; vert < D_.NumRows(); vert++)
+    for (int vert = 0; vert < D_.NumRows(); vert++)
     {
         auto& local_edge_weight = graph_space_.GetGraph().EdgeWeight()[vert];
         M_vert_[vert].SetSize(local_edge_weight.Size());

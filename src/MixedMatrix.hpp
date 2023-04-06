@@ -80,15 +80,6 @@ public:
 
     /// Assemble the mass matrix M
     void BuildM();
-    // {
-        // auto M_tmp = mbuilder_->BuildAssembledM();
-        // M_.Swap(M_tmp);
-    // }
-
-    // /**
-    //    @brief Build the assembled M for the local processor
-    //  */
-    // mfem::SparseMatrix BuildAssembledM() const;
 
     /**
        @brief Assemble the rescaled M for the local processor
