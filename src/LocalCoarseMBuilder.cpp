@@ -13,7 +13,7 @@
  *
  ***********************************************************************EHEADER*/
 
-#include "GraphCoarsenBuilder.hpp"
+#include "LocalCoarseMBuilder.hpp"
 #include "GraphTopology.hpp"
 #include "MatrixUtilities.hpp"
 
