@@ -18,7 +18,7 @@
 # generate lib file
 #####
 
-add_library(smoothg LocalMixedGraphSpectralTargets.cpp LocalCoarseMBuilder.cpp
+add_library(smoothg LocalMixedGraphSpectralTargets.cpp CoarseLocalMBuilder.cpp
   GraphCoarsen.cpp utilities.cpp BlockSolver.cpp HybridSolver.cpp
   sharedentitycommunication.cpp GraphTopology.cpp MetisGraphPartitioner.cpp 
   MatrixUtilities.cpp MixedMatrix.cpp LocalEigenSolver.cpp GraphGenerator.cpp 

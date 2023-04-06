@@ -22,7 +22,6 @@
 #include <numeric>
 #include "GraphCoarsen.hpp"
 #include "MatrixUtilities.hpp"
-#include "GraphCoarsenBuilder.hpp"
 
 using std::unique_ptr;
 

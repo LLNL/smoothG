@@ -18,8 +18,8 @@
     @brief Helper objects for GraphCoarsen::BuildPEdges
 */
 
-#ifndef __GRAPHCOARSENBUILDER_HPP
-#define __GRAPHCOARSENBUILDER_HPP
+#ifndef __COARSELOCALMBUILDER_HPP
+#define __COARSELOCALMBUILDER_HPP
 
 #include "smoothG_config.h"
 #include "utilities.hpp"
@@ -43,10 +43,10 @@ namespace smoothg
    where \f$ T \f$ signifies trace extension degrees of freedom, and
    \f$ B \f$ signifies bubble degrees of freedom on the coarse graph.
 */
-class LocalCoarseMBuilder
+class CoarseLocalMBuilder
 {
 public:
-    LocalCoarseMBuilder(const GraphSpace& coarse_space);
+    CoarseLocalMBuilder(const GraphSpace& coarse_space);
 
     void RegisterTraceIndex(int agg_index, int dof_global, int dof_loc);
 

@@ -24,7 +24,6 @@
 #include "MatrixUtilities.hpp"
 #include "utilities.hpp"
 #include "GraphSpace.hpp"
-#include "GraphCoarsenBuilder.hpp"
 
 namespace smoothg
 {

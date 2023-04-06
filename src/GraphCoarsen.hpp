@@ -172,7 +172,7 @@ private:
     mfem::SparseMatrix coarse_D_;
 
     /// Builder for local coarse M operator
-    LocalCoarseMBuilder coarse_loc_M_builder_;
+    CoarseLocalMBuilder coarse_loc_M_builder_;
 };
 
 } // namespace smoothg
