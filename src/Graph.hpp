@@ -26,6 +26,8 @@
 namespace smoothg
 {
 
+class Redistributor;
+
 /**
     @brief Distributed graph containing vertex to edge relation and edge weight
 
@@ -194,6 +196,9 @@ private:
     mfem::Array<int> edge_loc_to_glo_;
     mfem::Array<HYPRE_Int> vertex_starts_;
     mfem::Array<HYPRE_Int> edge_starts_;
+
+
+    friend class Redistributor;
 }; // class Graph
 
 } // namespace smoothg

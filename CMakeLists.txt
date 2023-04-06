@@ -135,6 +135,13 @@ else()
   set(${PROJECT_NAME}_USE_ARPACK 0)
 endif()
 
+# Look for MATRED if enabled
+if (USE_MATRED)
+  find_package(MATRED REQUIRED)
+  include_directories(${MATRED_INCLUDE_DIRS})
+  list(APPEND TPL_LIBRARIES ${MATRED_LIBRARIES})
+endif()
+
 # BLAS/LAPACK
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)

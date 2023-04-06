@@ -107,6 +107,11 @@ std::unique_ptr<mfem::HypreParMatrix> ParMult(const mfem::SparseMatrix& A,
 mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B);
 
 /**
+    @return the product Ax.
+*/
+mfem::Vector Mult(const mfem::Operator& A, const mfem::Vector& x);
+
+/**
     @brief Compute \f$ C = AB \f$, where \f$ A \f$ is sparse and
            \f$ B \f$ is dense, but C is kept transposed.
 */
@@ -490,6 +495,12 @@ double FrobeniusNorm(const mfem::SparseMatrix& mat);
 /// Drop the entries (whether on diagonal or not) that are smaller than tol
 /// modified from hypre function hypre_ParCSRMatrixDropSmallEntries
 HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol);
+
+/// @brief Create a block diag parallel matrix from local A
+/// @param comm MPI communicator
+/// @param A local CSR matrix
+/// @return hypre ParCSR Matrix with A as the "diag" part
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A);
 
 } // namespace smoothg
 

@@ -90,6 +90,8 @@ private:
     std::unique_ptr<mfem::HypreParMatrix> edof_trueedof_;
     std::unique_ptr<mfem::HypreParMatrix> trueedof_edof_;
     mfem::SparseMatrix edof_bdratt_;
+
+    friend class Redistributor;
 }; // class GraphSpace
 
 } // namespace smoothg

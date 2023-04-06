@@ -56,6 +56,9 @@ public:
         part_type_ = type;
     }
 
+    //! Set flags based on the desired number of partitions
+    void setDefaultFlags(int coarsening_factor);
+
     //! Set non-default options for metis
     void setOption(const int i, const int val)
     {

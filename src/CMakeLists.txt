@@ -23,7 +23,7 @@ add_library(smoothg LocalMixedGraphSpectralTargets.cpp CoarseLocalMBuilder.cpp
   sharedentitycommunication.cpp GraphTopology.cpp MetisGraphPartitioner.cpp 
   MatrixUtilities.cpp MixedMatrix.cpp LocalEigenSolver.cpp GraphGenerator.cpp 
   Upscale.cpp MixedLaplacianSolver.cpp Graph.cpp Sampler.cpp GraphSpace.cpp 
-  MLMCManager.cpp Hierarchy.cpp NonlinearSolver.cpp)
+  MLMCManager.cpp Hierarchy.cpp NonlinearSolver.cpp Redistributor.cpp)
 
 #####
 # library for install target

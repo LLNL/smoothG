@@ -32,6 +32,12 @@ MetisGraphPartitioner::MetisGraphPartitioner(PartType _part_type)
     options_[METIS_OPTION_CONTIG] = 1;
 }
 
+void MetisGraphPartitioner::setDefaultFlags(int coarsening_factor)
+{
+    auto flag = coarsening_factor <= 8 ? PartType::RECURSIVE : PartType::KWAY;
+    setFlags(flag);
+}
+
 void MetisGraphPartitioner::doPartition(const mfem::SparseMatrix& wtable,
                                         int& num_partitions,
                                         mfem::Array<int>& partitioning,

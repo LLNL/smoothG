@@ -202,6 +202,8 @@ private:
     bool W_is_nonzero_;
 
     mfem::Array<int> ess_edofs_;
+
+    friend class Redistributor;
 }; // class MixedMatrix
 
 } // namespace smoothg

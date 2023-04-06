@@ -266,6 +266,13 @@ mfem::DenseMatrix Mult(const mfem::Operator& A, const mfem::DenseMatrix& B)
     return out;
 }
 
+mfem::Vector Mult(const mfem::Operator& A, const mfem::Vector& x)
+{
+    mfem::Vector Ax(A.NumRows());
+    A.Mult(x, Ax);
+    return Ax;
+}
+
 void MultSparseDenseTranspose(const mfem::SparseMatrix& A, const mfem::DenseMatrix& B,
                               mfem::DenseMatrix& C)
 {
@@ -1324,7 +1331,6 @@ HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol)
     HYPRE_BigInt* col_map_offd_A  = hypre_ParCSRMatrixColMapOffd(A);
     HYPRE_Int* marker_offd = NULL;
 
-    HYPRE_BigInt first_row  = hypre_ParCSRMatrixFirstRowIndex(A);
     HYPRE_Int nrow_local = hypre_CSRMatrixNumRows(A_diag);
     HYPRE_Int my_id, num_procs;
     /* MPI size and rank*/
@@ -1406,6 +1412,21 @@ HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol)
     hypre_TFree(marker_offd, HYPRE_MEMORY_HOST);
 
     return hypre_error_flag;
+}
+
+mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A)
+{
+    mfem::Array<int> row_starts, col_starts;
+    GenerateOffsets(comm, A.NumRows(), row_starts);
+    GenerateOffsets(comm, A.NumCols(), col_starts);
+    auto pA = new mfem::HypreParMatrix(comm, A.NumRows(), A.NumCols(),
+                                       row_starts, col_starts, &A);
+    pA->CopyRowStarts();
+    pA->CopyColStarts();
+    pA->SetOwnerFlags(3, -1, -1);
+    A.SetGraphOwner(false);
+    A.SetDataOwner(false);
+    return pA;
 }
 
 } // namespace smoothg
