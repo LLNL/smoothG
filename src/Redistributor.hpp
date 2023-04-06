@@ -57,11 +57,11 @@ class Redistributor
     std::vector<unique_ptr<mfem::HypreParMatrix> > redTrueDof_trueDof;
     std::vector<unique_ptr<mfem::HypreParMatrix> > redDof_trueDof;
 
-    unique_ptr<Graph> redist_graph;
+    Graph redist_graph_;
 
-    std::unique_ptr<Graph> Redistribute(const Graph& graph);
+    Graph Redistribute(const Graph& graph);
 
-    std::unique_ptr<GraphSpace> Redistribute(const GraphSpace& dof);
+    GraphSpace Redistribute(const GraphSpace& dof);
 
     unique_ptr<mfem::HypreParMatrix> BuildRedEntToTrueEnt(
         const mfem::HypreParMatrix& elem_trueEntity) const;
@@ -78,8 +78,7 @@ class Redistributor
 
     unique_ptr<mfem::HypreParMatrix>
     BuildRepeatedEDofRedistribution(const GraphSpace& dof,
-                                   const GraphSpace& redist_dof,
-                                   int codim, int jform);
+                                    const GraphSpace& redist_dof);
 
     void Init(const Graph& graph, const std::vector<int>& elem_redist_procs);
 public:
@@ -105,7 +104,7 @@ public:
         return *(redTrueDof_trueDof[jform]);
     }
 
-    Graph& GetRedistributedGraph() { return *redist_graph; }
+    Graph& GetRedistributedGraph() { return redist_graph_; }
 
     MixedMatrix Redistribute(const MixedMatrix& seq);
 };

@@ -161,7 +161,7 @@ void Redistributor::Init(
     auto& elem_trueEntity = graph.VertexToTrueEdge();
     redEntity_trueEntity[1] = BuildRedEntToTrueEnt(elem_trueEntity);
 
-    redist_graph = Redistribute(graph);
+    redist_graph_ = Redistribute(graph);
 }
 
 unique_ptr<mfem::HypreParMatrix>
@@ -242,9 +242,10 @@ mfem::SparseMatrix BuildVertRDof(const mfem::SparseMatrix& vert_dof)
 
 unique_ptr<mfem::HypreParMatrix>
 Redistributor::BuildRepeatedEDofRedistribution(const GraphSpace& dof,
-                                              const GraphSpace& redist_dof,
-                                              int codim, int jform)
+                                               const GraphSpace& redist_dof)
 {
+    int codim = 0;
+    int jform = 1;
 //    auto type = static_cast<GraphTopology::Entity>(codim);
     auto& redTE_TE = *redTrueEntity_trueEntity[codim];
     auto comm = redTE_TE.GetComm();
@@ -341,12 +342,10 @@ Redistributor::BuildRepeatedEDofRedistribution(const GraphSpace& dof,
     return redRD_RD;
 }
 
-std::unique_ptr<Graph>
-Redistributor::Redistribute(const Graph& graph)
+Graph Redistributor::Redistribute(const Graph& graph)
 {
     // Redistribute the current graph to another set of processors
     // auto out = make_unique<Graph>(graph.GetComm());
-    auto out = make_unique<Graph>();
 
     // const int num_redElem = TrueEntityRedistribution(0).NumRows();
     // out->EntityTrueEntity(0).SetUp(num_redElem);
@@ -368,7 +367,7 @@ Redistributor::Redistribute(const Graph& graph)
     unique_ptr<mfem::HypreParMatrix> TE_redE(redEntity_trueEntity[1]->Transpose());
     auto redB = Mult(*redTrueEntity_trueEntity[0], trueB, *TE_redE);
 
-    mfem::SparseMatrix redB_diag = GetDiag(*redB);
+    // mfem::SparseMatrix redB_diag = GetDiag(*redB);
     //    mfem::SparseMatrix redB_diag_copy(redB_diag);
 
     //    out->B_[0] = make_unique<TopologyTable>(redB_diag_copy);
@@ -407,17 +406,17 @@ Redistributor::Redistribute(const Graph& graph)
         mfem::ParMult(redEntity_trueEntity[1].get(), tE_bdrattr.get()));
 
     HYPRE_Int* trash_map;
-    mfem::SparseMatrix redE_bdrattr_local_ref;
+    mfem::SparseMatrix redE_bdrattr_local;
     if (myid == 0)
     {
-        redE_bdrattr->GetDiag(redE_bdrattr_local_ref);
+        redE_bdrattr->GetDiag(redE_bdrattr_local);
     }
     else
     {
-        redE_bdrattr->GetOffd(redE_bdrattr_local_ref, trash_map);
+        redE_bdrattr->GetOffd(redE_bdrattr_local, trash_map);
     }
 
-    mfem::SparseMatrix redE_bdrattr_local(redE_bdrattr_local_ref);
+    // mfem::SparseMatrix redE_bdrattr_local(redE_bdrattr_local_ref);
     //    out->facet_bdrAttribute = make_unique<TopologyTable>(redE_bdrattr_local);
 
     //    out->element_attribute.SetSize(num_redElem);
@@ -429,11 +428,11 @@ Redistributor::Redistribute(const Graph& graph)
     //    auto trueFacetWeight = topo.TrueWeight(1);
     //    out->Weights_[1]->SetSize(out->B_[0]->NumCols());
     //    redEntity_trueEntity[1]->Mult(*trueFacetWeight, *(out->Weights_[1]));
-
-    return out;
+    
+    return Graph(GetDiag(*redB), *redE_redTE, mfem::Vector(), &redE_bdrattr_local);
 }
 
-std::unique_ptr<GraphSpace> Redistributor::Redistribute(const GraphSpace& dof)
+GraphSpace Redistributor::Redistribute(const GraphSpace& dof)
 {
     // auto& nonconst_dof = const_cast<GraphSpace&>(dof);
     // auto dof_alg = dynamic_cast<GraphSpaceALG*>(&nonconst_dof);
@@ -442,7 +441,7 @@ std::unique_ptr<GraphSpace> Redistributor::Redistribute(const GraphSpace& dof)
     // const int dim = 2;//redist_graph->Dimensions();
     // const int max_codim = 1; //dof.GetMaxCodimensionBaseForDof();
     const int jform = 1; //dim - max_codim;
-    auto out = make_unique<GraphSpace>(std::move(*redist_graph));
+    // auto out = make_unique<GraphSpace>(std::move(*redist_graph));
 
     // auto elem = GraphTopology::ELEMENT;
     // smoothg has all the dofs (vdof and edof in GraphSpace), so need to do at the same time unlike parelag
@@ -458,13 +457,13 @@ std::unique_ptr<GraphSpace> Redistributor::Redistribute(const GraphSpace& dof)
         BuildRedTrueEntToTrueEnt(*redvdof_redtruevdof, *redDof_trueDof[0]);
 
     std::unique_ptr<mfem::HypreParMatrix> truevdof_redvdof(redDof_trueDof[0]->Transpose());
+    std::unique_ptr<mfem::HypreParMatrix> redvert_redvdof;
     {
         // std::unique_ptr<mfem::HypreParMatrix> redvert_redvdof(
         // Mult(*redEntity_trueEntity[0], *vert_truevdof, *truevdof_redvdof));
         auto vert_redvdof = ParMult(dof.VertexToVDof(), *truevdof_redvdof, dof.GetGraph().VertexStarts());
-        std::unique_ptr<mfem::HypreParMatrix> redvert_redvdof(
-            ParMult(redEntity_trueEntity[0].get(), vert_redvdof.get()));
-        out->vertex_vdof_ = GetDiag(*redvert_redvdof);
+        redvert_redvdof.reset(ParMult(redEntity_trueEntity[0].get(), vert_redvdof.get()));
+        // out->vertex_vdof_ = GetDiag(*redvert_redvdof);
     }
 
 
@@ -477,9 +476,9 @@ std::unique_ptr<GraphSpace> Redistributor::Redistribute(const GraphSpace& dof)
     // auto redDof_redTrueDof = BuildRedEntToRedTrueEnt(*redDof_trueDof[jform]);
     // redTrueDof_trueDof[jform] = // TODO: prabably need to take case of rdof ordering
     //   BuildRedTrueEntToTrueEnt(*redDof_redTrueDof, *redDof_trueDof[jform]);
-    out->edof_trueedof_ = BuildRedEntToRedTrueEnt(*redDof_trueDof[jform]);
-    redTrueDof_trueDof[jform] = // TODO: prabably need to take care of rdof ordering
-        BuildRedTrueEntToTrueEnt(*out->edof_trueedof_, *redDof_trueDof[jform]);
+    // out->edof_trueedof_ = BuildRedEntToRedTrueEnt(*redDof_trueDof[jform]);
+    // redTrueDof_trueDof[jform] = // TODO: prabably need to take care of rdof ordering
+    //     BuildRedTrueEntToTrueEnt(*out->edof_trueedof_, *redDof_trueDof[jform]);
 
     std::unique_ptr<mfem::HypreParMatrix> trueedof_rededof(redDof_trueDof[jform]->Transpose());
     // out->dofTrueDof.SetUp(std::move(redDof_redTrueDof));
@@ -488,9 +487,10 @@ std::unique_ptr<GraphSpace> Redistributor::Redistribute(const GraphSpace& dof)
     // MPI_Comm_rank(redist_graph->GetComm(), &myid);
 
     // for (int i = 0; i < max_codim+1; ++i)
-    {
+    // {
         //    std::unique_ptr<mfem::HypreParMatrix> tE_tD;
         //    if (i > 0)
+        std::unique_ptr<mfem::HypreParMatrix> rededge_rededof;
         {
             //   auto codim = static_cast<GraphTopology::Entity>(i);
             auto& edge_edof = dof.EdgeToEDof();
@@ -499,23 +499,28 @@ std::unique_ptr<GraphSpace> Redistributor::Redistribute(const GraphSpace& dof)
             auto trueedge_trueedof = ParMult(&dof.GetGraph().EdgeToTrueEdge(), edge_trueedof.get());
             *trueedge_trueedof = 1.0;//@todo probably need something like IgnoreNonLocalRange
 
-            std::unique_ptr<mfem::HypreParMatrix> rededge_rededof(
+            rededge_rededof.reset(
                 Mult(*redEntity_trueEntity[1], *trueedge_trueedof, *trueedof_rededof));
-            out->edge_edof_ = GetDiag(*rededge_rededof);
+            // out->edge_edof_ = GetDiag(*rededge_rededof);
 
         }
         //    else
-        {
-            std::unique_ptr<mfem::HypreParMatrix> redvert_rededof(
-                Mult(*redEntity_trueEntity[0], *vert_trueedof, *trueedof_rededof));
-            out->vertex_edof_ = GetDiag(*redvert_rededof);
-        }
+        // {
+            // std::unique_ptr<mfem::HypreParMatrix> redvert_rededof(
+                // Mult(*redEntity_trueEntity[0], *vert_trueedof, *trueedof_rededof));
+            // out->vertex_edof_ = GetDiag(*redvert_rededof);
+        // }
 
         //    mfem::SparseMatrix redEnt_redDof_diag;
         //    redEnt_redDof->GetDiag(redEnt_redDof_diag);
         //    out->entity_dof[i].reset(new mfem::SparseMatrix(redEnt_redDof_diag));
         //    out->finalized[i] = true;
-    }
+    // }
+
+
+    GraphSpace out(std::move(redist_graph_), GetDiag(*rededge_rededof), GetDiag(*redvert_redvdof));
+    redTrueDof_trueDof[jform] = // TODO: prabably need to take care of rdof ordering
+        BuildRedTrueEntToTrueEnt(out.EDofToTrueEDof(), *redDof_trueDof[jform]);
 
     return out;
 }
@@ -565,7 +570,7 @@ MixedMatrix Redistributor::Redistribute(const MixedMatrix& sequence)
         // Mult(*redD_tD, trueTargets, *(redist_seq->Targets_[jform]));
     }
 
-    std::vector<mfem::DenseMatrix> red_M_vert(redist_space->GetGraph().NumVertices());
+    std::vector<mfem::DenseMatrix> red_M_vert(redist_space.GetGraph().NumVertices());
     for (int codim = 0; codim < num_forms; ++codim)
     {
         // const int jform = num_forms - codim - 1;
@@ -575,7 +580,6 @@ MixedMatrix Redistributor::Redistribute(const MixedMatrix& sequence)
 
         // for (int j = sequence.jformStart_; j <= jform; ++j)
         {
-            int j = 1;
             // mfem::SparseMatrix M(*const_cast<MixedMatrix&>(sequence).GetM(type, j));
             // Build block diagonal "mass" matrix
             auto vert_rdof = BuildVertRDof(space.VertexToEDof());
@@ -588,15 +592,14 @@ MixedMatrix Redistributor::Redistribute(const MixedMatrix& sequence)
             }
             M.Finalize();
             
-            unique_ptr<mfem::HypreParMatrix> trueM(ToParMatrix(redist_space->GetGraph().GetComm(), M));
+            unique_ptr<mfem::HypreParMatrix> trueM(ToParMatrix(redist_space.GetGraph().GetComm(), M));
 
             // M only exists for the vert-edof pair (codim=0, jform=1) in smoothG 
             unique_ptr<mfem::HypreParMatrix> red_trueM;
-            if (codim == 0) // redistribution of RDofs when codim=0 follows that of elements
+            // if (codim == 0) // redistribution of RDofs when codim=0 follows that of elements
             {
                 // auto topo = const_cast<MixedMatrix&>(sequence).GetTopology();
-                auto redRD_RD = BuildRepeatedEDofRedistribution(
-                                    space, *redist_space, codim, j);
+                auto redRD_RD = BuildRepeatedEDofRedistribution(space, redist_space);
                 unique_ptr<mfem::HypreParMatrix> RD_redRD(redRD_RD->Transpose());
                 red_trueM.reset(Mult(*redRD_RD, *trueM, *RD_redRD));
             }
@@ -613,17 +616,16 @@ MixedMatrix Redistributor::Redistribute(const MixedMatrix& sequence)
             //         mfem::RAP(tD_redTD.get(), trueM.get(), tD_redTD.get()));
             //     redM.reset(mfem::RAP(red_trueM.get(), redTD_redRD.get()));
             // }
-            else
-            {
+            // else
+            // {
                 // PARELAG_TEST_FOR_EXCEPTION(
                     // true, std::runtime_error,
                     // "redistribution of M when codim > 1 is not implemented.");
-                abort();
-            }
+            // }
 
             mfem::SparseMatrix redM = GetDiag(*red_trueM);
 
-            auto redvert_redrdof = BuildVertRDof(redist_space->VertexToEDof());
+            auto redvert_redrdof = BuildVertRDof(redist_space.VertexToEDof());
             for (int vert = 0; vert < redvert_redrdof.NumRows(); ++vert)
             {
                 GetTableRow(redvert_redrdof, vert, rdofs);
@@ -650,7 +652,7 @@ MixedMatrix Redistributor::Redistribute(const MixedMatrix& sequence)
     unique_ptr<mfem::HypreParMatrix> redTrueP_pwc(ParMult(&redTE_tE, redP_pwc_tmp.get()));
     auto redP_pwc = GetDiag(*redTrueP_pwc);
 
-    return MixedMatrix(std::move(*redist_space), std::move(red_M_vert), std::move(redD), std::move(redW), 
+    return MixedMatrix(std::move(redist_space), std::move(red_M_vert), std::move(redD), std::move(redW), 
                        std::move(red_const_rep), std::move(red_vert_sizes), std::move(redP_pwc));
 }
 

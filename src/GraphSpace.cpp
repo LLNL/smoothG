@@ -26,8 +26,6 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-// Construct entities to dofs table in the case when each dof belongs to one
-// and only one entity and the enumeration of dofs solely depends on entity
 mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_targets)
 {
     const unsigned int num_entities = local_targets.size();
@@ -65,11 +63,11 @@ GraphSpace::GraphSpace(Graph graph)
 }
 
 GraphSpace::GraphSpace(Graph graph,
-                       const std::vector<mfem::DenseMatrix>& edge_traces,
-                       const std::vector<mfem::DenseMatrix>& vertex_targets)
+                       mfem::SparseMatrix edge_edof,
+                       mfem::SparseMatrix vertex_vdof)
     : graph_(std::move(graph)),
-      vertex_vdof_(BuildEntityToDof(vertex_targets)),
-      edge_edof_(BuildEntityToDof(edge_traces)),
+      vertex_vdof_(std::move(vertex_vdof)),
+      edge_edof_(std::move(edge_edof)),
       vertex_edof_(BuildVertexToEDof()),
       edof_trueedof_(BuildEdofToTrueEdof())
 {
