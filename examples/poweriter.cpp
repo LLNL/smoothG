@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
     param.coarsen_param.dual_target = false;
     param.coarsen_param.scaled_dual = false;
     param.coarsen_param.energy_dual = false;
-    param.hybridization = false;
+    param.lin_solve_param.hybridization = false;
 
     // Solve Parameters
     constexpr auto max_iter = 800;

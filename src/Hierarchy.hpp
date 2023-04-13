@@ -29,6 +29,69 @@ namespace smoothg
 {
 
 /**
+   Collection of parameters for upscaling methods
+
+   @param spect_tol spectral tolerance determines how many eigenvectors to
+          keep per aggregate
+   @param max_evects maximum number of eigenvectors to keep per aggregate
+   @param max_traces maximum number of edge traces to keep per coarse face
+   @param trace_method methods for getting edge trace samples
+   @param dual_target use eigenvectors of dual graph as edge traces
+   @param scaled_dual use eigenvectors of scaled dual graph as edge traces
+   @param energy_dual use generalized eigenvectors of dual graph as edge traces
+   @param coarse_factor intended average number of vertices in an aggregate
+   @param num_iso_verts number of isolated vertices during coarsening
+*/
+class CoarsenParameters
+{
+public:
+    int max_levels;
+    double spect_tol;
+    int max_evects;
+    int max_traces;
+    bool dual_target;
+    bool scaled_dual;
+    bool energy_dual;
+    int coarse_factor;
+    int num_iso_verts;
+    // possibly also boundary condition information?
+
+    CoarsenParameters() 
+      : max_levels(2),
+        spect_tol(0.001),
+        max_evects(4),
+        max_traces(4),
+        dual_target(false),
+        scaled_dual(false),
+        energy_dual(false),
+        coarse_factor(64),
+        num_iso_verts(0)
+    {}
+
+    void RegisterInOptionsParser(mfem::OptionsParser& args)
+    {
+        args.AddOption(&max_levels, "--max-levels", "--max-levels",
+                       "Number of levels in multilevel hierarchy");
+        args.AddOption(&max_evects, "-m", "--max-evects",
+                       "Maximum number of eigenvectors per aggregate.");
+        args.AddOption(&max_traces, "-mt", "--max-traces",
+                       "Maximum number of edge traces per coarse face.");
+        args.AddOption(&spect_tol, "-t", "--spect-tol",
+                       "Spectral tolerance for eigenvalue problems.");
+        args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
+                       "--no-dual-target", "Use dual graph Laplacian in trace generation.");
+        args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
+                       "--no-scaled-dual", "Scale dual graph Laplacian by (inverse) edge weight.");
+        args.AddOption(&energy_dual, "-ed", "--energy-dual", "-no-ed",
+                       "--no-energy-dual", "Use energy matrix in trace generation.");
+        args.AddOption(&coarse_factor, "--coarse-factor", "--coarse-factor",
+                       "Coarsening factor for metis agglomeration.");
+        args.AddOption(&num_iso_verts, "--num-iso-verts", "--num-iso-verts",
+                       "Number of isolated vertices.");
+    }
+};
+
+/**
    @brief Hierarchy of mixed systems containing mixed systems in each level and
           mappings between different levels.
 */
@@ -135,7 +198,7 @@ public:
     virtual void SetAbsTol(int level, double atol);
 
     /// Create solver on level
-    void MakeSolver(int level, const UpscaleParameters& param);
+    void MakeSolver(int level, const LinearSolverParameters& param);
 
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);

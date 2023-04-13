@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
     }
     mg_param.num_levels = upscale_param.coarsen_param.max_levels;
     SetOptions(mg_param, use_vcycle, use_newton, num_backtrack, diff_tol);
-    upscale_param.hybridization = false;
+    upscale_param.lin_solve_param.hybridization = false;
     if (!myid)
     {
         std::cout << "\nWARNING: --hybridization flag is not used in this example."

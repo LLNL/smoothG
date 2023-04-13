@@ -25,7 +25,7 @@
 namespace smoothg
 {
 
-Upscale::Upscale(Hierarchy&& hierarchy)
+Upscale::Upscale(Hierarchy&& hierarchy, LinearSolverParameters lin_solve_param)
     : Operator(hierarchy.GetMatrix(0).NumVDofs()),
       comm_(hierarchy.GetComm()), hierarchy_(std::move(hierarchy))
 {
@@ -35,6 +35,7 @@ Upscale::Upscale(Hierarchy&& hierarchy)
     sol_.reserve(hierarchy_.NumLevels());
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
+        hierarchy_.MakeSolver(level, lin_solve_param);
         rhs_.emplace_back(BlockOffsets(level));
         sol_.emplace_back(BlockOffsets(level));
         sol_.back() = 0.0;

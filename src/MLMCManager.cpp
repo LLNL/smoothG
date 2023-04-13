@@ -104,6 +104,7 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
                          const QuantityOfInterest& qoi,
                          Hierarchy& hierarchy,
                          const mfem::BlockVector& rhs_fine,
+                         const LinearSolverParameters& lin_solve_param,
                          int dump_number,
                          int num_levels)
     :
@@ -121,9 +122,11 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     cost_.resize(num_levels_);
     initial_samples_.resize(num_levels_);
 
+    hierarchy_.MakeSolver(0, lin_solve_param);
     rhs_.push_back(rhs_fine);
     for (int k = 0; k < num_levels_ - 1; ++k)
     {
+        hierarchy_.MakeSolver(k+1, lin_solve_param);
         rhs_.push_back(hierarchy.Restrict(k, rhs_[k]));
     }
 }

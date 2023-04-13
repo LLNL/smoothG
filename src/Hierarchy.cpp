@@ -18,7 +18,7 @@
     @brief Implements Hierarchy class
 */
 
-#include "Hierarchy.hpp"
+#include "LocalMixedGraphSpectralTargets.hpp"
 #include "GraphCoarsen.hpp"
 #if SMOOTHG_USE_MATRED
 #include "Redistributor.hpp"
@@ -165,7 +165,7 @@ void Hierarchy::Coarsen(int level, const CoarsenParameters& param,
     Coarsen(mgL, param, partitioning);
 }
 
-void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
+void Hierarchy::MakeSolver(int level, const LinearSolverParameters& param)
 {
     if (param.hybridization) // Hybridization solver
     {

@@ -59,10 +59,11 @@ mfem::Vector& SimpleSampler::GetCoefficient(int level)
 }
 
 PDESampler::PDESampler(int dimension, double kappa, int seed,
-                       Hierarchy&& hierarchy)
+                       Hierarchy&& hierarchy,
+                       const LinearSolverParameters& lin_solve_param)
     : hierarchy_(std::move(hierarchy))
 {
-    Initialize(dimension, kappa, seed);
+    Initialize(dimension, kappa, seed, lin_solve_param);
 }
 
 PDESampler::PDESampler(int dimension, double cell_volume, double kappa, int seed,
@@ -83,10 +84,11 @@ PDESampler::PDESampler(int dimension, mfem::Vector cell_volume,
     MFEM_ASSERT(cell_volume.Size() == graph.NumVertices(), "cell_volume: wrong size!");
     auto W = SparseDiag(std::move(cell_volume)) *= (kappa * kappa);
     hierarchy_ = Hierarchy(graph, param.coarsen_param, partitioning, ess_attr, W);
-    Initialize(dimension, kappa, seed);
+    Initialize(dimension, kappa, seed, param.lin_solve_param);
 }
 
-void PDESampler::Initialize(int dimension, double kappa, int seed)
+void PDESampler::Initialize(int dimension, double kappa, int seed,
+                            const LinearSolverParameters& lin_solve_param)
 {
     normal_distribution_ = NormalDistribution(0.0, 1.0, seed);
     num_aggs_.resize(hierarchy_.NumLevels());
@@ -97,6 +99,7 @@ void PDESampler::Initialize(int dimension, double kappa, int seed)
 
     for (int level = 0; level < hierarchy_.NumLevels(); ++level)
     {
+        hierarchy_.MakeSolver(level, lin_solve_param);
         num_aggs_[level] = hierarchy_.NumVertices(level);
         rhs_[level].SetSize(hierarchy_.GetMatrix(level).NumVDofs());
         coefficient_[level].SetSize(num_aggs_[level]);

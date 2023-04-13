@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
     param.coarsen_param.dual_target = false;
     param.coarsen_param.scaled_dual = false;
     param.coarsen_param.energy_dual = false;
-    param.hybridization = false;
+    param.lin_solve_param.hybridization = false;
 
     // vertex_edge and partition
     const Graph graph(comm, ReadVertexEdge(ve_filename));
@@ -123,10 +123,10 @@ int main(int argc, char* argv[])
 
     // Compare Minres vs hybridization solvers
     {
-        param.hybridization = false;
+        param.lin_solve_param.hybridization = false;
         const auto minres_upscale = Upscale(graph, param);
 
-        param.hybridization = true;
+        param.lin_solve_param.hybridization = true;
         const auto hb_upscale = Upscale(graph, param);
 
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);

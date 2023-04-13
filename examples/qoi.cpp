@@ -176,7 +176,8 @@ int main(int argc, char* argv[])
     }
     PressureFunctionalQoI qoi(hierarchy, functional);
 
-    MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine, dump_number);
+    MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine, 
+                     upscale_param.lin_solve_param, dump_number);
     const bool verbose = (myid == 0);
 
     const int num_levels = upscale_param.coarsen_param.max_levels;

@@ -26,6 +26,39 @@
 namespace smoothg
 {
 
+/**
+   Collection of parameters for upscaling methods
+
+   @param coarsen_param 
+   @param hybridization use hybridization as solver
+   @param rescale_iter number of iteration to compute scaling in hybridization
+   @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+          coarse hybridized system if saamge_param is not nullptr
+*/
+class LinearSolverParameters
+{
+public:
+    bool hybridization;
+    int rescale_iter;
+    int use_saamge;
+    
+    LinearSolverParameters() :
+        hybridization(false),
+        rescale_iter(-1),
+        use_saamge(false)
+    {}
+
+    void RegisterInOptionsParser(mfem::OptionsParser& args)
+    {
+        args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+                       "--no-hybridization", "Enable hybridization.");
+        args.AddOption(&rescale_iter, "--rescale-iter", "--rescale-iter",
+                       "Number of iteration to compute rescale vector in hybridization.");
+        args.AddOption(&use_saamge, "--use-saamge", "--use-saamge",
+                       "Use SA-AMGe preconditioner in hybridization solver.");
+    }
+};
+
 enum class KrylovMethod { CG, MINRES, GMRES };
 
 /**

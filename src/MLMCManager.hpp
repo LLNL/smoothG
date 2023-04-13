@@ -199,6 +199,7 @@ public:
                 const QuantityOfInterest& qoi,
                 Hierarchy& hierarchy,
                 const mfem::BlockVector& rhs_fine,
+                const LinearSolverParameters& lin_solve_param,
                 int dump_number = 0,
                 int num_levels = -1);
     ~MLMCManager() {}

@@ -31,7 +31,6 @@
 #ifndef __HYBRIDIZATION_HPP
 #define __HYBRIDIZATION_HPP
 
-#include "LocalMixedGraphSpectralTargets.hpp"
 #include "utilities.hpp"
 #include "MixedLaplacianSolver.hpp"
 #include "MixedMatrix.hpp"

@@ -100,7 +100,8 @@ public:
        @todo cell_volume should be potentially spatially-varying
     */
     PDESampler(int dimension, double kappa, int seed,
-               Hierarchy&& hierarchy);
+               Hierarchy&& hierarchy,
+               const LinearSolverParameters& lin_solve_param);
 
     /**
        Initialize the PDESampler based on its own, owned Upscale object.
@@ -191,7 +192,8 @@ private:
     std::vector<mfem::Vector> rhs_;
     std::vector<mfem::Vector> coefficient_;
 
-    void Initialize(int dimension, double kappa, int seed);
+    void Initialize(int dimension, double kappa, int seed,
+                    const LinearSolverParameters& lin_solve_param);
 };
 
 }
