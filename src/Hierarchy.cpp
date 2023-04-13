@@ -64,7 +64,9 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
         {
             int num_procs;
             MPI_Comm_size(mgL.GetGraph().GetComm(), &num_procs);
-            Redistributor redistributor(mgL.GetGraph(), num_procs);
+
+            int num_procs_redist = num_procs / 2;
+            Redistributor redistributor(mgL.GetGraph(), num_procs_redist);
             MixedMatrix redist_mgL = redistributor.Redistribute(mgL);
 
             Coarsen(redist_mgL, param, nullptr);

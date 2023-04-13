@@ -22,6 +22,7 @@
 #define __UPSCALE_HPP__
 
 #include "Hierarchy.hpp"
+#include "Redistributor.hpp"
 
 namespace smoothg
 {
@@ -107,6 +108,11 @@ public:
     /// Wrapper for applying the upscaling in mixed form: result is at finest level
     void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const;
     mfem::BlockVector Solve(int level, const mfem::BlockVector& x) const;
+
+    void Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y,
+               const MixedLaplacianSolver& solver, 
+               const Redistributor& redistributor) const;
+
 
     /// Get block offsets for sigma, u blocks of mixed form dofs
     const mfem::Array<int>& BlockOffsets(int level) const;
