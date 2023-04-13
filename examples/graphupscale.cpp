@@ -79,7 +79,8 @@ int main(int argc, char* argv[])
 
     // Using coarse space
     {
-        const auto hierarchy = Hierarchy(graph, param.coarsen_param);
+        auto hierarchy = Hierarchy(graph, param.coarsen_param);
+        hierarchy.MakeSolver(1, param.lin_solve_param);
 
         // Start at Fine Level
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);

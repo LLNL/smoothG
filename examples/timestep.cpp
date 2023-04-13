@@ -129,6 +129,11 @@ int main(int argc, char* argv[])
     // Time Stepping
     {
         Hierarchy hierarchy(graph, upscale_param.coarsen_param, &partitioning, &ess_attr, W_block);
+        hierarchy.MakeSolver(0, upscale_param.lin_solve_param);
+        if (k != 0)
+        {
+            hierarchy.MakeSolver(k, upscale_param.lin_solve_param);
+        }
         hierarchy.PrintInfo();
 
         // Set some pressure initial condition

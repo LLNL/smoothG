@@ -152,8 +152,6 @@ int main(int argc, char* argv[])
     Graph graph = fvproblem.GetFVGraph();
     Hierarchy hierarchy(graph, upscale_param.coarsen_param, nullptr, &ess_attr);
 
-    hierarchy.PrintInfo();
-
     mfem::BlockVector rhs_fine(hierarchy.BlockOffsets(0));
     rhs_fine = 0.0;
     // it may make sense to have a more general, not hard-coded, right-hand side
@@ -178,6 +176,8 @@ int main(int argc, char* argv[])
 
     MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine, 
                      upscale_param.lin_solve_param, dump_number);
+    hierarchy.PrintInfo();
+
     const bool verbose = (myid == 0);
 
     const int num_levels = upscale_param.coarsen_param.max_levels;

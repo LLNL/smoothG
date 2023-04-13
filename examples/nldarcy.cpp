@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
     {
         std::cout << "\nWARNING: --hybridization flag is not used in this example."
                   << "\n         Fine level is always solved by BlockSolver while"
-                  << "\n         coarse levels are always solved by HybridSolver.";
+                  << "\n         coarse levels are always solved by HybridSolver.\n";
     }
 
     // Setting up finite volume discretization problem
@@ -242,7 +242,6 @@ int main(int argc, char* argv[])
 
     // Create hierarchy
     Hierarchy hierarchy(graph, upscale_param.coarsen_param, &partitioning, &ess_attr);
-    hierarchy.PrintInfo();
 
     mfem::BlockVector rhs(hierarchy.BlockOffsets(0));
     rhs.GetBlock(0) = fv_problem->GetEdgeRHS();
@@ -302,7 +301,8 @@ LevelSolver::LevelSolver(const MixedMatrix& mixed_system, Kappa kappa,
 {
     tag_ = param.linearization == Linearization::Picard ? "Picard" : "Newton";
 
-    if (IsDiag(mixed_system.GetM())) // L2-H1 block diagonal preconditioner
+    auto& M = mixed_system.GetM();
+    if (M.NumRows() > 0 && IsDiag(M)) // L2-H1 block diagonal preconditioner
     {
         linear_solver_.reset(new BlockSolverFalse(mixed_system_, &ess_attr));
     }
