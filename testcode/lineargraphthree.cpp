@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
     // const int num_partitions = 2;
     args.Parse();
     // force three levels for simplicity
-    upscale_param.max_levels = 3;
+    upscale_param.coarsen_param.max_levels = 3;
     // upscale_param.hybridization = true;
     if (myid == 0)
     {

@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
     Graph graph = SetupFVGraph(sigmafespace, vertex_edge, elem_scale, edge_bdratt);
 
     // Create Hierarchy to build interpolation matrices and coarse M builder
-    UpscaleParameters param;
+    CoarsenParameters param;
     param.spect_tol = 1.0;
     param.max_evects = 3;
     Hierarchy hierarchy(graph, param, &partitioning);

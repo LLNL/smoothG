@@ -58,9 +58,9 @@ int main(int argc, char* argv[])
     args.AddOption(&slice, "-s", "--slice",
                    "Slice of SPE10 data to take for 2D run.");
 
-    upscale_param.max_levels = 3;
-    upscale_param.coarse_factor = 8;
-    upscale_param.hybridization = true;
+    upscale_param.coarsen_param.max_levels = 3;
+    upscale_param.coarsen_param.coarse_factor = 8;
+    upscale_param.lin_solve_param.hybridization = true;
 
     // Read upscaling options from command line into upscale_param object
     upscale_param.RegisterInOptionsParser(args);
@@ -90,15 +90,13 @@ int main(int argc, char* argv[])
     Graph graph = spe10problem.GetFVGraph();
 
     // Create Hierarchy
-    Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
-
-    hierarchy.PrintInfo();
+    Hierarchy hierarchy(graph, upscale_param.coarsen_param, nullptr, &ess_attr);
 
     auto CoarseNotEqualRAP = [&](const char* name)
     {
         bool out = EXIT_SUCCESS;
         const bool is_M = !(std::strcmp(name, "M"));
-        for (int level = 1; level < upscale_param.max_levels; ++level)
+        for (int level = 1; level < upscale_param.coarsen_param.max_levels; ++level)
         {
             auto& fine_system = hierarchy.GetMatrix(level - 1);
             auto& coarse_system = hierarchy.GetMatrix(level);

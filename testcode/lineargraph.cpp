@@ -23,6 +23,7 @@
 
 #include "../src/picojson.h"
 
+#include "../src/Hierarchy.hpp"
 #include "../src/LocalMixedGraphSpectralTargets.hpp"
 #include "../src/GraphCoarsen.hpp"
 #include "../src/MatrixUtilities.hpp"
@@ -154,7 +155,7 @@ int main(int argc, char* argv[])
     int global_size = 4;
     args.AddOption(&global_size, "-s", "--size", "Size of fine linear graph.");
     const int num_partitions = 2;
-    UpscaleParameters param;
+    CoarsenParameters param;
     param.max_evects = 1;
     param.spect_tol = 0.0;
     const double test_tol = 1.e-8;
