@@ -77,6 +77,12 @@ public:
 
     MixedMatrix(MixedMatrix&& other) noexcept;
 
+    /// Move Assignment operator
+    MixedMatrix& operator=(MixedMatrix&& other) noexcept;
+
+    /// Swap two MixedMatrix
+    friend void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept;
+
     /// Assemble the mass matrix M
     void BuildM();
 

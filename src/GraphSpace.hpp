@@ -26,10 +26,6 @@
 namespace smoothg
 {
 
-// Construct entities to dofs table in the case when each dof belongs to one
-// and only one entity and the enumeration of dofs solely depends on entity
-mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_targets);
-
 /**
    @brief Contains information about degrees of freedom to vertex/edge
 
@@ -57,7 +53,9 @@ public:
     GraphSpace(Graph graph,
                const std::vector<mfem::DenseMatrix>& edge_traces,
                const std::vector<mfem::DenseMatrix>& vertex_targets)
-        : GraphSpace(std::move(graph), BuildEntityToDof(edge_traces), BuildEntityToDof(vertex_targets)) { }
+        : GraphSpace(std::move(graph), 
+                     BuildEntityToDof(edge_traces), 
+                     BuildEntityToDof(vertex_targets)) { }
 
     /// Default constructor
     GraphSpace() = default;
@@ -70,6 +68,11 @@ public:
 
     /// Swap two graph spaces
     friend void swap(GraphSpace& lhs, GraphSpace& rhs) noexcept;
+
+    // Construct entities to dofs table in the case when each dof belongs to one
+    // and only one entity and the enumeration of dofs solely depends on entity
+    static mfem::SparseMatrix BuildEntityToDof(
+        const std::vector<mfem::DenseMatrix>& local_targets);
 
     ///@name Getters for entity-to-dof relation tables
     ///@{

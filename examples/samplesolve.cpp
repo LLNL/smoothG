@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
     rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
-    const int num_levels = upscale_param.max_levels;
+    const int num_levels = upscale_param.coarsen_param.max_levels;
     unique_ptr<MultilevelSampler> sampler;
     if (std::string(sampler_type) == "simple")
     {

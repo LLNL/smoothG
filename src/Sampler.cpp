@@ -82,7 +82,7 @@ PDESampler::PDESampler(int dimension, mfem::Vector cell_volume,
 {
     MFEM_ASSERT(cell_volume.Size() == graph.NumVertices(), "cell_volume: wrong size!");
     auto W = SparseDiag(std::move(cell_volume)) *= (kappa * kappa);
-    hierarchy_ = Hierarchy(graph, param, partitioning, ess_attr, W);
+    hierarchy_ = Hierarchy(graph, param.coarsen_param, partitioning, ess_attr, W);
     Initialize(dimension, kappa, seed);
 }
 

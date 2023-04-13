@@ -20,6 +20,9 @@
 
 #include "Hierarchy.hpp"
 #include "GraphCoarsen.hpp"
+#if SMOOTHG_USE_MATRED
+#include "Redistributor.hpp"
+#endif
 #include <iostream>
 #include <fstream>
 
@@ -27,11 +30,14 @@ namespace smoothg
 {
 
 Hierarchy::Hierarchy(MixedMatrix mixed_system,
-                     const UpscaleParameters& param,
+                     const CoarsenParameters& param,
                      const mfem::Array<int>* partitioning,
                      const mfem::Array<int>* ess_attr)
     : comm_(mixed_system.GetComm()),
       solvers_(param.max_levels),
+      true_Psigma_(param.max_levels - 1),
+      true_Pu_(param.max_levels - 1),
+      true_Proj_sigma_(param.max_levels - 1),
       setup_time_(0.0),
       ess_attr_(ess_attr),
       param_(param)
@@ -44,30 +50,97 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
     mixed_systems_.reserve(param.max_levels);
     mixed_systems_.push_back(std::move(mixed_system));
     if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
-    MakeSolver(0, param);
+    // MakeSolver(0, param);
 
     agg_vert_.reserve(param.max_levels - 1);
 
+    int num_vert_min = 10;
+
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
-        Coarsen(level, param, level ? nullptr : partitioning);
-        MakeSolver(level + 1, param);
-        if (ess_attr) { mixed_systems_.back().SetEssDofs(*ess_attr); }
+        MixedMatrix& mgL = GetMatrix(level);
+        mgL.BuildM();
+        if (!partitioning && (mgL.GetGraph().NumVertices() < num_vert_min))
+        {
+            int num_procs;
+            MPI_Comm_size(mgL.GetGraph().GetComm(), &num_procs);
+            Redistributor redistributor(mgL.GetGraph(), num_procs);
+            MixedMatrix redist_mgL = redistributor.Redistribute(mgL);
+            
+            Coarsen(redist_mgL, param, nullptr);
+            auto& redTD_tD0 = redistributor.TrueDofRedistribution(0);
+            auto& redTD_tD1 = redistributor.TrueDofRedistribution(0);
+            unique_ptr<mfem::HypreParMatrix> tD_redTD0(redTD_tD0.Transpose());
+            unique_ptr<mfem::HypreParMatrix> tD_redTD1(redTD_tD1.Transpose());
+            
+            auto& fine = GetMatrix(level).GetGraphSpace();
+            auto& coarse = GetMatrix(level + 1).GetGraphSpace();
+            true_Psigma_[level] = ParMult(Psigma_[level], coarse.EDofToTrueEDof(), coarse.EDofStarts());
+            true_Psigma_[level].reset(ParMult(&fine.TrueEDofToEDof(), true_Psigma_[level].get()));
+            true_Psigma_[level].reset(ParMult(tD_redTD1.get(), true_Psigma_[level].get()));
+            true_Pu_[level] = ParMult(*tD_redTD0, Pu_[level], coarse.VDofStarts());
+        }
+        else
+        {
+            Coarsen(mgL, param, level ? nullptr : partitioning);
+#ifdef SMOOTHG_DEBUG
+            Debug_tests(level);
+#endif
+        }
+
+        // MakeSolver(level + 1, param);
+        if (ess_attr) { GetMatrix(level + 1).SetEssDofs(*ess_attr); }
     }
 
     chrono.Stop();
     setup_time_ = chrono.RealTime();
 }
 
-void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
+// void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
+//                         const mfem::Array<int>* partitioning)
+// {
+//     MixedMatrix& mgL = GetMatrix(level);
+//     mgL.BuildM();
+
+//     GraphTopology topology;
+//     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
+//                          topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
+
+//     agg_vert_.push_back(topology.Agg_vertex_);
+
+//     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
+
+//     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
+//     auto vertex_targets = localtargets.ComputeVertexTargets();
+
+//     auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
+
+//     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
+
+//     Pu_.push_back(graph_coarsen.BuildPVertices());
+//     Psigma_.push_back(graph_coarsen.BuildPEdges());
+//     Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
+
+//     mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_[level]));
+
+// #ifdef SMOOTHG_DEBUG
+//     Debug_tests(level);
+// #endif
+// }
+
+void Hierarchy::Coarsen(const MixedMatrix& mgL, const CoarsenParameters& param,
                         const mfem::Array<int>* partitioning)
 {
-    MixedMatrix& mgL = GetMatrix(level);
-    mgL.BuildM();
-
     GraphTopology topology;
-    Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
-                         topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
+    Graph coarse_graph;
+    if (partitioning)
+    {
+        coarse_graph = topology.Coarsen(mgL.GetGraph(), *partitioning);            
+    }
+    else
+    {
+        coarse_graph = topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
+    }
 
     agg_vert_.push_back(topology.Agg_vertex_);
 
@@ -75,7 +148,6 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
 
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
     auto vertex_targets = localtargets.ComputeVertexTargets();
-
     auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
 
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
@@ -83,21 +155,22 @@ void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
     Pu_.push_back(graph_coarsen.BuildPVertices());
     Psigma_.push_back(graph_coarsen.BuildPEdges());
     Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
+    mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_.back()));
+}
 
-    mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_[level]));
-
-#ifdef SMOOTHG_DEBUG
-    Debug_tests(level);
-#endif
+void Hierarchy::Coarsen(int level, const CoarsenParameters& param,
+                        const mfem::Array<int>* partitioning)
+{
+    MixedMatrix& mgL = GetMatrix(level);
+    Coarsen(mgL, param, partitioning);
 }
 
 void Hierarchy::MakeSolver(int level, const UpscaleParameters& param)
 {
     if (param.hybridization) // Hybridization solver
     {
-        SAAMGeParam* sa_param = level ? param.saamge_param : nullptr;
         solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
-                                               param.rescale_iter, sa_param));
+                                               param.rescale_iter, param.use_saamge));
     }
     else // L2-H1 block diagonal preconditioner
     {

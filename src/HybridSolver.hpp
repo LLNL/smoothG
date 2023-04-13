@@ -43,6 +43,28 @@
 namespace smoothg
 {
 
+/// Container for SAAMGe parameters
+struct SAAMGeParam
+{
+    int num_levels = 2;
+
+    /// Parameters for all levels
+    int nu_relax = 2;
+    bool use_arpack = false;
+    bool correct_nulspace = false;
+    bool do_aggregates = true;
+
+    /// Parameters for the first coarsening
+    int first_coarsen_factor = 64;
+    int first_nu_pro = 1;
+    double first_theta = 1e-3;
+
+    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
+    int coarsen_factor = 8;
+    int nu_pro = 1;
+    double theta = 1e-3;
+};
+
 /**
    @brief Hybridization solver for saddle point problems
 
@@ -98,8 +120,8 @@ public:
     */
     HybridSolver(const MixedMatrix& mgL,
                  const mfem::Array<int>* ess_attr = nullptr,
-                 const int rescale_iter = -1,
-                 const SAAMGeParam* saamge_param = nullptr);
+                 int rescale_iter = -1,
+                 int use_saamge_param = false);
 
     virtual ~HybridSolver();
 
@@ -224,7 +246,7 @@ private:
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
 
-    const SAAMGeParam* saamge_param_;
+    int use_saamge_;
 #if SMOOTHG_USE_SAAMGE
     std::vector<int> sa_nparts_;
     saamge::agg_partitioning_relations_t* sa_apr_;

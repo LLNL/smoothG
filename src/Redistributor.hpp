@@ -32,7 +32,6 @@
 #include "GraphTopology.hpp"
 #include "MixedMatrix.hpp"
 
-
 namespace smoothg
 {
 

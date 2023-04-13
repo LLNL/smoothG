@@ -26,25 +26,6 @@ using std::unique_ptr;
 namespace smoothg
 {
 
-mfem::SparseMatrix BuildEntityToDof(const std::vector<mfem::DenseMatrix>& local_targets)
-{
-    const unsigned int num_entities = local_targets.size();
-    int* I = new int[num_entities + 1]();
-    for (unsigned int entity = 0; entity < num_entities; ++entity)
-    {
-        I[entity + 1] = I[entity] + local_targets[entity].NumCols();
-    }
-
-    int nnz = I[num_entities];
-    int* J = new int[nnz];
-    std::iota(J, J + nnz, 0);
-
-    double* Data = new double[nnz];
-    std::fill_n(Data, nnz, 1.);
-
-    return mfem::SparseMatrix(I, J, Data, num_entities, nnz);
-}
-
 GraphSpace::GraphSpace(Graph graph)
     : graph_(std::move(graph)),
       vertex_vdof_(SparseIdentity(graph_.NumVertices())),
@@ -89,7 +70,6 @@ GraphSpace::GraphSpace(GraphSpace&& other) noexcept
 GraphSpace& GraphSpace::operator=(GraphSpace other) noexcept
 {
     swap(*this, other);
-
     return *this;
 }
 
@@ -112,6 +92,26 @@ void GraphSpace::Init()
 {
     trueedof_edof_.reset(edof_trueedof_->Transpose());
     GenerateOffsets(graph_.GetComm(), vertex_vdof_.NumCols(), vdof_starts_);
+}
+
+mfem::SparseMatrix GraphSpace::BuildEntityToDof(
+    const std::vector<mfem::DenseMatrix>& local_targets)
+{
+    const unsigned int num_entities = local_targets.size();
+    int* I = new int[num_entities + 1]();
+    for (unsigned int entity = 0; entity < num_entities; ++entity)
+    {
+        I[entity + 1] = I[entity] + local_targets[entity].NumCols();
+    }
+
+    int nnz = I[num_entities];
+    int* J = new int[nnz];
+    std::iota(J, J + nnz, 0);
+
+    double* Data = new double[nnz];
+    std::fill_n(Data, nnz, 1.);
+
+    return mfem::SparseMatrix(I, J, Data, num_entities, nnz);
 }
 
 mfem::SparseMatrix GraphSpace::BuildVertexToEDof()

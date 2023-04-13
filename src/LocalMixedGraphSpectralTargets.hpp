@@ -36,28 +36,6 @@
 namespace smoothg
 {
 
-/// Container for SAAMGe parameters
-struct SAAMGeParam
-{
-    int num_levels = 2;
-
-    /// Parameters for all levels
-    int nu_relax = 2;
-    bool use_arpack = false;
-    bool correct_nulspace = false;
-    bool do_aggregates = true;
-
-    /// Parameters for the first coarsening
-    int first_coarsen_factor = 64;
-    int first_nu_pro = 1;
-    double first_theta = 1e-3;
-
-    /// Parameters for all later coarsenings (irrelevant if num_levels = 2)
-    int coarsen_factor = 8;
-    int nu_pro = 1;
-    double theta = 1e-3;
-};
-
 /**
    Collection of parameters for upscaling methods
 
@@ -66,13 +44,13 @@ struct SAAMGeParam
    @param max_evects maximum number of eigenvectors to keep per aggregate
    @param max_traces maximum number of edge traces to keep per coarse face
    @param trace_method methods for getting edge trace samples
-   @param hybridization use hybridization as solver
-   @param coefficient use coarse coefficient rescaling construction
-   @param rescale_iter number of iteration to compute scaling in hybridization
-   @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
-          coarse hybridized system if saamge_param is not nullptr
+   @param dual_target use eigenvectors of dual graph as edge traces
+   @param scaled_dual use eigenvectors of scaled dual graph as edge traces
+   @param energy_dual use generalized eigenvectors of dual graph as edge traces
+   @param coarse_factor intended average number of vertices in an aggregate
+   @param num_iso_verts number of isolated vertices during coarsening
 */
-class UpscaleParameters
+class CoarsenParameters
 {
 public:
     int max_levels;
@@ -82,25 +60,20 @@ public:
     bool dual_target;
     bool scaled_dual;
     bool energy_dual;
-    bool hybridization;
     int coarse_factor;
     int num_iso_verts;
-    int rescale_iter;
-    SAAMGeParam* saamge_param;
     // possibly also boundary condition information?
 
-    UpscaleParameters() : max_levels(2),
+    CoarsenParameters() 
+      : max_levels(2),
         spect_tol(0.001),
         max_evects(4),
         max_traces(4),
         dual_target(false),
         scaled_dual(false),
         energy_dual(false),
-        hybridization(false),
         coarse_factor(64),
-        num_iso_verts(0),
-        rescale_iter(-1),
-        saamge_param(NULL)
+        num_iso_verts(0)
     {}
 
     void RegisterInOptionsParser(mfem::OptionsParser& args)
@@ -113,8 +86,6 @@ public:
                        "Maximum number of edge traces per coarse face.");
         args.AddOption(&spect_tol, "-t", "--spect-tol",
                        "Spectral tolerance for eigenvalue problems.");
-        args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
-                       "--no-hybridization", "Enable hybridization.");
         args.AddOption(&dual_target, "-dt", "--dual-target", "-no-dt",
                        "--no-dual-target", "Use dual graph Laplacian in trace generation.");
         args.AddOption(&scaled_dual, "-sd", "--scaled-dual", "-no-sd",
@@ -125,8 +96,42 @@ public:
                        "Coarsening factor for metis agglomeration.");
         args.AddOption(&num_iso_verts, "--num-iso-verts", "--num-iso-verts",
                        "Number of isolated vertices.");
+    }
+};
+
+/**
+   Collection of parameters for upscaling methods
+
+   @param coarsen_param 
+   @param hybridization use hybridization as solver
+   @param rescale_iter number of iteration to compute scaling in hybridization
+   @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
+          coarse hybridized system if saamge_param is not nullptr
+*/
+class UpscaleParameters
+{
+public:
+    CoarsenParameters coarsen_param;
+    bool hybridization;
+    int rescale_iter;
+    int use_saamge;
+    // possibly also boundary condition information?
+
+    UpscaleParameters() :
+        hybridization(false),
+        rescale_iter(-1),
+        use_saamge(false)
+    {}
+
+    void RegisterInOptionsParser(mfem::OptionsParser& args)
+    {
+        coarsen_param.RegisterInOptionsParser(args);
+        args.AddOption(&hybridization, "-hb", "--hybridization", "-no-hb",
+                       "--no-hybridization", "Enable hybridization.");
         args.AddOption(&rescale_iter, "--rescale-iter", "--rescale-iter",
                        "Number of iteration to compute rescale vector in hybridization.");
+        args.AddOption(&use_saamge, "--use-saamge", "--use-saamge",
+                       "Use SA-AMGe preconditioner in hybridization solver.");
     }
 };
 
@@ -180,7 +185,7 @@ public:
         const MixedMatrix& mixed_graph_laplacian,
         const Graph& coarse_graph,
         const DofAggregate& dof_agg,
-        const UpscaleParameters& param);
+        const CoarsenParameters& param);
 
     ~LocalMixedGraphSpectralTargets() {}
 

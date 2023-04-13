@@ -61,7 +61,7 @@ void LocalMixedGraphSpectralTargets::Orthogonalize(mfem::DenseMatrix& vectors,
 
 LocalMixedGraphSpectralTargets::LocalMixedGraphSpectralTargets(
     const MixedMatrix& mgL, const Graph& coarse_graph,
-    const DofAggregate& dof_agg, const UpscaleParameters& param)
+    const DofAggregate& dof_agg, const CoarsenParameters& param)
     :
     comm_(mgL.GetGraph().GetComm()),
     rel_tol_(param.spect_tol),

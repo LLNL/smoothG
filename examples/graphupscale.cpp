@@ -45,19 +45,19 @@ int main(int argc, char* argv[])
     constexpr auto rhs_filename = "../../graphdata/fiedler_sample.txt";
 
     UpscaleParameters param;
-    param.coarse_factor = 100;
-    param.max_evects = 4;
-    param.spect_tol = 1.e-3;
-    param.dual_target = false;
-    param.scaled_dual = false;
-    param.energy_dual = false;
+    param.coarsen_param.coarse_factor = 100;
+    param.coarsen_param.max_evects = 4;
+    param.coarsen_param.spect_tol = 1.e-3;
+    param.coarsen_param.dual_target = false;
+    param.coarsen_param.scaled_dual = false;
+    param.coarsen_param.energy_dual = false;
     param.hybridization = false;
 
     // vertex_edge and partition
     const Graph graph(comm, ReadVertexEdge(ve_filename));
     {
         mfem::Array<int> partitioning(graph.NumVertices());
-        PartitionAAT(graph.VertexToEdge(), partitioning, param.coarse_factor);
+        PartitionAAT(graph.VertexToEdge(), partitioning, param.coarsen_param.coarse_factor);
 
         const auto upscale = Upscale(graph, param, &partitioning);
 
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 
     // Using coarse space
     {
-        const auto hierarchy = Hierarchy(graph, param);
+        const auto hierarchy = Hierarchy(graph, param.coarsen_param);
 
         // Start at Fine Level
         const auto rhs_u_fine = graph.ReadVertexVector(rhs_filename);

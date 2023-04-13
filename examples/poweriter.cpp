@@ -38,12 +38,12 @@ int main(int argc, char* argv[])
 
     // Setup Parameters
     UpscaleParameters param;
-    param.coarse_factor = 80;
-    param.max_evects = 4;
-    param.spect_tol = 1.0;
-    param.dual_target = false;
-    param.scaled_dual = false;
-    param.energy_dual = false;
+    param.coarsen_param.coarse_factor = 80;
+    param.coarsen_param.max_evects = 4;
+    param.coarsen_param.spect_tol = 1.0;
+    param.coarsen_param.dual_target = false;
+    param.coarsen_param.scaled_dual = false;
+    param.coarsen_param.energy_dual = false;
     param.hybridization = false;
 
     // Solve Parameters

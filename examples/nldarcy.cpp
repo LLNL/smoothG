@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
     {
         args.PrintOptions(std::cout);
     }
-    mg_param.num_levels = upscale_param.max_levels;
+    mg_param.num_levels = upscale_param.coarsen_param.max_levels;
     SetOptions(mg_param, use_vcycle, use_newton, num_backtrack, diff_tol);
     upscale_param.hybridization = false;
     if (!myid)
@@ -231,17 +231,17 @@ int main(int argc, char* argv[])
     Graph graph = fv_problem->GetFVGraph(true);
 
     mfem::Array<int> partitioning;
-    if (upscale_param.max_levels > 1)
+    if (upscale_param.coarsen_param.max_levels > 1)
     {
         mfem::Array<int> coarsening_factors(problem == "egg" ? 3 : dim);
         coarsening_factors = 1;
-        coarsening_factors[0] = upscale_param.coarse_factor;
+        coarsening_factors[0] = upscale_param.coarsen_param.coarse_factor;
         fv_problem->Partition(use_metis, coarsening_factors, partitioning);
-        upscale_param.num_iso_verts = fv_problem->NumIsoVerts();
+        upscale_param.coarsen_param.num_iso_verts = fv_problem->NumIsoVerts();
     }
 
     // Create hierarchy
-    Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr);
+    Hierarchy hierarchy(graph, upscale_param.coarsen_param, &partitioning, &ess_attr);
     hierarchy.PrintInfo();
 
     mfem::BlockVector rhs(hierarchy.BlockOffsets(0));

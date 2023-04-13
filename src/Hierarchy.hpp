@@ -51,14 +51,14 @@ public:
               it will assumed to be zero
     */
     Hierarchy(Graph graph,
-              const UpscaleParameters& param = UpscaleParameters(),
+              const CoarsenParameters& param = CoarsenParameters(),
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr,
               const mfem::SparseMatrix& w_block = SparseIdentity(0))
         : Hierarchy(MixedMatrix(std::move(graph), w_block), param, partitioning, ess_attr) {}
 
     Hierarchy(MixedMatrix mixed_system,
-              const UpscaleParameters& param = UpscaleParameters(),
+              const CoarsenParameters& param = CoarsenParameters(),
               const mfem::Array<int>* partitioning = nullptr,
               const mfem::Array<int>* ess_attr = nullptr);
 
@@ -174,7 +174,10 @@ public:
     }
 
 private:
-    void Coarsen(int level, const UpscaleParameters& param,
+    void Coarsen(int level, const CoarsenParameters& param,
+                 const mfem::Array<int>* partitioning);
+
+    void Coarsen(const MixedMatrix& mgL, const CoarsenParameters& param,
                  const mfem::Array<int>* partitioning);
 
     /// Test if Proj_sigma_ * Psigma_ = identity
@@ -191,12 +194,16 @@ private:
     std::vector<mfem::SparseMatrix> Proj_sigma_;
     std::vector<std::vector<mfem::DenseMatrix>> edge_traces_;
 
+    std::vector<std::unique_ptr<mfem::HypreParMatrix>> true_Psigma_;
+    std::vector<std::unique_ptr<mfem::HypreParMatrix>> true_Pu_;
+    std::vector<std::unique_ptr<mfem::HypreParMatrix>> true_Proj_sigma_;
+
     double setup_time_;
 
     const mfem::Array<int>* ess_attr_;
 
     std::vector<mfem::SparseMatrix > agg_vert_;
-    UpscaleParameters param_;
+    CoarsenParameters param_;
 };
 
 } // namespace smoothg

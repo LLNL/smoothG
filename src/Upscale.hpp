@@ -52,7 +52,8 @@ public:
             const mfem::Array<int>* partitioning = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const mfem::SparseMatrix& w_block = SparseIdentity(0))
-        : Upscale(Hierarchy(std::move(graph), param, partitioning, ess_attr, w_block)) {}
+        : Upscale(Hierarchy(std::move(graph), param.coarsen_param, 
+                            partitioning, ess_attr, w_block)) {}
 
     Upscale(Hierarchy&& hierarchy);
 

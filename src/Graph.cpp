@@ -115,7 +115,6 @@ Graph::Graph(Graph&& other) noexcept
 Graph& Graph::operator=(Graph other) noexcept
 {
     swap(*this, other);
-
     return *this;
 }
 

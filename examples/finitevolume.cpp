@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
     if (metis_agglomeration)
     {
         coarsening_factors = 1;
-        coarsening_factors.Last() = upscale_param.coarse_factor;
+        coarsening_factors.Last() = upscale_param.coarsen_param.coarse_factor;
     }
     else
     {
@@ -132,10 +132,10 @@ int main(int argc, char* argv[])
     rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
 
     /// [Solve]
-    std::vector<mfem::BlockVector> sol(upscale_param.max_levels, rhs_fine);
-    std::vector<double> QoI(upscale_param.max_levels);
+    std::vector<mfem::BlockVector> sol(upscale_param.coarsen_param.max_levels, rhs_fine);
+    std::vector<double> QoI(upscale_param.coarsen_param.max_levels);
     FunctionalQoI qoi_evaluator(upscale.GetHierarchy(), rhs_fine);
-    for (int level = 0; level < upscale_param.max_levels; ++level)
+    for (int level = 0; level < upscale_param.coarsen_param.max_levels; ++level)
     {
         upscale.Solve(level, rhs_fine, sol[level]);
         upscale.ShowSolveInfo(level);

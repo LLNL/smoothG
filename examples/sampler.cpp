@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
     const double cell_volume = spe10problem.CellVolume();
     W_block *= cell_volume * kappa * kappa;
 
-    const int num_levels = upscale_param.max_levels;
+    const int num_levels = upscale_param.coarsen_param.max_levels;
     std::vector<mfem::Vector> mean(num_levels);
     std::vector<mfem::Vector> m2(num_levels);
     std::vector<int> total_iterations(num_levels);
@@ -163,8 +163,8 @@ int main(int argc, char* argv[])
     }
 
     // Create Hierarchy
-    upscale_param.coarse_factor = 4;
-    Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
+    upscale_param.coarsen_param.coarse_factor = 4;
+    Hierarchy hierarchy(graph, upscale_param.coarsen_param, &partitioning, &ess_attr, W_block);
     hierarchy.PrintInfo();
 
     PDESampler pdesampler(nDimensions, kappa, seed + myid, std::move(hierarchy));

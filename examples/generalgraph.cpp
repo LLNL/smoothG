@@ -185,8 +185,8 @@ int main(int argc, char* argv[])
         /// [Right Hand Side]
 
         /// [Solve]
-        std::vector<mfem::BlockVector> sol(upscale_param.max_levels, fine_rhs);
-        for (int level = 0; level < upscale_param.max_levels; ++level)
+        std::vector<mfem::BlockVector> sol(upscale_param.coarsen_param.max_levels, fine_rhs);
+        for (int level = 0; level < upscale_param.coarsen_param.max_levels; ++level)
         {
             upscale.Solve(level, fine_rhs, sol[level]);
             upscale.ShowSolveInfo(level);

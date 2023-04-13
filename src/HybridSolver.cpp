@@ -32,13 +32,13 @@ namespace smoothg
 
 HybridSolver::HybridSolver(const MixedMatrix& mgL,
                            const mfem::Array<int>* ess_attr,
-                           const int rescale_iter,
-                           const SAAMGeParam* saamge_param)
+                           int rescale_iter,
+                           int use_saamge)
     :
     MixedLaplacianSolver(mgL.GetComm(), mgL.BlockOffsets(), mgL.CheckW()),
     mgL_(mgL),
     rescale_iter_(rescale_iter),
-    saamge_param_(saamge_param)
+    use_saamge_(use_saamge)
 {
     MixedLaplacianSolver::Init(mgL, ess_attr);
 
@@ -50,7 +50,7 @@ HybridSolver::HybridSolver(const MixedMatrix& mgL,
 HybridSolver::~HybridSolver()
 {
 #if SMOOTHG_USE_SAAMGE
-    if (saamge_param_)
+    if (use_saamge_)
     {
         saamge::ml_free_data(sa_ml_data_);
         saamge::agg_free_partitioning(sa_apr_);
@@ -835,6 +835,7 @@ void HybridSolver::ComputeScaledHybridSystem(const mfem::HypreParMatrix& H)
 void HybridSolver::BuildSpectralAMGePreconditioner()
 {
 #if SMOOTHG_USE_SAAMGE
+    SAAMGeParam saamge_param;
     saamge::proc_init(comm_);
 
     mfem::Table elem_dof_tmp = MatrixToTable(Agg_multiplier_);
@@ -858,18 +859,18 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
     }
 
     int num_elems = elem_elem->Size();
-    sa_nparts_.resize(saamge_param_->num_levels - 1);
-    sa_nparts_[0] = (num_elems / saamge_param_->first_coarsen_factor) + 1;
+    sa_nparts_.resize(saamge_param->num_levels - 1);
+    sa_nparts_[0] = (num_elems / saamge_param->first_coarsen_factor) + 1;
 
-    bool first_do_aggregates = (saamge_param_->num_levels <= 2 && saamge_param_->do_aggregates);
+    bool first_do_aggregates = (saamge_param->num_levels <= 2 && saamge_param->do_aggregates);
     sa_apr_ = saamge::agg_create_partitioning_fine(
                   *H_, num_elems, elem_dof, elem_elem, nullptr, bdr_dofs.data(),
                   sa_nparts_.data(), multiplier_d_td_.get(), first_do_aggregates);
 
     // FIXME (CSL): I suspect agg_create_partitioning_fine may change the value
     // of sa_nparts_[0] in some cases, so I define the rest of the array here
-    for (int i = 1; i < saamge_param_->num_levels - 1; i++)
-        sa_nparts_[i] = sa_nparts_[i - 1] / saamge_param_->coarsen_factor + 1;
+    for (int i = 1; i < saamge_param->num_levels - 1; i++)
+        sa_nparts_[i] = sa_nparts_[i - 1] / saamge_param->coarsen_factor + 1;
 
     mfem::Array<mfem::DenseMatrix*> elmats(Hybrid_el_.size());
     for (unsigned int i = 0; i < Hybrid_el_.size(); i++)
@@ -878,10 +879,10 @@ void HybridSolver::BuildSpectralAMGePreconditioner()
 
     int polynomial_coarse = -1; // we do not have geometric information
     saamge::MultilevelParameters mlp(
-        saamge_param_->num_levels - 1, sa_nparts_.data(), saamge_param_->first_nu_pro,
-        saamge_param_->nu_pro, saamge_param_->nu_relax, saamge_param_->first_theta,
-        saamge_param_->theta, polynomial_coarse, saamge_param_->correct_nulspace,
-        saamge_param_->use_arpack, saamge_param_->do_aggregates);
+        saamge_param->num_levels - 1, sa_nparts_.data(), saamge_param->first_nu_pro,
+        saamge_param->nu_pro, saamge_param->nu_relax, saamge_param->first_theta,
+        saamge_param->theta, polynomial_coarse, saamge_param->correct_nulspace,
+        saamge_param->use_arpack, saamge_param->do_aggregates);
     sa_ml_data_ = saamge::ml_produce_data(*H_, sa_apr_, emp, mlp);
     auto level = saamge::levels_list_get_level(sa_ml_data_->levels_list, 0);
 
@@ -904,7 +905,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
 
     H_elim_.reset(H_->EliminateRowsCols(ess_true_multipliers_));
 
-    if (std::abs(rescale_iter_) > 0 && !saamge_param_)
+    if (std::abs(rescale_iter_) > 0 && !use_saamge_)
     {
         ComputeScaledHybridSystem(*H_);
     }
@@ -924,7 +925,7 @@ void HybridSolver::BuildParallelSystemAndSolver(mfem::SparseMatrix& H_proc)
     const bool use_prec = min_size > 0;
     if (use_prec)
     {
-        if (saamge_param_)
+        if (use_saamge_)
         {
             BuildSpectralAMGePreconditioner();
         }

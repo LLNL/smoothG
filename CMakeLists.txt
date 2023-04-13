@@ -140,6 +140,9 @@ if (USE_MATRED)
   find_package(MATRED REQUIRED)
   include_directories(${MATRED_INCLUDE_DIRS})
   list(APPEND TPL_LIBRARIES ${MATRED_LIBRARIES})
+  set(${PROJECT_NAME}_USE_MATRED 1)
+else()
+  set(${PROJECT_NAME}_USE_MATRED 0)
 endif()
 
 # BLAS/LAPACK

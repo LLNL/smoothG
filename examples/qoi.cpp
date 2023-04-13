@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
     ess_attr[0] = 1;
     DarcyProblem fvproblem(*pmesh, ess_attr);
     Graph graph = fvproblem.GetFVGraph();
-    Hierarchy hierarchy(graph, upscale_param, nullptr, &ess_attr);
+    Hierarchy hierarchy(graph, upscale_param.coarsen_param, nullptr, &ess_attr);
 
     hierarchy.PrintInfo();
 
@@ -179,7 +179,7 @@ int main(int argc, char* argv[])
     MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine, dump_number);
     const bool verbose = (myid == 0);
 
-    const int num_levels = upscale_param.max_levels;
+    const int num_levels = upscale_param.coarsen_param.max_levels;
     if (num_levels == 1)
     {
         mlmc.SetInitialSamplesLevel(0, fine_samples);

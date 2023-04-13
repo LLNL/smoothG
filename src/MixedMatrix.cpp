@@ -67,17 +67,28 @@ MixedMatrix::MixedMatrix(GraphSpace graph_space, std::vector<mfem::DenseMatrix> 
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
 {
-    std::swap(M_vert_, other.M_vert_);
-    M_.Swap(other.M_);
-    D_.Swap(other.D_);
-    W_.Swap(other.W_);
-    swap(graph_space_, other.graph_space_);
-    mfem::Swap(block_offsets_, other.block_offsets_);
-    mfem::Swap(block_true_offsets_, other.block_true_offsets_);
-    constant_rep_.Swap(other.constant_rep_);
-    vertex_sizes_.Swap(other.vertex_sizes_);
-    P_pwc_.Swap(other.P_pwc_);
-    W_is_nonzero_ = other.W_is_nonzero_;
+    swap(*this, other);  
+}
+
+MixedMatrix& MixedMatrix::operator=(MixedMatrix&& other) noexcept
+{
+    swap(*this, other);
+    return *this;
+}
+
+void swap(MixedMatrix& lhs, MixedMatrix& rhs) noexcept
+{
+    std::swap(lhs.M_vert_, rhs.M_vert_);
+    lhs.M_.Swap(rhs.M_);
+    lhs.D_.Swap(rhs.D_);
+    lhs.W_.Swap(rhs.W_);
+    swap(lhs.graph_space_, rhs.graph_space_);
+    mfem::Swap(lhs.block_offsets_, rhs.block_offsets_);
+    mfem::Swap(lhs.block_true_offsets_, rhs.block_true_offsets_);
+    lhs.constant_rep_.Swap(rhs.constant_rep_);
+    lhs.vertex_sizes_.Swap(rhs.vertex_sizes_);
+    lhs.P_pwc_.Swap(rhs.P_pwc_);
+    lhs.W_is_nonzero_ = rhs.W_is_nonzero_;
 }
 
 void MixedMatrix::Init()

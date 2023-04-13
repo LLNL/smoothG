@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
 
     // Time Stepping
     {
-        Hierarchy hierarchy(graph, upscale_param, &partitioning, &ess_attr, W_block);
+        Hierarchy hierarchy(graph, upscale_param.coarsen_param, &partitioning, &ess_attr, W_block);
         hierarchy.PrintInfo();
 
         // Set some pressure initial condition

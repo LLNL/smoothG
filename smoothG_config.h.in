@@ -17,7 +17,7 @@
 #define __SMOOTHG_CONFIG_H
 
 #define SMOOTHG_USE_ARPACK @smoothG_USE_ARPACK@
-
 #define SMOOTHG_USE_SAAMGE @smoothG_USE_SAAMGE@
+#define SMOOTHG_USE_MATRED @smoothG_USE_MATRED@
 
 #endif
