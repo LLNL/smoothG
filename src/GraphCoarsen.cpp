@@ -603,7 +603,7 @@ mfem::SparseMatrix GraphCoarsen::BuildEdgeProjection()
         GetTableRow(agg_vdof, agg, local_vdofs);
         GetTableRow(agg_face, agg, faces);
 
-        for (auto&& face : faces)
+        for (auto && face : faces)
         {
             GetTableRow(face_edof, face, face_edofs);
             local_edofs.Append(face_edofs);

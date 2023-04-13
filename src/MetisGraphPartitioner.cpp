@@ -164,7 +164,7 @@ void MetisGraphPartitioner::SetPreIsolateVertices(const std::vector<int>& indice
 
 void MetisGraphPartitioner::SetPreIsolateVertices(std::vector<std::vector<int>> sets)
 {
-    for (auto&& indices : sets)
+    for (auto && indices : sets)
     {
         pre_isolated_vertices_.push_back(indices);
     }

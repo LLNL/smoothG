@@ -165,7 +165,7 @@ int main(int argc, char* argv[])
     // Create Hierarchy
     upscale_param.coarsen_param.coarse_factor = 4;
     Hierarchy hierarchy(graph, upscale_param.coarsen_param, &partitioning, &ess_attr, W_block);
-    PDESampler pdesampler(nDimensions, kappa, seed + myid, std::move(hierarchy), 
+    PDESampler pdesampler(nDimensions, kappa, seed + myid, std::move(hierarchy),
                           upscale_param.lin_solve_param);
     pdesampler.GetHierarchy().PrintInfo();
 

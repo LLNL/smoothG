@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
     }
     PressureFunctionalQoI qoi(hierarchy, functional);
 
-    MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine, 
+    MLMCManager mlmc(sampler, qoi, hierarchy, rhs_fine,
                      upscale_param.lin_solve_param, dump_number);
     hierarchy.PrintInfo();
 

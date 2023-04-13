@@ -29,7 +29,7 @@ namespace smoothg
 /**
    Collection of parameters for upscaling methods
 
-   @param coarsen_param 
+   @param coarsen_param
    @param hybridization use hybridization as solver
    @param rescale_iter number of iteration to compute scaling in hybridization
    @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
@@ -76,7 +76,7 @@ public:
             const mfem::Array<int>* partitioning = nullptr,
             const mfem::Array<int>* ess_attr = nullptr,
             const mfem::SparseMatrix& w_block = SparseIdentity(0))
-        : Upscale(Hierarchy(std::move(graph), param.coarsen_param, 
+        : Upscale(Hierarchy(std::move(graph), param.coarsen_param,
                             partitioning, ess_attr, w_block),
                   param.lin_solve_param) {}
 

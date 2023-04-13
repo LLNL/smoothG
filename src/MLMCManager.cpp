@@ -126,7 +126,7 @@ MLMCManager::MLMCManager(MultilevelSampler& sampler,
     rhs_.push_back(rhs_fine);
     for (int k = 0; k < num_levels_ - 1; ++k)
     {
-        hierarchy_.MakeSolver(k+1, lin_solve_param);
+        hierarchy_.MakeSolver(k + 1, lin_solve_param);
         rhs_.push_back(hierarchy.Restrict(k, rhs_[k]));
     }
 }

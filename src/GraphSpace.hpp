@@ -49,12 +49,12 @@ public:
     GraphSpace(Graph graph,
                mfem::SparseMatrix edge_edof,
                mfem::SparseMatrix vertex_vdof);
-    
+
     GraphSpace(Graph graph,
                const std::vector<mfem::DenseMatrix>& edge_traces,
                const std::vector<mfem::DenseMatrix>& vertex_targets)
-        : GraphSpace(std::move(graph), 
-                     BuildEntityToDof(edge_traces), 
+        : GraphSpace(std::move(graph),
+                     BuildEntityToDof(edge_traces),
                      BuildEntityToDof(vertex_targets)) { }
 
     /// Default constructor

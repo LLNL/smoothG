@@ -29,7 +29,7 @@ namespace smoothg
 /**
    Collection of parameters for upscaling methods
 
-   @param coarsen_param 
+   @param coarsen_param
    @param hybridization use hybridization as solver
    @param rescale_iter number of iteration to compute scaling in hybridization
    @param saamge_param SAAMGe paramters, use SAAMGe as preconditioner for
@@ -41,7 +41,7 @@ public:
     bool hybridization;
     int rescale_iter;
     int use_saamge;
-    
+
     LinearSolverParameters() :
         hybridization(false),
         rescale_iter(-1),

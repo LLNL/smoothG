@@ -56,16 +56,16 @@ public:
     int num_iso_verts;
     // possibly also boundary condition information?
 
-    CoarsenParameters() 
-      : max_levels(2),
-        spect_tol(0.001),
-        max_evects(4),
-        max_traces(4),
-        dual_target(false),
-        scaled_dual(false),
-        energy_dual(false),
-        coarse_factor(64),
-        num_iso_verts(0)
+    CoarsenParameters()
+        : max_levels(2),
+          spect_tol(0.001),
+          max_evects(4),
+          max_traces(4),
+          dual_target(false),
+          scaled_dual(false),
+          energy_dual(false),
+          coarse_factor(64),
+          num_iso_verts(0)
     {}
 
     void RegisterInOptionsParser(mfem::OptionsParser& args)
@@ -199,6 +199,8 @@ public:
 
     /// Create solver on level
     void MakeSolver(int level, const LinearSolverParameters& param);
+    std::unique_ptr<MixedLaplacianSolver> MakeSolver(
+        const MixedMatrix& system, const LinearSolverParameters& param) const;
 
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);

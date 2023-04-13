@@ -66,13 +66,13 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
             MPI_Comm_size(mgL.GetGraph().GetComm(), &num_procs);
             Redistributor redistributor(mgL.GetGraph(), num_procs);
             MixedMatrix redist_mgL = redistributor.Redistribute(mgL);
-            
+
             Coarsen(redist_mgL, param, nullptr);
             auto& redTD_tD0 = redistributor.TrueDofRedistribution(0);
             auto& redTD_tD1 = redistributor.TrueDofRedistribution(0);
             unique_ptr<mfem::HypreParMatrix> tD_redTD0(redTD_tD0.Transpose());
             unique_ptr<mfem::HypreParMatrix> tD_redTD1(redTD_tD1.Transpose());
-            
+
             auto& fine = GetMatrix(level).GetGraphSpace();
             auto& coarse = GetMatrix(level + 1).GetGraphSpace();
             true_Psigma_[level] = ParMult(Psigma_[level], coarse.EDofToTrueEDof(), coarse.EDofStarts());
@@ -135,7 +135,7 @@ void Hierarchy::Coarsen(const MixedMatrix& mgL, const CoarsenParameters& param,
     Graph coarse_graph;
     if (partitioning)
     {
-        coarse_graph = topology.Coarsen(mgL.GetGraph(), *partitioning);            
+        coarse_graph = topology.Coarsen(mgL.GetGraph(), *partitioning);
     }
     else
     {
@@ -165,18 +165,23 @@ void Hierarchy::Coarsen(int level, const CoarsenParameters& param,
     Coarsen(mgL, param, partitioning);
 }
 
-void Hierarchy::MakeSolver(int level, const LinearSolverParameters& param)
+std::unique_ptr<MixedLaplacianSolver>
+Hierarchy::MakeSolver(const MixedMatrix& system, const LinearSolverParameters& param) const
 {
     if (param.hybridization) // Hybridization solver
     {
-        solvers_[level].reset(new HybridSolver(GetMatrix(level), ess_attr_,
-                                               param.rescale_iter, param.use_saamge));
+        return make_unique<HybridSolver>(system, ess_attr_, param.rescale_iter, param.use_saamge);
     }
     else // L2-H1 block diagonal preconditioner
     {
-        GetMatrix(level).BuildM();
-        solvers_[level].reset(new BlockSolverFalse(GetMatrix(level), ess_attr_));
+        return make_unique<BlockSolverFalse>(system, ess_attr_);
     }
+}
+
+void Hierarchy::MakeSolver(int level, const LinearSolverParameters& param)
+{
+    if (!param.hybridization) { GetMatrix(level).BuildM(); }
+    solvers_[level] = MakeSolver(GetMatrix(level), param);
 }
 
 void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const

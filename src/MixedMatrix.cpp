@@ -67,7 +67,7 @@ MixedMatrix::MixedMatrix(GraphSpace graph_space, std::vector<mfem::DenseMatrix> 
 
 MixedMatrix::MixedMatrix(MixedMatrix&& other) noexcept
 {
-    swap(*this, other);  
+    swap(*this, other);
 }
 
 MixedMatrix& MixedMatrix::operator=(MixedMatrix&& other) noexcept
