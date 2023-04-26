@@ -27,9 +27,10 @@ namespace smoothg
 {
 
 /**
-   @brief Contains information about degrees of freedom to vertex/edge
+    @brief Contains information about degrees of freedom to vertex/edge
 
-   For brevity, vdof/edof refer to vertex/edge-based degree of freedom
+    For brevity, vdof/edof refer to vertex/edge-based degree of freedom/
+    edofs are enumerated by traces first, followed by bubbles.
 */
 class GraphSpace
 {

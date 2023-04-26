@@ -187,7 +187,7 @@ mfem::HypreParMatrix* MixedMatrix::MakeParallelW(const mfem::SparseMatrix& W) co
     return new mfem::HypreParMatrix(GetComm(), vdof_starts.Last(), vdof_starts, W_ptr);
 }
 
-mfem::Vector MixedMatrix::AssembleTrueVector(const mfem::Vector& vec) const
+mfem::Vector MixedMatrix::Assemble(const mfem::Vector& vec) const
 {
     assert(vec.Size() == block_offsets_[2]);
     mfem::Vector true_vec(block_true_offsets_[2]);
@@ -197,6 +197,18 @@ mfem::Vector MixedMatrix::AssembleTrueVector(const mfem::Vector& vec) const
     graph_space_.TrueEDofToEDof().Mult(blk_vec.GetBlock(0), blk_true_vec.GetBlock(0));
     blk_true_vec.GetBlock(1) = blk_vec.GetBlock(1);
     return true_vec;
+}
+
+mfem::Vector MixedMatrix::Distribute(const mfem::Vector& true_vec) const
+{
+    assert(true_vec.Size() == block_true_offsets_[2]);
+    mfem::Vector vec(block_offsets_[2]);
+    mfem::BlockVector blk_true_vec(true_vec.GetData(), block_true_offsets_);
+    mfem::BlockVector blk_vec(vec.GetData(), block_offsets_);
+
+    graph_space_.TrueEDofToEDof().MultTranspose(blk_true_vec.GetBlock(0), blk_vec.GetBlock(0));
+    blk_vec.GetBlock(1) = blk_true_vec.GetBlock(1);
+    return vec;
 }
 
 void MixedMatrix::Mult(const mfem::Vector& scale,

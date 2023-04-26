@@ -198,9 +198,11 @@ public:
     virtual void SetAbsTol(int level, double atol);
 
     /// Create solver on level
-    void MakeSolver(int level, const LinearSolverParameters& param);
+    void MakeSolver(int level, const LinearSolverParameters& param, bool on_true_dof = false);
     std::unique_ptr<MixedLaplacianSolver> MakeSolver(
-        const MixedMatrix& system, const LinearSolverParameters& param) const;
+        const MixedMatrix& system,
+        const LinearSolverParameters& param,
+        bool on_true_dof = false) const;
 
     /// coeff should have the size of the number of vertices in the given level
     void RescaleCoefficient(int level, const mfem::Vector& coeff);

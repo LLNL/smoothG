@@ -333,7 +333,7 @@ mfem::Vector LevelSolver::Residual(const mfem::Vector& sol, const mfem::Vector& 
 
 double LevelSolver::ResidualNorm(const mfem::Vector& x, const mfem::Vector& y)
 {
-    return ParNormlp(mixed_system_.AssembleTrueVector(Residual(x, y)), 2, comm_);
+    return ParNormlp(mixed_system_.Assemble(Residual(x, y)), 2, comm_);
 }
 
 void LevelSolver::Step(const mfem::Vector& rhs, mfem::Vector& x, mfem::Vector& dx)
@@ -466,7 +466,7 @@ EllipticFAS::EllipticFAS(const Hierarchy& hierarchy, const Kappa& kappa,
 
 double EllipticFAS::Norm(int level, const mfem::Vector& vec) const
 {
-    return ParNormlp(hierarchy_.GetMatrix(level).AssembleTrueVector(vec), 2, comm_);
+    return ParNormlp(hierarchy_.GetMatrix(level).Assemble(vec), 2, comm_);
 }
 
 void EllipticFAS::Restrict(int level, const mfem::Vector& fine, mfem::Vector& coarse) const

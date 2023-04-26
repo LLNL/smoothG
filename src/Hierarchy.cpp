@@ -54,7 +54,7 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     agg_vert_.reserve(param.max_levels - 1);
 
-    int num_vert_min = 10;
+    int num_vert_min = 2;
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
@@ -167,8 +167,8 @@ void Hierarchy::Coarsen(int level, const CoarsenParameters& param,
     Coarsen(mgL, param, partitioning);
 }
 
-std::unique_ptr<MixedLaplacianSolver>
-Hierarchy::MakeSolver(const MixedMatrix& system, const LinearSolverParameters& param) const
+std::unique_ptr<MixedLaplacianSolver> Hierarchy::MakeSolver(
+    const MixedMatrix& system, const LinearSolverParameters& param, bool on_true_dof) const
 {
     if (param.hybridization) // Hybridization solver
     {
@@ -176,14 +176,22 @@ Hierarchy::MakeSolver(const MixedMatrix& system, const LinearSolverParameters& p
     }
     else // L2-H1 block diagonal preconditioner
     {
-        return make_unique<BlockSolverFalse>(system, ess_attr_);
+        if (on_true_dof)
+        {
+            return make_unique<BlockSolver>(system, ess_attr_);
+        }
+        else
+        {
+            return make_unique<BlockSolverFalse>(system, ess_attr_);
+        }
+
     }
 }
 
-void Hierarchy::MakeSolver(int level, const LinearSolverParameters& param)
+void Hierarchy::MakeSolver(int level, const LinearSolverParameters& param, bool on_true_dof)
 {
     if (!param.hybridization) { GetMatrix(level).BuildM(); }
-    solvers_[level] = MakeSolver(GetMatrix(level), param);
+    solvers_[level] = MakeSolver(GetMatrix(level), param, on_true_dof);
 }
 
 void Hierarchy::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y) const

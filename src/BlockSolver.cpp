@@ -140,7 +140,7 @@ void BlockSolver::Mult(const mfem::BlockVector& rhs,
     chrono.Clear();
     chrono.Start();
 
-    double rhs0 = rhs.GetBlock(1)[0];
+    double rhs0 = rhs.Size() ? rhs.GetBlock(1)[0] : 0.0;
 
     if (!W_is_nonzero_ && remove_one_dof_ && myid_ == 0)
     {
@@ -149,7 +149,10 @@ void BlockSolver::Mult(const mfem::BlockVector& rhs,
 
     solver_->Mult(rhs, sol);
 
-    const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
+    if (rhs.Size())
+    {
+        const_cast<mfem::Vector&>(rhs.GetBlock(1))[0] = rhs0;
+    }
 
     if (!W_is_nonzero_ && remove_one_dof_)
     {

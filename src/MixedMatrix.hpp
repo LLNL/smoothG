@@ -115,8 +115,11 @@ public:
     /// assemble the parallel W matrix
     mfem::HypreParMatrix* MakeParallelW(const mfem::SparseMatrix& W) const;
 
-    /// assemble a local vector into true vector
-    mfem::Vector AssembleTrueVector(const mfem::Vector& vec) const;
+    /// assemble a local vector to a true vector
+    mfem::Vector Assemble(const mfem::Vector& vec) const;
+
+    /// distribute a true vector to a local vector
+    mfem::Vector Distribute(const mfem::Vector& true_vec) const;
 
     /// Mult mixed system to input vector x with M scale inversely by "element" scale
     void Mult(const mfem::Vector& scale, const mfem::BlockVector& x, mfem::BlockVector& y) const;

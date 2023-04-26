@@ -1223,30 +1223,30 @@ std::unique_ptr<mfem::HypreParMatrix> BuildEntityToTrueEntity(
     HYPRE_Int max_entity = entity_shared->last_row_index;
 
     // Diagonal part
-    int nentities = entity_trueentity_entity.Width();
-    int* select_i = new int[nentities + 1];
-    int ntrueentities = 0;
-    for (int i = 0; i < nentities; i++)
+    const int num_entities = entity_trueentity_entity.NumCols();
+    int* select_i = new int[num_entities + 1];
+    int num_trueentities = 0;
+    for (int i = 0; i < num_entities; i++)
     {
-        select_i[i] = ntrueentities;
+        select_i[i] = num_trueentities;
         int j_offset = entity_shared_i[i];
         if (entity_shared_i[i + 1] == j_offset)
-            ntrueentities++;
+            num_trueentities++;
         else if (entity_shared_map[entity_shared_j[j_offset]] > max_entity)
-            ntrueentities++;
+            num_trueentities++;
     }
-    select_i[nentities] = ntrueentities;
-    int* select_j = new int[ntrueentities];
-    double* select_data = new double[ntrueentities];
-    std::iota(select_j, select_j + ntrueentities, 0);
-    std::fill_n(select_data, ntrueentities, 1.);
+    select_i[num_entities] = num_trueentities;
+    int* select_j = new int[num_trueentities];
+    double* select_data = new double[num_trueentities];
+    std::iota(select_j, select_j + num_trueentities, 0);
+    std::fill_n(select_data, num_trueentities, 1.);
     mfem::SparseMatrix select_diag(select_i, select_j, select_data,
-                                   nentities, ntrueentities);
+                                   num_entities, num_trueentities);
 
     // Construct a "block diagonal" global select matrix from local
     auto comm = entity_trueentity_entity.GetComm();
     mfem::Array<int> trueentity_starts;
-    GenerateOffsets(comm, ntrueentities, trueentity_starts);
+    GenerateOffsets(comm, num_trueentities, trueentity_starts);
 
     mfem::HypreParMatrix select(
         comm, entity_shared->global_num_rows, trueentity_starts.Last(),
@@ -1419,7 +1419,8 @@ mfem::HypreParMatrix* ToParMatrix(MPI_Comm comm, mfem::SparseMatrix& A)
     mfem::Array<int> row_starts, col_starts;
     GenerateOffsets(comm, A.NumRows(), row_starts);
     GenerateOffsets(comm, A.NumCols(), col_starts);
-    auto pA = new mfem::HypreParMatrix(comm, A.NumRows(), A.NumCols(),
+
+    auto pA = new mfem::HypreParMatrix(comm, row_starts.Last(), col_starts.Last(),
                                        row_starts, col_starts, &A);
     pA->CopyRowStarts();
     pA->CopyColStarts();
