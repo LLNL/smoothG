@@ -146,6 +146,11 @@ private:
               const mfem::HypreParMatrix& edgedof_d_td,
               const mfem::SparseMatrix& face_bdrattr);
 
+    /// Constructing the relation table between edge dof and multiplier. For
+    /// every edge dof that is associated with a face, a Lagrange multiplier
+    /// associated with the edge dof is created.
+    mfem::SparseMatrix BuildMultiplierToEDOF(const mfem::SparseMatrix& face_edof);
+
     void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
                                    const mfem::HypreParMatrix& edgedof_d_td);
 
@@ -197,6 +202,7 @@ private:
 
     const MixedMatrix& mgL_;
 
+    mfem::SparseMatrix multiplier_edof_;
     mfem::SparseMatrix Agg_multiplier_;
 
     std::vector<bool> edof_needs_averaging_;
@@ -225,13 +231,12 @@ private:
     mutable std::vector<mfem::Vector> local_rhs_;
 
     mfem::Array<int> ess_true_multipliers_;
-    mfem::Array<int> multiplier_to_edof_;
     mfem::Array<int> ess_true_mult_to_edof_;
     mfem::Array<HYPRE_Int> multiplier_start_;
     mfem::Array<bool> mult_on_bdr_;
 
-    std::unique_ptr<mfem::HypreParMatrix> multiplier_d_td_;
-    std::unique_ptr<mfem::HypreParMatrix> multiplier_td_d_;
+    std::unique_ptr<mfem::HypreParMatrix> mult_truemult_;
+    std::unique_ptr<mfem::HypreParMatrix> truemult_mult_;
     std::unique_ptr<mfem::HypreParMatrix> edof_shared_mean_;
 
     mutable mfem::Vector trueHrhs_;
@@ -240,7 +245,6 @@ private:
     mutable mfem::Vector Mu_;
 
     int nAggs_;
-    int num_multiplier_dofs_;
 
     int rescale_iter_;
     mfem::Vector diagonal_scaling_;
