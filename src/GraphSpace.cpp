@@ -107,7 +107,6 @@ mfem::SparseMatrix GraphSpace::BuildEntityToDof(
     int nnz = I[num_entities];
     int* J = new int[nnz];
     std::iota(J, J + nnz, 0);
-
     double* Data = new double[nnz];
     std::fill_n(Data, nnz, 1.);
 
@@ -137,7 +136,22 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
     int* J = new int[nnz];
     double* data = new double[nnz];
 
-    int edof_counter = edge_edof_.NumCols();
+    int bubble_counter = 0;
+
+    std::vector<int> bubbles;
+    bubbles.reserve(nnz-edge_edof_.NumNonZeroElems());
+    std::vector<bool> bubbles_marker(nnz, true);
+    for (int i = 0; i < edge_edof_.NumNonZeroElems(); ++i)
+    {
+        bubbles_marker[edge_edof_.GetJ()[i]] = false;
+    }
+    for (int dof = 0; dof < nnz; ++dof)
+    {
+        if (bubbles_marker[dof])
+        {
+            bubbles.push_back(dof);
+        }
+    }
 
     int* J_begin = J;
     double* data_begin = data;
@@ -148,14 +162,14 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
         const int num_local_bubbles = vertex_vdof_.RowSize(vertex) - 1;
 
         int* J_end = J_begin + num_local_bubbles;
-        std::iota(J_begin, J_end, edof_counter);
+        std::copy_n(bubbles.data() + bubble_counter, num_local_bubbles, J_begin);
         J_begin = J_end;
 
         double* data_end = data_begin + num_local_bubbles;
         std::fill(data_begin, data_end, 2.0);
         data_begin = data_end;
 
-        edof_counter += num_local_bubbles;
+        bubble_counter += num_local_bubbles;
 
         GetTableRow(vertex_edge, vertex, edges);
         for (int& edge : edges)
@@ -170,7 +184,9 @@ mfem::SparseMatrix GraphSpace::BuildVertexToEDof()
         data_begin = data_end;
     }
 
-    return mfem::SparseMatrix(I, J, data, num_vertices, edof_counter);
+    edge_edof_.SetWidth(edge_edof_.NumNonZeroElems() + bubble_counter);
+
+    return mfem::SparseMatrix(I, J, data, num_vertices, edge_edof_.NumCols());
 }
 
 unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
@@ -183,12 +199,8 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
 
     unique_ptr<mfem::HypreParMatrix> d_te_d; // dofs sharing the same true edge
     {
-        mfem::SparseMatrix edge_edof;
-        edge_edof.MakeRef(edge_edof_);
-        edge_edof.SetWidth(num_edofs);
-        mfem::SparseMatrix edof_edge = smoothg::Transpose(edge_edof);
-
-        auto tmp = ParMult(edge_trueedge_edge, edge_edof, edof_starts_);
+        mfem::SparseMatrix edof_edge = smoothg::Transpose(edge_edof_);
+        auto tmp = ParMult(edge_trueedge_edge, edge_edof_, edof_starts_);
         d_te_d = ParMult(edof_edge, *tmp, edof_starts_);
     }
 
@@ -197,7 +209,7 @@ unique_ptr<mfem::HypreParMatrix> GraphSpace::BuildEdofToTrueEdof()
     d_te_d->GetOffd(d_te_d_offd, d_te_d_col_map);
 
     mfem::SparseMatrix d_td_d_diag = SparseIdentity(num_edofs);
-    mfem::SparseMatrix d_td_d_offd(num_edofs, d_te_d_offd.Width());
+    mfem::SparseMatrix d_td_d_offd(num_edofs, d_te_d_offd.NumCols());
     {
         mfem::SparseMatrix e_te_e_offd = GetOffd(edge_trueedge_edge);
 

@@ -421,16 +421,13 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeVertexTarg
     mfem::SparseMatrix W_ext = use_w ? GetDiag(*pW_ext) : mfem::SparseMatrix();
 
     // Compute face to extended edge dofs relation table
-    mfem::SparseMatrix face_edof;
-    face_edof.MakeRef(dof_agg_.face_edof_);
-    face_edof.SetWidth(space.VertexToEDof().Width());
-
     ParMatrix edof_ext_edof(mfem::ParMult(&space.EDofToTrueEDof(), permute_eT.get()));
-    face_ext_edof_ = ParMult(face_edof, *edof_ext_edof, coarse_graph_.EdgeStarts());
+    face_ext_edof_ = ParMult(dof_agg_.face_edof_, *edof_ext_edof, coarse_graph_.EdgeStarts());
 
 #ifdef SMOOTHG_DEBUG
-    OrderingCheck(coarse_graph_.EdgeToTrueEdgeToEdge(), GetDiag(*face_ext_edof_), *permute_e);
-    OrderingCheck(coarse_graph_.EdgeToTrueEdgeToEdge(), face_edof, space.EDofToTrueEDof());
+    auto& face_trueface_face = coarse_graph_.EdgeToTrueEdgeToEdge();
+    OrderingCheck(face_trueface_face, GetDiag(*face_ext_edof_), *permute_e);
+    OrderingCheck(face_trueface_face, dof_agg_.face_edof_, space.EDofToTrueEDof());
 #endif
 
     // Column map for submatrix extraction
@@ -650,7 +647,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
     const mfem::SparseMatrix& M_proc = mgL_.GetM();
     const mfem::SparseMatrix& D_proc = mgL_.GetD();
 
-    const int nfaces = face_Agg.Height(); // Number of coarse faces
+    const int nfaces = face_Agg.NumRows(); // Number of coarse faces
     std::vector<mfem::DenseMatrix> out(nfaces);
 
     mfem::Array<int> ext_loc_edofs, iface_edofs;

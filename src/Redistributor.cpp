@@ -293,17 +293,25 @@ Redistributor::BuildRepeatedEDofRedistribution(const GraphSpace& dof,
     {
         if (redRD_TE_RD_diag.RowSize(i) > 0)
         {
+            mfem::Array<int> RDs;
             for (int j = 0; j < redRD_TE_RD_diag.RowSize(i); ++j)
             {
                 int RD = redRD_TE_RD_diag.GetRowColumns(i)[j];
-                mfem::Array<int> RDs(redRD_TD_RD_diag.GetRowColumns(i),
-                                     redRD_TD_RD_diag.RowSize(i));
+                GetTableRow(redRD_TD_RD_diag, i, RDs);
                 if (RDs.Find(RD) != -1)
                 {
                     out_diag->Add(i, RD, 1.0);
                     break;
                 }
             }
+            if (out_diag->RowSize(i) != 1)
+            {
+                std::cout<<"i:"<<i<<"\n";
+                // redRD_TE_RD_diag.Print();
+                // auto truedof_dof = redist_dof.EDofToTrueEDof().Transpose();
+                redist_dof.VertexToEDof().Print();
+            }
+
             assert(out_diag->RowSize(i) == 1);
         }
         else
@@ -324,6 +332,13 @@ Redistributor::BuildRepeatedEDofRedistribution(const GraphSpace& dof,
                     break;
                 }
             }
+            // if (out_offd->RowSize(i) != 1)
+            // {
+            //     std::cout<<"i:"<<i<<"\n";
+            //     // redRD_TE_RD_diag.Print();
+            //     auto truedof_dof = redist_dof.EDofToTrueEDof().Transpose();
+            //     GetDiag(*truedof_dof).Print();
+            // }
             assert(out_offd->RowSize(i) == 1);
         }
     }
@@ -449,8 +464,6 @@ GraphSpace Redistributor::RedistributeGraphSpace(const GraphSpace& dof)
     Graph redist_graph = RedistributeGraph(graph);
 
 
-std::cout<< "RedistributeGraphSpace 1\n";
-
     // redistribute vdofs
     mfem::SparseMatrix vert_vdof(dof.VertexToVDof());
     std::unique_ptr<mfem::HypreParMatrix> vert_truevdof(
@@ -499,12 +512,12 @@ std::cout<< "RedistributeGraphSpace 1\n";
     {
         //   auto codim = static_cast<GraphTopology::Entity>(i);
         // auto& edge_edof = dof.EdgeToEDof();
-        mfem::SparseMatrix edge_edof;
-        edge_edof.MakeRef(dof.EdgeToEDof());
-        edge_edof.SetWidth(edof_trueedof.NumRows());
+        // mfem::SparseMatrix edge_edof;
+        // edge_edof.MakeRef(dof.EdgeToEDof());
+        // edge_edof.SetWidth(edof_trueedof.NumRows());
 
         //   tE_tD = IgnoreNonLocalRange(dof.GetEntityTrueEntity(i), ent_dof, dof_trueDof);
-        auto edge_trueedof = ParMult(edge_edof, edof_trueedof, dof.GetGraph().EdgeStarts());
+        auto edge_trueedof = ParMult(dof.EdgeToEDof(), edof_trueedof, dof.GetGraph().EdgeStarts());
         unique_ptr<mfem::HypreParMatrix> trueedge_edge(dof.GetGraph().EdgeToTrueEdge().Transpose());
         unique_ptr<mfem::HypreParMatrix> trueedge_trueedof(
             ParMult(trueedge_edge.get(), edge_trueedof.get()));
@@ -540,7 +553,7 @@ std::cout<< "RedistributeGraphSpace 1\n";
 // but globally (true dof), it's (trace_p1, bubbles_p1, trace_p2, bubbles_p2, ..., trace_pn, bubbles_pn)
 // so after redistribution, the local order (trace, bubbles) can no longer be guaranteed
 
-    rededge_rededof_diag.SetWidth();
+    // rededge_rededof_diag.SetWidth();
 
     GraphSpace out(std::move(redist_graph), rededge_rededof_diag, GetDiag(*redvert_redvdof));
 
