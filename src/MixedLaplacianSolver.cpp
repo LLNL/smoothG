@@ -30,7 +30,8 @@ MixedLaplacianSolver::MixedLaplacianSolver(MPI_Comm comm,
                                            bool W_is_nonzero)
     : comm_(comm), rhs_(block_offsets), sol_(block_offsets), nnz_(0),
       num_iterations_(0), timing_(0), remove_one_dof_(true),
-      W_is_nonzero_(W_is_nonzero), is_symmetric_(true)
+      W_is_nonzero_(W_is_nonzero), is_symmetric_(true),
+      solve_on_true_dof_(false)
 {
     sol_ = 0.0;
 }

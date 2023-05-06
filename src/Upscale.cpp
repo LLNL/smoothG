@@ -111,26 +111,32 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y,
         hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
     }
 
-    auto& redTVD_TVD = redistributor.TrueEntityRedistribution(0);
-    auto& redTED_TED = redistributor.TrueEntityRedistribution(1);
-    std::unique_ptr<mfem::HypreParMatrix> TVD_redTVD(redTVD_TVD.Transpose());
-    std::unique_ptr<mfem::HypreParMatrix> TED_redTED(redTED_TED.Transpose());
+    auto& redTVD_TVD = redistributor.TrueDofRedistribution(0);
+    auto& redTED_TED = redistributor.TrueDofRedistribution(1);
 
-    mfem::Array<int> offsets(3);
-    offsets[0] = 0;
-    offsets[1] = redTED_TED.NumRows();
-    offsets[0] = offsets[1] + redTVD_TVD.NumRows();
+    mfem::Array<int> red_offsets(3);
+    red_offsets[0] = 0;
+    red_offsets[1] = redTED_TED.NumRows();
+    red_offsets[2] = red_offsets[1] + redTVD_TVD.NumRows();
 
-    mfem::BlockVector redist_rhs(offsets), redist_sol(offsets);
-    redist_rhs.GetBlock(0) = smoothg::Mult(redTED_TED, rhs_[level].GetBlock(0));
-    redist_rhs.GetBlock(1) = smoothg::Mult(redTVD_TVD, rhs_[level].GetBlock(1));
+    auto assembled_rhs = GetHierarchy().GetMatrix(level).Assemble(rhs_[level]);
+    auto& true_offsets = GetHierarchy().GetMatrix(level).BlockTrueOffsets();
+    mfem::BlockVector true_rhs(assembled_rhs.GetData(), true_offsets);
+
+    mfem::BlockVector redist_rhs(red_offsets), redist_sol(red_offsets);
+    redTED_TED.Mult(true_rhs.GetBlock(0), redist_rhs.GetBlock(0));
+    redTVD_TVD.Mult(true_rhs.GetBlock(1), redist_rhs.GetBlock(1) );
     
     redist_sol = 0.0;
     solver.Mult(redist_rhs, redist_sol);
 
-    sol_[level].GetBlock(0) = smoothg::Mult(*TED_redTED, redist_sol.GetBlock(0));
-    sol_[level].GetBlock(1) = smoothg::Mult(*TVD_redTVD, redist_sol.GetBlock(1));
-        
+    mfem::BlockVector true_sol(true_offsets);
+    redTED_TED.MultTranspose(redist_sol.GetBlock(0), true_sol.GetBlock(0));
+    redTVD_TVD.MultTranspose(redist_sol.GetBlock(1), true_sol.GetBlock(1));
+
+    auto sol = GetHierarchy().GetMatrix(level).Distribute(true_sol);
+    std::copy_n(sol.GetData(), sol.Size(), sol_[level].GetData());
+
     // interpolate solution
     for (int i = level; i > 0; --i)
     {

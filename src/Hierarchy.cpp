@@ -172,7 +172,8 @@ std::unique_ptr<MixedLaplacianSolver> Hierarchy::MakeSolver(
 {
     if (param.hybridization) // Hybridization solver
     {
-        return make_unique<HybridSolver>(system, ess_attr_, param.rescale_iter, param.use_saamge);
+        return make_unique<HybridSolver>(system, ess_attr_, param.rescale_iter,
+                                         param.use_saamge, on_true_dof);
     }
     else // L2-H1 block diagonal preconditioner
     {

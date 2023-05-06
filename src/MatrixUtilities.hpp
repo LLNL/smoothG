@@ -178,12 +178,6 @@ void Add(mfem::SparseMatrix& mat, const mfem::Vector& vec,
 mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D);
 
 /**
-   @brief Construct a diagonal matrix with the entries specified by a vector
-   @param vect diagonal entries
-*/
-mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect);
-
-/**
    Add scaling*subm into the matrix mat at locations given by rows and cols.
 
    The implementation is simply copied from mfem::SparseMatrix::AddSubMatrix,

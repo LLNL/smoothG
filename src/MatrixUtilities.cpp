@@ -435,30 +435,6 @@ mfem::SparseMatrix Mult_AtDA(const mfem::SparseMatrix& A, const mfem::Vector& D)
     return AtDA;
 }
 
-mfem::SparseMatrix VectorToMatrix(const mfem::Vector& vect)
-{
-    if (vect.Size() == 0)
-    {
-        return mfem::SparseMatrix();
-    }
-
-    const int size = vect.Size();
-
-    int* I = new int[size + 1];
-    int* J = new int[size];
-    double* Data = new double[size];
-
-    for (int i = 0; i < size; ++i)
-    {
-        Data[i] = vect[i];
-    }
-
-    std::iota(I, I + size + 1, 0);
-    std::iota(J, J + size, 0);
-
-    return mfem::SparseMatrix(I, J, Data, size, size);
-}
-
 /// I am worried that some of these methods (especially _Add_) will not be public
 /// in future versions of MFEM
 void AddScaledSubMatrix(mfem::SparseMatrix& mat, const mfem::Array<int>& rows,

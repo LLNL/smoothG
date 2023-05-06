@@ -140,6 +140,7 @@ protected:
 
     std::unique_ptr<mfem::IterativeSolver> solver_;
     bool is_symmetric_;
+    bool solve_on_true_dof_;
 };
 
 } // namespace smoothg

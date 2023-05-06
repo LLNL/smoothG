@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
     mfem::HypreParMatrix edge_d_td(comm, nedges, edge_start, &edge_d_td_diag);
 
     Graph graph(vertex_edge, edge_d_td, weight);
-    MixedMatrix mixed_graph_laplacian(std::move(graph), VectorToMatrix(w));
+    MixedMatrix mixed_graph_laplacian(std::move(graph), SparseDiag(w));
 
     // set the appropriate right hand side
     mfem::BlockVector rhs(mixed_graph_laplacian.BlockOffsets());

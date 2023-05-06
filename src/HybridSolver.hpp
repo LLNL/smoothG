@@ -113,14 +113,14 @@ public:
               system will be computed based on SISC, 41(3), B425–B447 Prop. 4.3;
               if positive, the rescaling vector will be computed by performing
               rescale_iter smoothing steps to H; no rescaling if set to 0.
-       @param saamge_param SAAMGe parameters. Use SAAMGe as preconditioner for
-              hybridized system if saamge_param is not nullptr, otherwise
-              BoomerAMG is used instead.
+       @param use_saamge Whether to use SAAMGe as preconditioner for
+              hybridized system.
     */
     HybridSolver(const MixedMatrix& mgL,
                  const mfem::Array<int>* ess_attr = nullptr,
                  int rescale_iter = -1,
-                 int use_saamge_param = false);
+                 int use_saamge = false,
+                 bool solve_on_true_dof = false);
 
     virtual ~HybridSolver();
 
@@ -141,18 +141,17 @@ public:
     virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
                                 const std::vector<mfem::DenseMatrix>& N_el);
 private:
-    void Init(const mfem::SparseMatrix& face_edgedof,
+    void Init(const mfem::SparseMatrix& edge_edof,
               const std::vector<mfem::DenseMatrix>& M_el,
-              const mfem::HypreParMatrix& edgedof_d_td,
-              const mfem::SparseMatrix& face_bdrattr);
+              const mfem::HypreParMatrix& edof_trueedof,
+              const mfem::SparseMatrix& edof_bdrattr);
 
     /// Constructing the relation table between edge dof and multiplier. For
     /// every edge dof that is associated with a face, a Lagrange multiplier
     /// associated with the edge dof is created.
-    mfem::SparseMatrix BuildMultiplierToEDOF(const mfem::SparseMatrix& face_edof);
+    mfem::SparseMatrix BuildMultiplierToEDOF(const mfem::SparseMatrix& edge_edof);
 
-    void CreateMultiplierRelations(const mfem::SparseMatrix& face_edgedof,
-                                   const mfem::HypreParMatrix& edgedof_d_td);
+    void BuildMultiplierToTrueMultiplier(const mfem::HypreParMatrix& edof_trueedof);
 
     mfem::SparseMatrix AssembleHybridSystem(
         const std::vector<mfem::DenseMatrix>& M_el);
@@ -162,7 +161,7 @@ private:
         const std::vector<mfem::DenseMatrix>& N_el);
 
     // Compute scaling vector and the scaled hybridized system
-    void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H_d);
+    void ComputeScaledHybridSystem(const mfem::HypreParMatrix& H);
 
     // Construct spectral AMGe preconditioner
     void BuildSpectralAMGePreconditioner();

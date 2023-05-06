@@ -79,6 +79,9 @@ int main(int argc, char* argv[])
                    "-no-lat-pres", "--no-lateral-pressure",
                    "Impose Dirichlet pressure condition on lateral sides.");
     // Read upscaling options from command line into upscale_param object
+    upscale_param.coarsen_param.spect_tol = 1.0;
+    upscale_param.coarsen_param.max_evects = 2;
+    upscale_param.coarsen_param.max_traces = 1;
     upscale_param.RegisterInOptionsParser(args);
     args.Parse();
     if (!args.Good())
@@ -143,18 +146,20 @@ int main(int argc, char* argv[])
         upscale.ShowSolveInfo(level);
 
         auto& hierarchy = upscale.GetHierarchy();
-        auto& mgL = hierarchy.GetMatrix(1);
+        auto& mgL = hierarchy.GetMatrix(level);
         int num_procs_redist = num_procs / 2;
         Redistributor redistributor(mgL.GetGraph(), num_procs_redist);
+
         MixedMatrix redist_mgL = redistributor.Redistribute(mgL);
+
+        redist_mgL.BuildM();
+        bool on_true_dof = true;
         auto redist_solver = hierarchy.MakeSolver(
-            redist_mgL, upscale_param.lin_solve_param);
-        
+            redist_mgL, upscale_param.lin_solve_param, on_true_dof);
+
         upscale.Solve(level, rhs_fine, redist_sol[level], *redist_solver, redistributor);
+
         upscale.ShowErrors(sol[level], redist_sol[level], level);
-
-
-
 
         // if (lateral_pressure)
         // {
