@@ -101,50 +101,6 @@ void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y)
     y = sol_[0];
 }
 
-void Upscale::Solve(int level, const mfem::BlockVector& x, mfem::BlockVector& y,
-                    const MixedLaplacianSolver& solver, 
-                    const Redistributor& redistributor) const
-{
-    rhs_[0] = x;
-    for (int i = 0; i < level; ++i)
-    {
-        hierarchy_.Restrict(i, rhs_[i], rhs_[i + 1]);
-    }
-
-    auto& redTVD_TVD = redistributor.TrueDofRedistribution(0);
-    auto& redTED_TED = redistributor.TrueDofRedistribution(1);
-
-    mfem::Array<int> red_offsets(3);
-    red_offsets[0] = 0;
-    red_offsets[1] = redTED_TED.NumRows();
-    red_offsets[2] = red_offsets[1] + redTVD_TVD.NumRows();
-
-    auto assembled_rhs = GetHierarchy().GetMatrix(level).Assemble(rhs_[level]);
-    auto& true_offsets = GetHierarchy().GetMatrix(level).BlockTrueOffsets();
-    mfem::BlockVector true_rhs(assembled_rhs.GetData(), true_offsets);
-
-    mfem::BlockVector redist_rhs(red_offsets), redist_sol(red_offsets);
-    redTED_TED.Mult(true_rhs.GetBlock(0), redist_rhs.GetBlock(0));
-    redTVD_TVD.Mult(true_rhs.GetBlock(1), redist_rhs.GetBlock(1) );
-    
-    redist_sol = 0.0;
-    solver.Mult(redist_rhs, redist_sol);
-
-    mfem::BlockVector true_sol(true_offsets);
-    redTED_TED.MultTranspose(redist_sol.GetBlock(0), true_sol.GetBlock(0));
-    redTVD_TVD.MultTranspose(redist_sol.GetBlock(1), true_sol.GetBlock(1));
-
-    auto sol = GetHierarchy().GetMatrix(level).Distribute(true_sol);
-    std::copy_n(sol.GetData(), sol.Size(), sol_[level].GetData());
-
-    // interpolate solution
-    for (int i = level; i > 0; --i)
-    {
-        hierarchy_.Interpolate(i, sol_[i], sol_[i - 1]);
-    }
-    y = sol_[0];
-}
-
 mfem::BlockVector Upscale::Solve(int level, const mfem::BlockVector& x) const
 {
     mfem::BlockVector y(BlockOffsets(0));

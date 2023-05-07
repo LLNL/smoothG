@@ -41,6 +41,63 @@
 
 using namespace smoothg;
 
+void RedistSolve(const Hierarchy& hierarchy, Redistributor& redistributor,
+                 const LinearSolverParameters& lin_solve_param, int level,
+                 const mfem::BlockVector& x, mfem::BlockVector& y)
+{
+    auto& mixed_system = hierarchy.GetMatrix(level);
+    MixedMatrix redist_system = redistributor.Redistribute(mixed_system);
+
+    if (!lin_solve_param.hybridization) { redist_system.BuildM(); }
+    auto solver = hierarchy.MakeSolver(redist_system, lin_solve_param, true);
+
+    std::vector<mfem::BlockVector> rhs, sol;
+    rhs.reserve(level + 1);
+    sol.reserve(level + 1);
+
+    rhs.push_back(x);
+    for (int i = 0; i < level; ++i)
+    {
+        rhs.push_back(hierarchy.Restrict(i, rhs[i]));
+        sol.emplace_back(hierarchy.BlockOffsets(i));
+    }
+    sol.emplace_back(hierarchy.BlockOffsets(level));
+
+    auto& redTVD_TVD = redistributor.TrueDofRedistribution(0);
+    auto& redTED_TED = redistributor.TrueDofRedistribution(1);
+
+    mfem::Array<int> red_offsets(3);
+    red_offsets[0] = 0;
+    red_offsets[1] = redTED_TED.NumRows();
+    red_offsets[2] = red_offsets[1] + redTVD_TVD.NumRows();
+
+    auto assembled_rhs = mixed_system.Assemble(rhs[level]);
+    auto& true_offsets = mixed_system.BlockTrueOffsets();
+    mfem::BlockVector true_rhs(assembled_rhs.GetData(), true_offsets);
+
+    mfem::BlockVector redist_rhs(red_offsets), redist_sol(red_offsets);
+    redTED_TED.Mult(true_rhs.GetBlock(0), redist_rhs.GetBlock(0));
+    redTVD_TVD.Mult(true_rhs.GetBlock(1), redist_rhs.GetBlock(1));
+
+    redist_sol = 0.0;
+    solver->Mult(redist_rhs, redist_sol);
+
+    mfem::BlockVector true_sol(true_offsets);
+    redTED_TED.MultTranspose(redist_sol.GetBlock(0), true_sol.GetBlock(0));
+    redTVD_TVD.MultTranspose(redist_sol.GetBlock(1), true_sol.GetBlock(1));
+
+    // ((mfem::Vector&)sol[level]) = mixed_system.Distribute(true_sol);
+    auto dist_sol = mixed_system.Distribute(true_sol);
+    std::copy_n(dist_sol.GetData(), dist_sol.Size(), sol[level].GetData());
+
+    // interpolate solution
+    for (int i = level; i > 0; --i)
+    {
+        hierarchy.Interpolate(i, sol[i], sol[i - 1]);
+    }
+    y = sol[0];
+}
+
 int main(int argc, char* argv[])
 {
     int num_procs, myid;
@@ -118,21 +175,21 @@ int main(int argc, char* argv[])
     }
 
     // Setting up finite volume discretization problem
-    SPE10Problem spe10problem(perm_file, nDimensions, spe10_scale, slice,
-                              metis_agglomeration, ess_attr);
-    Graph graph = spe10problem.GetFVGraph();
+    SPE10Problem problem(perm_file, nDimensions, spe10_scale, slice,
+                         metis_agglomeration, ess_attr);
+    Graph graph = problem.GetFVGraph();
 
     // Construct agglomerated topology based on METIS or Cartesian agglomeration
     mfem::Array<int> partitioning;
-    spe10problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
+    problem.Partition(metis_agglomeration, coarsening_factors, partitioning);
 
     // Create Upscaler and Solve
     Upscale upscale(std::move(graph), upscale_param, &partitioning, &ess_attr);
     upscale.PrintInfo();
 
     mfem::BlockVector rhs_fine(upscale.BlockOffsets(0));
-    rhs_fine.GetBlock(0) = spe10problem.GetEdgeRHS();
-    rhs_fine.GetBlock(1) = spe10problem.GetVertexRHS();
+    rhs_fine.GetBlock(0) = problem.GetEdgeRHS();
+    rhs_fine.GetBlock(1) = problem.GetVertexRHS();
 
     /// [Solve]
     const int num_levels = upscale_param.coarsen_param.max_levels;
@@ -150,49 +207,19 @@ int main(int argc, char* argv[])
         int num_procs_redist = num_procs / 2;
         Redistributor redistributor(mgL.GetGraph(), num_procs_redist);
 
-        MixedMatrix redist_mgL = redistributor.Redistribute(mgL);
+        RedistSolve(hierarchy, redistributor, upscale_param.lin_solve_param,
+                    level, rhs_fine, redist_sol[level]);
 
-        redist_mgL.BuildM();
-        bool on_true_dof = true;
-        auto redist_solver = hierarchy.MakeSolver(
-            redist_mgL, upscale_param.lin_solve_param, on_true_dof);
-
-        upscale.Solve(level, rhs_fine, redist_sol[level], *redist_solver, redistributor);
-
-        upscale.ShowErrors(sol[level], redist_sol[level], level);
-
-        // if (lateral_pressure)
-        // {
-        //     mfem::Vector dummy;
-        //     QoI[level] = qoi_evaluator.Evaluate(dummy, sol[level]);
-        //     if (myid == 0)
-        //     {
-        //         std::cout << "Quantity of interest on level " << level
-        //                   << " = " << QoI[level] << "\n";
-        //     }
-        // }
-
-        // if (level > 0)
-        // {
-        //     upscale.ShowErrors(sol[level], sol[0], level);
-        //     if (lateral_pressure)
-        //     {
-        //         serialize["quantity-error-level-" + std::to_string(level)] =
-        //             picojson::value(fabs(QoI[level] - QoI[0]) / QoI[0]);
-        //     }
-        // }
-
-        // Visualize the solution
-        // if (visualization)
-        // {
-        //     mfem::socketstream vis_v;
-        //     spe10problem.VisSetup(vis_v, sol[level].GetBlock(1));
-        // }
+        auto errors = upscale.ComputeErrors(sol[level], redist_sol[level], 0);
+        if (myid == 0)
+        {
+            serialize["relative-vertex-error"] = picojson::value(errors[0]);
+            serialize["relative-edge-error"] = picojson::value(errors[1]);
+            serialize["relative-D-edge-error"] = picojson::value(errors[2]);
+            std::cout << picojson::value(serialize).serialize(true) << "\n";
+        }
     }
     /// [Solve]
-
-    if (lateral_pressure && myid == 0)
-        std::cout << picojson::value(serialize).serialize(true) << std::endl;
 
     return EXIT_SUCCESS;
 }
