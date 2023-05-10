@@ -1,15 +1,17 @@
-/*
-  Copyright (c) 2018, Lawrence Livermore National Security, LLC. Produced at the
-  Lawrence Livermore National Laboratory. LLNL-CODE-745557. All Rights reserved.
-  See file COPYRIGHT for details.
-
-  This file is part of the ParElag library. For more information and source code
-  availability see http://github.com/LLNL/parelag.
-
-  ParElag is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Lesser General Public License (as published by the Free
-  Software Foundation) version 2.1 dated February 1999.
-*/
+/*BHEADER**********************************************************************
+ *
+ * Copyright (c) 2018, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * LLNL-CODE-745247. All Rights reserved. See file COPYRIGHT for details.
+ *
+ * This file is part of smoothG. For more information and source code
+ * availability, see https://www.github.com/llnl/smoothG.
+ *
+ * smoothG is free software; you can redistribute it and/or modify it under the
+ * terms of the GNU Lesser General Public License (as published by the Free
+ * Software Foundation) version 2.1 dated February 1999.
+ *
+ ***********************************************************************EHEADER*/
 
 #ifndef _REDISTRIBUTOR_HPP_
 #define _REDISTRIBUTOR_HPP_
@@ -19,15 +21,6 @@
 
 #include "mfem.hpp"
 #include "matred.hpp"
-
-//#include "topology/Topology.hpp"
-//#include "structures/BooleanMatrix.hpp"
-//#include "structures/SharingMap.hpp"
-//#include "topology/TopologyTable.hpp"
-//#include "utilities/elagError.hpp"
-//#include "partitioning/MetisGraphPartitioner.hpp"
-//#include "amge/DofHandler.hpp"
-// #include "amge/DeRhamSequence.hpp"
 
 #include "GraphTopology.hpp"
 #include "MixedMatrix.hpp"
@@ -99,14 +92,11 @@ public:
         return *(redTrueDof_trueDof[jform]);
     }
 
-    // Graph& GetRedistributedGraph() { return redist_graph_; }
-
     Graph RedistributeGraph(const Graph& graph) const;
 
+    GraphSpace RedistributeSpace(const GraphSpace& dof);
 
-    GraphSpace RedistributeGraphSpace(const GraphSpace& dof);
-
-    MixedMatrix Redistribute(const MixedMatrix& seq);
+    MixedMatrix RedistributeMatrix(const MixedMatrix& seq);
 };
 
 } // namespace parelag

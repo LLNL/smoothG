@@ -46,7 +46,7 @@ void RedistSolve(const Hierarchy& hierarchy, Redistributor& redistributor,
                  const mfem::BlockVector& x, mfem::BlockVector& y)
 {
     auto& mixed_system = hierarchy.GetMatrix(level);
-    MixedMatrix redist_system = redistributor.Redistribute(mixed_system);
+    MixedMatrix redist_system = redistributor.RedistributeMatrix(mixed_system);
 
     if (!lin_solve_param.hybridization) { redist_system.BuildM(); }
     auto solver = hierarchy.MakeSolver(redist_system, lin_solve_param, true);
