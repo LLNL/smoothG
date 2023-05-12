@@ -68,7 +68,7 @@ class Redistributor
     BuildRepeatedEDofRedistribution(const GraphSpace& dof,
                                     const GraphSpace& redist_dof) const;
 
-    void Init(const Graph& graph, const std::vector<int>& elem_redist_procs);
+    void Init(const GraphSpace& space, const std::vector<int>& elem_redist_procs);
 public:
 
     /// Constructor for Redistributor
@@ -77,10 +77,10 @@ public:
     /// @param elem_redist_procs an array of size number of local elements.
     /// elem_redist_procs[i] indicates which processor the i-th local element
     /// will be redistributed to. Other entities are redistributed accordingly.
-    Redistributor(const Graph& graph, const std::vector<int>& elem_redist_procs);
+    Redistributor(const GraphSpace& space, const std::vector<int>& elem_redist_procs);
 
     /// @param num_redist_procs number of processors to be redistributed to
-    Redistributor(const Graph& graph, int& num_redist_procs);
+    Redistributor(const GraphSpace& space, int& num_redist_procs);
 
     const mfem::HypreParMatrix& TrueEntityRedistribution(int codim) const
     {
@@ -94,9 +94,9 @@ public:
 
     Graph RedistributeGraph(const Graph& graph) const;
 
-    GraphSpace RedistributeSpace(const GraphSpace& dof);
+    GraphSpace RedistributeSpace(const GraphSpace& dof) const;
 
-    MixedMatrix RedistributeMatrix(const MixedMatrix& seq);
+    MixedMatrix RedistributeMatrix(const MixedMatrix& seq) const;
 };
 
 } // namespace parelag

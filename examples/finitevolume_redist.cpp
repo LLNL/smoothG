@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
         auto& hierarchy = upscale.GetHierarchy();
         auto& mgL = hierarchy.GetMatrix(level);
         int num_procs_redist = num_procs / 2;
-        Redistributor redistributor(mgL.GetGraph(), num_procs_redist);
+        Redistributor redistributor(mgL.GetGraphSpace(), num_procs_redist);
 
         RedistSolve(hierarchy, redistributor, upscale_param.lin_solve_param,
                     level, rhs_fine, redist_sol[level]);
