@@ -41,7 +41,7 @@
 
 using namespace smoothg;
 
-void RedistSolve(const Hierarchy& hierarchy, Redistributor& redistributor,
+void RedistSolve(const Hierarchy& hierarchy, const Redistributor& redistributor,
                  const LinearSolverParameters& lin_solve_param, int level,
                  const mfem::BlockVector& x, mfem::BlockVector& y)
 {
@@ -63,8 +63,8 @@ void RedistSolve(const Hierarchy& hierarchy, Redistributor& redistributor,
     }
     sol.emplace_back(hierarchy.BlockOffsets(level));
 
-    auto& redTVD_TVD = redistributor.TrueDofRedistribution(0);
-    auto& redTED_TED = redistributor.TrueDofRedistribution(1);
+    auto& redTVD_TVD = redistributor.TrueDofRedistribution(VDOF);
+    auto& redTED_TED = redistributor.TrueDofRedistribution(EDOF);
 
     mfem::Array<int> red_offsets(3);
     red_offsets[0] = 0;

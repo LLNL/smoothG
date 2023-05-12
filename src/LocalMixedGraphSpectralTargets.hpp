@@ -118,8 +118,6 @@ public:
     std::vector<mfem::DenseMatrix> ComputeEdgeTargets(
         const std::vector<mfem::DenseMatrix>& local_vertex_targets);
 private:
-    enum DofType { VDOF, EDOF }; // vertex-based and edge-based dofs
-
     /// Build extended aggregates to vertex-based and edge-based dofs relation
     void BuildExtendedAggregates(const GraphSpace& space);
 

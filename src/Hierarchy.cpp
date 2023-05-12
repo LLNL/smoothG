@@ -70,17 +70,17 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
             MixedMatrix redist_mgL = redistributor.RedistributeMatrix(mgL);
 
             Coarsen(redist_mgL, param, nullptr);
-            auto& redTD_tD0 = redistributor.TrueDofRedistribution(0);
-            auto& redTD_tD1 = redistributor.TrueDofRedistribution(0);
-            unique_ptr<mfem::HypreParMatrix> tD_redTD0(redTD_tD0.Transpose());
-            unique_ptr<mfem::HypreParMatrix> tD_redTD1(redTD_tD1.Transpose());
+            auto& redTVD_tVD = redistributor.TrueDofRedistribution(VDOF);
+            auto& redTED_tED = redistributor.TrueDofRedistribution(EDOF);
+            unique_ptr<mfem::HypreParMatrix> tVD_redTVD(redTVD_tVD.Transpose());
+            unique_ptr<mfem::HypreParMatrix> tED_redTED(redTED_tED.Transpose());
 
             auto& fine = GetMatrix(level).GetGraphSpace();
             auto& coarse = GetMatrix(level + 1).GetGraphSpace();
             true_Psigma_[level] = ParMult(Psigma_[level], coarse.EDofToTrueEDof(), coarse.EDofStarts());
             true_Psigma_[level].reset(ParMult(&fine.TrueEDofToEDof(), true_Psigma_[level].get()));
-            true_Psigma_[level].reset(ParMult(tD_redTD1.get(), true_Psigma_[level].get()));
-            true_Pu_[level] = ParMult(*tD_redTD0, Pu_[level], coarse.VDofStarts());
+            true_Psigma_[level].reset(ParMult(tED_redTED.get(), true_Psigma_[level].get()));
+            true_Pu_[level] = ParMult(*tVD_redTVD, Pu_[level], coarse.VDofStarts());
         }
         else
         {

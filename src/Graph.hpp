@@ -25,6 +25,7 @@
 
 namespace smoothg
 {
+enum EntityType { EDGE, VERTEX };
 
 /**
     @brief Distributed graph containing vertex to edge relation and edge weight

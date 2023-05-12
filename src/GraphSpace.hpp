@@ -25,6 +25,8 @@
 
 namespace smoothg
 {
+/// edge-based and vertex-based dofs
+enum DofType { EDOF, VDOF };
 
 /**
     @brief Contains information about degrees of freedom to vertex/edge

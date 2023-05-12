@@ -43,16 +43,15 @@ class Redistributor
 {
     using ParMatrix = matred::ParMatrix;
 
-    // Enumeration convention follows the ones in AgglomeratedTopology/DofHandler
-    std::vector<unique_ptr<mfem::HypreParMatrix> > redTrueEntity_trueEntity;
-    std::vector<unique_ptr<mfem::HypreParMatrix> > redEntity_trueEntity;
-    std::vector<unique_ptr<mfem::HypreParMatrix> > redTrueDof_trueDof;
-    std::vector<unique_ptr<mfem::HypreParMatrix> > redDof_trueDof;
-
-    // Graph redist_graph_;
+    unique_ptr<mfem::HypreParMatrix> redVertex_vertex_;
+    unique_ptr<mfem::HypreParMatrix> redTrueEdge_trueEdge_;
+    unique_ptr<mfem::HypreParMatrix> redEdge_trueEdge_;
+    unique_ptr<mfem::HypreParMatrix> redVDOF_VDOF_;
+    unique_ptr<mfem::HypreParMatrix> redTrueEDOF_trueEDOF_;
+    unique_ptr<mfem::HypreParMatrix> redEDOF_trueEDOF_;
 
     unique_ptr<mfem::HypreParMatrix> BuildRedEntToTrueEnt(
-        const mfem::HypreParMatrix& elem_trueEntity) const;
+        const mfem::HypreParMatrix& vert_trueEntity) const;
 
     unique_ptr<mfem::HypreParMatrix> BuildRedEntToRedTrueEnt(
         const mfem::HypreParMatrix& redEntity_trueEntity) const;
@@ -62,40 +61,39 @@ class Redistributor
         const mfem::HypreParMatrix& redEntity_trueEntity) const;
 
     unique_ptr<mfem::HypreParMatrix>
-    BuildRepeatedEDofToTrueEDof(const GraphSpace& dof) const;
+    BuildRepeatedEDofToTrueEDof(const GraphSpace& space) const;
 
     unique_ptr<mfem::HypreParMatrix>
-    BuildRepeatedEDofRedistribution(const GraphSpace& dof,
-                                    const GraphSpace& redist_dof) const;
+    BuildRepeatedEDofRedistribution(const GraphSpace& space,
+                                    const GraphSpace& redist_space) const;
 
-    void Init(const GraphSpace& space, const std::vector<int>& elem_redist_procs);
+    void Init(const GraphSpace& space, const std::vector<int>& vert_redist_procs);
 public:
 
     /// Constructor for Redistributor
     /// A redistributed topology will be constructed and stored in the class
     /// @param graph graph in the original data distribution
-    /// @param elem_redist_procs an array of size number of local elements.
-    /// elem_redist_procs[i] indicates which processor the i-th local element
+    /// @param vert_redist_procs an array of size number of local vertices.
+    /// vert_redist_procs[i] indicates which processor the i-th local vertex
     /// will be redistributed to. Other entities are redistributed accordingly.
-    Redistributor(const GraphSpace& space, const std::vector<int>& elem_redist_procs);
+    Redistributor(const GraphSpace& space, const std::vector<int>& vert_redist_procs);
 
     /// @param num_redist_procs number of processors to be redistributed to
     Redistributor(const GraphSpace& space, int& num_redist_procs);
 
-    const mfem::HypreParMatrix& TrueEntityRedistribution(int codim) const
-    {
-        return *(redTrueEntity_trueEntity[codim]);
-    }
+    ///  Get redistribution matrix of true EDGE or VERTEX
+    const mfem::HypreParMatrix& TrueEntityRedistribution(EntityType entity) const;
 
-    const mfem::HypreParMatrix& TrueDofRedistribution(int jform) const
-    {
-        return *(redTrueDof_trueDof[jform]);
-    }
+    ///  Get redistribution matrix of true EDOF or VDOF
+    const mfem::HypreParMatrix& TrueDofRedistribution(DofType dof) const;
 
+    /// Redistribute a graph
     Graph RedistributeGraph(const Graph& graph) const;
 
+    /// Redistribute a graph space
     GraphSpace RedistributeSpace(const GraphSpace& space) const;
 
+    /// Redistribute a mixed matrix
     MixedMatrix RedistributeMatrix(const MixedMatrix& system) const;
 };
 
