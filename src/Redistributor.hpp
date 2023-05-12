@@ -94,9 +94,9 @@ public:
 
     Graph RedistributeGraph(const Graph& graph) const;
 
-    GraphSpace RedistributeSpace(const GraphSpace& dof) const;
+    GraphSpace RedistributeSpace(const GraphSpace& space) const;
 
-    MixedMatrix RedistributeMatrix(const MixedMatrix& seq) const;
+    MixedMatrix RedistributeMatrix(const MixedMatrix& system) const;
 };
 
 } // namespace parelag
