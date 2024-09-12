@@ -1,3 +1,4 @@
+#!/bin/sh
 # BHEADER ####################################################################
 #
 # Copyright (c) 2018, Lawrence Livermore National Security, LLC.
@@ -18,8 +19,8 @@
 #   - SuiteSparse_INCLUDE_DIRS
 #   - SuiteSparse_LIBRARIES
 #
-# This is the one FindXXX.cmake module that ParELAG has that is
-# component-aware. That is, the following import targets are created,
+# This is the one FindXXX.cmake module that smoothG has that is
+# component-aware. That is, the following IMPORTED targets are created,
 # each aware of its own dependencies:
 #
 # SuiteSparse::amd
@@ -36,39 +37,13 @@
 # SuiteSparse::suitesparseconfig
 # SuiteSparse::umfpack
 #
-# TODO: Actually use a "COMPONENTS" framework so that this module
-# becomes useful outside of ParELAG. See FindBoost or FindQt* for details
+# There is a master IMPORTED target, SuiteSparse::suitesparse, that
+# depends on all found dependencies.
 
-# My SuiteSparse looks like:
-#
-# libamd.a
-# libbtf.a
-# libcamd.a
-# libccolamd.a
-# libcholmod.a
-# libcolamd.a
-# libcxsparse.a
-# libklu.a
-# libldl.a
-# librbio.a
-# libspqr.a
-# libsuitesparseconfig.a
-# libumfpack.a
-#
-# RBio.h
-# SuiteSparseQR.hpp
-# SuiteSparse_config.h
-# amd.h
-# btf.h
-# camd.h
-# ccolamd.h
-# cholmod.h
-# colamd.h
-# cs.h
-# klu.h
-# ldl.h
-# spqr.hpp
-# umfpack.h
+# TODO: Actually use a "COMPONENTS" framework so that this module
+# becomes useful outside of smoothG. See FindBoost or FindQt* for details
+
+include(CMakeUtilities)
 
 # The components that we need
 set(${PROJECT_NAME}_SUITESPARSE_COMPONENTS
@@ -87,6 +62,10 @@ set(${PROJECT_NAME}_SUITESPARSE_ALL_COMPONENTS
 set(config_HEADER_NAME "SuiteSparse_config.h")
 set(config_LIBRARY_NAME "suitesparseconfig")
 
+# Create the master target
+if (NOT TARGET SuiteSparse::suitesparse)
+  add_library(SuiteSparse::suitesparse INTERFACE IMPORTED)
+endif ()
 
 # Find and add the components
 foreach (component ${${PROJECT_NAME}_SUITESPARSE_ALL_COMPONENTS})
@@ -130,8 +109,7 @@ foreach (component ${${PROJECT_NAME}_SUITESPARSE_ALL_COMPONENTS})
     # Setup the imported target
     if (NOT TARGET SuiteSparse::${component})
       # Check if we have shared or static libraries
-      include(CMakeUtilities)
-      parelag_determine_library_type(${${component}_LIBRARY} ${component}_LIB_TYPE)
+      smoothg_determine_library_type(${${component}_LIBRARY} ${component}_LIB_TYPE)
 
       add_library(SuiteSparse::${component} ${${component}_LIB_TYPE} IMPORTED)
     endif (NOT TARGET SuiteSparse::${component})
@@ -148,6 +126,10 @@ foreach (component ${${PROJECT_NAME}_SUITESPARSE_ALL_COMPONENTS})
     set_property(TARGET SuiteSparse::${component} APPEND
       PROPERTY INTERFACE_LINK_LIBRARIES
       ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+
+    # Add the library to the master target
+    set_property(TARGET SuiteSparse::suitesparse APPEND
+      PROPERTY INTERFACE_LINK_LIBRARIES SuiteSparse::${component})
 
     # Set the libraries
     mark_as_advanced(FORCE ${component}_INCLUDE_DIR)
@@ -191,10 +173,10 @@ endforeach (component ${${PROJECT_NAME}_SUITESPARSE_COMPONENTS})
 #
 # Set the output LIBRARIES variable and cache INCLUDE_DIRS
 #
-set(SuiteSparse_LIBRARIES SuiteSparse::umfpack SuiteSparse::klu)
+set(SuiteSparse_LIBRARIES SuiteSparse::suitesparse)
 
 # Set the include directories
-set(SuiteSparse_INCLUDE_DIRS ${SuiteSparse_INCLUDE_DIRS}
+set(SuiteSparse_INCLUDE_DIRS "${SuiteSparse_INCLUDE_DIRS}"
   CACHE PATH
   "Directories in which to find headers for SuiteSparse.")
 mark_as_advanced(FORCE SuiteSparse_INCLUDE_DIRS)

@@ -77,7 +77,7 @@ class UpscaleBlockSolve : public mfem::Operator
 {
 public:
     UpscaleBlockSolve(const Hierarchy& h, int level = 1)
-        : mfem::Operator(h_.BlockOffsets(level)[2]), h_(h), level_(level) { }
+        : mfem::Operator(h.BlockOffsets(level)[2]), h_(h), level_(level) { }
 
     void Mult(const mfem::Vector& x, mfem::Vector& y) const
     {

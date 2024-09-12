@@ -15,7 +15,7 @@
 
 #include "mfem.hpp"
 
-#include "smoothG_config.h"
+#include "smoothg_config.h"
 #include "../src/LocalEigenSolver.hpp"
 #include "../src/utilities.hpp"
 #include "../src/MatrixUtilities.hpp"

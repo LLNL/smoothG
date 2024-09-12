@@ -13,12 +13,12 @@
 #
 #################################################################### EHEADER #
 
-# Contents of this file stolen from Parelag's ParELAGCMakeUtilities.cmake
+# Contents of this file is stolen from Parelag's ParELAGCMakeUtilities.cmake
 
 # Function that uses "dumb" logic to try to figure out if a library
 # file is a shared or static library. This won't work on Windows; it
 # will just return "unknown" for everything.
-function(parelag_determine_library_type lib_name output_var)
+function(smoothg_determine_library_type lib_name output_var)
 
   # Test if ends in ".a"
   string(REGEX MATCH "\\.a$" _static_match ${lib_name})
@@ -42,4 +42,4 @@ function(parelag_determine_library_type lib_name output_var)
   endif (_mac_shared_match)
 
   set(${output_var} "UNKNOWN" PARENT_SCOPE)
-endfunction(parelag_determine_library_type lib_name output)
+endfunction(smoothg_determine_library_type lib_name output)

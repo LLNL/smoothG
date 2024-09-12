@@ -18,7 +18,7 @@
 # generate lib file
 #####
 
-add_library(smoothg LocalMixedGraphSpectralTargets.cpp GraphCoarsenBuilder.cpp
+add_library(${PROJECT_NAME} LocalMixedGraphSpectralTargets.cpp GraphCoarsenBuilder.cpp
   GraphCoarsen.cpp utilities.cpp BlockSolver.cpp HybridSolver.cpp
   sharedentitycommunication.cpp GraphTopology.cpp MetisGraphPartitioner.cpp 
   MatrixUtilities.cpp MixedMatrix.cpp LocalEigenSolver.cpp GraphGenerator.cpp 
@@ -28,8 +28,13 @@ add_library(smoothg LocalMixedGraphSpectralTargets.cpp GraphCoarsenBuilder.cpp
 #####
 # library for install target
 #####
-install(TARGETS smoothg
+install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Targets
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   INCLUDES DESTINATION include
+  )
+
+install(EXPORT ${PROJECT_NAME}Targets
+  NAMESPACE smoothg::
+  DESTINATION lib/cmake/smoothg
   )

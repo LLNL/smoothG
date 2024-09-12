@@ -105,7 +105,7 @@ public:
 
 private:
     int options_[METIS_NOPTIONS];
-    int flags_;
+    // int flags_;
 
     PartType part_type_;
     real_t unbalance_tol_;

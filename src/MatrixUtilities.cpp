@@ -544,12 +544,12 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
            temporary memory usage. */
 
         /* Add diagonals, off-diagonals, copy cmap. */
-        C_diag = hypre_CSRMatrixAdd(A_diag, B_diag);
+        C_diag = hypre_CSRMatrixAdd(1.0, A_diag, 1.0, B_diag);
         if (!C_diag)
         {
             return NULL; /* error: A_diag and B_diag have different dimensions */
         }
-        C_offd = hypre_CSRMatrixAdd(A_offd, B_offd);
+        C_offd = hypre_CSRMatrixAdd(1.0, A_offd, 1.0, B_offd);
         if (!C_offd)
         {
             hypre_CSRMatrixDestroy(C_diag);
@@ -597,7 +597,7 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
         csr_B = hypre_MergeDiagAndOffd(B);
 
         /* add A and B */
-        csr_C_temp = hypre_CSRMatrixAdd(csr_A, csr_B);
+        csr_C_temp = hypre_CSRMatrixAdd(1.0, csr_A, 1.0, csr_B);
 
         /* delete CSR versions of A and B */
         ierr += hypre_CSRMatrixDestroy(csr_A);
@@ -634,8 +634,8 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
     /* C owns diag, offd, and cmap. */
     hypre_ParCSRMatrixSetDataOwner(C, 1);
     /* C does not own row and column starts. */
-    hypre_ParCSRMatrixSetRowStartsOwner(C, 0);
-    hypre_ParCSRMatrixSetColStartsOwner(C, 0);
+    // hypre_ParCSRMatrixSetRowStartsOwner(C, 0);
+    // hypre_ParCSRMatrixSetColStartsOwner(C, 0);
 
     return new mfem::HypreParMatrix(C);
 }
@@ -1324,7 +1324,7 @@ HYPRE_Int DropSmallEntries(hypre_ParCSRMatrix* A, double tol)
     HYPRE_BigInt* col_map_offd_A  = hypre_ParCSRMatrixColMapOffd(A);
     HYPRE_Int* marker_offd = NULL;
 
-    HYPRE_BigInt first_row  = hypre_ParCSRMatrixFirstRowIndex(A);
+    // HYPRE_BigInt first_row  = hypre_ParCSRMatrixFirstRowIndex(A);
     HYPRE_Int nrow_local = hypre_CSRMatrixNumRows(A_diag);
     HYPRE_Int my_id, num_procs;
     /* MPI size and rank*/

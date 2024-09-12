@@ -119,11 +119,11 @@ public:
     BlockSolverFalse(const MixedMatrix& mgL,
                      const mfem::Array<int>* ess_attr = nullptr);
 
-    virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const;
+    virtual void Mult(const mfem::BlockVector& rhs, mfem::BlockVector& sol) const override;
 
-    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const;
+    virtual void Mult(const mfem::Vector& rhs, mfem::Vector& sol) const override;
 
-    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse);
+    virtual void UpdateElemScaling(const mfem::Vector& elem_scaling_inverse) override;
 
     virtual void UpdateJacobian(const mfem::Vector& elem_scaling_inverse,
                                 const std::vector<mfem::DenseMatrix>& N_el) override;

@@ -1,0 +1,109 @@
+# Copyright (c) 2018, Lawrence Livermore National Security, LLC. Produced at the
+# Lawrence Livermore National Laboratory. LLNL-CODE-745557. All Rights reserved.
+# See file COPYRIGHT for details.
+#
+# This file is part of the ParElag library. For more information and source code
+# availability see http://github.com/LLNL/parelag.
+#
+# ParElag is free software; you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License (as published by the Free
+# Software Foundation) version 2.1 dated February 1999.
+
+include(CMakeFindDependencyMacro)
+
+# Get the version
+include(${CMAKE_CURRENT_LIST_DIR}/smoothgConfigVersion.cmake)
+set(SMOOTHG_VERSION ${PACKAGE_VERSION})
+
+@PACKAGE_INIT@
+
+# A few of the parameters
+set(SMOOTHG_USE_ARPACK @smoothg_USE_ARPACK@)
+set(SMOOTHG_USE_SAAMGE @smoothg_USE_SAAMGE@)
+
+# Compilers and flags and the like
+set(SMOOTHG_C_COMPILER @CMAKE_C_COMPILER@)
+set(SMOOTHG_CXX_COMPILER @CMAKE_CXX_COMPILER@)
+set(SMOOTHG_MPI_C_COMPILER @MPI_C_COMPILER@)
+set(SMOOTHG_MPI_CXX_COMPILER @MPI_CXX_COMPILER@)
+
+#
+# DEPENDENCIES:
+#
+set_and_check(SMOOTHG_MODULE_PATH "@PACKAGE_MODULE_INSTALL_DIR@")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${SMOOTHG_MODULE_PATH}")
+
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+
+if (NOT METIS_DIR)
+  set(METIS_DIR "@METIS_DIR@")
+endif()
+find_package(METIS REQUIRED)
+
+if (NOT SuiteSparse_DIR)
+  set(SuiteSparse_DIR "@SuiteSparse_DIR@")
+endif()
+find_package(SuiteSparse REQUIRED)
+
+if (NOT HYPRE_DIR)
+  set(HYPRE_DIR "@HYPRE_DIR@")
+endif()
+find_package(HYPRE REQUIRED)
+
+if (NOT MFEM_DIR)
+  set(MFEM_DIR "@MFEM_DIR@")
+endif()
+find_package(MFEM REQUIRED)
+
+# Set the MPI_CXX_COMPILER to help FindMPI out
+set(MPI_CXX_COMPILER "@MPI_CXX_COMPILER@")
+find_dependency(MPI)
+
+if (MPI_CXX_FOUND)
+  if (NOT TARGET MPI::MPI_CXX)
+    add_library(MPI::MPI_CXX INTERFACE IMPORTED)
+
+    if (MPI_CXX_COMPILE_FLAGS)
+      separate_arguments(_MPI_CXX_COMPILE_OPTIONS UNIX_COMMAND
+        "${MPI_CXX_COMPILE_FLAGS}")
+      set_property(TARGET MPI::MPI_CXX PROPERTY
+        INTERFACE_COMPILE_OPTIONS "${_MPI_CXX_COMPILE_OPTIONS}")
+    endif()
+
+    if(MPI_CXX_LINK_FLAGS)
+      separate_arguments(_MPI_CXX_LINK_LINE UNIX_COMMAND
+        "${MPI_CXX_LINK_FLAGS}")
+    endif()
+    list(APPEND _MPI_CXX_LINK_LINE "${MPI_CXX_LIBRARIES}")
+
+    set_property(TARGET MPI::MPI_CXX PROPERTY
+      INTERFACE_LINK_LIBRARIES "${_MPI_CXX_LINK_LINE}")
+
+    set_property(TARGET MPI::MPI_CXX PROPERTY
+      INTERFACE_INCLUDE_DIRECTORIES "${MPI_CXX_INCLUDE_PATH}")
+
+  endif (NOT TARGET MPI::MPI_CXX)
+else (MPI_CXX_FOUND)
+
+  message(FATAL_ERROR "MPI not found for CXX language.")
+  
+endif (MPI_CXX_FOUND)
+
+#
+# OPTIONAL DEPENDENCIES
+#
+
+set(SMOOTHG_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIRS@")
+foreach (dir ${SMOOTHG_INCLUDE_DIRS})
+  set_and_check(SMOOTHG_INCLUDE_DIRS "${dir}")
+endforeach (dir ${SMOOTHG_INCLUDE_DIRS})
+
+set_and_check(SMOOTHG_LIBRARY_DIR "@PACKAGE_LIB_INSTALL_DIR@")
+check_required_components(smoothg)
+
+if (NOT TARGET smoothg::smoothg)
+  include(${CMAKE_CURRENT_LIST_DIR}/smoothgTargets.cmake)
+endif (NOT TARGET smoothg::smoothg)
+
+set(SMOOTHG_LIBRARIES smoothg::smoothg)

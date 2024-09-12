@@ -17,34 +17,34 @@
 
 # add executables
 add_executable(lineargraph lineargraph.cpp)
-target_link_libraries(lineargraph smoothg ${TPL_LIBRARIES})
+target_link_libraries(lineargraph ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(lineargraphthree lineargraphthree.cpp)
-target_link_libraries(lineargraphthree smoothg ${TPL_LIBRARIES})
+target_link_libraries(lineargraphthree ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(tinygraphsolver tinygraphsolver.cpp)
-target_link_libraries(tinygraphsolver smoothg ${TPL_LIBRARIES})
+target_link_libraries(tinygraphsolver ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(partinygraph partinygraph.cpp)
-target_link_libraries(partinygraph smoothg ${TPL_LIBRARIES})
+target_link_libraries(partinygraph ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(eigen eigen.cpp)
-target_link_libraries(eigen smoothg ${TPL_LIBRARIES})
+target_link_libraries(eigen ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(test_MetisGraphPartitioner test_MetisGraphPartitioner.cpp)
-target_link_libraries(test_MetisGraphPartitioner smoothg ${TPL_LIBRARIES})
+target_link_libraries(test_MetisGraphPartitioner ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(test_IsolatePartitioner test_IsolatePartitioner.cpp)
-target_link_libraries(test_IsolatePartitioner smoothg ${TPL_LIBRARIES})
+target_link_libraries(test_IsolatePartitioner ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(wattsstrogatz wattsstrogatz.cpp)
-target_link_libraries(wattsstrogatz smoothg ${TPL_LIBRARIES})
+target_link_libraries(wattsstrogatz ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(rescaling rescaling.cpp)
-target_link_libraries(rescaling smoothg ${TPL_LIBRARIES})
+target_link_libraries(rescaling ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(coarse_assembling coarse_assembling.cpp)
-target_link_libraries(coarse_assembling smoothg ${TPL_LIBRARIES})
+target_link_libraries(coarse_assembling ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 # add tests
 add_test(lineargraph lineargraph)

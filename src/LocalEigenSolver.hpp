@@ -25,7 +25,7 @@
 #ifndef __LocalEigenSolver_HPP
 #define __LocalEigenSolver_HPP
 
-#include "smoothG_config.h"
+#include "smoothg_config.h"
 
 #include "mfem.hpp"
 

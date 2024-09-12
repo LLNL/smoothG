@@ -16,7 +16,7 @@
 
 cmake_minimum_required(VERSION 2.6)
 
-set(PROJECT_NAME smoothG)
+set(PROJECT_NAME smoothg)
 project(${PROJECT_NAME})
 enable_testing()
 
@@ -30,6 +30,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DSMOOTHG_DEBUG")
 
 set(${PROJECT_NAME}_GRAPHDATA ${PROJECT_SOURCE_DIR}/graphdata)
+
+#enable_language(Fortran)
+
+#set(CMAKE_EXE_LINKER_FLAGS  "-L/Users/lee1029/local/lib/gcc/current -lgfortran ${CMAKE_EXE_LINKER_FLAGS}")
 
 #####
 # set up external dependencies
@@ -65,24 +69,34 @@ else()
 endif()
 
 # MFEM
-find_path(MFEM_INCLUDE_PATH mfem.hpp
-          HINTS ${MFEM_DIR}/include)
-set(MFEM_LIB_NAME libmfem.a)
-find_path(MFEM_LIBRARY_PATH ${MFEM_LIB_NAME}
-  ${MFEM_DIR}/lib)
-include_directories(${MFEM_INCLUDE_PATH})
-add_library(MFEM_LIB STATIC IMPORTED)
-set_property(TARGET MFEM_LIB PROPERTY IMPORTED_LOCATION ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
-list(APPEND TPL_LIBRARIES ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
+# find_path(MFEM_INCLUDE_PATH mfem.hpp
+#           HINTS ${MFEM_DIR}/include)
+# set(MFEM_LIB_NAME libmfem.a)
+# find_path(MFEM_LIBRARY_PATH ${MFEM_LIB_NAME}
+#   ${MFEM_DIR}/lib)
+# include_directories(${MFEM_INCLUDE_PATH})
+# add_library(MFEM_LIB STATIC IMPORTED)
+# set_property(TARGET MFEM_LIB PROPERTY IMPORTED_LOCATION ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
+# list(APPEND TPL_LIBRARIES ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
+find_package(MFEM REQUIRED)
+include_directories(${MFEM_INCLUDE_DIRS})
+list(APPEND TPL_LIBRARIES ${MFEM_LIBRARIES})
+
 
 # Hypre
-find_path(HYPRE_INCLUDE_PATH HYPRE.h
-          HINTS ${HYPRE_DIR}/include)
-include_directories(${HYPRE_INCLUDE_PATH})
-set(HYPRE_LIB_NAME libHYPRE.a)
-find_library(HYPRE_LIB HYPRE
-  ${HYPRE_DIR}/lib)
-list(APPEND TPL_LIBRARIES ${HYPRE_LIB})
+# find_path(HYPRE_INCLUDE_PATH HYPRE.h
+#           HINTS ${HYPRE_DIR}/include)
+# include_directories(${HYPRE_INCLUDE_PATH})
+# set(HYPRE_LIB_NAME libHYPRE.a)
+# find_library(HYPRE_LIB HYPRE
+#   ${HYPRE_DIR}/lib)
+# list(APPEND TPL_LIBRARIES ${HYPRE_LIB})
+# find_package(HYPRE REQUIRED)
+find_package(HYPRE REQUIRED)
+include_directories(${HYPRE_INCLUDE_DIRS})
+list(APPEND TPL_LIBRARIES ${HYPRE_LIBRARIES})
+
+
 
 # MPI
 find_package(MPI REQUIRED)
@@ -93,15 +107,19 @@ if(MPI_CXX_COMPILE_FLAGS)
 endif()
 
 # Metis
-find_path(METIS_INCLUDE_PATH metis.h
-  HINTS ${METIS_DIR}/include)
-set(METIS_LIB_NAME libmetis.a)
-find_path(METIS_LIBRARY_PATH ${METIS_LIB_NAME}
-  ${METIS_DIR}/lib)
-include_directories(${METIS_INCLUDE_PATH})
-add_library(METIS_LIB STATIC IMPORTED)
-set_property(TARGET METIS_LIB PROPERTY IMPORTED_LOCATION ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
-list(APPEND TPL_LIBRARIES ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
+# find_path(METIS_INCLUDE_PATH metis.h
+#   HINTS ${METIS_DIR}/include)
+# set(METIS_LIB_NAME libmetis.dylib)
+# find_path(METIS_LIBRARY_PATH ${METIS_LIB_NAME}
+#   ${METIS_DIR}/lib)
+# include_directories(${METIS_INCLUDE_PATH})
+# add_library(METIS_LIB STATIC IMPORTED)
+# set_property(TARGET METIS_LIB PROPERTY IMPORTED_LOCATION ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
+# list(APPEND TPL_LIBRARIES ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
+
+find_package(METIS REQUIRED)
+include_directories(${METIS_INCLUDE_DIRS})
+list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
 
 # SuiteSparse
 find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)
@@ -124,7 +142,7 @@ if(USE_ARPACK)
   find_path(ARPACK_LIBRARY_PATH ${ARPACK_LIB_NAME}
              HINTS ${ARPACK_DIR}
                    ${ARPACK_DIR}/lib64
-                   $ENV{ARPACK_DIR}/lib)
+                   ${ARPACK_DIR}/lib)
   include_directories(${ARPACK_INCLUDE_PATH})
   add_library(ARPACK_LIB STATIC IMPORTED)
   set_property(TARGET ARPACK_LIB PROPERTY IMPORTED_LOCATION
@@ -205,6 +223,24 @@ add_subdirectory(src)
 #####
 add_subdirectory(examples)
 add_subdirectory(testcode)
+
+#
+# INSTALL TARGET
+#
+
+# Library install command in src/CMakeLists.txt
+# All the export stuff is either in src/CMakeLists.txt or cmake/CMakeLists.txt
+
+# Build directory export
+export(EXPORT ${PROJECT_NAME}Targets
+  NAMESPACE smoothg::
+  FILE ${PROJECT_NAME}Targets.cmake)
+
+# Add the build tree to package registry
+export(PACKAGE ${PROJECT_NAME})
+
+# Handle the rest of the export stuff
+add_subdirectory(cmake)
 
 #####
 # include files for install target

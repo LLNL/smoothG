@@ -21,7 +21,7 @@
 #ifndef __GRAPHCOARSENBUILDER_HPP
 #define __GRAPHCOARSENBUILDER_HPP
 
-#include "smoothG_config.h"
+#include "smoothg_config.h"
 #include "utilities.hpp"
 #include "GraphSpace.hpp"
 

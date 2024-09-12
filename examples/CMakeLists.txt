@@ -17,34 +17,34 @@
 
 # add executables
 add_executable(finitevolume finitevolume.cpp)
-target_link_libraries(finitevolume smoothg ${TPL_LIBRARIES})
+target_link_libraries(finitevolume ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(sampler sampler.cpp)
-target_link_libraries(sampler smoothg ${TPL_LIBRARIES})
+target_link_libraries(sampler ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(generalgraph generalgraph.cpp)
-target_link_libraries(generalgraph smoothg ${TPL_LIBRARIES})
+target_link_libraries(generalgraph ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(timestep timestep.cpp)
-target_link_libraries(timestep smoothg ${TPL_LIBRARIES})
+target_link_libraries(timestep ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(graphupscale graphupscale.cpp)
-target_link_libraries(graphupscale smoothg ${TPL_LIBRARIES})
+target_link_libraries(graphupscale ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(poweriter poweriter.cpp)
-target_link_libraries(poweriter smoothg ${TPL_LIBRARIES})
+target_link_libraries(poweriter ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(mltopo mltopo.cpp)
-target_link_libraries(mltopo smoothg ${TPL_LIBRARIES})
+target_link_libraries(mltopo ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(samplesolve samplesolve.cpp)
-target_link_libraries(samplesolve smoothg ${TPL_LIBRARIES})
+target_link_libraries(samplesolve ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(qoi qoi.cpp)
-target_link_libraries(qoi smoothg ${TPL_LIBRARIES})
+target_link_libraries(qoi ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 add_executable(nldarcy nldarcy.cpp)
-target_link_libraries(nldarcy smoothg ${TPL_LIBRARIES})
+target_link_libraries(nldarcy ${PROJECT_NAME} ${TPL_LIBRARIES})
 
 # add tests
 if (NOT DEFINED SMOOTHG_TEST_PROCS)
