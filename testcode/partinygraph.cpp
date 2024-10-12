@@ -119,7 +119,7 @@ mfem::HypreParMatrix* build_tiny_graph()
     return out;
 }
 
-mfem::SparseMatrix* build_tiny_w_block()
+mfem::SparseMatrix* build_tiny_w_block(bool real_w_block)
 {
     int num_procs, myid;
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -131,6 +131,21 @@ mfem::SparseMatrix* build_tiny_w_block()
                 "Only implemented for assumed partition!");
 
     int nrows = 3;
+
+    if (!real_w_block)
+    {
+        if (myid == 0)
+        {
+            auto out = new mfem::SparseMatrix(nrows, nrows);
+            out->Add(0, 0, -1.0);
+            return out;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
     int local_nnz = 3;
 
     HYPRE_Int* I = new HYPRE_Int[nrows + 1];
@@ -274,7 +289,7 @@ int main(int argc, char* argv[])
         std::cout << "Building parallel graph..." << std::endl;
     mfem::HypreParMatrix* D = build_tiny_graph();
     mfem::HypreParMatrix* M = build_tiny_graph_weights(weighted);
-    mfem::SparseMatrix* W = w_block ? build_tiny_w_block() : nullptr;
+    mfem::SparseMatrix* W = build_tiny_w_block(w_block);
 
     // setup mixed problem
     if (myid == 0)
@@ -291,9 +306,17 @@ int main(int argc, char* argv[])
     rhs.GetBlock(0) = 0.0;
     rhs.GetBlock(1) = 1.0;
 
-    // make rhs average zero so the problem is well defined when W block is zero
-    if (!w_block && myid == 0)
-        rhs.GetBlock(1)[0] = -5.0;
+    // eliminate 1 dof so the problem is well defined when W block is zero
+    if (!w_block)
+    {
+        mfem::Array<int> ess_dofs;
+        if (myid == 0)
+        {
+            rhs.GetBlock(1)[0] = 0.0;
+            ess_dofs.Append(0);
+        }
+        D->EliminateRows(ess_dofs);
+    }
 
     // solve
     mfem::BlockVector sol(block_true_offsets);
