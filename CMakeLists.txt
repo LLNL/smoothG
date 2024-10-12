@@ -68,35 +68,28 @@ else()
   set(${PROJECT_NAME}_USE_SAAMGE 0)
 endif()
 
-# MFEM
-# find_path(MFEM_INCLUDE_PATH mfem.hpp
-#           HINTS ${MFEM_DIR}/include)
-# set(MFEM_LIB_NAME libmfem.a)
-# find_path(MFEM_LIBRARY_PATH ${MFEM_LIB_NAME}
-#   ${MFEM_DIR}/lib)
-# include_directories(${MFEM_INCLUDE_PATH})
-# add_library(MFEM_LIB STATIC IMPORTED)
-# set_property(TARGET MFEM_LIB PROPERTY IMPORTED_LOCATION ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
-# list(APPEND TPL_LIBRARIES ${MFEM_LIBRARY_PATH}/${MFEM_LIB_NAME})
+# Find MFEM (and find metis and Hypre as it's dependencies)
 find_package(MFEM REQUIRED)
 include_directories(${MFEM_INCLUDE_DIRS})
 list(APPEND TPL_LIBRARIES ${MFEM_LIBRARIES})
-
-
-# Hypre
-# find_path(HYPRE_INCLUDE_PATH HYPRE.h
-#           HINTS ${HYPRE_DIR}/include)
-# include_directories(${HYPRE_INCLUDE_PATH})
-# set(HYPRE_LIB_NAME libHYPRE.a)
-# find_library(HYPRE_LIB HYPRE
-#   ${HYPRE_DIR}/lib)
-# list(APPEND TPL_LIBRARIES ${HYPRE_LIB})
-# find_package(HYPRE REQUIRED)
-find_package(HYPRE REQUIRED)
+include_directories(${METIS_INCLUDE_DIRS})
+list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
 include_directories(${HYPRE_INCLUDE_DIRS})
 list(APPEND TPL_LIBRARIES ${HYPRE_LIBRARIES})
 
-
+# Determine Hypre version
+try_run(HYPRE_VERSION_RUN_RESULT HYPRE_VERSION_COMPILE_RESULT
+        ${CMAKE_CURRENT_BINARY_DIR}/config
+        ${CMAKE_CURRENT_SOURCE_DIR}/config/get_hypre_version.cpp
+        CMAKE_FLAGS -DINCLUDE_DIRECTORIES:STRING=${HYPRE_INCLUDE_DIRS}
+        RUN_OUTPUT_VARIABLE HYPRE_VERSION_OUTPUT)
+if ((HYPRE_VERSION_RUN_RESULT EQUAL 0) AND HYPRE_VERSION_OUTPUT)
+  string(STRIP "${HYPRE_VERSION_OUTPUT}" HYPRE_VERSION)
+  set(${PROJECT_NAME}_HYPRE_VERSION ${HYPRE_VERSION} CACHE STRING "HYPRE version in MFEM." FORCE)
+  message(STATUS "Found HYPRE version ${${PROJECT_NAME}_HYPRE_VERSION} in MFEM dependency")
+else()
+  message(FATAL_ERROR "Unable to determine HYPRE version.")
+endif()
 
 # MPI
 find_package(MPI REQUIRED)
@@ -105,21 +98,6 @@ list(APPEND TPL_LIBRARIES ${MPI_LIBRARIES})
 if(MPI_CXX_COMPILE_FLAGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
 endif()
-
-# Metis
-# find_path(METIS_INCLUDE_PATH metis.h
-#   HINTS ${METIS_DIR}/include)
-# set(METIS_LIB_NAME libmetis.dylib)
-# find_path(METIS_LIBRARY_PATH ${METIS_LIB_NAME}
-#   ${METIS_DIR}/lib)
-# include_directories(${METIS_INCLUDE_PATH})
-# add_library(METIS_LIB STATIC IMPORTED)
-# set_property(TARGET METIS_LIB PROPERTY IMPORTED_LOCATION ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
-# list(APPEND TPL_LIBRARIES ${METIS_LIBRARY_PATH}/${METIS_LIB_NAME})
-
-find_package(METIS REQUIRED)
-include_directories(${METIS_INCLUDE_DIRS})
-list(APPEND TPL_LIBRARIES ${METIS_LIBRARIES})
 
 # SuiteSparse
 find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)

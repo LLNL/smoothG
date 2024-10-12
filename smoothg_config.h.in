@@ -20,4 +20,6 @@
 
 #define SMOOTHG_USE_SAAMGE @smoothg_USE_SAAMGE@
 
+#define SMOOTHG_HYPRE_VERSION @smoothg_HYPRE_VERSION@
+
 #endif

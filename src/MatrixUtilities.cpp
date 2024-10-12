@@ -23,8 +23,16 @@
 #include "MatrixUtilities.hpp"
 #include <assert.h>
 #include "utilities.hpp"
+#include "smoothg_config.h"
 
 using std::unique_ptr;
+
+#if SMOOTHG_HYPRE_VERSION < 22200
+#define smoothg_hypre_CSRMatrixAdd(A, B) hypre_CSRMatrixAdd(A, B)
+#else // SMOOTHG_HYPRE_VERSION >= 22000
+#define smoothg_hypre_CSRMatrixAdd(A, B) \
+    hypre_CSRMatrixAdd(1.0, A, 1.0, B)
+#endif
 
 namespace smoothg
 {
@@ -544,12 +552,12 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
            temporary memory usage. */
 
         /* Add diagonals, off-diagonals, copy cmap. */
-        C_diag = hypre_CSRMatrixAdd(1.0, A_diag, 1.0, B_diag);
+        C_diag = smoothg_hypre_CSRMatrixAdd(A_diag, B_diag);
         if (!C_diag)
         {
             return NULL; /* error: A_diag and B_diag have different dimensions */
         }
-        C_offd = hypre_CSRMatrixAdd(1.0, A_offd, 1.0, B_offd);
+        C_offd = smoothg_hypre_CSRMatrixAdd(A_offd, B_offd);
         if (!C_offd)
         {
             hypre_CSRMatrixDestroy(C_diag);
@@ -597,7 +605,7 @@ mfem::HypreParMatrix* ParAdd(const mfem::HypreParMatrix& A_ref, const mfem::Hypr
         csr_B = hypre_MergeDiagAndOffd(B);
 
         /* add A and B */
-        csr_C_temp = hypre_CSRMatrixAdd(1.0, csr_A, 1.0, csr_B);
+        csr_C_temp = smoothg_hypre_CSRMatrixAdd(csr_A, csr_B);
 
         /* delete CSR versions of A and B */
         ierr += hypre_CSRMatrixDestroy(csr_A);

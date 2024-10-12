@@ -115,7 +115,7 @@ void PDESampler::Initialize(int dimension, double kappa, int seed)
     W_sqrt_.resize(hierarchy_.NumLevels());
 
     const mfem::SparseMatrix& W = hierarchy_.GetMatrix(0).GetW();
-    double * W_data = const_cast<double *>(W.GetData());
+    double* W_data = const_cast<double*>(W.GetData());
     mfem::Vector W_diag(W_data, W.NumRows()); // assume W is diagonal
     mfem::Vector W_sqrt_diag(W.NumRows());
     for (int i = 0; i < W.NumRows(); ++i)
@@ -158,7 +158,7 @@ void PDESampler::SetSample(const mfem::Vector& state)
     // build right-hand side for PDE-sampler based on white noise in state
     // (cell_volume is supposed to represent fine-grid W_h)
     const mfem::SparseMatrix& W = hierarchy_.GetMatrix(0).GetW();
-    double * W_data = const_cast<double *>(W.GetData());
+    double* W_data = const_cast<double*>(W.GetData());
     mfem::Vector kappa_sq_cell_volume(W_data, W.NumRows());
     for (int i = 0; i < num_aggs_[0]; ++i)
     {
