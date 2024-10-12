@@ -98,6 +98,7 @@ list(APPEND TPL_LIBRARIES ${MPI_LIBRARIES})
 if(MPI_CXX_COMPILE_FLAGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
 endif()
+find_program(MPIRUN_COMMAND NAMES mpirun srun)
 
 # SuiteSparse
 find_package(SuiteSparse REQUIRED UMFPACK KLU AMD BTF CHOLMOD COLAMD CAMD CCOLAMD config)
@@ -146,12 +147,15 @@ find_file(SPE10_PERM spe_perm.dat
   HINTS ${SPE10_DIR})
 
 # for valgrind memory testing
+option(MEMORY_CHECK "Should memory leak be tested?" ON)
 find_program(MEMORYCHECK_COMMAND valgrind)
 set(MEMORYCHECK_COMMAND_OPTIONS "")
 list(APPEND MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full")
 list(APPEND MEMORYCHECK_COMMAND_OPTIONS "--error-exitcode=1")
 function(add_valgrind_test name binary)
-  add_test(${name} ${MEMORYCHECK_COMMAND} ${MEMORYCHECK_COMMAND_OPTIONS} ./${binary})
+  if (MEMORY_CHECK)
+    add_test(${name} ${MEMORYCHECK_COMMAND} ${MEMORYCHECK_COMMAND_OPTIONS} ./${binary})
+  endif()
 endfunction(add_valgrind_test)
 
 #####

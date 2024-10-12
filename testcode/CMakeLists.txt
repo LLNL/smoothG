@@ -61,10 +61,10 @@ add_valgrind_test(vtinygraph_w tinygraphsolver -w)
 add_valgrind_test(vtinygraph_m tinygraphsolver -m)
 add_valgrind_test(vtinygraph_wm tinygraphsolver -w -m)
 
-add_test(partinygraph mpirun -np 2 ./partinygraph)
-add_test(partinygraph_w mpirun -np 2 ./partinygraph -w)
-add_test(partinygraph_m mpirun -np 2 ./partinygraph -m)
-add_test(partinygraph_wm mpirun -np 2 ./partinygraph -w -m)
+add_test(partinygraph ${MPIRUN_COMMAND} -n 2 ./partinygraph)
+add_test(partinygraph_w ${MPIRUN_COMMAND} -n 2 ./partinygraph -w)
+add_test(partinygraph_m ${MPIRUN_COMMAND} -n 2 ./partinygraph -m)
+add_test(partinygraph_wm ${MPIRUN_COMMAND} -n 2 ./partinygraph -w -m)
 
 add_test(eigen eigen)
 add_valgrind_test(veigen eigen)
@@ -74,15 +74,15 @@ add_test(test_IsolatePartitioner test_IsolatePartitioner)
 add_valgrind_test(vtest_IsolatePartitioner test_IsolatePartitioner)
 
 add_test(wattsstrogatz wattsstrogatz)
-add_test(parwattsstrogatz mpirun -np 2 ./wattsstrogatz)
-# add_valgrind_test(vwattsstrogatz wattsstrogatz)
+add_test(parwattsstrogatz ${MPIRUN_COMMAND} -n 2 ./wattsstrogatz)
+add_valgrind_test(vwattsstrogatz wattsstrogatz)
 
 add_test(rescaling rescaling)
-add_test(parrescaling mpirun -np 2 ./rescaling)
+add_test(parrescaling ${MPIRUN_COMMAND} -n 2 ./rescaling)
 add_valgrind_test(vrescaling rescaling)
 
 add_test(coarse_assembling coarse_assembling -m 3 -t 1 --perm ${SPE10_PERM})
-add_test(parcoarse_assembling mpirun -np 2 ./coarse_assembling -m 3 -t 1 --perm ${SPE10_PERM})
+add_test(parcoarse_assembling ${MPIRUN_COMMAND} -n 2 ./coarse_assembling -m 3 -t 1 --perm ${SPE10_PERM})
 
 add_test(lineargraphthree lineargraphthree --size 64 --partitions 32 --max-evects 1 --coarse-factor 2)
 

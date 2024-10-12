@@ -30,6 +30,7 @@ import readjson
 import sys
 import platform
 
+mpirun_command = "@MPIRUN_COMMAND@"
 spe10_perm_file = "@SPE10_PERM@"
 graph_data = "@smoothG_GRAPHDATA@"
 memorycheck_command = "@MEMORYCHECK_COMMAND@"
@@ -286,7 +287,7 @@ def make_tests():
           "operator-complexity": 1.000874038778061}]
 
     tests["parsamplegraph1-coeff"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1",
@@ -297,7 +298,7 @@ def make_tests():
           "operator-complexity": 1.016509834901651}]
 
     tests["parsamplegraph1-coeff-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1",
@@ -308,7 +309,7 @@ def make_tests():
           "operator-complexity": 1.008739912600874}]
 
     tests["parsamplegraph1-coeff-hb"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1",
@@ -320,7 +321,7 @@ def make_tests():
           "operator-complexity": 1.000874038778061}]
 
     tests["parsamplegraph1-coeff-hb-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1",
@@ -459,7 +460,7 @@ def make_tests():
          {"relative-vertex-error": 0.14875751525009742}]
 
     tests["par-mlmc"] = \
-        [["mpirun", "-n", "2", "./mlmc",
+        [[mpirun_command, "-n", "2", "./mlmc",
           "--sampler-type", "pde",
           "--kappa", "0.01"],
          {"relative-vertex-error": 0.38805214759478951}]
@@ -470,7 +471,7 @@ def make_tests():
           "--perm", spe10_perm_file]]
 
     tests["pareigenvector1"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "1",
@@ -482,7 +483,7 @@ def make_tests():
           "operator-complexity": 1.0221724964280585}]
 
     tests["pareigenvector4"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -493,7 +494,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parfv-hybridization"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -505,7 +506,7 @@ def make_tests():
           "operator-complexity": 1.1362437864707153}]
 
     tests["parslice19"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "19",
           "--max-evects", "1",
@@ -517,7 +518,7 @@ def make_tests():
           "operator-complexity": 1.0221724964280585}]
 
     tests["pardual-trace"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -529,7 +530,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parscaled-dual-trace"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -542,7 +543,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parenergy-dual-trace"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -555,7 +556,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["parscaled-energy-dual-trace"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--spect-tol", "1.0",
           "--slice", "0",
           "--max-evects", "4",
@@ -569,7 +570,7 @@ def make_tests():
           "operator-complexity": 1.3017591339648173}]
 
     tests["pardirichlet"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--lateral-pressure",
           "--spect-tol", "1.0",
           "--max-levels", "3",
@@ -579,7 +580,7 @@ def make_tests():
           "quantity-error-level-2": 0.0034320940221200902}]
 
     tests["pardirichlet-mac"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--lateral-pressure",
           "--spect-tol", "1.0",
           "--max-levels", "3",
@@ -589,7 +590,7 @@ def make_tests():
           "quantity-error-level-2": 0.0039259944921827836}]
 
     tests["pardirichlet-hb"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--lateral-pressure",
           "--spect-tol", "1.0",
           "--max-levels", "3",
@@ -600,7 +601,7 @@ def make_tests():
           "quantity-error-level-2": 0.0034320940221200902}]
 
     tests["pardirichlet-hb-mac"] = \
-        [["mpirun", "-n", num_procs, "./finitevolume",
+        [[mpirun_command, "-n", num_procs, "./finitevolume",
           "--lateral-pressure",
           "--spect-tol", "1.0",
           "--max-levels", "3",
@@ -611,7 +612,7 @@ def make_tests():
           "quantity-error-level-2": 0.0039259944921827836}]
 
     tests["parsamplegraph1"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1"],
@@ -621,7 +622,7 @@ def make_tests():
           "operator-complexity": 1.016509834901651}]
 
     tests["parsamplegraph1-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1"],
@@ -631,7 +632,7 @@ def make_tests():
           "operator-complexity": 1.008739912600874}]
 
     tests["pargraph-metis"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1",
@@ -642,7 +643,7 @@ def make_tests():
           "operator-complexity": 1.016509834901651}]
 
     tests["pargraph-metis-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "1",
           "--max-traces", "1",
@@ -653,7 +654,7 @@ def make_tests():
           "operator-complexity": 1.008739912600874}]
 
     tests["parsamplegraph4"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
          {"relative-D-edge-error": 0.1438138616203242,
@@ -662,7 +663,7 @@ def make_tests():
           "operator-complexity": (1.230, 1.e-3)}]
 
     tests["parsamplegraph4-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4"],
          {"relative-D-edge-error": 0.094122554052011503,
@@ -671,7 +672,7 @@ def make_tests():
           "operator-complexity": 1.1303686963130368}]
 
     tests["pargraph-hybridization"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--hybridization"],
@@ -681,7 +682,7 @@ def make_tests():
           "operator-complexity": 1.0124793314423153}]
 
     tests["pargraph-hybridization-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--hybridization"],
@@ -691,7 +692,7 @@ def make_tests():
           "operator-complexity": 1.0067715933613413}]
 
     tests["pargraph-usegenerator"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--generate-graph"],
@@ -701,7 +702,7 @@ def make_tests():
           "operator-complexity": (1.189778, 3.e-4)}]
 
     tests["pargraph-usegenerator-mac"] = \
-        [["mpirun", "-n", num_procs, "./generalgraph",
+        [[mpirun_command, "-n", num_procs, "./generalgraph",
           "--spect-tol", "1.0",
           "--max-evects", "4",
           "--generate-graph"],
@@ -711,21 +712,21 @@ def make_tests():
           "operator-complexity": 1.1347886521134789}]
 
     tests["parpoweriter"] = \
-        [["mpirun", "-n", num_procs, "./poweriter"],
+        [[mpirun_command, "-n", num_procs, "./poweriter"],
          {"coarse-error": 1.4795742061962853,
           "coarse-eval": 0.33533401525270057,
           "fine-error": 2.950192232309819e-05,
           "fine-eval": 0.17545528997987314}]
 
     tests["parpoweriter-mac"] = \
-        [["mpirun", "-n", num_procs, "./poweriter"],
+        [[mpirun_command, "-n", num_procs, "./poweriter"],
          {"coarse-error": 1.3769646029608467,
           "coarse-eval": 0.24465778499404064,
           "fine-error": 2.9877711869866266e-05,
           "fine-eval": 0.1754552899797806}]
 
     tests["partimestep"] = \
-        [["mpirun", "-n", num_procs, "./timestep",
+        [[mpirun_command, "-n", num_procs, "./timestep",
           "--total-time", "100.0",
           "--perm", spe10_perm_file]]
 
@@ -903,7 +904,7 @@ def make_tests():
     if "tux" in platform.node():
         tests["veigenvector"] = \
             [[memorycheck_command, "--leak-check=full",
-              "mpirun", "-n", num_procs, "./finitevolume",
+              mpirun_command, "-n", num_procs, "./finitevolume",
               "--max-evects", "1",
               "--spe10-scale", "1",
               "--perm", spe10_perm_file]]
@@ -988,7 +989,7 @@ def main(argv):
         argv.remove("-nv")
 
     tests = make_tests()
-
+    print("argv:", argv)
     if argv:
         tests = dict((name, tests[name]) for name in argv if name in tests)
 
