@@ -54,20 +54,26 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
 
     agg_vert_.reserve(param.max_levels - 1);
 
-    int num_vert_min = 2;
+    int num_vert_min = 500;
 
     for (int level = 0; level < param.max_levels - 1; ++level)
     {
         MixedMatrix& mgL = GetMatrix(level);
-        mgL.BuildM();
-        if (!partitioning && (mgL.GetGraph().NumVertices() < num_vert_min))
+        if (mgL.GetGraph().NumVertices() < num_vert_min)
         {
             int num_procs;
-            MPI_Comm_size(mgL.GetGraph().GetComm(), &num_procs);
+            MPI_Comm_size(comm_, &num_procs);
 
             int num_procs_redist = num_procs / 2;
-            Redistributor redistributor(mgL.GetGraph(), num_procs_redist);
+
+            if (myid_ == 0)
+            {
+                std::cout << "Redistributing Level " << level << " to "
+                          << num_procs_redist << " processors\n";
+            }
+            Redistributor redistributor(mgL.GetGraphSpace(), num_procs_redist);
             MixedMatrix redist_mgL = redistributor.RedistributeMatrix(mgL);
+            redist_mgL.BuildM();
 
             Coarsen(redist_mgL, param, nullptr);
             auto& redTVD_tVD = redistributor.TrueDofRedistribution(VDOF);
@@ -84,6 +90,7 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
         }
         else
         {
+            mgL.BuildM();
             Coarsen(mgL, param, level ? nullptr : partitioning);
 #ifdef SMOOTHG_DEBUG
             Debug_tests(level);
@@ -98,38 +105,6 @@ Hierarchy::Hierarchy(MixedMatrix mixed_system,
     setup_time_ = chrono.RealTime();
 }
 
-// void Hierarchy::Coarsen(int level, const UpscaleParameters& param,
-//                         const mfem::Array<int>* partitioning)
-// {
-//     MixedMatrix& mgL = GetMatrix(level);
-//     mgL.BuildM();
-
-//     GraphTopology topology;
-//     Graph coarse_graph = partitioning ? topology.Coarsen(mgL.GetGraph(), *partitioning) :
-//                          topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
-
-//     agg_vert_.push_back(topology.Agg_vertex_);
-
-//     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
-
-//     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
-//     auto vertex_targets = localtargets.ComputeVertexTargets();
-
-//     auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
-
-//     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
-
-//     Pu_.push_back(graph_coarsen.BuildPVertices());
-//     Psigma_.push_back(graph_coarsen.BuildPEdges());
-//     Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
-
-//     mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_[level]));
-
-// #ifdef SMOOTHG_DEBUG
-//     Debug_tests(level);
-// #endif
-// }
-
 void Hierarchy::Coarsen(const MixedMatrix& mgL, const CoarsenParameters& param,
                         const mfem::Array<int>* partitioning)
 {
@@ -143,21 +118,28 @@ void Hierarchy::Coarsen(const MixedMatrix& mgL, const CoarsenParameters& param,
     {
         coarse_graph = topology.Coarsen(mgL.GetGraph(), param.coarse_factor, param.num_iso_verts);
     }
-
+std::cout<<"coarsen 1\n";
     agg_vert_.push_back(topology.Agg_vertex_);
 
     DofAggregate dof_agg(topology, mgL.GetGraphSpace());
 
+std::cout<<"coarsen 2\n";
     LocalMixedGraphSpectralTargets localtargets(mgL, coarse_graph, dof_agg, param);
+std::cout<<"coarsen 2.1\n";
     auto vertex_targets = localtargets.ComputeVertexTargets();
+
+std::cout<<"coarsen 2.2\n";
     auto edge_traces = localtargets.ComputeEdgeTargets(vertex_targets);
 
+std::cout<<"coarsen 3\n";
     GraphCoarsen graph_coarsen(mgL, dof_agg, edge_traces, vertex_targets, std::move(coarse_graph));
 
     Pu_.push_back(graph_coarsen.BuildPVertices());
     Psigma_.push_back(graph_coarsen.BuildPEdges());
     Proj_sigma_.push_back(graph_coarsen.BuildEdgeProjection());
     mixed_systems_.push_back(graph_coarsen.BuildCoarseMatrix(mgL, Pu_.back()));
+
+std::cout<<"coarsen 4\n";
 }
 
 void Hierarchy::Coarsen(int level, const CoarsenParameters& param,

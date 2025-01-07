@@ -347,9 +347,20 @@ SharedEntityCommunication<T>::SharedEntityCommunication(
         entity_trueentity_->row_starts[1] - entity_trueentity_->row_starts[0];
     entity_master_ = new int[num_entities];
     entity_proc_->MakeI(num_entities);
+
+if (entity_trueentity_->diag->num_rows==19)
+{
+    std::cout<< "SEC constructor num sends: "<<comm_pkg->num_sends<<"\n";
+}
+
     std::vector<std::pair<int, int> > trueentity_proc;
     for (int send = 0; send < comm_pkg->num_sends; ++send)
     {
+
+if (entity_trueentity_->diag->num_rows==19)
+{
+    std::cout<< "SEC construtor send "<<send<<" num send_map_elmts: "<<comm_pkg->send_map_starts[send+1]-comm_pkg->send_map_starts[send]<<"\n";
+}
         int proc = comm_pkg->send_procs[send];
         for (int j = comm_pkg->send_map_starts[send];
              j < comm_pkg->send_map_starts[send + 1];
@@ -757,6 +768,13 @@ T** SharedEntityCommunication<T>::Collect()
     MFEM_ASSERT(send_counter_ == num_slave_comms_,
                 "Have not called ReduceSend() for every entity!");
 
+// if (entity_proc_->Size()==19)
+// {
+    // entity_proc_->Print();
+// }
+std::cout<<"SEC::Collect 0 " << num_entities_ <<" "<<send_counter_<< " "
+        << num_slave_comms_<<" "<< num_master_comms_<<"\n";
+
     MPI_Status* header_statuses =
         new MPI_Status[num_slave_comms_ + num_master_comms_];
     MPI_Waitall(num_slave_comms_ + num_master_comms_, header_requests_,
@@ -764,11 +782,14 @@ T** SharedEntityCommunication<T>::Collect()
     delete [] header_requests_;
     delete [] header_statuses;
 
+std::cout<<"SEC::Collect 1 " << num_entities_ <<"\n";
     int data_receive_counter = 0;
     std::vector<int> received_entities(num_entities_);
     for (int i = 0; i < num_entities_; ++i)
     {
         int owner = entity_master_[i];
+
+// std::cout<<"SEC::Collect 2 " << num_entities_ <<"\n";
         if (owner == comm_rank_)
         {
             int neighbor_row_size = entity_proc_->RowSize(i);
@@ -800,6 +821,7 @@ T** SharedEntityCommunication<T>::Collect()
         }
     }
 
+std::cout<<"SEC::Collect 3 " << num_entities_ <<"\n";
     delete [] send_headers_;
     delete [] receive_headers_;
 

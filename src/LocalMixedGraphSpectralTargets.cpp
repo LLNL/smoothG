@@ -653,13 +653,17 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
     mfem::Array<int> ext_loc_edofs, iface_edofs;
     mfem::DenseMatrix collected_sigma;
 
+std::cout<<"ComputeEdgeTargets 0 " << nfaces<<"\n";
     mfem::SparseMatrix face_ext_edof_diag = GetDiag(*face_ext_edof_);
     mfem::SparseMatrix face_IsShared = GetOffd(coarse_graph_.EdgeToTrueEdgeToEdge());
 
+std::cout<<"ComputeEdgeTargets 0.1 " << nfaces<<"\n";
     // Send and receive traces
     const auto& face_trueface = coarse_graph_.EdgeToTrueEdge();
     SharedEntityCommunication<mfem::DenseMatrix> sec_trace(comm_, face_trueface);
     sec_trace.ReducePrepare();
+
+std::cout<<"ComputeEdgeTargets 0.2 " << nfaces<<"\n";
     for (int iface = 0; iface < nfaces; ++iface)
     {
         // extract the (extended) dofs i.d. for the face
@@ -710,8 +714,25 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
         }
         sec_trace.ReduceSend(iface, face_sigma_tmp);
     }
+
+if (face_trueface.NumRows()==19)
+{
+    GetDiag(face_trueface).Print();
+    GetOffd(face_trueface).Print();
+
+    int* cmap;
+    mfem::SparseMatrix offd;
+    face_trueface.GetOffd(offd, cmap);
+    mfem::Array<int> col_map(cmap, offd.NumCols());
+    std::cout<<"num global cols = "<<face_trueface.GetGlobalNumCols()<<"\n";
+    std::cout<<"offd num cols = "<<offd.NumCols()<<"\n";
+    col_map.Print();
+}
+
+std::cout<<"ComputeEdgeTargets 0.3 " << nfaces<<"\n";
     mfem::DenseMatrix** shared_sigma = sec_trace.Collect();
 
+std::cout<<"ComputeEdgeTargets 1 " << nfaces<<"\n";
     // Send and receive Dloc
     mfem::Array<int> local_dof, face_nbh_dofs, vertex_local_dof;
     int dof_counter;
@@ -770,6 +791,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
     }
     mfem::SparseMatrix** shared_Dloc = sec_D.Collect();
 
+std::cout<<"ComputeEdgeTargets 2 " << nfaces<<"\n";
     // Send and receive Mloc
     SharedEntityCommunication<mfem::SparseMatrix> sec_M(comm_, face_trueface);
     sec_M.ReducePrepare();
@@ -812,6 +834,7 @@ std::vector<mfem::DenseMatrix> LocalMixedGraphSpectralTargets::ComputeEdgeTarget
     }
     mfem::SparseMatrix** shared_Mloc = sec_M.Collect();
 
+std::cout<<"ComputeEdgeTargets 3 " << nfaces<<"\n";
     // Add the "1, -1" divergence function to local trace targets
     // (paper calls this the "particular vector" which serves the
     // same purpose as the Pasciak-Vassilevski vector)

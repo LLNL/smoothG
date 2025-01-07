@@ -55,7 +55,7 @@ Graph GraphTopology::Coarsen(const Graph& fine_graph, const mfem::Array<int>& pa
     const auto& edge_trueedge_edge = fine_graph.EdgeToTrueEdgeToEdge();
 
     // generate the 'start' array
-    int nAggs = partitioning.Max() + 1;
+    int nAggs = partitioning.Size() ? partitioning.Max() + 1 : 0;
 
     mfem::Array<HYPRE_Int> agg_starts;
     GenerateOffsets(comm, nAggs, agg_starts);
